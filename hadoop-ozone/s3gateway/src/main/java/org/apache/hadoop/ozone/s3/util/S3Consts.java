@@ -123,11 +123,17 @@ public final class S3Consts {
   public static final int TAG_VALUE_LENGTH_LIMIT = 256;
   // See https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_S3Tag.html
   // Also see https://docs.aws.amazon.com/directoryservice/latest/devguide/API_Tag.html for Java regex equivalent
-  public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
+  public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-@]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
 
   /** AWS S3 maximum number of keys per DeleteObjects request. */
   public static final int S3_DELETE_OBJECTS_MAX_KEYS = 1000;
+
+  /**
+   * Maximum DeleteObjects request body size, in bytes. It fits {@link #S3_DELETE_OBJECTS_MAX_KEYS} keys of
+   * the maximum S3 key length (1024 bytes) with XML escaping.
+   */
+  public static final int S3_DELETE_OBJECTS_MAX_BODY_SIZE = 8 * 1024 * 1024;
 
   /** Version ID of an object in a bucket that never had versioning enabled. */
   public static final String NULL_VERSION_ID = "null";

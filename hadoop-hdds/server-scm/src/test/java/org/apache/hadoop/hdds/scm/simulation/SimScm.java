@@ -67,6 +67,7 @@ import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
 import org.apache.hadoop.hdds.scm.node.NodeSimSupport;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.BackgroundPipelineCreator;
+import org.apache.hadoop.hdds.scm.pipeline.BackgroundPipelineScrubber;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineSimSupport;
@@ -622,8 +623,7 @@ final class SimScm {
     ReplicationManager rm = scm.getReplicationManager();
     PipelineManagerImpl pipelineManager = (PipelineManagerImpl) scm.getPipelineManager();
     BackgroundPipelineCreator creator = pipelineManager.getBackgroundPipelineCreator();
-    // Like the pipeline scrubber, the expired replica op scrubber is a BackgroundSCMService, which waits as long.
-    BackgroundSCMService scrubber = pipelineManager.getBackgroundPipelineScrubber();
+    BackgroundPipelineScrubber pipelineScrubber = pipelineManager.getBackgroundPipelineScrubber();
     SimConfig config = sim.config();
 
     replicationWakeUp = newWakeUp("replicationMonitor.wakeUp", rm::processAll);
@@ -641,12 +641,13 @@ final class SimScm {
     every("pipelineCreator", config.getPipelineCreationIntervalMs(),
         () -> PipelineSimSupport.runPipelineCreator(creator));
     every("pipelineScrubber", config.getPipelineScrubIntervalMs(), () -> {
-      if (scrubber.shouldRun()) {
+      if (pipelineScrubber.shouldRun()) {
         pipelineManager.scrubAndClosePipelinesMissingDataStreamPort();
       }
     });
+    // The expired replica op scrubber is a BackgroundSCMService, which waits after safe mode exit as long as RM does.
     every("replicaOpScrubber", config.getReplicaOpScrubIntervalMs(), () -> {
-      if (scrubber.shouldRun()) {
+      if (rm.shouldRun()) {
         rm.getContainerReplicaPendingOps().removeExpiredEntries();
       }
     });

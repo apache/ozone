@@ -21,7 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -29,17 +32,21 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Unit tests for {@link DbVolume}.
@@ -155,6 +162,54 @@ public class TestDbVolume {
 
     // The db handlers should be removed from the cache
     assertEquals(0, DatanodeStoreCache.getInstance().size());
+  }
+
+  @Test
+  public void testFailVolumeWhileDbStorePathIsAdded() throws IOException {
+    // Use a separate conf to keep the shared CONF unchanged for other tests.
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
+        Files.createDirectory(folder.resolve("dbDir")).toString());
+    MutableVolumeSet dbVolumeSet = new MutableVolumeSet(DATANODE_UUID,
+        CLUSTER_ID, conf, null, StorageVolume.VolumeType.DB_VOLUME, null);
+    DbVolume dbVolume = (DbVolume) dbVolumeSet.getVolumesList().get(0);
+    // The db stores are closed only if the clusterID dir exists.
+    dbVolume.format(CLUSTER_ID);
+    dbVolume.createWorkingDir(CLUSTER_ID, null);
+
+    // More than one path, so that iteration continues after the new path is added.
+    Set<String> dbPaths = new HashSet<>();
+    for (int i = 0; i < 3; i++) {
+      String dbPath = "db" + i;
+      dbVolume.addHddsDbStorePath(UUID.randomUUID().toString(), dbPath);
+      dbPaths.add(dbPath);
+    }
+
+    // Register one more db store path when the first db is closed,
+    // while closing the first DB, add a new path as HddsVolume#createDbStore does during SchemaV3
+    // finalization while holding a different lock.
+    Set<String> closedDbPaths = new HashSet<>();
+    DatanodeStoreCache cache = mock(DatanodeStoreCache.class);
+    doAnswer(invocation -> {
+      if (closedDbPaths.isEmpty()) {
+        dbVolume.addHddsDbStorePath(UUID.randomUUID().toString(), "newDb");
+      }
+      closedDbPaths.add(invocation.getArgument(0));
+      return null;
+    }).when(cache).removeDB(anyString());
+
+    // Fail the volume the way the disk checker does
+    try (MockedStatic<DatanodeStoreCache> mockedCache = mockStatic(DatanodeStoreCache.class)) {
+      mockedCache.when(DatanodeStoreCache::getInstance).thenReturn(cache);
+      dbVolumeSet.failVolume(dbVolume.getStorageDir().getPath());
+    }
+
+    assertEquals(HddsVolume.VolumeState.FAILED, dbVolume.getStorageState());
+    // The newly added path may or may not be visited by the iteration.
+    assertTrue(closedDbPaths.containsAll(dbPaths));
+    // The failed volume must be moved out of the active volumes.
+    assertFalse(dbVolumeSet.getVolumesList().contains(dbVolume));
+    assertEquals(Collections.singletonList(dbVolume), dbVolumeSet.getFailedVolumesList());
   }
 
   private MutableVolumeSet createHddsVolumeSet(int volumeNum)

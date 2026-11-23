@@ -34,6 +34,7 @@ permissions:
 concurrency:
   group: fork-ci-status
   cancel-in-progress: false
+  queue: max # do not cancel pending jobs
 
 jobs:
   bridge:

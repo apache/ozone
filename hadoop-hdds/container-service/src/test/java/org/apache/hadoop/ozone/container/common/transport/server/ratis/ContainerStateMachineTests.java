@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -51,6 +52,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -68,12 +70,14 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InOrder;
 
@@ -116,8 +120,8 @@ abstract class ContainerStateMachineTests {
     when(division.getInfo()).thenReturn(info);
     when(info.isLeader()).thenReturn(isLeader);
     when(ratisServer.getServerDivision(any())).thenReturn(division);
-    stateMachine = new ContainerStateMachine(null,
-        RaftGroupId.randomId(), dispatcher, controller, executor, ratisServer, conf, "containerOp");
+    stateMachine = new ContainerStateMachine(null, RaftGroupId.randomId(), ReplicationType.RATIS,
+        dispatcher, controller, executor, ratisServer, conf, "containerOp");
     try {
       stateMachine.initialize(raftServer, stateMachine.getGroupId(), null);
     } catch (Exception e) {
@@ -295,20 +299,83 @@ abstract class ContainerStateMachineTests {
     verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
   }
 
+  @ParameterizedTest
+  @EnumSource(value = ContainerProtos.Type.class, names = {"StreamInit", "StreamInitWithPutBlock"})
+  public void testStreamOpenedOnlyIfStreamInitSucceeds(ContainerProtos.Type streamInitType) throws Exception {
+    when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto.newBuilder()
+        .setCmdType(streamInitType).setResult(ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED).build());
+
+    final ExecutionException e = assertThrows(
+        ExecutionException.class, () -> stateMachine.stream(newStreamRequest(streamInitType)).get());
+    assertInstanceOf(StorageContainerException.class, e.getCause());
+    final StorageContainerException sce = (StorageContainerException) e.getCause();
+    assertEquals(ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED, sce.getResult());
+    verify(dispatcher, never()).getStreamDataChannel(any(), any());
+  }
+
+  @Test
+  public void testStreamCommandPutBlockNotMatchingStreamBlockIsRejected() throws Exception {
+    final StateMachine.DataStream stream = setUpStream(mock(KeyValueStreamDataChannel.class));
+
+    for (ContainerProtos.ContainerCommandRequestProto putBlock : newPutBlocksNotMatchingStreamBlock()) {
+      final ByteBuffer command = ContainerCommandRequestMessage.toMessage(putBlock, null).getContent()
+          .asReadOnlyByteBuffer();
+      final ExecutionException e = assertThrows(ExecutionException.class, () -> stream.onCommand(command, 0).get());
+      final StorageContainerException sce = assertInstanceOf(StorageContainerException.class, e.getCause());
+      assertEquals(ContainerProtos.Result.MALFORMED_REQUEST, sce.getResult());
+    }
+    verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
+
+    stream.onCommand(newPutBlockCommand(), 0).get();
+    verify(dispatcher).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
+        argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_COMMAND));
+  }
+
+  @Test
+  public void testStreamClosePutBlockNotMatchingStreamBlockIsRejected() throws Exception {
+    final AtomicReference<CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException>> closePutBlock
+        = new AtomicReference<>();
+    setUpStream(mock(KeyValueStreamDataChannel.class), ContainerProtos.Type.StreamInitWithPutBlock, closePutBlock);
+
+    for (ContainerProtos.ContainerCommandRequestProto request : newPutBlocksNotMatchingStreamBlock()) {
+      final StorageContainerException e = assertThrows(StorageContainerException.class,
+          () -> closePutBlock.get().accept(request));
+      assertEquals(ContainerProtos.Result.MALFORMED_REQUEST, e.getResult());
+    }
+    verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
+
+    closePutBlock.get().accept(newPutBlock(1, newBlockID()));
+    verify(dispatcher).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
+        argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_LINK));
+  }
+
   private StateMachine.DataStream setUpStream(StateMachine.DataChannel channel) throws Exception {
+    return setUpStream(channel, ContainerProtos.Type.StreamInit, new AtomicReference<>());
+  }
+
+  private StateMachine.DataStream setUpStream(StateMachine.DataChannel channel, ContainerProtos.Type streamInitType,
+      AtomicReference<CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException>> closePutBlock)
+      throws Exception {
     when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto.newBuilder()
         .setCmdType(ContainerProtos.Type.PutBlock).setResult(ContainerProtos.Result.SUCCESS).build());
-    when(dispatcher.getStreamDataChannel(any(), any())).thenReturn(channel);
+    when(dispatcher.getStreamDataChannel(any(), any())).thenAnswer(invocation -> {
+      closePutBlock.set(invocation.getArgument(1));
+      return channel;
+    });
+    return stateMachine.stream(newStreamRequest(streamInitType)).get();
+  }
+
+  private RaftClientRequest newStreamRequest(ContainerProtos.Type streamInitType) {
     final ContainerProtos.ContainerCommandRequestProto streamInit = ContainerProtos.ContainerCommandRequestProto
         .newBuilder()
-        .setCmdType(ContainerProtos.Type.StreamInit)
+        .setCmdType(streamInitType)
         .setWriteChunk(ContainerProtos.WriteChunkRequestProto.newBuilder().setBlockID(newBlockID()).build())
         .setContainerID(1)
         .setDatanodeUuid(UUID.randomUUID().toString())
         .build();
     final RaftClientRequest request = mock(RaftClientRequest.class);
     when(request.getMessage()).thenReturn(ContainerCommandRequestMessage.toMessage(streamInit, null));
-    return stateMachine.stream(request).get();
+    return request;
   }
 
   private static ByteBuffer newPutBlockCommand() {
@@ -328,8 +395,31 @@ abstract class ContainerStateMachineTests {
     return ContainerCommandRequestMessage.toMessage(putBlock, null).getContent().asReadOnlyByteBuffer();
   }
 
+  private static ContainerProtos.ContainerCommandRequestProto newPutBlock(long containerID,
+      ContainerProtos.DatanodeBlockID blockID) {
+    return ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.PutBlock)
+        .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(ContainerProtos.BlockData.newBuilder().setBlockID(blockID).build()))
+        .setContainerID(containerID)
+        .setDatanodeUuid(UUID.randomUUID().toString())
+        .build();
+  }
+
+  /** PutBlocks that do not match the stream block (container 1, local ID 1). */
+  private static List<ContainerProtos.ContainerCommandRequestProto> newPutBlocksNotMatchingStreamBlock() {
+    return Arrays.asList(
+        newPutBlock(1, newBlockID(1, 2)),
+        newPutBlock(2, newBlockID(2, 1)),
+        newPutBlock(2, newBlockID()));
+  }
+
   private static ContainerProtos.DatanodeBlockID newBlockID() {
-    return ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1).setLocalID(1).build();
+    return newBlockID(1, 1);
+  }
+
+  private static ContainerProtos.DatanodeBlockID newBlockID(long containerID, long localID) {
+    return ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(containerID).setLocalID(localID).build();
   }
 
   private void setUpMockDispatcherReturn(boolean failWithException) {

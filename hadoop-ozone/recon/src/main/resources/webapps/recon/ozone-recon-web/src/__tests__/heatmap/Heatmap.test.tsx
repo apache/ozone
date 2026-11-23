@@ -54,22 +54,12 @@ vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
   return {
     ...actual,
-    useApiData: <T,>(url: string, defaultValue: T, options = {}) => {
-      // The hook's own initial GET does not handle a rejected request, so a 404/500 on mount surfaces as an
-      // unhandled rejection in tests. Skip it and issue the initial request with a handled promise instead.
-      const api = actual.useApiData(url, defaultValue, {
+    useApiData: <T,>(url: string, defaultValue: T, options = {}) =>
+      actual.useApiData(url, defaultValue, {
         ...options,
-        initialFetch: false,
         retryAttempts: 0,
         retryDelay: 0,
-      });
-      React.useEffect(() => {
-        if (url) {
-          api.execute().catch(() => undefined);
-        }
-      }, []); // eslint-disable-line react-hooks/exhaustive-deps
-      return api;
-    },
+      }),
   };
 });
 
@@ -123,15 +113,23 @@ describe('Heatmap page', () => {
     expect(heatmapRequests).toEqual([{ path: '/', entityType: 'key', startDate: '24H' }]);
   });
 
-  test('shows validation error for invalid path characters', async () => {
+  test('searches Ozone paths with special characters without client-side validation', async () => {
+    const paths = [
+      '/vol1/b1/a&b#c+d.csv', // encoding: &, #, +
+      '/vol1/my.bucket',
+      '/vol1/key@name',
+    ];
+
     render(<Heatmap />);
     await waitForPlot('root');
 
-    const pathInput = screen.getByPlaceholderText('/');
-    await userEvent.clear(pathInput);
-    await userEvent.type(pathInput, 'bad@path');
-
-    expect(screen.getByText('Please enter valid path')).toBeInTheDocument();
+    for (const path of paths) {
+      await searchPath(path);
+      await waitFor(() => {
+        expect(heatmapRequests.map((request) => request.path)).toContain(path);
+      });
+    }
+    expect(screen.queryByText('Please enter valid path')).not.toBeInTheDocument();
   });
 
   test('fetches heatmap for a new path when the user searches', async () => {

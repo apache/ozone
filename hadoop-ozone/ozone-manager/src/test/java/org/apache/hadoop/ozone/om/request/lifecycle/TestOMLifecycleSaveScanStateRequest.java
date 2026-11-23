@@ -24,13 +24,23 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.UUID;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
@@ -40,12 +50,19 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SaveLifecycleScanStateRequest;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests OMLifecycleSaveScanStateRequest.
  */
 public class TestOMLifecycleSaveScanStateRequest {
+
+  private static final String BUCKET_KEY = "/vol1/bucket1";
+  private static final long BUCKET_OBJ_ID = 100L;
+  private static final long LCC_UPDATE_ID = 10L;
 
   @Test
   public void testPreExecuteAdminCheck() throws Exception {
@@ -87,14 +104,71 @@ public class TestOMLifecycleSaveScanStateRequest {
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    Table<String, OmLifecycleScanState> table = mock(Table.class);
+    OMClientResponse response = saveScanState(table, BUCKET_OBJ_ID, LCC_UPDATE_ID);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    verify(table).addCacheEntry(any(CacheKey.class), any(CacheValue.class));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, true", "true, false"})
+  public void testSkipScanStateOfDeletedBucketOrLifecycle(boolean bucketExists, boolean lccExists) throws Exception {
+    Table<String, OmLifecycleScanState> table = mock(Table.class);
+    OMClientResponse response = saveScanState(table, bucketExists ? BUCKET_OBJ_ID : null,
+        lccExists ? LCC_UPDATE_ID : null);
+    assertEquals(OzoneManagerProtocolProtos.Status.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        response.getOMResponse().getStatus());
+    verify(table, never()).addCacheEntry(any(CacheKey.class), any(CacheValue.class));
+
+    OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
+    when(omMetadataManager.getLifecycleScanStateTable()).thenReturn(table);
+    response.checkAndUpdateDB(omMetadataManager, mock(BatchOperation.class));
+    verify(table, never()).putWithBatch(any(), any(), any());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"101, 10", "100, 11"})
+  public void testSkipScanStateOfRecreatedBucketOrLifecycle(long bucketObjID, long lccUpdateID) throws Exception {
+    Table<String, OmLifecycleScanState> table = mock(Table.class);
+    OMClientResponse response = saveScanState(table, bucketObjID, lccUpdateID);
+    assertEquals(OzoneManagerProtocolProtos.Status.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        response.getOMResponse().getStatus());
+    verify(table, never()).addCacheEntry(any(CacheKey.class), any(CacheValue.class));
+  }
+
+  private OMClientResponse saveScanState(Table<String, OmLifecycleScanState> scanStateTable, Long bucketObjID,
+      Long lccUpdateID) throws Exception {
     OzoneManager ozoneManager = mock(OzoneManager.class);
     OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    Table<String, OmLifecycleScanState> table = mock(Table.class);
-    when(omMetadataManager.getLifecycleScanStateTable()).thenReturn(table);
+    when(omMetadataManager.getLifecycleScanStateTable()).thenReturn(scanStateTable);
+
+    Table<String, OmBucketInfo> bucketTable = mock(Table.class);
+    when(omMetadataManager.getBucketTable()).thenReturn(bucketTable);
+    if (bucketObjID != null) {
+      when(bucketTable.get(BUCKET_KEY)).thenReturn(OmBucketInfo.newBuilder()
+          .setVolumeName("vol1").setBucketName("bucket1").setObjectID(bucketObjID).build());
+    }
+    Table<String, OmLifecycleConfiguration> lccTable = mock(Table.class);
+    when(omMetadataManager.getLifecycleConfigurationTable()).thenReturn(lccTable);
+    if (lccUpdateID != null) {
+      when(lccTable.get(BUCKET_KEY)).thenReturn(new OmLifecycleConfiguration.Builder()
+          .setVolume("vol1")
+          .setBucket("bucket1")
+          .setBucketLayout(BucketLayout.OBJECT_STORE)
+          .addRule(new OmLCRule.Builder().setPrefix("")
+              .addAction(new OmLCExpiration.Builder().setDays(30).build())
+              .build())
+          .setCreationTime(Time.now())
+          .setObjectID(1L)
+          .setUpdateID(lccUpdateID)
+          .build());
+    }
 
     LifecycleScanState stateProto = LifecycleScanState.newBuilder()
-        .setBucketKey("/vol1/bucket1")
+        .setBucketKey(BUCKET_KEY)
+        .setBucketObjID(BUCKET_OBJ_ID)
+        .setLifecycleConfigurationUpdateID(LCC_UPDATE_ID)
         .setScanStartTime(123456789L)
         .setLastScannedKey("key1")
         .build();
@@ -112,6 +186,6 @@ public class TestOMLifecycleSaveScanStateRequest {
     OMLifecycleSaveScanStateRequest request = new OMLifecycleSaveScanStateRequest(omRequest);
     OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 100L);
     assertNotNull(response);
-    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    return response;
   }
 }

@@ -85,7 +85,13 @@ describe('HeatmapPlot nodeClick', () => {
       />
     );
 
-    invokeNodeClick({ label: 'vol1', path: '/vol1', size: 512, maxAccessCount: 100 });
+    invokeNodeClick({
+      label: 'vol1',
+      path: '/vol1',
+      size: 512,
+      maxAccessCount: 100,
+      children: [{ label: 'demo-key', size: 512, accessCount: 100, color: 1 }],
+    });
 
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(onClick).toHaveBeenCalledWith('/vol1');

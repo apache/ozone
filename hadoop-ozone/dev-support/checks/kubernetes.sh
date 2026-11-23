@@ -43,7 +43,7 @@ else
   source "${DIR}/install/k3s.sh"
 fi
 
-OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
+OZONE_VERSION=$(get_version ozone)
 DIST_DIR="${OZONE_ROOT}/hadoop-ozone/dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then

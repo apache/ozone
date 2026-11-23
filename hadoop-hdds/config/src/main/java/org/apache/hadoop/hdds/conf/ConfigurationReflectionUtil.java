@@ -23,8 +23,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -87,7 +89,9 @@ public final class ConfigurationReflectionUtil {
 
     try {
       final Object oldValue = forcedFieldGet(field, configuration);
-      setField(klass, configuration, field, configAnnotation, key, value);
+      // null means the property was unset, which restores its default value
+      final String newValue = value != null ? value : configAnnotation.defaultValue();
+      setField(klass, configuration, field, configAnnotation, key, newValue);
       try {
         callPostConstruct(configuration);
       } catch (Exception e) {
@@ -238,43 +242,37 @@ public final class ConfigurationReflectionUtil {
     }
   }
 
-  public static Optional<String> getDefaultValue(Class<?> configClass,
-      String fieldName) {
-    return findFieldConfigAnnotationByName(configClass, fieldName)
-        .map(Config::defaultValue);
-  }
+  public static Optional<Config> getConfigByKey(Class<?> configClass, String key) {
+    for (Class<?> clazz = configClass; clazz != null;) {
+      final List<Config> configs = Stream.of(clazz.getDeclaredFields())
+          .map(f -> f.getAnnotation(Config.class))
+          .filter(c -> c != null && c.key().equals(key))
+          .collect(Collectors.toList());
 
-  public static Optional<String> getKey(Class<?> configClass,
-      String fieldName) {
-    return findFieldConfigAnnotationByName(configClass, fieldName)
-        .map(Config::key);
-  }
-
-  public static Optional<ConfigType> getType(Class<?> configClass,
-      String fieldName) {
-    return findFieldConfigAnnotationByName(configClass, fieldName)
-        .map(Config::type);
-  }
-
-  private static Optional<Config> findFieldConfigAnnotationByName(
-      final Class<?> configClass, String fieldName) {
-    Class<?> theClass = configClass;
-    while (theClass != null) {
-      Optional<Config> config = Stream.of(theClass.getDeclaredFields())
-          .filter(f -> f.getName().equals(fieldName))
-          .findFirst()
-          .map(f -> f.getAnnotation(Config.class));
-
-      if (config.isPresent()) {
-        return config;
+      final int size = configs.size();
+      if (size == 1) {
+        return Optional.of(configs.get(0));
+      } else if (size > 1) {
+        throw new IllegalStateException("Duplicated key \"" + key + "\": found " + size + " fields in " + configClass);
       }
 
-      theClass = theClass.getSuperclass();
-      if (Object.class.equals(theClass)) {
-        theClass = null;
+      clazz = clazz.getSuperclass();
+      if (Object.class.equals(clazz)) {
+        break;
       }
     }
     return Optional.empty();
+  }
+
+  public static void assertNoDuplicatedKeys(Class<?> configClass) {
+    for (Field field : configClass.getDeclaredFields()) {
+      final Config config = field.getAnnotation(Config.class);
+      if (config == null) {
+        continue;
+      }
+
+      getConfigByKey(configClass, config.key()); // getConfigByKey throws IllegalStateException for duplicated
+    }
   }
 
   private static void checkNotFinal(

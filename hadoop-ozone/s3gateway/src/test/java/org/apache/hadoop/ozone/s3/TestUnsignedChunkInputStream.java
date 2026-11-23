@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.Base64;
 import java.util.stream.Stream;
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
