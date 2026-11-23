@@ -4077,9 +4077,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put("newLeaderId", newLeaderId);
     try {
       final RaftServer.Division division = omRatisServer.getServerDivision();
+      final RaftPeerId curLeader = omRatisServer.getLeaderId();
       final RaftPeerId targetPeerId;
       if (newLeaderId.isEmpty()) {
-        final RaftPeerId curLeader = omRatisServer.getLeaderId();
         targetPeerId = division.getGroup().getPeers().stream()
             .map(RaftPeer::getId)
             .filter(id -> !id.equals(curLeader))
@@ -4087,6 +4087,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .orElseThrow(() -> new IOException("Cannot find a new leader to transfer leadership."));
       } else {
         targetPeerId = RaftPeerId.valueOf(newLeaderId);
+      }
+
+      if (targetPeerId.equals(curLeader)) {
+        LOG.info("Target {} is already the leader. Skipping leadership transfer.", targetPeerId);
+        return;
       }
 
       final GrpcTlsConfig tlsConfig =
