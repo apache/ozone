@@ -258,6 +258,14 @@ public final class OzoneClientUtils {
         HddsProtos.ReplicationType.EC;
   }
 
+  /**
+   * @return the EC policy name of the given replication config, or an empty string if it is not EC.
+   */
+  public static String getErasureCodingPolicyName(ReplicationConfig replicationConfig) {
+    return replicationConfig != null && replicationConfig.getReplicationType() == HddsProtos.ReplicationType.EC
+        ? replicationConfig.getReplication() : "";
+  }
+
   public static boolean isKeyEncrypted(OmKeyInfo keyInfo) {
     return !Objects.isNull(keyInfo.getFileEncryptionInfo());
   }
