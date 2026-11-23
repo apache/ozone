@@ -83,6 +83,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private final AtomicLong callId = new AtomicLong();
   private final RaftServer.Division division;
   private final GrpcTlsConfig grpcTlsConfig;
+  private final FollowerApplyLagMonitor applyLagMonitor;
   private boolean isStopped;
   private final long requestTimeout;
 
@@ -126,6 +127,9 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         (SCMStateMachine) server.getDivision(groupId).getStateMachine();
 
     this.division = server.getDivision(groupId);
+    this.applyLagMonitor = new FollowerApplyLagMonitor(division, grpcTlsConfig,
+        conf.getTimeDuration(ScmConfigKeys.OZONE_SCM_HA_FOLLOWER_APPLY_LAG_POLL_INTERVAL,
+            ScmConfigKeys.OZONE_SCM_HA_FOLLOWER_APPLY_LAG_POLL_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS));
     this.isStopped = false;
   }
 
@@ -206,11 +210,17 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   public void start() throws IOException {
     LOG.info("starting ratis server {}", server.getPeer().getAddress());
     server.start();
+    applyLagMonitor.start();
   }
 
   @Override
   public RaftServer.Division getDivision() {
     return division;
+  }
+
+  @Override
+  public long getFollowerApplyLag() {
+    return applyLagMonitor.getLag();
   }
 
   @VisibleForTesting
@@ -267,6 +277,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public void stop() throws IOException {
     LOG.info("stopping ratis server {}", server.getPeer().getAddress());
+    applyLagMonitor.close();
     server.close();
     isStopped = true;
     getSCMStateMachine().close();

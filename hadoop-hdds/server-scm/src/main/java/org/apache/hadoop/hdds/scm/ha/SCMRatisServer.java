@@ -54,6 +54,14 @@ public interface SCMRatisServer {
   RaftServer.Division getDivision();
 
   /**
+   * Returns how many committed Raft log entries the slowest SCM follower is behind in applying them.
+   * Returns 0 when this node is not the leader or non-HA (no throttling signal applies.)
+   */
+  default long getFollowerApplyLag() {
+    return 0;
+  }
+
+  /**
    * Returns roles of ratis peers.
    */
   List<String> getRatisRoles();
