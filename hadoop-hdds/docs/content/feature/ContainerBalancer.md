@@ -84,30 +84,9 @@ does not count as spare SSD space. Byte and datanode limits remain shared across
 Assessment warns when storage-type reports are incomplete, and estimation rejects those
 reports. When no storage-type breakdown is available, both commands use overall usage.
 
-### Balancing by storage type
-
-When complete storage-type usage reports are available, the running balancer selects
-sources and targets separately for each type. For example, a datanode at 80% SSD usage
-can send an SSD replica to another datanode at 20% SSD usage, even when both datanodes
-have the same overall utilization. Free DISK space is not a destination for that SSD copy.
-The selected type is included in the copy command so the destination uses a matching volume.
-
-Storage types take turns within each iteration, and the first type rotates between
-iterations. The iteration byte limit, each datanode's incoming and outgoing byte limits,
-and the distinct-datanode limit are shared across all types. A datanode that sends SSD
-replicas and receives DISK replicas counts once toward the datanode limit.
-
-For an existing replica without a recorded storage type, the balancer uses its reported
-volume type. It skips replicas whose recorded type and reported volume type are both unknown,
-or whose recorded type conflicts with their reported volume type. It does not rewrite container
-metadata to resolve these cases.
-If usage reports contain an incomplete type breakdown, the balancer stops before selecting moves.
-When every report has only aggregate usage, it retains the existing aggregate balancing behavior.
-
-Typed copies require source and destination datanodes that support storage-type copy commands.
-Complete the datanode upgrade before using typed balancing; complete usage reports alone do
-not establish copy-command compatibility. Per-type move metrics and iteration history are
-separate follow-up work; existing overall status and counters remain available.
+These commands report and estimate balancing work. The running balancer still chooses
+moves using overall datanode usage; selecting moves separately for each storage type is
+separate work.
 
 ### Status
 
