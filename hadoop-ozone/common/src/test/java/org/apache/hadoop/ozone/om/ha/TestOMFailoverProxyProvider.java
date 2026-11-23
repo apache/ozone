@@ -27,17 +27,23 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.StringJoiner;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.BeforeEach;
@@ -129,6 +135,57 @@ public class TestOMFailoverProxyProvider {
     assertEquals(0, provider.getWaitTime());
   }
 
+  @Test
+  public void testNotLeaderFailsOverToSuggestedLeader() throws Exception {
+    final List<String> nodeIds = new ArrayList<>(provider.getOMProxyMap().getNodeIds());
+    // Not the next node, which a failover without the suggested leader would try.
+    final String suggestedLeader = nodeIds.get((nodeIds.indexOf(provider.getCurrentProxyOMNodeId()) + 2) % numNodes);
+
+    final RetryPolicy.RetryAction action = provider.getRetryPolicy(10).shouldRetry(
+        new ServiceException(new OMNotLeaderException("not the leader", suggestedLeader)), 0, 0, true);
+
+    assertEquals(RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY, action.action);
+    assertEquals(suggestedLeader, provider.getNextProxyOMNodeId());
+  }
+
+  @Test
+  public void testDownSuggestedLeaderFallsBackToRoundRobin() throws Exception {
+    final List<String> nodeIds = new ArrayList<>(provider.getOMProxyMap().getNodeIds());
+    final String suggestedLeader = nodeIds.get((nodeIds.indexOf(provider.getCurrentProxyOMNodeId()) + 2) % numNodes);
+    final RetryPolicy retryPolicy = provider.getRetryPolicy(10);
+
+    final Set<String> triedNodes = new HashSet<>();
+    long waitTime = 0;
+    for (int failovers = 0; failovers < 2 * numNodes && waitTime == 0; failovers++) {
+      final String nodeId = provider.getCurrentProxyOMNodeId();
+      triedNodes.add(nodeId);
+      final Exception failure = nodeId.equals(suggestedLeader)
+          ? new IOException("connection refused")
+          : new ServiceException(new OMNotLeaderException("not the leader", suggestedLeader));
+      waitTime = retryPolicy.shouldRetry(failure, 0, failovers, true).delayMillis;
+      provider.performFailover(null);
+    }
+
+    assertEquals(numNodes, triedNodes.size());
+    assertEquals(waitBetweenRetries, waitTime);
+  }
+
+  @Test
+  public void testSuggestedLeaderIsTriedEvenIfAnEarlierRequestFailedOnIt() throws Exception {
+    final RetryPolicy retryPolicy = provider.getRetryPolicy(10);
+    final String newLeader = provider.getCurrentProxyOMNodeId();
+
+    // An earlier request fails on the OM while it is down, and then succeeds on the next OM.
+    retryPolicy.shouldRetry(new IOException("connection refused"), 0, 0, true);
+    provider.performFailover(null);
+
+    final RetryPolicy.RetryAction action = retryPolicy.shouldRetry(
+        new ServiceException(new OMNotLeaderException("not the leader", newLeader)), 0, 0, true);
+
+    assertEquals(0, action.delayMillis);
+    assertEquals(newLeader, provider.getNextProxyOMNodeId());
+  }
+
   /**
    * Tests waitTime reset after same node failover.
    */
@@ -143,6 +200,15 @@ public class TestOMFailoverProxyProvider {
     // Next node failover should reset wait time.
     failoverToNextNode(numNodes - 1, 0);
     failoverToNextNode(1, waitBetweenRetries);
+  }
+
+  /**
+   * Tests that OM proxies do not retry connect timeouts on the same OM, since the provider fails over to the next OM.
+   */
+  @Test
+  public void testNoConnectRetriesOnTimeouts() {
+    OzoneManagerProtocolPB proxy = provider.getProxy().getProxy();
+    assertEquals(0, RPC.getConnectionIdForProxy(proxy).getMaxRetriesOnSocketTimeouts());
   }
 
   /**

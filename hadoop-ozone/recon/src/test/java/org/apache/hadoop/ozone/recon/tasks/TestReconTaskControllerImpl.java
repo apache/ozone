@@ -427,6 +427,31 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result,
         "Reinitialization event should indicate retry needed due to checkpoint creation failure");
   }
+
+  @Test
+  public void testQueueReInitializationEventBeforeOMMetadataManagerIsSet() throws Exception {
+    // Recon upgrade actions queue a reinitialization before the OM metadata manager is set.
+    reconTaskController.stop();
+    ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
+
+    ReconTaskController.ReInitializationResult result = controllerImpl.queueReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+
+    assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result);
+    assertTrue(controllerImpl.hasTasksFailed(), "The next OM sync should reinitialize the tasks");
+    assertEquals(0, controllerImpl.getEventProcessRetryCount(), "Deferral should not count as a retry");
+
+    // The startup reinitialization that follows immediately must not be throttled by the retry delay.
+    controllerImpl.updateOMMetadataManager(mock(ReconOMMetadataManager.class));
+    ReconTaskControllerImpl controllerSpy = spy(controllerImpl);
+    doReturn(mock(ReconOMMetadataManager.class)).when(controllerSpy).createOMCheckpoint(any());
+
+    result = controllerSpy.queueReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+
+    assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result);
+    assertFalse(controllerSpy.hasTasksFailed(), "Task failure flag should be reset once the event is queued");
+  }
   
   @Test
   public void testDrainEventBufferAndCleanExistingCheckpoints() throws Exception {

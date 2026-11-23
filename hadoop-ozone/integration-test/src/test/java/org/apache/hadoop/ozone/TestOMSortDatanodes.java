@@ -22,29 +22,46 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -53,7 +70,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * {@link org.apache.hadoop.hdds.scm.server.TestSCMBlockProtocolServer}
  * sortDatanodes tests for
- * {@link org.apache.hadoop.ozone.om.KeyManagerImpl#sortDatanodes(List, String)}.
+ * {@link KeyManager#listStatus(OmKeyArgs, boolean, String, long, String)}.
  */
 public class TestOMSortDatanodes {
 
@@ -62,9 +79,12 @@ public class TestOMSortDatanodes {
   private static OzoneConfiguration config;
   private static StorageContainerManager scm;
   private static NodeManager nodeManager;
-  private static KeyManagerImpl keyManager;
+  private static KeyManager keyManager;
   private static OzoneManager om;
   private static final int NODE_COUNT = 10;
+  private static final String VOLUME = "vol";
+  private static final String BUCKET = "bucket";
+  private static final long CONTAINER_ID = 1;
   private static final Map<String, String> EDGE_NODES = ImmutableMap.of(
       "edge0", "/rack0",
       "edge1", "/rack1"
@@ -77,7 +97,7 @@ public class TestOMSortDatanodes {
     config = new OzoneConfiguration();
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     config.set(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-        StaticMapping.class.getName());
+        CountingStaticMapping.class.getName());
     config.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
     List<DatanodeDetails> datanodes = new ArrayList<>(NODE_COUNT);
     List<String> nodeMapping = new ArrayList<>(NODE_COUNT);
@@ -107,7 +127,23 @@ public class TestOMSortDatanodes {
         mockScmContainerClient);
     om = omTestManagers.getOzoneManager();
     ozoneClient = omTestManagers.getRpcClient();
-    keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
+    keyManager = omTestManagers.getKeyManager();
+
+    // A key whose only block is in a pipeline of all datanodes, so listStatus sorts all of them for the client.
+    OMRequestTestUtils.addVolumeAndBucketToDB(VOLUME, BUCKET, om.getMetadataManager(), BucketLayout.LEGACY);
+    Pipeline pipeline = MockPipeline.createPipeline(new ArrayList<>(nodeManager.getAllNodes()));
+    OmKeyLocationInfo location = new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(CONTAINER_ID, 1))
+        .setPipeline(pipeline)
+        .build();
+    OMRequestTestUtils.addKeyToTable(false, false, false, VOLUME, BUCKET, "key", 0,
+        pipeline.getReplicationConfig(), 0, om.getMetadataManager(), Collections.singletonList(location), 0);
+    ContainerInfo container = new ContainerInfo.Builder()
+        .setContainerID(CONTAINER_ID)
+        .setPipelineID(pipeline.getId())
+        .build();
+    when(mockScmContainerClient.getContainerWithPipelineBatch(any()))
+        .thenReturn(Collections.singletonList(new ContainerWithPipeline(container, pipeline)));
   }
 
   @AfterAll
@@ -125,11 +161,10 @@ public class TestOMSortDatanodes {
   }
 
   @Test
-  public void sortDatanodesRelativeToDatanode() {
+  public void sortDatanodesRelativeToDatanode() throws IOException {
     for (DatanodeDetails dn : nodeManager.getAllNodes()) {
       assertEquals(ROOT_LEVEL + 2, dn.getLevel());
-      List<? extends DatanodeDetails> sorted =
-          keyManager.sortDatanodes(nodeManager.getAllNodes(), nodeAddress(dn));
+      List<? extends DatanodeDetails> sorted = listStatusNodes(nodeAddress(dn));
       assertEquals(dn, sorted.get(0),
           "Source node should be sorted very first");
       assertRackOrder(dn.getNetworkLocation(), sorted);
@@ -137,33 +172,43 @@ public class TestOMSortDatanodes {
   }
 
   @Test
-  public void sortDatanodesRelativeToNonDatanode() {
+  public void sortDatanodesRelativeToNonDatanode() throws IOException {
     for (Map.Entry<String, String> entry : EDGE_NODES.entrySet()) {
-      assertRackOrder(entry.getValue(),
-          keyManager.sortDatanodes(nodeManager.getAllNodes(), entry.getKey()));
+      assertRackOrder(entry.getValue(), listStatusNodes(entry.getKey()));
     }
   }
 
   @Test
-  public void testSortDatanodes() {
-    List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
-
+  public void testSortDatanodes() throws IOException {
     // sort normal datanodes
     String client;
     client = nodeManager.getAllNodes().get(0).getIpAddress();
-    List<? extends DatanodeDetails> datanodeDetails =
-        keyManager.sortDatanodes(nodes, client);
+    List<? extends DatanodeDetails> datanodeDetails = listStatusNodes(client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // illegal client 1
     client += "X";
-    datanodeDetails = keyManager.sortDatanodes(nodes, client);
+    datanodeDetails = listStatusNodes(client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // illegal client 2
     client = "/default-rack";
-    datanodeDetails = keyManager.sortDatanodes(nodes, client);
+    datanodeDetails = listStatusNodes(client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
+  }
+
+  /** Lists the bucket for {@code clientAddress} and returns the key's pipeline nodes in the order OM sorted them. */
+  private static List<DatanodeDetails> listStatusNodes(String clientAddress) throws IOException {
+    OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME)
+        .setBucketName(BUCKET)
+        .setKeyName("")
+        .setSortDatanodesInPipeline(true)
+        .build();
+    List<OzoneFileStatus> statuses = keyManager.listStatus(args, false, "", 100, clientAddress);
+    assertEquals(1, statuses.size());
+    return statuses.get(0).getKeyInfo().getLatestVersionLocations().createLocationList().get(0)
+        .getPipeline().getNodesInOrder();
   }
 
   private static void assertRackOrder(String rack, List<? extends DatanodeDetails> list) {
@@ -190,14 +235,16 @@ public class TestOMSortDatanodes {
     for (DatanodeDetails dn : nodeManager.getAllNodes()) {
       // The client address is normally an IP, but the sort must resolve a client
       // by either IP or hostname, so cover both.
+      Node ipClient = keyManager.resolveClientForWrite(dn.getIpAddress(), om.getClusterMap());
       List<? extends DatanodeDetails> byIp =
-          keyManager.sortDatanodesForWrite(rpcNodes, dn.getIpAddress(), om.getClusterMap());
+          keyManager.sortDatanodesForWrite(rpcNodes, dn.getIpAddress(), ipClient, om.getClusterMap());
       assertEquals(dn, byIp.get(0),
           "Source node should be sorted first for writes (IP client)");
       assertRackOrder(dn.getNetworkLocation(), byIp);
 
+      Node hostClient = keyManager.resolveClientForWrite(dn.getHostName(), om.getClusterMap());
       List<? extends DatanodeDetails> byHostname =
-          keyManager.sortDatanodesForWrite(rpcNodes, dn.getHostName(), om.getClusterMap());
+          keyManager.sortDatanodesForWrite(rpcNodes, dn.getHostName(), hostClient, om.getClusterMap());
       assertEquals(dn, byHostname.get(0),
           "Source node should be sorted first for writes (hostname client)");
       assertRackOrder(dn.getNetworkLocation(), byHostname);
@@ -205,28 +252,106 @@ public class TestOMSortDatanodes {
   }
 
   @Test
-  public void sortDatanodesForWriteKeepsOrderForStaleTopology() {
+  public void sortDatanodesForWriteReturnsNullForStaleTopology() {
     List<DatanodeDetails> nodes = new ArrayList<>();
     nodes.add(randomDatanodeDetails());
     nodes.addAll(nodeManager.getAllNodes());
+    Node client = keyManager.resolveClientForWrite("edge0", om.getClusterMap());
+    assertNotNull(client);
 
-    List<? extends DatanodeDetails> sorted =
-        keyManager.sortDatanodesForWrite(nodes, "edge0", om.getClusterMap());
-
-    assertSame(nodes, sorted,
-        "Pipeline order should be preserved when a node is missing from the OM topology");
+    assertNull(keyManager.sortDatanodesForWrite(nodes, "edge0", client, om.getClusterMap()),
+        "Sort must be skipped when a node is missing from the OM topology");
   }
 
   @Test
-  public void sortDatanodesForWriteKeepsOrderWhenClientUnresolved() {
-    List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
-    List<DatanodeDetails> original = new ArrayList<>(nodes);
-    // A client that resolves to no known rack must NOT trigger a shuffle.
-    String unresolved = nodes.get(0).getIpAddress() + "X";
-    List<? extends DatanodeDetails> result =
-        keyManager.sortDatanodesForWrite(nodes, unresolved, om.getClusterMap());
-    assertEquals(original, result,
-        "Write pipeline order must be preserved when client is unresolved");
+  public void resolveClientForWriteReturnsNullWhenUnresolved() {
+    // A client that maps to no rack in the OM topology cannot be placed, so OM
+    // must report null and let the caller fall back to SCM.
+    String unresolved = nodeManager.getAllNodes().get(0).getIpAddress() + "X";
+    assertNull(keyManager.resolveClientForWrite(unresolved, om.getClusterMap()));
+  }
+
+  @Test
+  public void resolveClientForWriteAttachesNonDatanodeClientToItsRack() {
+    for (Map.Entry<String, String> entry : EDGE_NODES.entrySet()) {
+      Node client = keyManager.resolveClientForWrite(entry.getKey(), om.getClusterMap());
+      assertNotNull(client, "Edge client should resolve via the DNS-to-switch mapping");
+      assertEquals(entry.getValue(), client.getNetworkLocation());
+    }
+  }
+
+  @Test
+  public void sortDatanodesForWritePrefersPipelineDatanodeAsClient() {
+    // Resolve the client in the other rack so preferring the matching pipeline datanode is deterministic.
+    List<? extends DatanodeDetails> all = nodeManager.getAllNodes();
+    DatanodeDetails clientDn = all.get(0);
+    DatanodeDetails sameRack = null;
+    List<DatanodeDetails> otherRack = new ArrayList<>();
+    for (DatanodeDetails dn : all) {
+      if (dn.equals(clientDn)) {
+        continue;
+      }
+      if (dn.getNetworkLocation().equals(clientDn.getNetworkLocation())) {
+        if (sameRack == null) {
+          sameRack = dn;
+        }
+      } else if (otherRack.size() < 2) {
+        otherRack.add(dn);
+      }
+    }
+    assertNotNull(sameRack);
+    assertEquals(2, otherRack.size());
+    String otherRackEdge = "/rack0".equals(clientDn.getNetworkLocation()) ? "edge1" : "edge0";
+    Node otherRackClient = keyManager.resolveClientForWrite(otherRackEdge, om.getClusterMap());
+    assertNotNull(otherRackClient);
+    assertNotEquals(clientDn.getNetworkLocation(), otherRackClient.getNetworkLocation());
+
+    for (String address : new String[] {clientDn.getIpAddress(), clientDn.getHostName()}) {
+      // Without a matching datanode, sort relative to the supplied client.
+      List<DatanodeDetails> without = new ArrayList<>();
+      without.add(rpcCopy(sameRack));
+      without.add(rpcCopy(otherRack.get(0)));
+      without.add(rpcCopy(otherRack.get(1)));
+      List<? extends DatanodeDetails> sortedWithout =
+          keyManager.sortDatanodesForWrite(without, address, otherRackClient, om.getClusterMap());
+      assertNotNull(sortedWithout);
+      assertEquals(otherRackClient.getNetworkLocation(), sortedWithout.get(0).getNetworkLocation());
+
+      // A matching datanode takes precedence over the supplied client and sorts first.
+      List<DatanodeDetails> with = new ArrayList<>();
+      with.add(rpcCopy(otherRack.get(0)));
+      with.add(rpcCopy(sameRack));
+      with.add(rpcCopy(clientDn));
+      List<? extends DatanodeDetails> sortedWith =
+          keyManager.sortDatanodesForWrite(with, address, otherRackClient, om.getClusterMap());
+      assertNotNull(sortedWith);
+      assertEquals(clientDn, sortedWith.get(0));
+    }
+  }
+
+  @Test
+  public void resolveClientForWriteIsTheOnlyMappingLookup() {
+    List<? extends DatanodeDetails> all = nodeManager.getAllNodes();
+    CountingStaticMapping.RESOLVED_NAMES.set(0);
+    Node client = keyManager.resolveClientForWrite("edge0", om.getClusterMap());
+    assertNotNull(client);
+    assertEquals(1, CountingStaticMapping.RESOLVED_NAMES.get());
+
+    for (int start = 0; start + 3 <= all.size(); start += 3) {
+      List<DatanodeDetails> pipeline = new ArrayList<>();
+      for (DatanodeDetails dn : all.subList(start, start + 3)) {
+        pipeline.add(rpcCopy(dn));
+      }
+      assertNotNull(keyManager.sortDatanodesForWrite(pipeline, "edge0", client, om.getClusterMap()));
+    }
+    assertEquals(1, CountingStaticMapping.RESOLVED_NAMES.get(),
+        "sortDatanodesForWrite must not call the DNS-to-switch mapping");
+  }
+
+  // Simulate a pipeline node as OM receives it from SCM over RPC: same identity,
+  // no topology linkage.
+  private static DatanodeDetails rpcCopy(DatanodeDetails dn) {
+    return DatanodeDetails.getFromProtoBuf(dn.getProtoBufMessage());
   }
 
   private String nodeAddress(DatanodeDetails dn) {
@@ -234,5 +359,16 @@ public class TestOMSortDatanodes {
         HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
         HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     return useHostname ? dn.getHostName() : dn.getIpAddress();
+  }
+
+  /** StaticMapping that counts how many names were resolved. */
+  public static class CountingStaticMapping extends StaticMapping {
+    static final AtomicInteger RESOLVED_NAMES = new AtomicInteger();
+
+    @Override
+    public List<String> resolve(List<String> names) {
+      RESOLVED_NAMES.addAndGet(names.size());
+      return super.resolve(names);
+    }
   }
 }

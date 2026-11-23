@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import static java.util.concurrent.Executors.newFixedThreadPool;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,8 +30,15 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -54,6 +63,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -70,6 +80,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 class TestBlockOutputStreamCorrectness {
 
   private static final int DATA_SIZE = 16 * (int) OzoneConsts.MB;
+  private static final int BUFFER_SIZE = 1024 * 1024 / 4;
+  private static final int FLUSH_SIZE = 1024 * 1024;
   private static final byte[] DATA = RandomUtils.secure().randomBytes(DATA_SIZE);
 
   @ParameterizedTest
@@ -90,6 +102,54 @@ class TestBlockOutputStreamCorrectness {
         }
       }
     }
+  }
+
+  /**
+   * The reply handler of a later PutBlock runs before the one of an earlier PutBlock.
+   * The block must still end up with the bcsId of the latest PutBlock.
+   */
+  @Test
+  void testBcsIdOfLatestPutBlockWhenReplyHandlersRunLate() throws IOException {
+    final HeldExecutor executor = new HeldExecutor();
+    final MockXceiverClientSpi xceiverClient = new MockXceiverClientSpi(MockPipeline.createRatisPipeline());
+    try (BlockOutputStream outputStream = createBlockOutputStream(new BufferPool(BUFFER_SIZE, 16), xceiverClient,
+        executor)) {
+      outputStream.write(DATA, 0, 2 * FLUSH_SIZE);
+      executor.runDirectly();
+
+      assertThat(outputStream.getBlockID().getBlockCommitSequenceId())
+          .isEqualTo(xceiverClient.getLastPutBlockIndex());
+    }
+  }
+
+  /**
+   * The reply handler of a later PutBlock runs, then a later WriteChunk fails, then the reply handler of an earlier
+   * PutBlock runs. The buffers not acknowledged yet must hold exactly the data after the acknowledged length, since
+   * that is the data rewritten to a new block.
+   */
+  @Test
+  void testUnackedBuffersFollowAckedLengthWhenReplyHandlersRunLate() throws IOException {
+    final HeldExecutor executor = new HeldExecutor();
+    final MockXceiverClientSpi xceiverClient = new MockXceiverClientSpi(MockPipeline.createRatisPipeline());
+    final BufferPool bufferPool = new BufferPool(BUFFER_SIZE, 16);
+    final BlockOutputStream outputStream = createBlockOutputStream(bufferPool, xceiverClient, executor);
+    outputStream.write(DATA, 0, 2 * FLUSH_SIZE);
+    executor.runLatest();
+    xceiverClient.setReplyResult(Result.CLOSED_CONTAINER_IO);
+    outputStream.write(DATA, 2 * FLUSH_SIZE, BUFFER_SIZE);
+    executor.runLatest();
+    executor.runDirectly();
+    assertThat(outputStream.getIoException()).isNotNull();
+
+    final int acked = (int) outputStream.getTotalAckDataLength();
+    ByteString unacked = ByteString.EMPTY;
+    for (ChunkBuffer buffer : bufferPool.getAllocatedBuffers()) {
+      unacked = unacked.concat(buffer.duplicate(0, buffer.position()).toByteString(bufferPool.byteStringConversion()));
+    }
+    assertThat(unacked).as("unacknowledged data after %d acknowledged bytes", acked)
+        .isEqualTo(ByteString.copyFrom(DATA, acked, 2 * FLUSH_SIZE + BUFFER_SIZE - acked));
+
+    assertThatThrownBy(outputStream::close).isInstanceOf(IOException.class);
   }
 
   /**
@@ -194,18 +254,24 @@ class TestBlockOutputStreamCorrectness {
 
   private BlockOutputStream createBlockOutputStream(BufferPool bufferPool)
       throws IOException {
+    return createBlockOutputStream(bufferPool, new MockXceiverClientSpi(MockPipeline.createRatisPipeline()),
+        newFixedThreadPool(10));
+  }
 
-    final Pipeline pipeline = MockPipeline.createRatisPipeline();
+  private BlockOutputStream createBlockOutputStream(BufferPool bufferPool, XceiverClientSpi xceiverClient,
+      ExecutorService responseExecutor) throws IOException {
+
+    final Pipeline pipeline = xceiverClient.getPipeline();
 
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
     when(xcm.acquireClient(any()))
-        .thenReturn(new MockXceiverClientSpi(pipeline));
+        .thenReturn(xceiverClient);
 
     OzoneClientConfig config = new OzoneClientConfig();
-    config.setStreamBufferSize(1024 * 1024 / 4);
+    config.setStreamBufferSize(BUFFER_SIZE);
     config.setStreamBufferMaxSize(2 * 1024 * 1024);
     config.setStreamBufferFlushDelay(true);
-    config.setStreamBufferFlushSize(1024 * 1024);
+    config.setStreamBufferFlushSize(FLUSH_SIZE);
     config.setChecksumType(ChecksumType.NONE);
     config.setBytesPerChecksum(16 * 1024);
     StreamBufferArgs streamBufferArgs =
@@ -221,7 +287,7 @@ class TestBlockOutputStreamCorrectness {
         null,
         ContainerClientMetrics.acquire(),
         streamBufferArgs,
-        () -> newFixedThreadPool(10));
+        () -> responseExecutor);
   }
 
   private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
@@ -253,6 +319,8 @@ class TestBlockOutputStreamCorrectness {
 
     private final AtomicInteger counter = new AtomicInteger();
     private int i;
+    private Result replyResult = Result.SUCCESS;
+    private long lastPutBlockIndex;
 
     MockXceiverClientSpi(Pipeline pipeline) {
       super();
@@ -281,18 +349,20 @@ class TestBlockOutputStreamCorrectness {
         request = ContainerCommandRequestProto.newBuilder(request)
             .setVersion(ClientVersion.CURRENT.serialize()).build();
       }
+      final long logIndex = counter.incrementAndGet();
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()
-              .setResult(Result.SUCCESS)
+              .setResult(replyResult)
               .setCmdType(request.getCmdType());
 
       switch (request.getCmdType()) {
       case PutBlock:
+        lastPutBlockIndex = logIndex;
         builder.setPutBlock(PutBlockResponseProto.newBuilder()
             .setCommittedBlockLength(
                 GetCommittedBlockLengthResponseProto.newBuilder()
-                    .setBlockID(
-                        request.getPutBlock().getBlockData().getBlockID())
+                    .setBlockID(request.getPutBlock().getBlockData().getBlockID().toBuilder()
+                        .setBlockCommitSequenceId(logIndex))
                     .setBlockLength(
                         request.getPutBlock().getBlockData().getSize())
                     .build())
@@ -311,9 +381,17 @@ class TestBlockOutputStreamCorrectness {
       }
       final XceiverClientReply result = new XceiverClientReply(
           CompletableFuture.completedFuture(builder.build()));
-      result.setLogIndex(counter.incrementAndGet());
+      result.setLogIndex(logIndex);
       return result;
 
+    }
+
+    void setReplyResult(Result replyResult) {
+      this.replyResult = replyResult;
+    }
+
+    long getLastPutBlockIndex() {
+      return lastPutBlockIndex;
     }
 
     @Override
@@ -345,4 +423,61 @@ class TestBlockOutputStreamCorrectness {
     }
   }
 
+  /**
+   * Holds the submitted tasks until the test runs them, to control the order in which reply handlers run.
+   */
+  private static class HeldExecutor extends AbstractExecutorService {
+
+    private final Deque<Runnable> tasks = new ArrayDeque<>();
+    private boolean direct;
+
+    @Override
+    public void execute(Runnable task) {
+      if (direct) {
+        task.run();
+      } else {
+        tasks.addLast(task);
+      }
+    }
+
+    /** Run the most recently submitted task. */
+    void runLatest() {
+      tasks.removeLast().run();
+    }
+
+    /**
+     * Run the held tasks, the most recently submitted first, including those submitted meanwhile.
+     * Then run each new task when it is submitted.
+     */
+    void runDirectly() {
+      while (!tasks.isEmpty()) {
+        runLatest();
+      }
+      direct = true;
+    }
+
+    @Override
+    public void shutdown() {
+    }
+
+    @Override
+    public List<Runnable> shutdownNow() {
+      return Collections.emptyList();
+    }
+
+    @Override
+    public boolean isShutdown() {
+      return false;
+    }
+
+    @Override
+    public boolean isTerminated() {
+      return false;
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
+      return true;
+    }
+  }
 }

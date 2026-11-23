@@ -786,7 +786,7 @@ public class TestSCMContainerPlacementRackScatter {
         policy.chooseDatanodes(usedDns, excludedDns,
             null, 3, 0, 5));
     assertThat(exception.getMessage())
-        .matches("^No enough datanodes to choose.*");
+        .matches("^Not enough datanodes to choose.*");
     assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
         exception.getResult());
   }
