@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.net.InetSocketAddress;
-import org.apache.hadoop.hdds.HddsConfigKeys;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -56,7 +56,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.BeforeEach;
@@ -202,27 +201,35 @@ class TestSCMConfiguration {
 
     assertEquals(port++,
         conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
-        scmServiceId, "scm1"), 9999));
+            scmServiceId, "scm1"), 9999));
+  }
 
-
+  @Test
+  public void testScmRatisServerConfigRaftProperties() {
     final ScmRatisServerConfig scmRatisConfig = conf.getObject(
         ScmRatisServerConfig.class);
     assertEquals(0, scmRatisConfig.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
-
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getPath());
-
-    final RaftProperties p = RatisUtil.newRaftProperties(conf);
-    final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
-    assertEquals(TimeDuration.ZERO, t,
+    assertEquals(TimeDuration.ZERO,
+        RaftServerConfigKeys.Log.Appender.waitTimeMin(
+            RatisUtil.newRaftProperties(conf)),
+        RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
+    scmRatisConfig.setLogAppenderWaitTimeMin(7);
+    conf.setFromObject(scmRatisConfig);
+    assertEquals(TimeDuration.valueOf(7, TimeUnit.MILLISECONDS),
+        RaftServerConfigKeys.Log.Appender.waitTimeMin(
+            RatisUtil.newRaftProperties(conf)),
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
 
-    assertFalse(scmRatisConfig.isAppendEntriesComposeEnabled(), "isAppendEntriesComposeEnabled");
-    assertFalse(RaftServerConfigKeys.Log.appendEntriesComposeEnabled(p),
+    assertFalse(scmRatisConfig.isAppendEntriesComposeEnabled(),
+        "isAppendEntriesComposeEnabled");
+    assertFalse(RaftServerConfigKeys.Log.appendEntriesComposeEnabled(
+            RatisUtil.newRaftProperties(conf)),
         RaftServerConfigKeys.Log.APPEND_ENTRIES_COMPOSE_ENABLED_KEY);
     scmRatisConfig.setAppendEntriesComposeEnabled(true);
     conf.setFromObject(scmRatisConfig);
-    assertTrue(RaftServerConfigKeys.Log.appendEntriesComposeEnabled(RatisUtil.newRaftProperties(conf)),
+    assertTrue(RaftServerConfigKeys.Log.appendEntriesComposeEnabled(
+            RatisUtil.newRaftProperties(conf)),
         RaftServerConfigKeys.Log.APPEND_ENTRIES_COMPOSE_ENABLED_KEY);
   }
 

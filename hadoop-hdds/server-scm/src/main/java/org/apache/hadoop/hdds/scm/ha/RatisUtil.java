@@ -197,6 +197,9 @@ public final class RatisUtil {
             ozoneConf.getInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP,
                     ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     Log.setSegmentCacheNumMax(properties, 2);
+    Log.Appender.setWaitTimeMin(properties, TimeDuration.valueOf(
+        ozoneConf.getObject(ScmRatisServerConfig.class)
+            .getLogAppenderWaitTimeMin(), TimeUnit.MILLISECONDS));
     Log.setAppendEntriesComposeEnabled(properties,
         ozoneConf.getObject(ScmRatisServerConfig.class).isAppendEntriesComposeEnabled());
 
