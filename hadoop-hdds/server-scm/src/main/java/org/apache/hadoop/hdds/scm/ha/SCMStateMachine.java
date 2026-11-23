@@ -22,6 +22,8 @@ import static java.util.Objects.requireNonNull;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collection;
@@ -45,6 +47,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.util.Time;
@@ -202,9 +205,12 @@ public class SCMStateMachine extends BaseStateMachine {
       if (LOG.isDebugEnabled()) {
         LOG.debug("{}: applyTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
       }
-      try {
+      final Span span = request.getTraceID().isEmpty() ? Span.getInvalid()
+          : TracingUtil.importAndCreateSpan("SCMStateMachine.applyTransaction", request.getTraceID());
+      try (Scope ignored = span.makeCurrent()) {
         applyTransactionFuture.complete(process(request));
       } catch (SCMException ex) {
+        TracingUtil.recordException(span, ex);
         // For SCM exceptions while applying a transaction, if the error
         // code indicate a FATAL issue, let it crash SCM.
         if (ex.getResult() == ResultCodes.INTERNAL_ERROR
@@ -214,6 +220,8 @@ public class SCMStateMachine extends BaseStateMachine {
         // Otherwise, it's considered as a logical rejection and is returned to
         // Ratis client, leaving SCM intact.
         applyTransactionFuture.completeExceptionally(ex);
+      } finally {
+        span.end();
       }
 
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
