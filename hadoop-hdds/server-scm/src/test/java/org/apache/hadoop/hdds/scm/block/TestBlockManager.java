@@ -140,8 +140,7 @@ public class TestBlockManager {
             eventQueue,
             scmContext,
             serviceManager,
-            Clock.system(ZoneOffset.UTC),
-            null);
+            Clock.system(ZoneOffset.UTC));
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,

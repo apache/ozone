@@ -769,8 +769,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               eventQueue,
               scmContext,
               serviceManager,
-              systemClock,
-              versionManager
+              systemClock
               );
     }
 

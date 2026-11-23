@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
 /**
@@ -46,7 +45,7 @@ public class PipelineFactory {
 
   PipelineFactory(NodeManager nodeManager, PipelineStateManager stateManager,
                   ConfigurationSource conf, EventPublisher eventPublisher,
-                  SCMContext scmContext, ScmVersionManager versionManager) {
+                  SCMContext scmContext) {
     providers = new HashMap<>();
     providers.put(ReplicationType.STAND_ALONE,
         new SimplePipelineProvider(nodeManager, stateManager));
@@ -54,9 +53,6 @@ public class PipelineFactory {
         new RatisPipelineProvider(nodeManager,
             stateManager, conf,
             eventPublisher, scmContext));
-    providers.put(ReplicationType.CHAINED,
-        new ChainedPipelineProvider(nodeManager, stateManager, conf, eventPublisher, scmContext,
-            versionManager));
     PlacementPolicy ecPlacementPolicy;
     try {
       ecPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(conf,

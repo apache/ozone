@@ -114,8 +114,7 @@ public class RatisPipelineProvider
       dns = pickNodesNotUsed(replicationConfig, getMinRatisVolumeSizeBytes(), getContainerSizeBytes());
       break;
     case THREE:
-      dns = chooseThreeFactorDatanodes(excludedNodes, favoredNodes, factor.getNumber(),
-          isRatisStreamingEnabled, true);
+      dns = chooseThreeFactorDatanodes(excludedNodes, favoredNodes, factor.getNumber(), isRatisStreamingEnabled);
 
       break;
     default:

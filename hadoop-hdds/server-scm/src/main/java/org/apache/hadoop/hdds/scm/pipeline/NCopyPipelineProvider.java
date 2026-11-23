@@ -158,14 +158,13 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
    * Choose datanodes for a factor THREE pipeline,
    * excluding the datanodes which have reached their pipeline limit.
    *
-   * @param excludeNonStreamNodes Should the datanodes without the {@link DatanodeDetails.Port.Name#RATIS_DATASTREAM}
-   *                              port be excluded?
-   * @param fallback When excludeNonStreamNodes is true, should it fall back to choose from all the datanodes
-   *                 if there are not enough datanodes with the stream port?
+   * @param excludeNonStreamNodes Should it first try to exclude the datanodes without the
+   *                              {@link DatanodeDetails.Port.Name#RATIS_DATASTREAM} port,
+   *                              falling back to all the datanodes if there are not enough datanodes with the port?
    */
   List<DatanodeDetails> chooseThreeFactorDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, int requiredNode,
-      boolean excludeNonStreamNodes, boolean fallback)
+      boolean excludeNonStreamNodes)
       throws IOException {
     final NodeManager nodeManager = getNodeManager();
     final PipelineStateManager stateManager = getPipelineStateManager();
@@ -196,9 +195,6 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
             favoredNodes, requiredNode, minRatisVolumeSizeBytes,
             containerSizeBytes);
       } catch (SCMException scmException) {
-        if (!fallback) {
-          throw scmException;
-        }
         LOG.debug("Failed to allocate datanodes with strict exclusion (non-streaming nodes excluded)." +
             " Falling back.", scmException);
       }
