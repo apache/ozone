@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Sort
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.ScmTracingAttributes;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -63,6 +64,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -192,8 +194,10 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     } catch (IOException e) {
       RatisUtil.checkRatisException(e, scm.getBlockProtocolRpcPort(),
           scm.getScmId(), scm.getHostname(), ROLE_TYPE);
+      TracingUtil.recordExceptionInCurrentSpan(e);
       response.setSuccess(false);
       response.setStatus(exceptionToResponseStatus(e));
+      TracingUtil.addAttributesToCurrentSpan(ScmTracingAttributes.STATUS, response.getStatus().name());
       if (e.getMessage() != null) {
         response.setMessage(e.getMessage());
       }

@@ -33,11 +33,13 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecre
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
 import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
+import org.apache.hadoop.hdds.scm.ScmTracingAttributes;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.slf4j.Logger;
@@ -117,8 +119,10 @@ public class SecretKeyProtocolServerSideTranslatorPB
     } catch (IOException e) {
       RatisUtil.checkRatisException(e, scm.getSecurityProtocolRpcPort(),
           scm.getScmId(), scm.getHostname(), ROLE_TYPE);
+      TracingUtil.recordExceptionInCurrentSpan(e);
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
+      TracingUtil.addAttributesToCurrentSpan(ScmTracingAttributes.STATUS, scmSecurityResponse.getStatus().name());
       // If actual cause is set in SCMSecurityException, set message with
       // actual cause message.
       if (e.getMessage() != null) {
