@@ -773,7 +773,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
 
     List<Tag> tagsPutOrder = Arrays.asList(
         Tag.builder().key("key2").value("val2").build(),
-        Tag.builder().key("key").value("val").build());
+        Tag.builder().key("key").value("a@b").build());
     s3Client.putObjectTagging(b -> b.bucket(bucketName).key(keyName)
         .tagging(Tagging.builder().tagSet(tagsPutOrder).build()));
 
@@ -781,7 +781,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
     List<Tag> tagSet = taggingResult.tagSet();
     assertEquals(2, tagSet.size());
     assertEquals("key", tagSet.get(0).key());
-    assertEquals("val", tagSet.get(0).value());
+    assertEquals("a@b", tagSet.get(0).value());
     assertEquals("key2", tagSet.get(1).key());
     assertEquals("val2", tagSet.get(1).value());
   }
