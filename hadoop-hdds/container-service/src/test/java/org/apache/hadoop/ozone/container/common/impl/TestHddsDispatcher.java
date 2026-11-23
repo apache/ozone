@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -65,11 +66,16 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -98,6 +104,9 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -106,6 +115,8 @@ import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,6 +137,9 @@ public class TestHddsDispatcher {
   public static final IncrementalReportSender<Container> NO_OP_ICR_SENDER =
       c -> {
       };
+
+  // The block of the route requests; the container is created and deleted with block 1.
+  private static final long LOCAL_ID = 2L;
 
   @BeforeAll
   public static void init() {
@@ -644,6 +658,206 @@ public class TestHddsDispatcher {
   }
 
   /**
+   * A container deleted from the datanode is not created again by any request that creates a container, neither before
+   * nor after a restart, and the restart does not mark it missing.
+   */
+  @ParameterizedTest
+  @EnumSource(CreateRoute.class)
+  public void testDeletedContainerIsNotRecreated(CreateRoute route) throws Exception {
+    final long containerID = 1L;
+    try {
+      WitnessedDatanode dn = new WitnessedDatanode(testDir.getPath());
+      createAndForceDelete(dn, containerID);
+      assertDeletedContainerIsNotRecreated(dn, route, containerID, "before restart");
+
+      dn.restart();
+      dn.buildMissingContainerSet(containerID);
+      assertDeletedContainerIsNotRecreated(dn, route, containerID, "after restart");
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  private void assertDeletedContainerIsNotRecreated(WitnessedDatanode dn, CreateRoute route, long containerID,
+      String when) {
+    ContainerCommandResponseProto response = dn.dispatcher.dispatch(
+        newRouteRequest(route, dn.dd.getUuidString(), containerID), newRouteContext(route));
+    assertEquals(ContainerProtos.Result.CLOSED_CONTAINER_IO, response.getResult(), when);
+    assertNull(dn.containerSet.getContainer(containerID), when);
+    assertFalse(dn.containerDirExists(containerID), when);
+    ContainerCreateInfo entry = dn.table.get(ContainerID.valueOf(containerID));
+    assertNotNull(entry, when + ": no witnessed entry for container " + containerID);
+    assertEquals(State.DELETED, entry.getState(), when);
+    assertEquals(-1, entry.getReplicaIndex(), when);
+    assertFalse(dn.dispatcher.getMissingContainerSet().contains(containerID), when);
+  }
+
+  /**
+   * A commit-stage WriteChunk for a deleted container is answered with CONTAINER_NOT_FOUND and creates nothing.
+   */
+  @Test
+  public void testCommitStageWriteToDeletedContainerIsNotFound() throws Exception {
+    final long containerID = 1L;
+    try {
+      WitnessedDatanode dn = new WitnessedDatanode(testDir.getPath());
+      createAndForceDelete(dn, containerID);
+
+      ContainerCommandResponseProto response = dn.dispatcher.dispatch(
+          getWriteChunkRequest(dn.dd.getUuidString(), containerID, 1L), COMMIT_STAGE);
+      assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
+      assertNull(dn.containerSet.getContainer(containerID));
+      assertFalse(dn.containerDirExists(containerID));
+      ContainerCreateInfo entry = dn.table.get(ContainerID.valueOf(containerID));
+      assertNotNull(entry);
+      assertEquals(State.DELETED, entry.getState());
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  /**
+   * A write to an ID with no container creates the container and its witnessed entry. Later writes use the loaded
+   * container, and an explicit create for it is answered with CONTAINER_ALREADY_EXISTS.
+   */
+  @Test
+  public void testWriteCreatesContainerAndEntryOnce() throws Exception {
+    final long containerID = 1L;
+    try {
+      WitnessedDatanode dn = new WitnessedDatanode(testDir.getPath());
+      final String datanodeId = dn.dd.getUuidString();
+      assertNull(dn.table.get(ContainerID.valueOf(containerID)));
+
+      assertEquals(ContainerProtos.Result.SUCCESS, dn.dispatcher.dispatch(
+          getWriteChunkRequest(datanodeId, containerID, 1L), null).getResult());
+      Container<?> container = dn.containerSet.getContainer(containerID);
+      assertNotNull(container);
+      assertNotNull(dn.table.get(ContainerID.valueOf(containerID)));
+
+      assertEquals(ContainerProtos.Result.SUCCESS, dn.dispatcher.dispatch(
+          getWriteChunkRequest(datanodeId, containerID, 2L), null).getResult());
+      assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS, dn.dispatcher.dispatch(
+          newRouteRequest(CreateRoute.CREATE_CONTAINER, datanodeId, containerID), null).getResult());
+      assertSame(container, dn.containerSet.getContainer(containerID));
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  private ContainerCommandRequestProto newRouteRequest(CreateRoute route, String datanodeId, long containerID) {
+    switch (route) {
+    case CREATE_CONTAINER:
+      return ContainerCommandRequestProto.newBuilder()
+          .setCmdType(ContainerProtos.Type.CreateContainer)
+          .setContainerID(containerID)
+          .setCreateContainer(ContainerProtos.CreateContainerRequestProto.newBuilder()
+              .setContainerType(ContainerType.KeyValueContainer).build())
+          .setDatanodeUuid(datanodeId)
+          .build();
+    case WRITE_CHUNK_WRITE_STAGE:
+    case WRITE_CHUNK_COMBINED_STAGE:
+      return getWriteChunkRequest(datanodeId, containerID, LOCAL_ID);
+    case PUT_BLOCK:
+      return getEmptyPutBlockRequest(datanodeId, containerID, LOCAL_ID);
+    case PUT_SMALL_FILE:
+      return newPutSmallFile(containerID, LOCAL_ID);
+    case STREAM_INIT:
+      return getWriteChunkRequest(datanodeId, containerID, LOCAL_ID).toBuilder()
+          .setCmdType(ContainerProtos.Type.StreamInit).build();
+    case STREAM_INIT_WITH_PUT_BLOCK:
+      return getWriteChunkRequest(datanodeId, containerID, LOCAL_ID).toBuilder()
+          .setCmdType(ContainerProtos.Type.StreamInitWithPutBlock).build();
+    default:
+      throw new IllegalArgumentException("Unknown route " + route);
+    }
+  }
+
+  private static DispatcherContext newRouteContext(CreateRoute route) {
+    switch (route) {
+    case WRITE_CHUNK_WRITE_STAGE:
+      return newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA);
+    case STREAM_INIT:
+    case STREAM_INIT_WITH_PUT_BLOCK:
+      return newContext(Op.STREAM_INIT, WriteChunkStage.WRITE_DATA);
+    default:
+      return null;
+    }
+  }
+
+  /**
+   * Creates the container with a write and deletes it with a forced DeleteContainer, both through the dispatcher.
+   */
+  private void createAndForceDelete(WitnessedDatanode dn, long containerID) throws IOException {
+    assertEquals(ContainerProtos.Result.SUCCESS, dn.dispatcher.dispatch(
+        getWriteChunkRequest(dn.dd.getUuidString(), containerID, 1L), null).getResult());
+    assertTrue(dn.containerDirExists(containerID));
+    assertEquals(ContainerProtos.Result.SUCCESS, dn.dispatcher.dispatch(ContainerTestHelper.getDeleteContainer(
+        MockPipeline.createSingleNodePipeline(), containerID, true), null).getResult());
+    assertNull(dn.containerSet.getContainer(containerID));
+  }
+
+  /**
+   * The requests with which a datanode creates a container replica on a write.
+   */
+  private enum CreateRoute {
+    CREATE_CONTAINER, WRITE_CHUNK_WRITE_STAGE, WRITE_CHUNK_COMBINED_STAGE, PUT_BLOCK, PUT_SMALL_FILE, STREAM_INIT,
+    STREAM_INIT_WITH_PUT_BLOCK
+  }
+
+  /**
+   * A datanode whose witnessed container table outlives {@link #restart()}, which builds a new container set and
+   * dispatcher over the same table and volumes.
+   */
+  private static final class WitnessedDatanode {
+    private final DatanodeDetails dd = randomDatanodeDetails();
+    private final UUID scmId = UUID.randomUUID();
+    private final OzoneConfiguration conf = new OzoneConfiguration();
+    private final InMemoryTestTable<ContainerID, ContainerCreateInfo> table = new InMemoryTestTable<>();
+    private final WitnessedContainerMetadataStore store = mock(WitnessedContainerMetadataStore.class);
+    private final MutableVolumeSet volumeSet;
+    private final ContainerMetrics metrics;
+    private ContainerSet containerSet;
+    private HddsDispatcher dispatcher;
+
+    WitnessedDatanode(String dataDir) throws IOException {
+      conf.set(HDDS_DATANODE_DIR_KEY, dataDir);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, dataDir);
+      when(store.getContainerCreateInfoTable()).thenReturn(table);
+      volumeSet = newVolumeSet(dd, scmId, conf);
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
+        // The delete moves the container directory to the volume's deleted-containers directory.
+        volume.createTmpDirs(scmId.toString());
+      }
+      metrics = ContainerMetrics.create(conf);
+      restart();
+    }
+
+    void restart() throws IOException {
+      containerSet = newContainerSet(1000, store);
+      dispatcher = createDispatcher(scmId, conf, null, ContainerTestUtils.getMockContext(dd, conf), containerSet,
+          volumeSet, metrics);
+    }
+
+    /** Builds the missing container set as both callers do at startup: OzoneContainer, then the Ratis path. */
+    void buildMissingContainerSet(long ratisContainerId) throws IOException {
+      final Map<ContainerID, Long> tableIds = new HashMap<>();
+      try (TableIterator<ContainerID, ContainerID> keys = table.keyIterator()) {
+        while (keys.hasNext()) {
+          tableIds.put(keys.next(), 0L);
+        }
+      }
+      containerSet.buildMissingContainerSetAndValidate(tableIds, ContainerID::getId);
+      dispatcher.buildMissingContainerSetAndValidate(Collections.singletonMap(ratisContainerId, 0L));
+    }
+
+    boolean containerDirExists(long containerID) {
+      return volumeSet.getVolumesList().stream()
+          .map(volume -> ((HddsVolume) volume).getHddsRootDir().toString())
+          .anyMatch(root -> new File(KeyValueContainerLocationUtil.getBaseContainerLocation(
+              root, scmId.toString(), containerID)).exists());
+    }
+  }
+
+  /**
    * Creates HddsDispatcher instance with given infos.
    * @param dd datanode detail info.
    * @param scmId UUID of scm id.
@@ -663,7 +877,12 @@ public class TestHddsDispatcher {
 
   static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf, TokenVerifier tokenVerifier, StateContext context) throws IOException {
-    ContainerSet containerSet = newContainerSet();
+    return createDispatcher(scmId, conf, tokenVerifier, context, newContainerSet(), newVolumeSet(dd, scmId, conf),
+        ContainerMetrics.create(conf));
+  }
+
+  private static MutableVolumeSet newVolumeSet(DatanodeDetails dd, UUID scmId, OzoneConfiguration conf)
+      throws IOException {
     MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     volumeSet.getVolumesList().stream().forEach(v -> {
@@ -675,7 +894,12 @@ public class TestHddsDispatcher {
       }
     });
     volumeSet.startAllVolume();
-    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    return volumeSet;
+  }
+
+  private static HddsDispatcher createDispatcher(UUID scmId, OzoneConfiguration conf, TokenVerifier tokenVerifier,
+      StateContext context, ContainerSet containerSet, MutableVolumeSet volumeSet, ContainerMetrics metrics)
+      throws IOException {
     Map<ContainerType, Handler> handlers = Maps.newHashMap();
     for (ContainerType containerType : ContainerType.values()) {
       handlers.put(containerType,

@@ -84,6 +84,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
@@ -101,10 +102,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -136,9 +140,12 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
@@ -156,9 +163,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -190,6 +199,8 @@ public class TestKeyValueHandler {
   private OzoneConfiguration conf;
   private ContainerSet mockContainerSet;
   private long maxContainerSize;
+  private InMemoryTestTable<ContainerID, ContainerCreateInfo> witnessTable;
+  private final AtomicBoolean failWitnessGet = new AtomicBoolean();
 
   @BeforeEach
   public void setup() throws IOException {
@@ -792,6 +803,104 @@ public class TestKeyValueHandler {
   }
 
   /**
+   * An ordinary create is refused for an ID that has a witnessed entry, whatever the entry holds.
+   */
+  @ParameterizedTest
+  @CsvSource({"OPEN,0", "CLOSED,2", "RECOVERING,4", "DELETED,-1"})
+  public void testCreateIsRefusedForWitnessedEntry(State entryState, int entryReplicaIndex) throws Exception {
+    final long containerID = 1L;
+    HandlerWithVolumeSet handlerWithVolume = createHandlerWithWitnessTable();
+    witnessTable.put(ContainerID.valueOf(containerID), ContainerCreateInfo.valueOf(entryState, entryReplicaIndex));
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+
+    assertEquals(ContainerProtos.Result.CLOSED_CONTAINER_IO, kvHandler.handleCreateContainer(
+        createContainerRequest(kvHandler.getDatanodeId(), containerID), null).getResult());
+    assertNull(handlerWithVolume.getContainerSet().getContainer(containerID));
+    assertFalse(containerDirExists(handlerWithVolume, containerID));
+    assertWitnessEntry(containerID, entryState, entryReplicaIndex);
+  }
+
+  /**
+   * A RECOVERING create is not subject to the witnessed entry: it re-adds a deleted container with its replica index,
+   * and deleting it again leaves a DELETED entry.
+   */
+  @Test
+  public void testRecoveringCreateAfterDeleteIsAllowed() throws Exception {
+    final long containerID = 1L;
+    HandlerWithVolumeSet handlerWithVolume = createHandlerWithWitnessTable();
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+    ContainerSet containerSet = handlerWithVolume.getContainerSet();
+    ContainerCommandRequestProto createRequest = createContainerRequest(kvHandler.getDatanodeId(), containerID);
+    assertEquals(ContainerProtos.Result.SUCCESS, kvHandler.handleCreateContainer(createRequest, null).getResult());
+    kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
+
+    ContainerCommandRequestProto.Builder recoveringRequest = createRequest.toBuilder();
+    recoveringRequest.getCreateContainerBuilder().setState(State.RECOVERING).setReplicaIndex(4);
+    assertEquals(ContainerProtos.Result.SUCCESS,
+        kvHandler.handleCreateContainer(recoveringRequest.build(), null).getResult());
+    Container<?> container = containerSet.getContainer(containerID);
+    assertNotNull(container);
+    assertTrue(containerDirExists(handlerWithVolume, containerID));
+    assertEquals(4, container.getContainerData().getReplicaIndex());
+    assertEquals(4, witnessTable.get(ContainerID.valueOf(containerID)).getReplicaIndex());
+
+    kvHandler.deleteContainer(container, true);
+    assertNull(containerSet.getContainer(containerID));
+    assertWitnessEntry(containerID, State.DELETED, -1);
+  }
+
+  /**
+   * An ordinary create is refused, and leaves nothing behind, when the witnessed entry cannot be read.
+   */
+  @Test
+  public void testCreateIsRefusedWhenWitnessedEntryCannotBeRead() throws Exception {
+    final long containerID = 1L;
+    HandlerWithVolumeSet handlerWithVolume = createHandlerWithWitnessTable();
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+    failWitnessGet.set(true);
+
+    assertEquals(ContainerProtos.Result.IO_EXCEPTION, kvHandler.handleCreateContainer(
+        createContainerRequest(kvHandler.getDatanodeId(), containerID), null).getResult());
+    assertNull(handlerWithVolume.getContainerSet().getContainer(containerID));
+    assertFalse(containerDirExists(handlerWithVolume, containerID));
+  }
+
+  private static Answer<Object> failWhen(AtomicBoolean fail) {
+    return invocation -> {
+      if (fail.get()) {
+        throw new RocksDatabaseException("injected");
+      }
+      return invocation.callRealMethod();
+    };
+  }
+
+  /**
+   * Creates a handler over a real volume whose witnessed container table is {@link #witnessTable}. Reads of the table
+   * fail while {@link #failWitnessGet} is set.
+   */
+  private HandlerWithVolumeSet createHandlerWithWitnessTable() throws IOException {
+    witnessTable = spy(new InMemoryTestTable<ContainerID, ContainerCreateInfo>());
+    doAnswer(failWhen(failWitnessGet)).when(witnessTable).get(any());
+    WitnessedContainerMetadataStore store = mock(WitnessedContainerMetadataStore.class);
+    when(store.getContainerCreateInfoTable()).thenReturn(witnessTable);
+    return createKeyValueHandlerWithVolumeSet(tempDir, null, newContainerSet(1000, store));
+  }
+
+  private void assertWitnessEntry(long containerID, State state, int replicaIndex) {
+    ContainerCreateInfo entry = witnessTable.get(ContainerID.valueOf(containerID));
+    assertNotNull(entry, "no witnessed entry for container " + containerID);
+    assertEquals(state, entry.getState());
+    assertEquals(replicaIndex, entry.getReplicaIndex());
+  }
+
+  private static boolean containerDirExists(HandlerWithVolumeSet handlerWithVolume, long containerID) {
+    return handlerWithVolume.getVolumeSet().getVolumesList().stream()
+        .map(volume -> ((HddsVolume) volume).getHddsRootDir().toString())
+        .anyMatch(root -> new File(KeyValueContainerLocationUtil.getBaseContainerLocation(
+            root, CLUSTER_ID, containerID)).exists());
+  }
+
+  /**
    * Tests that deleting a container decrements the cached used space of its volume.
    */
   @Test
@@ -1348,8 +1457,12 @@ public class TestKeyValueHandler {
 
   private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(Path path, OzoneContainer ozoneContainer)
       throws IOException {
+    return createKeyValueHandlerWithVolumeSet(path, ozoneContainer, newContainerSet());
+  }
+
+  private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(
+      Path path, OzoneContainer ozoneContainer, ContainerSet containerSet) throws IOException {
     ContainerMetrics.remove();
-    final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     final ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
 

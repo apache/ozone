@@ -177,7 +177,8 @@ public class TestValidateBCSIDOnRestart {
     OzoneContainer ozoneContainer =
         dnService.getDatanodeStateMachine()
             .getContainer();
-    ozoneContainer.getContainerSet().removeContainer(containerID);
+    // Lose the replica, not delete it: its witnessed entry stays, so the snapshot marks the container missing.
+    ozoneContainer.getContainerSet().removeContainerOnlyFromMemory(containerID);
     ContainerStateMachine stateMachine =
         (ContainerStateMachine) OzoneTestHelper.getStateMachine(cluster.
                 getHddsDatanodes().get(index),

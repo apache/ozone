@@ -17,10 +17,13 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyLong;
@@ -52,7 +55,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -67,6 +72,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
@@ -242,6 +248,25 @@ class TestContainerImporter {
         targetVolume, NO_COMPRESSION);
 
     assertEquals(Optional.empty(), containerData.lastDataScanTime());
+  }
+
+  @Test
+  void testImportReplicaOfDeletedContainerWritesWitnessEntry() throws Exception {
+    Table<ContainerID, ContainerCreateInfo> entries = containerSet.getContainerMetadataStore()
+        .getContainerCreateInfoTable();
+    ContainerID id = ContainerID.valueOf(containerId);
+    entries.put(id, ContainerCreateInfo.valueOf(DELETED, -1));
+    containerData.setState(CLOSED);
+    containerData.setReplicaIndex(4);
+    HddsVolume targetVolume = mock(HddsVolume.class);
+    File tarFile = containerTarFile(containerId, containerData);
+
+    containerImporter.importContainer(containerId, tarFile.toPath(), targetVolume, NO_COMPRESSION);
+
+    assertNotNull(containerSet.getContainer(containerId));
+    ContainerCreateInfo entry = entries.get(id);
+    assertEquals(4, entry.getReplicaIndex());
+    assertEquals(CLOSED, entry.getState());
   }
 
   private File containerTarFile(long id, ContainerData data) throws IOException {

@@ -22,11 +22,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +50,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.LongStream;
 import org.apache.hadoop.conf.StorageUnit;
@@ -54,12 +58,18 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.junit.jupiter.api.Test;
 
@@ -649,6 +659,186 @@ public class TestContainerSet {
     }
     assertEquals(vol2Ids.size(), foundVol2Ids.size());
     assertTrue(foundVol2Ids.containsAll(vol2Ids));
+  }
+
+  /**
+   * Deleting a replica keeps its entry in the witnessed container table and sets the value to (DELETED, -1).
+   */
+  @Test
+  public void testRemoveContainerKeepsEntryAsDeleted() throws IOException {
+    WitnessedTable witnessed = new WitnessedTable();
+    ContainerSet containerSet = witnessed.containerSet;
+    containerSet.addContainer(newReplica(100L, State.CLOSED, 0));
+
+    assertTrue(containerSet.removeContainer(100L));
+
+    assertEntry(witnessed.entry(100L), State.DELETED, ContainerCreateInfo.INVALID_REPLICA_INDEX);
+    assertNull(containerSet.getContainer(100L));
+    assertFalse(containerSet.getMissingContainerSet().contains(100L));
+  }
+
+  /**
+   * If the entry write of a delete fails, the delete fails: the replica stays in the map and the entry is unchanged.
+   */
+  @Test
+  public void testRemoveContainerFailsWhenEntryWriteFails() throws IOException {
+    WitnessedTable witnessed = new WitnessedTable();
+    ContainerSet containerSet = witnessed.containerSet;
+    KeyValueContainer replica = newReplica(100L, State.CLOSED, 0);
+    containerSet.addContainer(replica);
+    witnessed.failPut.set(true);
+
+    StorageContainerException e = assertThrows(StorageContainerException.class,
+        () -> containerSet.removeContainer(100L));
+
+    assertEquals(ContainerProtos.Result.IO_EXCEPTION, e.getResult());
+    assertSame(replica, containerSet.getContainer(100L));
+    assertEntry(witnessed.entry(100L), State.CLOSED, 0);
+  }
+
+  /**
+   * The repair route replaces a valid replica index in the entry with the index of the replica it adds.
+   */
+  @Test
+  public void testAddByOverwriteReplacesEntryReplicaIndex() throws IOException {
+    WitnessedTable witnessed = new WitnessedTable();
+    ContainerSet containerSet = witnessed.containerSet;
+    witnessed.setEntry(100L, State.CLOSED, 2);
+    KeyValueContainer replica = newReplica(100L, State.CLOSED, 4);
+
+    assertTrue(containerSet.addContainerByOverwriteMissingContainer(replica));
+
+    assertSame(replica, containerSet.getContainer(100L));
+    assertEquals(4, witnessed.entry(100L).getReplicaIndex());
+  }
+
+  /**
+   * If the entry write fails, the add through the repair route is undone: nothing is left in memory, and an ID that was
+   * missing is still missing.
+   */
+  @Test
+  public void testAddByOverwriteUndoneWhenEntryWriteFails() throws IOException {
+    WitnessedTable witnessed = new WitnessedTable();
+    ContainerSet containerSet = witnessed.containerSet;
+    containerSet.removeMissingContainer(100L);
+    assertTrue(containerSet.getMissingContainerSet().contains(100L));
+    witnessed.failPut.set(true);
+
+    StorageContainerException e = assertThrows(StorageContainerException.class,
+        () -> containerSet.addContainerByOverwriteMissingContainer(newReplica(100L, State.RECOVERING, 0)));
+
+    assertEquals(ContainerProtos.Result.IO_EXCEPTION, e.getResult());
+    assertNull(containerSet.getContainer(100L));
+    assertFalse(containerSet.getRecoveringContainerMap().containsKey(100L));
+    assertTrue(containerSet.getMissingContainerSet().contains(100L));
+  }
+
+  /**
+   * If the entry write fails, an ordinary add reports the failure and the replica stays registered, as it did before
+   * the witnessed entry was kept on delete. Only the repair route undoes the registration.
+   */
+  @Test
+  public void testAddStaysRegisteredWhenEntryWriteFails() throws IOException {
+    WitnessedTable witnessed = new WitnessedTable();
+    ContainerSet containerSet = witnessed.containerSet;
+    KeyValueContainer replica = newReplica(100L, State.CLOSED, 0);
+    witnessed.failPut.set(true);
+
+    StorageContainerException e = assertThrows(StorageContainerException.class,
+        () -> containerSet.addContainer(replica));
+
+    assertEquals(ContainerProtos.Result.IO_EXCEPTION, e.getResult());
+    assertSame(replica, containerSet.getContainer(100L));
+  }
+
+  /**
+   * At startup an ID without a loaded replica is marked missing, unless its entry is DELETED. The ID map is keyed by
+   * {@link ContainerID}, as {@code OzoneContainer} builds it from all keys of the table.
+   */
+  @Test
+  public void testBuildMissingContainerSetSkipsDeletedEntries() throws IOException {
+    WitnessedTable witnessed = new WitnessedTable();
+    ContainerSet containerSet = witnessed.containerSet;
+    witnessed.setEntry(100L, State.DELETED, ContainerCreateInfo.INVALID_REPLICA_INDEX);
+    witnessed.setEntry(101L, State.CLOSED, 0);
+    Map<ContainerID, Long> containerIds = new HashMap<>();
+    containerIds.put(ContainerID.valueOf(100L), 0L);
+    containerIds.put(ContainerID.valueOf(101L), 0L);
+
+    containerSet.buildMissingContainerSetAndValidate(containerIds, ContainerID::getId);
+
+    assertThat(containerSet.getMissingContainerSet()).containsExactly(101L);
+  }
+
+  /**
+   * An ID whose entry cannot be read is treated as not deleted, so it is marked missing.
+   */
+  @Test
+  public void testBuildMissingContainerSetWhenEntryReadFails() throws IOException {
+    WitnessedTable witnessed = new WitnessedTable();
+    ContainerSet containerSet = witnessed.containerSet;
+    witnessed.setEntry(100L, State.DELETED, ContainerCreateInfo.INVALID_REPLICA_INDEX);
+    witnessed.failGet.set(true);
+    Map<Long, Long> container2BCSIDMap = new HashMap<>();
+    container2BCSIDMap.put(100L, 5L);
+
+    containerSet.buildMissingContainerSetAndValidate(container2BCSIDMap, n -> n);
+
+    assertThat(containerSet.getMissingContainerSet()).containsExactly(100L);
+  }
+
+  /**
+   * An in-memory witnessed container table and a {@link ContainerSet} over it. Reads and writes of the table can be
+   * made to fail. The table is a mock that delegates to the in-memory table, so a test can replace the answer of a
+   * method.
+   */
+  private static final class WitnessedTable {
+    private final InMemoryTestTable<ContainerID, ContainerCreateInfo> backing = new InMemoryTestTable<>();
+    private final AtomicBoolean failGet = new AtomicBoolean();
+    private final AtomicBoolean failPut = new AtomicBoolean();
+    private final Table<ContainerID, ContainerCreateInfo> table;
+    private final ContainerSet containerSet;
+
+    @SuppressWarnings("unchecked")
+    private WitnessedTable() throws IOException {
+      table = mock(Table.class, delegatesTo(backing));
+      doAnswer(inv -> {
+        if (failGet.get()) {
+          throw new RocksDatabaseException("injected get failure");
+        }
+        return backing.get(inv.getArgument(0));
+      }).when(table).get(any());
+      doAnswer(inv -> {
+        if (failPut.get()) {
+          throw new RocksDatabaseException("injected put failure");
+        }
+        backing.put(inv.getArgument(0), inv.getArgument(1));
+        return null;
+      }).when(table).put(any(), any());
+      WitnessedContainerMetadataStore store = mock(WitnessedContainerMetadataStore.class);
+      when(store.getContainerCreateInfoTable()).thenReturn(table);
+      containerSet = newContainerSet(1000, store);
+    }
+
+    private ContainerCreateInfo entry(long id) {
+      return backing.get(ContainerID.valueOf(id));
+    }
+
+    private void setEntry(long id, State state, int replicaIndex) {
+      backing.put(ContainerID.valueOf(id), ContainerCreateInfo.valueOf(state, replicaIndex));
+    }
+  }
+
+  private static KeyValueContainer newReplica(long id, State state, int replicaIndex) {
+    KeyValueContainer replica = newContainerOnVolume(id, null, state);
+    replica.getContainerData().setReplicaIndex(replicaIndex);
+    return replica;
+  }
+
+  private static void assertEntry(ContainerCreateInfo entry, State state, int replicaIndex) {
+    assertNotNull(entry, "no entry in the witnessed container table");
+    assertEquals(state, entry.getState());
+    assertEquals(replicaIndex, entry.getReplicaIndex());
   }
 
 }

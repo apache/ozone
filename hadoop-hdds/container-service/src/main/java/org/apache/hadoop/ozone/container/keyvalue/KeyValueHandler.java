@@ -504,6 +504,9 @@ public class KeyValueHandler extends Handler {
     containerIdLock.lock();
     try {
       if (containerSet.getContainer(containerID) == null) {
+        if (containerState != RECOVERING) {
+          containerSet.ensureContainerNotWitnessed(containerID);
+        }
         newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
         if (RECOVERING == newContainer.getContainerState()) {
           created = containerSet.addContainerByOverwriteMissingContainer(newContainer);

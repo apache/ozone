@@ -17,10 +17,28 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_MISSING;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getBlockRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCloseContainer;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDeleteContainer;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getReadChunkRequest;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlockID;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -34,9 +52,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -59,28 +79,39 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -300,6 +331,93 @@ public class TestOzoneContainer {
   }
 
   @ContainerTestVersionInfo.ContainerTest
+  public void testDeletedContainerIsNotRecreatedAfterRestart(ContainerTestVersionInfo versionInfo) throws Exception {
+    initTest(versionInfo);
+    Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(datanodeDetails));
+    final long deletedId = 1;
+    final long lostId = 2;
+    OzoneContainer container = startContainer();
+    assertEquals(SUCCESS, dispatch(container, getCreateContainerRequest(deletedId, pipeline)));
+    assertEquals(SUCCESS, dispatch(container, getCreateContainerRequest(lostId, pipeline)));
+    assertThat(containerDirectories(container, deletedId)).hasSize(1);
+    String lostPath = container.getContainerSet().getContainer(lostId).getContainerData().getContainerPath();
+    assertEquals(SUCCESS, dispatch(container, getDeleteContainer(pipeline, deletedId, true)));
+    FileUtils.deleteDirectory(new File(lostPath));
+
+    container = restart(container);
+
+    ContainerSet containerSet = container.getContainerSet();
+    assertEquals(Collections.singleton(lostId), containerSet.getMissingContainerSet());
+    DispatcherContext commitStage = DispatcherContext.newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
+        .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).setContainer2BCSIDMap(new HashMap<>()).build();
+    ContainerProtos.ContainerCommandRequestProto writeToDeleted =
+        getWriteChunkRequest(pipeline, getTestBlockID(deletedId), 100);
+    assertEquals(CONTAINER_NOT_FOUND, container.getDispatcher().dispatch(writeToDeleted, commitStage).getResult());
+    assertEquals(CONTAINER_MISSING, dispatch(container, getWriteChunkRequest(pipeline, getTestBlockID(lostId), 100)));
+    assertEquals(CLOSED_CONTAINER_IO, dispatch(container, getCreateContainerRequest(deletedId, pipeline)));
+    assertThat(containerDirectories(container, deletedId)).isEmpty();
+    assertNull(containerSet.getContainer(deletedId));
+    container.stop();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testRecoveredReplicaWithNewIndexIsLoadedAfterRestart(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
+    Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(datanodeDetails));
+    final long containerId = 1;
+    OzoneContainer container = startContainer();
+    // The datanode witnessed a replica with index 2 of this container and holds no replica now.
+    container.getWitnessedContainerMetadataStore().getContainerCreateInfoTable()
+        .put(ContainerID.valueOf(containerId), ContainerCreateInfo.valueOf(CLOSED, 2));
+
+    // Reconstruction of the replica with index 4: recovering create, write a block, close.
+    assertEquals(SUCCESS, dispatch(container, createRequest(pipeline, containerId, RECOVERING, 4)));
+    ContainerProtos.ContainerCommandRequestProto writeChunk = writeBlock(container, pipeline, containerId, 4);
+    assertEquals(SUCCESS, dispatch(container, getCloseContainer(pipeline, containerId)));
+
+    container = restart(container);
+
+    assertServesBlock(container, pipeline, writeChunk, 4);
+    container.stop();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testImportedReplicaWithNewIndexIsLoadedAfterRestart(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
+    Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(datanodeDetails));
+    final long containerId = 1;
+    ContainerID id = ContainerID.valueOf(containerId);
+    OzoneContainer container = startContainer();
+    // Make a closed replica with index 4 and a block, keep it in a tar file, and delete it.
+    assertEquals(SUCCESS, dispatch(container, createRequest(pipeline, containerId, OPEN, 4)));
+    ContainerProtos.ContainerCommandRequestProto writeChunk = writeBlock(container, pipeline, containerId, 4);
+    assertEquals(SUCCESS, dispatch(container, getCloseContainer(pipeline, containerId)));
+    Path tarFile = folder.resolve("container-" + containerId + ".tar");
+    try (OutputStream out = Files.newOutputStream(tarFile)) {
+      container.getController().exportContainer(ContainerProtos.ContainerType.KeyValueContainer, containerId, out,
+          new TarContainerPacker(NO_COMPRESSION));
+    }
+    assertEquals(SUCCESS, dispatch(container, getDeleteContainer(pipeline, containerId, true)));
+    // The datanode witnessed a replica with index 2 of this container and holds no replica now.
+    container.getWitnessedContainerMetadataStore().getContainerCreateInfoTable()
+        .put(id, ContainerCreateInfo.valueOf(CLOSED, 2));
+    assertNull(container.getContainerSet().getContainer(containerId));
+
+    ContainerImporter importer = new ContainerImporter(conf, container.getContainerSet(), container.getController(),
+        container.getVolumeSet(), VolumeChoosingPolicyFactory.getPolicy(conf));
+    HddsVolume targetVolume = StorageVolumeUtil.getHddsVolumesList(container.getVolumeSet().getVolumesList()).get(0);
+    importer.importContainer(containerId, tarFile, targetVolume, NO_COMPRESSION);
+    assertNotNull(container.getContainerSet().getContainer(containerId));
+
+    container = restart(container);
+
+    assertServesBlock(container, pipeline, writeChunk, 4);
+    container.stop();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
   public void testBuildNodeReport(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);
@@ -426,6 +544,80 @@ public class TestOzoneContainer {
     }
     // remaining available capacity of the container
     return (freeBytes - usedBytes);
+  }
+
+  /** Builds an {@link OzoneContainer} over the test directories and loads its containers, as a restart does. */
+  private OzoneContainer startContainer() throws Exception {
+    BlockUtils.shutdownCache(conf);
+    OzoneContainer container = ContainerTestUtils.getOzoneContainer(datanodeDetails, conf);
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(container.getVolumeSet().getVolumesList())) {
+      StorageVolumeUtil.checkVolume(volume, clusterId, clusterId, conf, null, null);
+    }
+    container.buildContainerSet();
+    container.getVolumeSet().startAllVolume();
+    container.getDispatcher().setClusterId(clusterId);
+    return container;
+  }
+
+  private OzoneContainer restart(OzoneContainer container) throws Exception {
+    container.stop();
+    return startContainer();
+  }
+
+  private ContainerProtos.Result dispatch(OzoneContainer container,
+      ContainerProtos.ContainerCommandRequestProto request) {
+    return container.getDispatcher().dispatch(request, null).getResult();
+  }
+
+  private static ContainerProtos.ContainerCommandRequestProto createRequest(Pipeline pipeline, long containerId,
+      ContainerProtos.ContainerDataProto.State state, int replicaIndex) throws IOException {
+    ContainerProtos.ContainerCommandRequestProto request = getCreateContainerRequest(containerId, pipeline, state);
+    return request.toBuilder()
+        .setCreateContainer(request.getCreateContainer().toBuilder().setReplicaIndex(replicaIndex)).build();
+  }
+
+  /** Writes one chunk and commits its block through the dispatcher. Returns the WriteChunk request. */
+  private ContainerProtos.ContainerCommandRequestProto writeBlock(OzoneContainer container, Pipeline pipeline,
+      long containerId, int replicaIndex) throws IOException {
+    ContainerProtos.ContainerCommandRequestProto writeChunk =
+        getWriteChunkRequest(pipeline, getTestBlockID(containerId, replicaIndex), 100);
+    assertEquals(SUCCESS, dispatch(container, writeChunk));
+    assertEquals(SUCCESS, dispatch(container, getPutBlockRequest(pipeline, writeChunk.getWriteChunk())));
+    return writeChunk;
+  }
+
+  /** Verifies that the closed replica is loaded with the replica index and that its block can be read. */
+  private void assertServesBlock(OzoneContainer container, Pipeline pipeline,
+      ContainerProtos.ContainerCommandRequestProto writeChunk, int replicaIndex) throws IOException {
+    long containerId = writeChunk.getContainerID();
+    Container<?> loaded = container.getContainerSet().getContainer(containerId);
+    assertNotNull(loaded);
+    assertEquals(replicaIndex, loaded.getContainerData().getReplicaIndex());
+    assertEquals(CLOSED, loaded.getContainerState());
+    ContainerProtos.ContainerCommandRequestProto putBlock = getPutBlockRequest(pipeline, writeChunk.getWriteChunk());
+    ContainerProtos.ContainerCommandResponseProto getBlock =
+        container.getDispatcher().dispatch(getBlockRequest(pipeline, putBlock.getPutBlock()), null);
+    assertEquals(SUCCESS, getBlock.getResult());
+    assertEquals(writeChunk.getWriteChunk().getBlockID().getLocalID(),
+        getBlock.getGetBlock().getBlockData().getBlockID().getLocalID());
+    ContainerProtos.ContainerCommandResponseProto readChunk =
+        container.getDispatcher().dispatch(getReadChunkRequest(pipeline, writeChunk.getWriteChunk()), null);
+    assertEquals(SUCCESS, readChunk.getResult());
+    assertEquals(writeChunk.getWriteChunk().getData(),
+        BufferUtils.concatByteStrings(readChunk.getReadChunk().getDataBuffers().getBuffersList()));
+  }
+
+  /** Returns the directories named after the container ID in the container trees of all data volumes. */
+  private List<File> containerDirectories(OzoneContainer container, long containerId) {
+    List<File> dirs = new ArrayList<>();
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(container.getVolumeSet().getVolumesList())) {
+      File dir = new File(KeyValueContainerLocationUtil.getBaseContainerLocation(
+          volume.getHddsRootDir().toString(), clusterId, containerId));
+      if (dir.exists()) {
+        dirs.add(dir);
+      }
+    }
+    return dirs;
   }
 
   private String getVolumeKey(HddsVolume volume) {
