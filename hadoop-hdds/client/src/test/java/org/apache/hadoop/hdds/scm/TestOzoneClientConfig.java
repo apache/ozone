@@ -23,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
+import java.util.Optional;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
 
@@ -115,12 +118,27 @@ class TestOzoneClientConfig {
 
   @Test
   void testDatastreamPutBlockWithoutRaftConfigParsing() {
+    final String key = OzoneClientConfig.OZONE_CLIENT_DATASTREAM_PUTBLOCK_WITHOUT_RAFT_ENABLED;
+
+    // assert experimental
+    final Optional<Config> config = ConfigurationReflectionUtil.getConfigByKey(OzoneClientConfig.class, key);
+    assertTrue(config.isPresent());
+    assertTrue(config.get().experimental());
+
+    // assert default
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean("ozone.client.datastream.putblock.without.raft.enabled", true);
-
     OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+    assertFalse(subject.isDatastreamPutBlockWithoutRaftEnabled());
 
+    // assert set conf
+    conf.setBoolean(OzoneClientConfig.OZONE_CLIENT_DATASTREAM_PUTBLOCK_WITHOUT_RAFT_ENABLED, true);
+    subject = conf.getObject(OzoneClientConfig.class);
     assertTrue(subject.isDatastreamPutBlockWithoutRaftEnabled());
+  }
+
+  @Test
+  void testNoDuplicatedKeys() {
+    ConfigurationReflectionUtil.assertNoDuplicatedKeys(OzoneClientConfig.class);
   }
 
   @Test
