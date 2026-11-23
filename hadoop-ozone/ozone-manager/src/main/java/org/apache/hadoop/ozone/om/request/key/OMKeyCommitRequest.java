@@ -257,7 +257,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           keyName, writerClientId);
       omKeyInfo =
           omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
-      // Builder copies below replace the block locations. Retain allocation evidence for successful-commit metrics.
+      // Keep the allocated block tiers and fallback flags for successful-commit metrics. No copy is needed: get()
+      // returns a request-private object, later steps rebuild omKeyInfo via toBuilder() (which copies the location
+      // groups) before updating locations, and this reference never enters the table cache or the response.
       allocatedKeyInfo = omKeyInfo;
       if (omKeyInfo == null) {
         String action = isRecovery ? "recovery" : isHSync ? "hsync" : "commit";

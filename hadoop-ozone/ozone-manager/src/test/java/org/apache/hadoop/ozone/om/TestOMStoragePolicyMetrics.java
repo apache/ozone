@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.http.PrometheusMetricsSink;
 import org.apache.hadoop.metrics2.AbstractMetric;
+import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.impl.MetricsRecordImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -241,6 +242,32 @@ public class TestOMStoragePolicyMetrics {
     }
     assertThat(snapshot(metrics)).isEqualTo(Map.of(
         "HOT/SSD/SSD/preferred", 3200L, "HOT/SSD/DISK/fallback", 1600L));
+  }
+
+  /**
+   * A started metrics system, as in a running OM, rejects a second registration of the same source name, so
+   * repeated calls on one instance must not register twice.
+   */
+  @Test
+  void testRepeatedRegisterAndUnregisterAreSafe() {
+    MetricsSystem metricsSystem = DefaultMetricsSystem.initialize("TestOMStoragePolicyMetrics");
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(false);
+    OMStoragePolicyMetrics metrics = new OMStoragePolicyMetrics();
+    try {
+      metrics.register(null);
+      metrics.register(null);
+      assertSame(metrics, metricsSystem.getSource("OMStoragePolicyMetrics"));
+      metrics.unregister();
+      metrics.unregister();
+      assertNull(metricsSystem.getSource("OMStoragePolicyMetrics"));
+      metrics.register(null);
+      assertSame(metrics, metricsSystem.getSource("OMStoragePolicyMetrics"));
+    } finally {
+      metrics.unregister();
+      DefaultMetricsSystem.shutdown();
+      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+    }
   }
 
   @Test

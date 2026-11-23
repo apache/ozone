@@ -65,16 +65,23 @@ public final class OMStoragePolicyMetrics implements MetricsSource {
     PREFERRED, FALLBACK, UNKNOWN
   }
 
-  void register(ConfigurationSource conf) {
-    sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME,
+  /** Registers this source once; repeated calls on the same instance are no-ops. */
+  synchronized void register(ConfigurationSource conf) {
+    if (sourceName != null) {
+      return;
+    }
+    String name = MetricUtil.getMetricsSourceName(SOURCE_NAME,
         conf == null ? null : conf.get(OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID),
         conf == null ? null : conf.get(OMConfigKeys.OZONE_OM_NODE_ID_KEY));
-    DefaultMetricsSystem.instance().register(sourceName, "OM storage policy commit metrics", this);
+    DefaultMetricsSystem.instance().register(name, "OM storage policy commit metrics", this);
+    sourceName = name;
   }
 
-  void unregister() {
+  /** Unregisters this source if registered, so a later {@link #register} can register it again. */
+  synchronized void unregister() {
     if (sourceName != null) {
       DefaultMetricsSystem.instance().unregisterSource(sourceName);
+      sourceName = null;
     }
   }
 

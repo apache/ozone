@@ -274,7 +274,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     final boolean isHSync = commitKeyRequest.hasHsync() && commitKeyRequest.getHsync();
     final String clientIdString = String.valueOf(commitKeyRequest.getClientID());
 
-    // Keep the allocated locations for metrics before rebuilding the committed key with client locations.
+    // Keep the allocated block tiers and fallback flags for metrics. No copy is needed: the open key is
+    // request-private, the committed key is rebuilt via toBuilder() (which copies the location groups) before its
+    // locations are updated, and this reference never enters the table cache or the response.
     prepared.allocatedKeyInfo = prepared.omKeyInfo;
     prepared.omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
