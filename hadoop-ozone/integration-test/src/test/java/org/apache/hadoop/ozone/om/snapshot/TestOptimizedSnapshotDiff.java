@@ -27,11 +27,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -156,6 +159,52 @@ public class TestOptimizedSnapshotDiff extends OmSnapshotTests {
       assertThat(response.getSnapshotDiffReport().getDiffList()).containsExactlyInAnyOrder(
           SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.DELETE, key1),
           SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.RENAME, key2, renamedKey));
+    }
+  }
+
+  /**
+   * Verifies that DAG diff falls back to full diff for a value-pruned backup SST.
+   */
+  @Test
+  public void testDagDiffAfterBackupSstValuePruning() throws Exception {
+    String snap1 = "snap-pruned-1";
+    String snap2 = "snap-pruned-2";
+    RDBStore rdbStore = (RDBStore) getCluster().getOzoneManager()
+        .getMetadataManager().getStore();
+
+    // Overlapping key ranges force compaction to merge SSTs instead of moving
+    // the newer SST to another level.
+    createObsKey(getOzoneBucket(), "pruned-a");
+    createObsKey(getOzoneBucket(), "pruned-z");
+    rdbStore.flushDB();
+    createSnapshot(getVolumeName(), getBucketName(), snap1);
+
+    List<DiffReportEntry> expected = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      String key = "pruned-m" + i;
+      createObsKey(getOzoneBucket(), key);
+      expected.add(SnapshotDiffReportOzone.getDiffReportEntry(
+          SnapshotDiffReport.DiffType.CREATE, key));
+    }
+    rdbStore.flushDB();
+    createSnapshot(getVolumeName(), getBucketName(), snap2);
+
+    // Prune the compaction input SSTs retained in the backup directory.
+    rdbStore.compactDB();
+    RocksDBCheckpointDiffer differ = rdbStore.getRocksDBCheckpointDiffer();
+    differ.pruneSstFileValues();
+    assertThat(differ.getPruningMetrics().getFilesPrunedLast()).isPositive();
+
+    try (GenericTestUtils.LogCapturer logs =
+             GenericTestUtils.LogCapturer.captureLogs(SnapshotDiffManager.class)) {
+      for (boolean ordered : new boolean[] {false, true}) {
+        SnapshotDiffResponse response = waitForDoneReportAfterSubmit(
+            getVolumeName(), getBucketName(), snap1, snap2, false, ordered);
+        assertThat(response.getSnapshotDiffReport().getDiffList())
+            .containsExactlyInAnyOrderElementsOf(expected);
+      }
+      assertThat(logs.getOutput())
+          .contains("Falling back to full diff for table 'fileTable'");
     }
   }
 

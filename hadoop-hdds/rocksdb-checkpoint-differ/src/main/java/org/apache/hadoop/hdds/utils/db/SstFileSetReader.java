@@ -44,6 +44,10 @@ import org.rocksdb.RocksDBException;
  */
 public class SstFileSetReader {
 
+  /** Table property that RocksDB's SstFileWriter adds to every file it writes. */
+  private static final String EXTERNAL_SST_FILE_VERSION =
+      "rocksdb.external_sst_file.version";
+
   private final Collection<Path> sstFiles;
 
   private volatile long estimatedTotalKeys = -1;
@@ -77,6 +81,30 @@ public class SstFileSetReader {
     }
 
     return estimatedTotalKeys;
+  }
+
+  /**
+   * Returns whether any file was written by an SST file writer instead of a
+   * flush or compaction. Such files, including value-pruned compaction backup
+   * files, do not preserve the per-entry sequence numbers required by DAG diff.
+   */
+  public boolean hasExternalSstFile() throws RocksDatabaseException {
+    try (ManagedOptions options = new ManagedOptions()) {
+      for (Path sstFile : sstFiles) {
+        try (ManagedSstFileReader fileReader =
+                 new ManagedSstFileReader(options)) {
+          fileReader.open(sstFile.toAbsolutePath().toString());
+          if (fileReader.getTableProperties().getUserCollectedProperties()
+              .containsKey(EXTERNAL_SST_FILE_VERSION)) {
+            return true;
+          }
+        } catch (RocksDBException e) {
+          throw new RocksDatabaseException(
+              "Failed to open SST file: " + sstFile, e);
+        }
+      }
+    }
+    return false;
   }
 
   public ClosableIterator<String> getKeyStream(String lowerBound, String upperBound) throws CodecException {

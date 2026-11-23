@@ -19,13 +19,16 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,16 +39,24 @@ import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.RocksTestUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedFlushOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.util.ClosableIterator;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
 /**
@@ -356,6 +367,44 @@ class TestSstFileSetReader {
     int expectedTotalKeys = testKeys.length + (numberOfFiles * 3);
     assertEquals(expectedTotalKeys, actualKeys.size(),
         "Should have correct total number of distinct keys");
+  }
+
+  @Test
+  public void testHasExternalSstFile() throws Exception {
+    Path external = createRandomSSTFile(
+        new TreeMap<>(createKeys(0, 2)));
+    assertTrue(new SstFileSetReader(Collections.singletonList(external))
+        .hasExternalSstFile());
+
+    File dbDir = new File(tempDir, "db");
+    List<ColumnFamilyHandle> handles = new ArrayList<>();
+    try (ManagedDBOptions dbOptions = new ManagedDBOptions();
+         ManagedColumnFamilyOptions cfOptions =
+             new ManagedColumnFamilyOptions();
+         ManagedFlushOptions flushOptions = new ManagedFlushOptions()) {
+      dbOptions.setCreateIfMissing(true);
+      List<ColumnFamilyDescriptor> descriptors = Collections.singletonList(
+          new ColumnFamilyDescriptor(StringUtils.string2Bytes("default"),
+              cfOptions));
+      try (ManagedRocksDB db = ManagedRocksDB.open(dbOptions,
+          dbDir.getAbsolutePath(), descriptors, handles)) {
+        try {
+          db.get().put(StringUtils.string2Bytes("key"),
+              StringUtils.string2Bytes("value"));
+          db.get().flush(flushOptions);
+        } finally {
+          handles.forEach(ColumnFamilyHandle::close);
+        }
+      }
+    }
+
+    List<Path> flushed;
+    try (Stream<Path> files = Files.list(dbDir.toPath())) {
+      flushed = files.filter(file -> file.toString().endsWith(".sst"))
+          .collect(Collectors.toList());
+    }
+    assertEquals(1, flushed.size());
+    assertFalse(new SstFileSetReader(flushed).hasExternalSstFile());
   }
 
   /**

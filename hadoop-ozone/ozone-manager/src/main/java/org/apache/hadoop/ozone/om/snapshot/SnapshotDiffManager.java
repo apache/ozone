@@ -1405,6 +1405,14 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
 
     boolean fullDiff = useFullDiff || deltaDiffComputer.isFullDiff();
     deltaDiffComputer.resetFullDiffFallback();
+    // The DAG reader requires original values and sequence numbers. Value-pruned
+    // backup SSTs are external files with empty values and sequence number zero.
+    if (!fullDiff && sstFileReader.hasExternalSstFile()) {
+      LOG.info("Falling back to full diff for table '{}' because a delta SST "
+          + "was written externally and cannot be read safely by the DAG "
+          + "reader, jobId: {}", tableName, jobId);
+      fullDiff = true;
+    }
     // Raw RDBTable (DBStore#getTable): delta keys and values are byte[]; TypedTable would decode keys/values.
     Table<byte[], byte[]> fromTable;
     Table<byte[], byte[]> toTable;
