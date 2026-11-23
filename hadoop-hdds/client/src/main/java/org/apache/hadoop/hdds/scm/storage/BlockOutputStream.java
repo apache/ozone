@@ -597,11 +597,7 @@ public class BlockOutputStream extends OutputStream {
       asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString, containerAutoCreate());
       CompletableFuture<ContainerCommandResponseProto> future = asyncReply.getResponse();
       flushFuture = future.thenCombineAsync(putBlockReplyHandled, (e, ignored) -> {
-        try {
-          validateResponse(e);
-        } catch (IOException sce) {
-          throw new CompletionException(sce);
-        }
+        validateResponse(e, true);
         // if the ioException is not set, putBlock is successful
         if (getIoException() == null && !force) {
           handleSuccessfulPutBlock(e.getPutBlock().getCommittedBlockLength(),
@@ -800,21 +796,25 @@ public class BlockOutputStream extends OutputStream {
   void waitOnFlushFuture() throws InterruptedException, ExecutionException {
   }
 
-  void validateResponse(
-      ContainerCommandResponseProto responseProto)
-      throws IOException {
+  void validateResponse(ContainerCommandResponseProto responseProto, boolean throwCompletionException) {
     try {
       // if the ioException is already set, it means a prev request has failed
       // just throw the exception. The current operation will fail with the
       // original error
       IOException exception = getIoException();
       if (exception != null) {
-        throw exception;
+        if (throwCompletionException) {
+          throw new CompletionException(exception);
+        } else {
+          return;
+        }
       }
       ContainerProtocolCalls.validateContainerResponse(responseProto);
     } catch (StorageContainerException sce) {
       setIoException(sce);
-      throw sce;
+      if (throwCompletionException) {
+        throw new CompletionException(sce);
+      }
     }
   }
 
@@ -966,11 +966,7 @@ public class BlockOutputStream extends OutputStream {
       CompletableFuture<ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       validateFuture = respFuture.thenCombineAsync(putBlockReplyHandled, (e, ignored) -> {
-        try {
-          validateResponse(e);
-        } catch (IOException sce) {
-          respFuture.completeExceptionally(sce);
-        }
+        validateResponse(e, true);
         // if the ioException is not set, putBlock is successful
         if (getIoException() == null && putBlockPiggybacking) {
           handleSuccessfulPutBlock(e.getWriteChunk().getCommittedBlockLength(),
