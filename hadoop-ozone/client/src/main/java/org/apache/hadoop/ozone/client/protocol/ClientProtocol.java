@@ -1285,7 +1285,7 @@ public interface ClientProtocol {
    * @param volumeName Volume name
    * @param bucketName Bucket name
    * @param keyName    Absolute path of the file to be written
-   * @param options    Size, replication config, overwrite, recursive flags and storage policy of the file
+   * @param options    Size, replication config, overwrite and recursive flags of the file
    * @return Output stream for writing to the file
    * @throws OMException if given key is a directory
    *                     if file exists and isOverwrite flag is false

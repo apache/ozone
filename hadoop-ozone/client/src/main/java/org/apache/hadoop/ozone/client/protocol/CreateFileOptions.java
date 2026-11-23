@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.ozone.client.protocol;
 
-import jakarta.annotation.Nullable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.StoragePolicy;
 
 /**
  * Options for {@link ClientProtocol#createFile(String, String, String, CreateFileOptions)}.
@@ -31,14 +29,12 @@ public final class CreateFileOptions {
   private final ReplicationConfig replicationConfig;
   private final boolean overWrite;
   private final boolean recursive;
-  private final StoragePolicy storagePolicy;
 
   private CreateFileOptions(Builder b) {
     this.size = b.size;
     this.replicationConfig = b.replicationConfig;
     this.overWrite = b.overWrite;
     this.recursive = b.recursive;
-    this.storagePolicy = b.storagePolicy;
   }
 
   /** @return the size of the data to be written. */
@@ -61,12 +57,6 @@ public final class CreateFileOptions {
     return recursive;
   }
 
-  /** @return the storage policy of the file, or null to inherit the bucket's. */
-  @Nullable
-  public StoragePolicy getStoragePolicy() {
-    return storagePolicy;
-  }
-
   /**
    * Builder for CreateFileOptions.
    */
@@ -75,7 +65,6 @@ public final class CreateFileOptions {
     private ReplicationConfig replicationConfig;
     private boolean overWrite;
     private boolean recursive;
-    private StoragePolicy storagePolicy;
 
     public Builder setSize(long size) {
       this.size = size;
@@ -94,11 +83,6 @@ public final class CreateFileOptions {
 
     public Builder setRecursive(boolean recursive) {
       this.recursive = recursive;
-      return this;
-    }
-
-    public Builder setStoragePolicy(@Nullable StoragePolicy storagePolicy) {
-      this.storagePolicy = storagePolicy;
       return this;
     }
 

@@ -753,6 +753,49 @@ public class TestRpcClient {
     }
   }
 
+  /**
+   * A single CreateKeyOptions carrying both a storage policy and derived key piggybacking must send both to the OM.
+   */
+  @Test
+  void testCreateKeyOptionsMappedToRequest() throws IOException {
+    AtomicReference<CreateKeyRequest> captured = new AtomicReference<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return super.submitRequest(request).toBuilder()
+              .setServiceListResponse(ServiceListResponse.newBuilder()
+                  .addServiceInfo(OzoneManagerProtocolProtos.ServiceInfo.newBuilder()
+                      .setNodeType(HddsProtos.NodeType.OM).setHostname("new-om")
+                      .setOMVersion(OzoneManagerVersion.STORAGE_POLICY_SUPPORT.serialize())))
+              .build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          captured.set(request.getCreateKeyRequest());
+          throw new IOException("Captured CreateKey request");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      CreateKeyOptions options = new CreateKeyOptions.Builder()
+          .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+          .setStoragePolicy(OzoneStoragePolicy.HOT)
+          .setDerivedKeyPiggyBacking(true)
+          .build();
+
+      assertThatThrownBy(() -> client.createKey("volume", "bucket", "key", options))
+          .isInstanceOf(IOException.class)
+          .hasMessage("Captured CreateKey request");
+      assertThat(captured.get()).isNotNull();
+      assertThat(captured.get().getDerivedKeyPiggyBacking()).isTrue();
+      assertThat(captured.get().getKeyArgs().getStoragePolicy()).isEqualTo(HddsProtos.StoragePolicyProto.HOT);
+    } finally {
+      client.close();
+    }
+  }
+
   @Test
   public void testCreateKeyRejectsNullOptions() throws IOException {
     RpcClient client = createRpcClient();
