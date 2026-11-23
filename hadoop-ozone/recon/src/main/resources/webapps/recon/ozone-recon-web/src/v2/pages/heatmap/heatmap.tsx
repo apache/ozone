@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import React, { ChangeEvent, useState, useEffect, useCallback } from 'react';
+import React, { ChangeEvent, useState, useEffect } from 'react';
 import moment, { Moment } from 'moment';
 import { Button, Menu, Input, Dropdown, DatePicker, Form, Result, Spin } from 'antd';
 import { MenuProps } from 'antd/es/menu';
@@ -24,7 +24,7 @@ import { DownOutlined } from '@ant-design/icons';
 import { showDataFetchError } from '@/utils/common';
 import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import * as CONSTANTS from '@/v2/constants/heatmap.constants';
-import { HeatmapChild, HeatmapResponse, HeatmapState, InputPathState } from '@/v2/types/heatmap.types';
+import { HeatmapChild, HeatmapResponse, HeatmapState } from '@/v2/types/heatmap.types';
 import HeatmapPlot from '@/v2/components/plots/heatmapPlot';
 
 import './heatmap.less';
@@ -41,13 +41,13 @@ const DEFAULT_HEATMAP_RESPONSE: HeatmapResponse = {
   minAccessCount: 0
 };
 
-const INPUT_PATH_REGEX = /^[a-zA-Z0-9_./-]*$/;
-
-function getInputPathValidation(path: string): Pick<InputPathState, 'isInputPathValid' | 'helpMessage'> {
-  if (!INPUT_PATH_REGEX.test(path)) {
-    return { isInputPathValid: 'error', helpMessage: 'Please enter valid path' };
-  }
-  return { isInputPathValid: undefined, helpMessage: '' };
+function buildHeatmapReadAccessUrl(startDate: string | number, path: string, entityType: string): string {
+  const params = new URLSearchParams({
+    startDate: String(startDate),
+    path,
+    entityType,
+  });
+  return `/api/v1/heatmap/readaccess?${params.toString()}`;
 }
 
 const Heatmap: React.FC<{}> = () => {
@@ -69,7 +69,7 @@ const Heatmap: React.FC<{}> = () => {
   // Use the modern hooks pattern for heatmap data - only trigger on searchPath change
   const heatmapData = useApiData<HeatmapResponse>(
     isHeatmapEnabled && state.date && searchPath && state.entityType
-      ? `/api/v1/heatmap/readaccess?startDate=${state.date}&path=${searchPath}&entityType=${state.entityType}`
+      ? buildHeatmapReadAccessUrl(state.date, searchPath, state.entityType)
       : '',
     DEFAULT_HEATMAP_RESPONSE,
     {
@@ -106,9 +106,6 @@ const Heatmap: React.FC<{}> = () => {
   }
 
   function handleSubmit() {
-    if (getInputPathValidation(inputPath).isInputPathValid === 'error') {
-      return;
-    }
     if (isHeatmapEnabled && state.date && inputPath && state.entityType) {
       setSearchPath(inputPath);
     }
@@ -201,7 +198,6 @@ const Heatmap: React.FC<{}> = () => {
   };
 
   const { date, entityType, heatmapResponse } = state;
-  const { isInputPathValid, helpMessage } = getInputPathValidation(inputPath);
   const loading = heatmapData.loading;
 
   const menuCalendar = (
@@ -277,10 +273,7 @@ const Heatmap: React.FC<{}> = () => {
                 <div className='heatmap-filter-section'>
                   <div className='path-input-container'>
                     <h4 style={{ paddingTop: '2%' }}>Path</h4>
-                    <Form.Item
-                      className='path-input-element'
-                      validateStatus={isInputPathValid}
-                      help={isInputPathValid === 'error' ? helpMessage : undefined}>
+                    <Form.Item className='path-input-element'>
                       <Input.Search
                         allowClear
                         placeholder={CONSTANTS.ROOT_PATH}
