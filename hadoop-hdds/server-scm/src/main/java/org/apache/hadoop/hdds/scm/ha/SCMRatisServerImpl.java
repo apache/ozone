@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSCon
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.net.InetAddresses;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -45,6 +47,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.conf.Parameters;
@@ -232,20 +235,28 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   public SCMRatisResponse submitRequest(SCMRatisRequest request)
       throws IOException, ExecutionException, InterruptedException,
       TimeoutException {
-    final RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-        .setClientId(clientId)
-        .setServerId(getDivision().getId())
-        .setGroupId(getDivision().getGroup().getGroupId())
-        .setCallId(nextCallId())
-        .setMessage(request.encode())
-        .setType(RaftClientRequest.writeRequestType())
-        .build();
-    // any request submitted to
-    final RaftClientReply raftClientReply =
-        server.submitClientRequestAsync(raftClientRequest)
-            .get(requestTimeout, TimeUnit.MILLISECONDS);
-    LOG.debug("request {} Reply {}", raftClientRequest, raftClientReply);
-    return SCMRatisResponse.decode(raftClientReply);
+    final Span span = TracingUtil.createInternalSpan("SCMRatisServerImpl.submit." + request.getOperation());
+    try (Scope ignored = span.makeCurrent()) {
+      final RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
+          .setClientId(clientId)
+          .setServerId(getDivision().getId())
+          .setGroupId(getDivision().getGroup().getGroupId())
+          .setCallId(nextCallId())
+          .setMessage(request.encode())
+          .setType(RaftClientRequest.writeRequestType())
+          .build();
+      // any request submitted to
+      final RaftClientReply raftClientReply =
+          server.submitClientRequestAsync(raftClientRequest)
+              .get(requestTimeout, TimeUnit.MILLISECONDS);
+      LOG.debug("request {} Reply {}", raftClientRequest, raftClientReply);
+      return SCMRatisResponse.decode(raftClientReply);
+    } catch (Exception e) {
+      TracingUtil.recordException(span, e);
+      throw e;
+    } finally {
+      span.end();
+    }
   }
 
   @Override
