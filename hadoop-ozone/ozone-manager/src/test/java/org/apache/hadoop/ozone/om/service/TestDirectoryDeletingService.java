@@ -57,7 +57,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -412,8 +411,8 @@ public class TestDirectoryDeletingService {
           RatisReplicationConfig.getInstance(ONE)).setObjectID(3).setParentObjectID(2).build();
       String childDeleteKey = metadataManager.getOzoneDeletePathKey(child.getObjectID(),
           metadataManager.getOzonePathKey(1, 2, child.getParentObjectID(), child.getFileName()));
-      List<Pair<String, OmKeyInfo>> subDirs = new ArrayList<>();
-      subDirs.add(Pair.of(childDeleteKey, child));
+      List<DirectoryDeletingService.PendingSubDir> subDirs = new ArrayList<>();
+      subDirs.add(new DirectoryDeletingService.PendingSubDir(childDeleteKey, child));
       PurgePathRequest parent = PurgePathRequest.newBuilder().setVolumeId(1).setBucketId(2)
           .setDeletedDir("parent").addMarkDeletedSubDirs(child.getProtobuf(ClientVersion.CURRENT)).build();
       List<PurgePathRequest> purgeList = new ArrayList<>();

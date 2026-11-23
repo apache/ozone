@@ -44,6 +44,7 @@ env:
   # MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
+  MVNW_VERBOSE: true
   OZONE_WITH_COVERAGE: ${{ github.event_name != 'pull_request' }}
 
 permissions: { }
@@ -207,10 +208,9 @@ jobs:
     uses: $/.github/workflows/check.yml
     with:
       checkout-fetch-depth: ${{ matrix.check != 'bats' && 1 || 0 }}
-      java-version: ${{ !contains('author,bats', matrix.check) && needs.build-info.outputs.java-version || '' }}
-      needs-maven-cache: ${{ !contains('author,bats', matrix.check) }}
+      java-version: ${{ !contains('author,bats,pyunit', matrix.check) && needs.build-info.outputs.java-version || '' }}
       ratis-args: ${{ inputs.ratis_args }}
-      runner: ${{ contains('author,bats', matrix.check) && 'ubuntu-slim' || 'ubuntu-26.04' }}
+      runner: ${{ contains('author,bats,pyunit', matrix.check) && 'ubuntu-slim' || 'ubuntu-24.04' }}
       script: ${{ matrix.check }}
       sha: ${{ needs.build-info.outputs.sha }}
       timeout-minutes: 30
@@ -248,7 +248,6 @@ jobs:
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
-      needs-maven-cache: false
       needs-ozone-binary-tarball: true
       runner: ubuntu-slim
       script: dependency
@@ -321,7 +320,7 @@ jobs:
       java-version: 11 # Hadoop may not work with newer Java
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
-      runner: ubuntu-26.04
+      runner: ubuntu-24.04
       script: acceptance
       script-args: ${{ matrix.suite }}
       sha: ${{ needs.build-info.outputs.sha }}
@@ -350,6 +349,7 @@ jobs:
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: acceptance
@@ -376,6 +376,7 @@ jobs:
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: kubernetes
@@ -490,15 +491,6 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ needs.build-info.outputs.sha }}
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v6
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
@@ -508,9 +500,8 @@ jobs:
           mkdir -p hadoop-ozone/dist/target
           tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Setup java ${{ env.TEST_JAVA_VERSION }}
-        uses: actions/setup-java@v6
+        uses: $/.github/actions/setup-java-with-cache
         with:
-          distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
@@ -522,8 +513,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Archive build results
+        id: archive
         uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: target/coverage
         continue-on-error: true
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python3 dev-support/ci/coverage_summary.py >> "$GITHUB_STEP_SUMMARY"
+        env:
+          COVERAGE_REPORT_URL: ${{ steps.archive.outputs.artifact-url }}

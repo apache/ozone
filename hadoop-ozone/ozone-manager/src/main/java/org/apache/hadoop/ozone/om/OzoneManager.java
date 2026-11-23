@@ -290,6 +290,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
@@ -518,6 +519,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
   private final boolean isS3STSEnabled;
+  private final int s3StsMinDurationSeconds;
   private ExitManager exitManager;
   /** Test-only hook to fail a checkpoint-install DB backup part way through. */
   private FaultInjector checkpointBackupInjector;
@@ -768,6 +770,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isS3STSEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY,
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
+    // Invalid AssumeRole min duration with STS feature flag off must not break startup
+    this.s3StsMinDurationSeconds = isS3STSEnabled ? S3STSUtils.getMinDurationSeconds(conf) :
+        S3STSUtils.MIN_DURATION_SECONDS;
 
     metrics = OMMetrics.create(conf);
     omSnapshotIntMetrics = OmSnapshotInternalMetrics.create(getOMServiceId(),
@@ -1215,6 +1220,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isS3STSEnabled() {
     return isS3STSEnabled;
+  }
+
+  /**
+   * Returns the minimum valid AssumeRole {@code DurationSeconds}, including any test-only override.
+   */
+  public int getS3StsMinDurationSeconds() {
+    return s3StsMinDurationSeconds;
   }
 
   /**
@@ -2034,6 +2046,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
 
+    // If the OM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB,
+    // and the finalization included in the snapshot is not in the Raft log to be replayed.
+    versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
+
     metadataManager.start(configuration);
 
     startSecretManagerIfNecessary();
@@ -2173,6 +2189,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.startSnapshotDirectoryMetrics(configuration, getMetadataManager());
 
     initializeRatisServer(false);
+    // If the OM stopped during a snapshot install after the DB was replaced, the VERSION file is behind the DB,
+    // and the finalization included in the snapshot is not in the Raft log to be replayed.
+    // Ratis must be initialized first so that upgrade actions (e.g. quota repair) can check leader status.
+    versionManager.finalizeFromDBIfRequired(metadataManager.getMetaTable());
     if (omRatisServer != null) {
       omRatisServer.start();
     }
@@ -4525,8 +4545,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmMultipartUploadListParts listParts(final String volumeName,
       final String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
+    return listParts(volumeName, bucketName, keyName, uploadID, partNumberMarker, maxParts, false);
+  }
 
-    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+  public OmMultipartUploadListParts listParts(String volumeName, String bucketName, String keyName, String uploadID,
+      int partNumberMarker, int maxParts, boolean assumeS3Context) throws IOException {
+    String resolvedVolumeName = assumeS3Context ? getS3VolumeContext(true).getOmVolumeArgs().getVolume() : volumeName;
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(resolvedVolumeName, bucketName));
     final String realVolumeName = bucket.realVolume();
     final String realBucketName = bucket.realBucket();
 
@@ -4565,8 +4590,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String bucketName,
       String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
       throws IOException {
+    return listMultipartUploads(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
+        withPagination, false);
+  }
 
-    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OmMultipartUploadList listMultipartUploads(String volumeName, String bucketName, String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination, boolean assumeS3Context)
+      throws IOException {
+    String resolvedVolumeName = assumeS3Context ? getS3VolumeContext(true).getOmVolumeArgs().getVolume() : volumeName;
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(resolvedVolumeName, bucketName));
     final String realVolumeName = bucket.realVolume();
     final String realBucketName = bucket.realBucket();
 
@@ -6310,18 +6343,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private String reconfOzoneSnapshotSSTFilteringServiceInterval(String newVal) {
-    boolean wasSstFilteringSvcEnabled = ((KeyManagerImpl) keyManager).isSstFilteringSvcEnabled();
     getConfiguration().set(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
 
     if (this.isFilesystemSnapshotEnabled()) {
-      if (wasSstFilteringSvcEnabled) {
-        // Sanity check
-        Objects.requireNonNull(keyManager.getSnapshotSstFilteringService(),
-            "sstFilteringService should not be null when SST filtering service is enabled.");
-        ((KeyManagerImpl) keyManager).stopSnapshotSstFilteringService();
-      }
-      // Note startSnapshotSstFilteringService checks whether the config is set to a value that enables the service
-      ((KeyManagerImpl) keyManager).startSnapshotSstFilteringService(getConfiguration());
+      keyManager.restartSnapshotSstFilteringService(getConfiguration());
     } else {
       LOG.warn("Ozone filesystem snapshot is not enabled. {} is reconfigured but will not make any difference.",
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL);
@@ -6362,6 +6387,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
   }
 
+  /**
+   * Test hook that lets a test make this OM reject a feature it supports, by listing the feature in
+   * {@link OMConfigKeys#OZONE_OM_FEATURES_DISABLED}.
+   * <p>
+   * This is not a version gate: it reads only the config, not the OM version.
+   * New features do not need to call it; add a call only for a feature that a test disables.
+   */
   public void checkFeatureEnabled(OzoneManagerVersion feature) throws OMException {
     String disabledFeatures = configuration.get(OMConfigKeys.OZONE_OM_FEATURES_DISABLED, "");
     if (disabledFeatures.contains(feature.name())) {

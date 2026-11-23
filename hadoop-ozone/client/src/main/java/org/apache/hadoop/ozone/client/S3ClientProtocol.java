@@ -484,24 +484,20 @@ final class S3ClientProtocol implements ClientProtocol {
   @Override
   public void abortMultipartUpload(String volumeName, String bucketName, String keyName, String uploadID)
       throws IOException {
-    delegate.abortMultipartUpload(volumeName, bucketName, keyName, uploadID);
-  }
-
-  @Override
-  public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
-    delegate.abortS3MultipartUpload(bucketName, keyName, uploadID);
+    delegate.abortMultipartUpload(resolveVolumeName(volumeName), bucketName, keyName, uploadID);
   }
 
   @Override
   public OzoneMultipartUploadPartListParts listParts(String volumeName, String bucketName, String keyName,
       String uploadID, int partNumberMarker, int maxParts) throws IOException {
-    return delegate.listParts(volumeName, bucketName, keyName, uploadID, partNumberMarker, maxParts);
+    return delegate.listParts(resolveVolumeName(volumeName), bucketName, keyName, uploadID, partNumberMarker, maxParts);
   }
 
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumename, String bucketName, String prefix,
       String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
-    return delegate.listMultipartUploads(volumename, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
+    return delegate.listMultipartUploads(
+        resolveVolumeName(volumename), bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
   }
 
   @Override
@@ -917,7 +913,7 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public void deleteObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
-    delegate.deleteObjectTagging(volumeName, bucketName, keyName);
+    delegate.deleteObjectTagging(resolveVolumeName(volumeName), bucketName, keyName);
   }
 
   @Override

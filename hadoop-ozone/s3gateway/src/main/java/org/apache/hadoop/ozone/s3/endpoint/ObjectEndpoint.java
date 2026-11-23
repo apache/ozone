@@ -31,8 +31,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
@@ -937,8 +935,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: " +
             OmConfig.Keys.ENABLE_FILESYSTEM_PATHS + " is enabled Keys are " +
-            "considered as Unix Paths. A directory already exists with a " +
-            "given KeyName caused failure for MPU");
+            "considered as Unix Paths. Path has Violated FS Semantics " +
+            "which caused failure for MPU");
         throw os3Exception;
       } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS
           || ex.getResult() == ResultCodes.ETAG_MISMATCH
@@ -1031,17 +1029,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         } else {
           length = sourceKeyDetails.getDataSize();
         }
-        Long sourceKeyModificationTime = sourceKeyDetails
-            .getModificationTime().toEpochMilli();
-        String copySourceIfModifiedSince =
-            getHeaders().getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
-        String copySourceIfUnmodifiedSince =
-            getHeaders().getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
-        if (!S3ConditionalRequest.checkCopySourceModificationTime(
-            sourceKeyModificationTime,
-            copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
-          throw newError(PRECOND_FAILED, sourceBucket + "/" + sourceKey);
-        }
+        S3ConditionalRequest.evaluatePreconditions(getHeaders(), sourceBucket + "/" + sourceKey,
+            sourceKeyDetails, S3ConditionalRequest.PreconditionContext.COPY_SOURCE);
 
         final MessageDigest md5Digest = getMD5DigestInstance();
         try (OzoneInputStream sourceObject = sourceKeyDetails.getContent();

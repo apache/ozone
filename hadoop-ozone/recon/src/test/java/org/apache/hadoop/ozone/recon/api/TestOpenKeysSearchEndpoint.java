@@ -36,6 +36,7 @@ import java.util.UUID;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -130,18 +131,7 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
     if (reconScm != null) {
       reconScm.stop();
     }
-    if (reconReplicaHistoryDBProvider != null) {
-      reconReplicaHistoryDBProvider.close();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
-    }
-    if (reconOMMetadataManager != null) {
-      reconOMMetadataManager.stop();
-    }
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
-    }
+    IOUtils.closeQuietly(reconReplicaHistoryDBProvider, reconDBProvider, reconOMMetadataManager, omMetadataManager);
   }
 
   /**

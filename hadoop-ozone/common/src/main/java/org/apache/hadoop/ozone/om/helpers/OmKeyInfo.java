@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -342,10 +341,9 @@ public final class OmKeyInfo extends WithParentObjectId
       updatedBlockLocations = locationInfoList;
       uncommittedBlocks = new ArrayList<>();
     } else {
-      Pair<List<OmKeyLocationInfo>, List<OmKeyLocationInfo>> verifiedResult =
-          verifyAndGetKeyLocations(locationInfoList, keyLocationInfoGroup);
-      updatedBlockLocations = verifiedResult.getLeft();
-      uncommittedBlocks = verifiedResult.getRight();
+      VerifiedLocations verifiedResult = verifyAndGetKeyLocations(locationInfoList, keyLocationInfoGroup);
+      updatedBlockLocations = verifiedResult.updated;
+      uncommittedBlocks = verifiedResult.uncommitted;
     }
 
     keyLocationInfoGroup.removeBlocks(latestVersion);
@@ -363,12 +361,11 @@ public final class OmKeyInfo extends WithParentObjectId
    *
    * @param locationInfoList committed KeyLocationInfos
    * @param keyLocationInfoGroup allocated KeyLocationInfoGroup
-   * @return Pair of updatedOmKeyLocationInfo and uncommittedOmKeyLocationInfo
+   * @return updatedOmKeyLocationInfo and uncommittedOmKeyLocationInfo
    */
-  private Pair<List<OmKeyLocationInfo>, List<OmKeyLocationInfo>>
-      verifyAndGetKeyLocations(
-          List<OmKeyLocationInfo> locationInfoList,
-          OmKeyLocationInfoGroup keyLocationInfoGroup) {
+  private VerifiedLocations verifyAndGetKeyLocations(
+      List<OmKeyLocationInfo> locationInfoList,
+      OmKeyLocationInfoGroup keyLocationInfoGroup) {
     // Only check ContainerBlockID here to avoid the mismatch of the pipeline
     // field and BcsId in the OmKeyLocationInfo, as the OmKeyInfoCodec ignores
     // the pipeline field by default and bcsId would be updated in Ratis mode.
@@ -399,7 +396,7 @@ public final class OmKeyInfo extends WithParentObjectId
     }
     List<OmKeyLocationInfo> uncommittedLocationInfos = new ArrayList<>(
         allocatedBlockLocations.values());
-    return Pair.of(updatedBlockLocations, uncommittedLocationInfos);
+    return new VerifiedLocations(updatedBlockLocations, uncommittedLocationInfos);
   }
 
   /**
@@ -1102,5 +1099,19 @@ public final class OmKeyInfo extends WithParentObjectId
       return true;
     }
     return !keyInfo.hasBlocks();
+  }
+
+  /**
+   * The committed (updated) block locations of a key paired with its allocated-but-uncommitted block locations,
+   * used as the result of verifying the locations sent by a commit request.
+   */
+  private static final class VerifiedLocations {
+    private final List<OmKeyLocationInfo> updated;
+    private final List<OmKeyLocationInfo> uncommitted;
+
+    private VerifiedLocations(List<OmKeyLocationInfo> updated, List<OmKeyLocationInfo> uncommitted) {
+      this.updated = updated;
+      this.uncommitted = uncommitted;
+    }
   }
 }

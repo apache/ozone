@@ -1579,53 +1579,6 @@
   </property>
 
   <property>
-    <name>ozone.om.compaction.service.enabled</name>
-    <value>false</value>
-    <tag>OZONE, OM, PERFORMANCE</tag>
-    <description>
-      Enable or disable a background job that periodically compacts rocksdb tables flagged for compaction.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.compaction.service.run.interval</name>
-    <value>6h</value>
-    <tag>OZONE, OM, PERFORMANCE</tag>
-    <description>
-      A background job that periodically compacts rocksdb tables flagged for compaction.
-      Unit could be defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.compaction.service.timeout</name>
-    <value>10m</value>
-    <tag>OZONE, OM, PERFORMANCE</tag>
-    <description>A timeout value of compaction service. If this is set
-      greater than 0, the service will stop waiting for compaction
-      completion after this time.
-      Unit could be defined with postfix (ns,ms,s,m,h,d)
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.compaction.service.columnfamilies</name>
-    <value>keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable</value>
-    <tag>OZONE, OM, PERFORMANCE</tag>
-    <description>A comma separated, no spaces list of all the column families
-      that are compacted by the compaction service.
-      If this is empty, no column families are compacted.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.compaction.service.bottommost-level-compaction</name>
-    <value>kSkip</value>
-    <tag>OZONE, OM, PERFORMANCE</tag>
-    <description>
-      Bottommost level compaction type for compaction.
-      Invalid values will default to kSkip.
-      Valid values: kSkip, kIfHaveCompactionFilter, kForce, kForceOptimized.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.snapshot.compact.non.snapshot.diff.tables</name>
     <value>false</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
@@ -1722,7 +1675,10 @@
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
       SCM schedules a fixed interval job using the configured interval to
-      scrub pipelines.
+      scrub pipelines. While SCM is in safe mode, the job starts on the leader
+      once the container safe mode rules have passed and
+      ozone.scm.stale.node.interval has elapsed since SCM started, so that open
+      pipelines with unregistered datanodes are closed before safe mode exits.
     </description>
   </property>
   <property>
@@ -1774,8 +1730,7 @@
     <value>5m</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description> After exiting safemode, wait for configured interval of
-      time to start replication monitor and cleanup activities of unhealthy
-      pipelines.
+      time to start replication monitor and other background services.
     </description>
   </property>
 
@@ -3338,12 +3293,13 @@
     <name>ozone.client.failover.max.attempts</name>
     <value>500</value>
     <description>
-      Expert only. Ozone RpcClient attempts talking to each OzoneManager
-      ipc.client.connect.max.retries (default = 10) number of times before
-      failing over to another OzoneManager, if available. This parameter
-      represents the number of times per request the client will failover
-      before giving up. This value is kept high so that client does not
-      give up trying to connect to OMs easily.
+      Expert only. The number of times per request the Ozone client will
+      failover between OzoneManagers before giving up. A failed connection
+      attempt fails over to the next OzoneManager, if available, without
+      retrying on the same one (for connect timeouts, unless
+      ipc.client.connect.max.retries.on.timeouts is set explicitly). This
+      value is kept high so that client does not give up trying to connect
+      to OMs easily.
     </description>
   </property>
   <property>
@@ -3622,9 +3578,10 @@
     <value>10000</value>
     <tag>OZONE, RECON</tag>
     <description>
-      Number of rows Derby returns per JDBC round-trip when streaming unhealthy
+      Number of rows the Recon SQL DB returns per JDBC round-trip when streaming unhealthy
       container records during a CSV export. Higher values reduce round-trip
       overhead at the cost of slightly more memory per fetch batch.
+      SQLite, the default Recon SQL DB, ignores this setting.
     </description>
   </property>
   <property>
@@ -4154,6 +4111,16 @@
     <description>Consecutive heartbeat failures the DataNode tolerates
       against one SCM endpoint before re-resolving its hostname. Only
       consulted when ozone.client.failover.resolve-needed is true.
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.heartbeat.re-register.missed-count-threshold</name>
+    <value>100</value>
+    <tag>OZONE, DATANODE, HA</tag>
+    <description>Consecutive heartbeat failures the DataNode tolerates
+      against one SCM endpoint before forcing that endpoint back to
+      GETVERSION and re-running registration.
     </description>
   </property>
 
@@ -4802,7 +4769,7 @@
     <tag>OZONE, RECON, PERFORMANCE</tag>
     <description>
       Maximum threshold number of entries to hold in memory for File Size Count task in hashmap before flushing to
-      recon derby DB
+      Recon DB
     </description>
   </property>
 

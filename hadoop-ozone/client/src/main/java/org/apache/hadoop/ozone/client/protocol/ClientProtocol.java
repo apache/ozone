@@ -915,12 +915,10 @@ public interface ClientProtocol {
   void abortMultipartUpload(String volumeName,
       String bucketName, String keyName, String uploadID) throws IOException;
 
-  /** Abort a multipart upload in S3 volume context. */
-  void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException;
-
   /**
    * Returns list of parts of a multipart upload key.
-   * @param volumeName
+   * Use an S3 client when passing null for compatibility with older OMs.
+   * @param volumeName volume name, or null to resolve the S3 volume context
    * @param bucketName
    * @param keyName
    * @param uploadID
@@ -934,7 +932,8 @@ public interface ClientProtocol {
       int maxParts)  throws IOException;
 
   /**
-   * Return with the inflight multipart uploads.
+   * Return with the inflight multipart uploads. A null volume name resolves the S3 volume context.
+   * Use an S3 client when passing null for compatibility with older OMs.
    */
   OzoneMultipartUploadList listMultipartUploads(String volumename,
       String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException;
@@ -1771,7 +1770,7 @@ public interface ClientProtocol {
 
   /**
    * Removes all the tags from the specified key.
-   * @param volumeName Volume name.
+   * @param volumeName Volume name, or null to resolve it from the S3 request context.
    * @param bucketName Bucket name.
    * @param keyName Key name.
    * @throws IOException

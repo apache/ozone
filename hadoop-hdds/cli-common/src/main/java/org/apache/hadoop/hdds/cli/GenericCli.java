@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.cli;
 
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.PrintStream;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystemException;
@@ -70,7 +70,7 @@ public abstract class GenericCli implements GenericParentCommand {
     cmd = new CommandLine(this, factory);
     ExtensibleParentCommand.addSubcommands(cmd);
     cmd.getCommandSpec().preprocessor((args, commandSpec, argSpec, info) -> {
-      args.replaceAll(arg -> DeprecatedCliOption.toNonDeprecated(arg, cmd.getErr()));
+      args.replaceAll(arg -> DeprecatedCliOption.toNonDeprecated(arg, err()));
       return false;
     });
 
@@ -98,20 +98,20 @@ public abstract class GenericCli implements GenericParentCommand {
     //print out the stack trace.
     final String rawMessage = error.getMessage();
     if (verbose || rawMessage == null || rawMessage.isEmpty()) {
-      error.printStackTrace(cmd.getErr());
+      error.printStackTrace(err());
       return;
     }
     String aclLine = HddsUtils.formatAccessControlExceptionLine(error);
     if (aclLine != null) {
-      cmd.getErr().println(aclLine);
+      err().println(aclLine);
       ExitUtils.terminate(EXECUTION_ERROR_EXIT_CODE, aclLine, null);
     }
     if (error instanceof FileSystemException) {
       String errorMessage = handleFileSystemException((FileSystemException) error);
-      cmd.getErr().println(errorMessage);
+      err().println(errorMessage);
       return;
     }
-    cmd.getErr().println(rawMessage.split("\n")[0]);
+    err().println(rawMessage.split("\n")[0]);
   }
 
   @Override
@@ -136,12 +136,16 @@ public abstract class GenericCli implements GenericParentCommand {
     return verbose;
   }
 
-  protected PrintWriter out() {
-    return cmd.getOut();
+  protected PrintStream out() {
+    return System.out;
+    // until https://github.com/remkop/picocli/issues/2546 is fixed
+    // return cmd.getOut();
   }
 
-  protected PrintWriter err() {
-    return cmd.getErr();
+  protected PrintStream err() {
+    return System.err;
+    // until https://github.com/remkop/picocli/issues/2546 is fixed
+    // return cmd.getErr();
   }
 
   private static String handleFileSystemException(FileSystemException e) {

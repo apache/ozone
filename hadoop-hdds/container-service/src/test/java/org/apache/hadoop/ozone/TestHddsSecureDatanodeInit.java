@@ -23,7 +23,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOK
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.PrivateKey;
@@ -44,8 +45,8 @@ import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.Callable;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -58,12 +59,11 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
+import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.util.ServicePlugin;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,7 +76,6 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestHddsSecureDatanodeInit {
   @TempDir
   private static File testDir;
-  private static OzoneConfiguration conf;
   private static HddsDatanodeService service;
   private static String[] args = new String[]{};
   private static PrivateKey privateKey;
@@ -88,6 +87,9 @@ public class TestHddsSecureDatanodeInit {
   private static X509Certificate cert;
   private static final String DN_COMPONENT = DNCertificateClient.COMPONENT_NAME;
   private static final int CERT_LIFETIME = 15; // seconds
+  // Addresses for the SAN extension and subject of the CSRs to avoid real resolving.
+  private static final List<InetAddress> CSR_INET_ADDRESSES =
+      Collections.singletonList(mockInetAddress("192.0.2.10", "dn1.example.com"));
 
   private DNCertificateClient client;
   private static DatanodeDetails datanodeDetails;
@@ -95,7 +97,7 @@ public class TestHddsSecureDatanodeInit {
 
   @BeforeAll
   public static void setUp() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     //conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
     String volumeDir = testDir + "/disk1";
@@ -118,20 +120,13 @@ public class TestHddsSecureDatanodeInit {
         return mock(SCMSecurityProtocolClientSideTranslatorPB.class);
       }
     };
-    callQuietly(() -> {
-      service.start(conf);
-      return null;
-    });
-    callQuietly(() -> {
-      service.initializeCertificateClient(service.getCertificateClient());
-      return null;
-    });
     dnLogs = LogCapturer.captureLogs(DNCertificateClient.class);
     certCodec = new CertificateCodec(securityConfig, DN_COMPONENT);
     keyStorage = new KeyStorage(securityConfig, DN_COMPONENT);
     dnLogs.clearOutput();
-    privateKey = service.getCertificateClient().getPrivateKey();
-    publicKey = service.getCertificateClient().getPublicKey();
+    KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
+    privateKey = keyPair.getPrivate();
+    publicKey = keyPair.getPublic();
 
     cert = generateX509Cert(new KeyPair(publicKey, privateKey),
         null, Duration.ofSeconds(CERT_LIFETIME));
@@ -153,13 +148,83 @@ public class TestHddsSecureDatanodeInit {
         .getCertificateLocation(DN_COMPONENT).toString(),
         securityConfig.getCertificateFileName()).toFile());
     dnLogs.clearOutput();
-    client = new DNCertificateClient(securityConfig, scmClient, datanodeDetails,
-        cert.getSerialNumber().toString(), id -> { }, null);
+    client = newDnCertificateClient(cert.getSerialNumber().toString());
   }
 
   @AfterEach
   public void tearDownClient() throws IOException {
     client.close();
+  }
+
+  /**
+   * A client with the scheduled renewer off, so it cannot renew while the test re-stubs the SCM mock.
+   * <p>
+   * This is what HDDS-8873 fixes: the rotation tests used to start the scheduled CertificateRenewerService twice
+   * (lazily from getCertificate() -> loadAllCertificates(), then explicitly) on a background thread that called the
+   * shared Mockito SCM client while the test thread was still re-stubbing it, and then waited with Thread.sleep and
+   * waitFor ceilings derived from the {@value #CERT_LIFETIME}-second certificate minted in {@code @BeforeAll}.
+   * The tests now call {@link #renewCertificateNow()} on the test thread instead. Because renewal only proceeds for a
+   * certificate that is already inside its grace period, each test first installs an in-grace (or expired)
+   * certificate with {@link #useCertificate(X509Certificate)} and rebuilds the client with that serial id.
+   */
+  private static DNCertificateClient newDnCertificateClient(String certSerialId) {
+    return new DNCertificateClient(securityConfig, scmClient, datanodeDetails,
+        certSerialId, id -> { }, null) {
+      @Override
+      protected boolean shouldStartCertificateRenewerService() {
+        return false;
+      }
+
+      @Override
+      protected List<InetAddress> getLocalInetAddresses() {
+        return CSR_INET_ADDRESSES;
+      }
+
+      @Override
+      protected String getLocalHostName() {
+        return CSR_INET_ADDRESSES.get(0).getCanonicalHostName();
+      }
+    };
+  }
+
+  private static InetAddress mockInetAddress(String ip, String canonicalHostName) {
+    InetAddress address = mock(InetAddress.class);
+    when(address.getHostAddress()).thenReturn(ip);
+    when(address.getCanonicalHostName()).thenReturn(canonicalHostName);
+    return address;
+  }
+
+  /**
+   * Replacement for the scheduled renewer.
+   */
+  private void renewCertificateNow() {
+    client.new CertificateRenewerService(false, () -> { }).run();
+  }
+
+  /**
+   * Still valid, but expires halfway into the grace period, so renewal is due and stays due.
+   */
+  private static X509Certificate generateCertInGracePeriod(KeyPair keyPair) throws Exception {
+    Duration remainingLifetime = securityConfig.getRenewalGracePeriod().dividedBy(2);
+    return generateX509Cert(keyPair, ZonedDateTime.now().plus(remainingLifetime).minusSeconds(CERT_LIFETIME),
+        Duration.ofSeconds(CERT_LIFETIME));
+  }
+
+  /**
+   * Already expired, as the datanode's own is once renewal keeps failing.
+   */
+  private static X509Certificate generateExpiredCert(KeyPair keyPair) throws Exception {
+    return generateX509Cert(keyPair, ZonedDateTime.now().minusSeconds(CERT_LIFETIME),
+        Duration.ofSeconds(CERT_LIFETIME));
+  }
+
+  /**
+   * Makes {@code certificate} the certificate the client currently holds.
+   */
+  private void useCertificate(X509Certificate certificate) throws IOException {
+    certCodec.writeCertificate(certificate);
+    client.close();
+    client = newDnCertificateClient(certificate.getSerialNumber().toString());
   }
 
   @Test
@@ -297,28 +362,13 @@ public class TestHddsSecureDatanodeInit {
         .contains("Init response: SUCCESS");
   }
 
-  /**
-   * Invoke a callable; Ignore all exception.
-   * @param closure closure to execute
-   * @return
-   */
-  public static void callQuietly(Callable closure) {
-    try {
-      closure.call();
-    } catch (Throwable e) {
-      e.printStackTrace();
-      // Ignore all Throwable,
-    }
-  }
-
   @Test
   public void testCertificateRotation() throws Exception {
-    // save the certificate on dn
-    certCodec.writeCertificate(cert);
+    // the dn holds a valid cert that entered its grace period
+    useCertificate(generateCertInGracePeriod(new KeyPair(publicKey, privateKey)));
 
-    Duration gracePeriod = securityConfig.getRenewalGracePeriod();
-    X509Certificate newCert =
-        generateX509Cert(null, ZonedDateTime.now().plus(gracePeriod), Duration.ofSeconds(CERT_LIFETIME));
+    // in its grace period too, so the second rotation below is due
+    X509Certificate newCert = generateCertInGracePeriod(null);
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
     SCMSecurityProtocolProtos.SCMGetCertResponseProto responseProto =
         SCMSecurityProtocolProtos.SCMGetCertResponseProto
@@ -338,21 +388,18 @@ public class TestHddsSecureDatanodeInit {
     String certId = newCert.getSerialNumber().toString();
     assertNotEquals(certId, client.getCertificate().getSerialNumber().toString());
 
-    // start monitor task to renew key and cert
-    client.startCertificateRenewerService();
+    // renew key and cert
+    renewCertificateNow();
 
-    // check after renew, client will have the new cert ID
-    GenericTestUtils.waitFor(() -> {
-      String newCertId = client.getCertificate().getSerialNumber().toString();
-      return newCertId.equals(certId);
-    }, 1000, CERT_LIFETIME * 1000);
+    // after renew, client has the new cert ID
+    assertEquals(certId, client.getCertificate().getSerialNumber().toString());
     PrivateKey privateKey1 = client.getPrivateKey();
     PublicKey publicKey1 = client.getPublicKey();
     String caCertId1 = client.getCACertificate().getSerialNumber().toString();
     String rootCaCertId1 =
         client.getRootCACertificate().getSerialNumber().toString();
 
-    // test the second time certificate rotation, generate a new cert
+    // test the second time certificate rotation. Nothing renews this one, so it gets a full lifetime
     newCert = generateX509Cert(null, null, Duration.ofSeconds(CERT_LIFETIME));
     rootCaList.remove(pemCert);
     pemCert = CertificateCodec.getPEMEncodedString(newCert);
@@ -369,11 +416,10 @@ public class TestHddsSecureDatanodeInit {
     when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
     String certId2 = newCert.getSerialNumber().toString();
 
-    // check after renew, client will have the new cert ID
-    GenericTestUtils.waitFor(() -> {
-      String newCertId = client.getCertificate().getSerialNumber().toString();
-      return newCertId.equals(certId2);
-    }, 1000, CERT_LIFETIME * 1000);
+    renewCertificateNow();
+
+    // after renew, client has the new cert ID
+    assertEquals(certId2, client.getCertificate().getSerialNumber().toString());
     assertNotEquals(privateKey1, client.getPrivateKey());
     assertNotEquals(publicKey1, client.getPublicKey());
     assertNotEquals(caCertId1, client.getCACertificate().getSerialNumber().toString());
@@ -384,14 +430,13 @@ public class TestHddsSecureDatanodeInit {
    * Test unexpected SCMGetCertResponseProto returned from SCM.
    */
   @Test
-  @Flaky("HDDS-8873")
   public void testCertificateRotationRecoverableFailure() throws Exception {
-    // save the certificate on dn
-    certCodec.writeCertificate(cert);
+    // the dn holds an expired cert: renewal has been failing past its expiry
+    X509Certificate currentCert = generateExpiredCert(new KeyPair(publicKey, privateKey));
+    useCertificate(currentCert);
+    String currentCertId = currentCert.getSerialNumber().toString();
 
-    Duration gracePeriod = securityConfig.getRenewalGracePeriod();
-    X509Certificate newCert =
-        generateX509Cert(null, ZonedDateTime.now().plus(gracePeriod), Duration.ofSeconds(CERT_LIFETIME));
+    X509Certificate newCert = generateX509Cert(null, null, Duration.ofSeconds(CERT_LIFETIME));
     String pemCert = CertificateCodec.getPEMEncodedString(newCert);
     // provide an invalid SCMGetCertResponseProto. Without
     // setX509CACertificate(pemCert), signAndStoreCert will throw exception.
@@ -408,17 +453,11 @@ public class TestHddsSecureDatanodeInit {
     String certId = newCert.getSerialNumber().toString();
     assertNotEquals(certId, client.getCertificate().getSerialNumber().toString());
 
-    // start monitor task to renew key and cert
-    client.startCertificateRenewerService();
-
-    // certificate failed to renew, client still hold the old expired cert.
-    Thread.sleep(CERT_LIFETIME * 1000);
-    assertNotEquals(certId, client.getCertificate().getSerialNumber().toString());
-    try {
-      client.getCertificate().checkValidity();
-    } catch (Exception e) {
-      assertInstanceOf(CertificateExpiredException.class, e);
-    }
+    // renewal fails, client still holds the old expired cert.
+    renewCertificateNow();
+    assertEquals(currentCertId, client.getCertificate().getSerialNumber().toString());
+    assertThrows(CertificateExpiredException.class,
+        () -> client.getCertificate().checkValidity());
 
     // provide a new valid SCMGetCertResponseProto
     newCert = generateX509Cert(null, null, Duration.ofSeconds(CERT_LIFETIME));
@@ -433,11 +472,10 @@ public class TestHddsSecureDatanodeInit {
         .thenReturn(responseProto);
     String certId2 = newCert.getSerialNumber().toString();
 
-    // check after renew, client will have the new cert ID
-    GenericTestUtils.waitFor(() -> {
-      String newCertId = client.getCertificate().getSerialNumber().toString();
-      return newCertId.equals(certId2);
-    }, 1000, CERT_LIFETIME * 1000);
+    renewCertificateNow();
+
+    // after renew, client has the new cert ID
+    assertEquals(certId2, client.getCertificate().getSerialNumber().toString());
   }
 
   private static X509Certificate generateX509Cert(KeyPair keyPair,
