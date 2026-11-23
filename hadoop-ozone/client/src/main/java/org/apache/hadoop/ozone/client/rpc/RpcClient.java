@@ -2657,8 +2657,9 @@ public class RpcClient implements ClientProtocol {
     Objects.requireNonNull(options, "options == null");
     final ReplicationConfig replicationConfig = options.getReplicationConfig();
     if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(omVersion)) {
-      if (replicationConfig.getReplicationType()
-          == HddsProtos.ReplicationType.EC) {
+      if (replicationConfig != null &&
+          replicationConfig.getReplicationType()
+              == HddsProtos.ReplicationType.EC) {
         throw new IOException("Can not set the replication of the file to"
             + " Erasure Coded replication, as OzoneManager does not support"
             + " Erasure Coded replication.");
