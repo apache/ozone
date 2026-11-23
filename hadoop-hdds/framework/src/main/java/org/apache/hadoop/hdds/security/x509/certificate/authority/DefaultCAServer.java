@@ -210,7 +210,7 @@ public class DefaultCAServer implements CertificateServer {
   public Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType approverType, NodeType role,
-      String certSerialId) {
+      String certSerialId, String commonNameIfTooLong) {
     Duration certDuration = getDuration(role);
 
     CompletableFuture<Void> csrInspection = getApprover(role).inspectCSR(csr);
@@ -241,7 +241,8 @@ public class DefaultCAServer implements CertificateServer {
         break;
       case KERBEROS_TRUSTED:
       case TESTING_AUTOMATIC:
-        X509Certificate signedCertificate = signAndStoreCertificate(certDuration, csr, role, certSerialId);
+        X509Certificate signedCertificate =
+            signAndStoreCertificate(certDuration, csr, role, certSerialId, commonNameIfTooLong);
         CertificateCodec codec = new CertificateCodec(config, componentName);
         CertPath certPath = codec.getCertPath();
         CertPath updatedCertPath = codec.prependCertToCertPath(signedCertificate, certPath);
@@ -274,7 +275,7 @@ public class DefaultCAServer implements CertificateServer {
   }
 
   private X509Certificate signAndStoreCertificate(
-      Duration duration, PKCS10CertificationRequest csr, NodeType role, String certSerialId
+      Duration duration, PKCS10CertificationRequest csr, NodeType role, String certSerialId, String commonNameIfTooLong
   ) throws IOException, OperatorCreationException, CertificateException {
 
     ZonedDateTime beginDate = ZonedDateTime.now();
@@ -289,7 +290,7 @@ public class DefaultCAServer implements CertificateServer {
           getCACertificate(),
           Date.from(beginDate.toInstant()),
           Date.from(endDate.toInstant()),
-          csr, scmID, clusterID, certSerialId);
+          csr, scmID, clusterID, certSerialId, commonNameIfTooLong);
       if (store != null) {
         store.checkValidCertID(xcert.getSerialNumber());
         store.storeValidCertificate(xcert.getSerialNumber(), xcert, role);

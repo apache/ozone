@@ -91,10 +91,23 @@ public interface CertificateServer {
    * approved.
    * @throws SCMSecurityException - on Error.
    */
+  default Future<CertPath> requestCertificate(
+      PKCS10CertificationRequest csr,
+      CertificateApprover.ApprovalType type, NodeType role,
+      String certSerialId) throws SCMSecurityException {
+    return requestCertificate(csr, type, role, certSerialId, null);
+  }
+
+  /**
+   * Like {@link #requestCertificate(PKCS10CertificationRequest, CertificateApprover.ApprovalType, NodeType, String)},
+   * with the commonName to issue instead of the CSR's when that is longer than RFC 5280 ub-common-name.
+   *
+   * @param commonNameIfTooLong - commonName for a CSR commonName longer than 64 characters, or null to keep it.
+   */
   Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType type, NodeType role,
-      String certSerialId) throws SCMSecurityException;
+      String certSerialId, String commonNameIfTooLong) throws SCMSecurityException;
 
   /**
    * List certificates.

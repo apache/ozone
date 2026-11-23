@@ -43,9 +43,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Sequence;
@@ -300,6 +303,22 @@ public class TestCertificateSignRequest {
   }
 
   @Test
+  public void testCommonName() {
+    String id = UUID.randomUUID().toString();
+    String fits = "dn@" + StringUtils.repeat('a', 61);
+    assertEquals(64, fits.length());
+    assertEquals(fits, CertificateSignRequest.commonName(fits, "dn", id));
+    // one character too long, and a long user@FQDN: the same prefix@id, whatever the host names have in common
+    assertEquals("dn@" + id, CertificateSignRequest.commonName(fits + "b", "dn", id));
+    assertEquals("dn@" + id, CertificateSignRequest.commonName(LONG_SUBJECT, "dn", id));
+
+    assertEquals("dn", CertificateSignRequest.commonNamePrefix(NodeType.DATANODE));
+    assertEquals("om", CertificateSignRequest.commonNamePrefix(NodeType.OM));
+    assertEquals("recon", CertificateSignRequest.commonNamePrefix(NodeType.RECON));
+    assertEquals(OzoneConsts.SCM_SUB_CA, CertificateSignRequest.commonNamePrefix(NodeType.SCM));
+  }
+
+  @Test
   public void testGenerateCSRWithLongSubject() throws Exception {
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
@@ -316,6 +335,7 @@ public class TestCertificateSignRequest {
         .generateCSR();
 
     assertEquals(LONG_SUBJECT, csr.getSubject().getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+    assertEquals(scmID, CertificateSignRequest.getScmId(csr));
     assertEquals(String.format(DISTINGUISHED_NAME_FORMAT, LONG_SUBJECT, scmID, clusterID),
         csr.getSubject().toString());
     ContentVerifierProvider verifierProvider = new JcaContentVerifierProviderBuilder()

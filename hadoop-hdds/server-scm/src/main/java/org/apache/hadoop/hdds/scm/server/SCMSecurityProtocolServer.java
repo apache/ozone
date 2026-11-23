@@ -76,6 +76,7 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -192,7 +193,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         storageContainerManager.getRootCARotationManager(), false, config,
         "getDataNodeCertificate");
 
-    return getEncodedCertToString(certSignReq, NodeType.DATANODE);
+    return getEncodedCertToString(certSignReq, NodeType.DATANODE, dnDetails.getUuid());
   }
 
   @Override
@@ -208,7 +209,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         storageContainerManager.getRootCARotationManager(), false, config,
         "getCertificate");
 
-    return getEncodedCertToString(certSignReq, nodeDetails.getNodeType());
+    return getEncodedCertToString(certSignReq, nodeDetails.getNodeType(), nodeDetails.getUuid());
   }
 
   @Override
@@ -288,7 +289,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
         storageContainerManager.getRootCARotationManager(), false, config,
         "getOMCertificate");
 
-    return getEncodedCertToString(certSignReq, NodeType.OM);
+    return getEncodedCertToString(certSignReq, NodeType.OM, omDetails.getUuid());
   }
 
   /**
@@ -331,18 +332,20 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for scm {}, nodeId: {}",
         scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
 
-    return getEncodedCertToString(certSignReq, NodeType.SCM);
+    return getEncodedCertToString(certSignReq, NodeType.SCM, null);
   }
 
   /**
    *  Request certificate for the specified role.
    * @param certSignReq - Certificate signing request.
    * @param nodeType - role OM/SCM/DATANODE
+   * @param nodeId - UUID of the requester, for its commonName if the CSR's is too long; ignored for SCM, whose SCM ID
+   *               is in the CSR subject.
    * @return String         - SCM signed pem encoded certificate.
    * @throws IOException
    */
   private synchronized String getEncodedCertToString(String certSignReq,
-      NodeType nodeType) throws IOException {
+      NodeType nodeType, String nodeId) throws IOException {
     if (nodeType == NodeType.SCM) {
       // SCM role certificates are CA certificates and are issued to SCM admins only, the check addSCM applies.
       storageContainerManager.checkAdminAccess(getRpcRemoteUser(), false);
@@ -350,12 +353,15 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     checkRequesterIsService(nodeType);
     Future<CertPath> future;
     PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
+    // The same commonName as CertificateSignRequest.commonName gives a client of this version.
+    String commonNameIfTooLong = CertificateSignRequest.commonNamePrefix(nodeType) + "@"
+        + (nodeType == NodeType.SCM ? CertificateSignRequest.getScmId(csr) : nodeId);
     if (nodeType == NodeType.SCM && rootCertificateServer != null) {
       future = rootCertificateServer.requestCertificate(csr,
-          KERBEROS_TRUSTED, nodeType, getNextCertificateId());
+          KERBEROS_TRUSTED, nodeType, getNextCertificateId(), commonNameIfTooLong);
     } else {
       future = scmCertificateServer.requestCertificate(csr,
-          KERBEROS_TRUSTED, nodeType, getNextCertificateId());
+          KERBEROS_TRUSTED, nodeType, getNextCertificateId(), commonNameIfTooLong);
     }
     try {
       return getPEMEncodedString(future.get());

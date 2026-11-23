@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
@@ -103,8 +104,11 @@ public class RecoverSCMCertificate extends RepairTool {
         info("All Certs in DB : %s", allCerts.keySet());
         String hostName = InetAddress.getLocalHost().getHostName();
         info("Host: %s", hostName);
+        // A commonName longer than 64 characters is <prefix>@<SCM ID> instead of <prefix>@<host name>.
+        String scmId = getScmId();
+        info("SCM ID: %s", scmId);
 
-        X509Certificate subCertificate = getSubCertificate(allCerts, hostName);
+        X509Certificate subCertificate = getSubCertificate(allCerts, hostName, scmId);
         X509Certificate rootCertificate = getRootCertificate(allCerts);
 
         info("Sub cert serialID for this host: %s", subCertificate.getSerialNumber());
@@ -113,7 +117,8 @@ public class RecoverSCMCertificate extends RepairTool {
         boolean isRootCA = false;
 
         String caPrincipal = rootCertificate.getSubjectDN().getName();
-        if (caPrincipal.contains(hostName)) {
+        if (caPrincipal.contains(hostName)
+            || (scmId != null && caPrincipal.contains(OzoneConsts.SCM_ROOT_CA_PREFIX + scmId))) {
           isRootCA = true;
         }
         storeCerts(subCertificate, rootCertificate, isRootCA, securityConfig);
@@ -149,12 +154,23 @@ public class RecoverSCMCertificate extends RepairTool {
     return cert.get();
   }
 
+  /** This SCM's ID, or null if its storage cannot be read: then certificates are only matched by host name. */
+  private String getScmId() {
+    try {
+      return new SCMStorageConfig(getOzoneConf()).getScmId();
+    } catch (IOException e) {
+      error("Failed to read the SCM ID, matching certificates by host name only: %s", e.getMessage());
+      return null;
+    }
+  }
+
   private static X509Certificate getSubCertificate(
-      Map<BigInteger, X509Certificate> allCerts, String hostName) throws Exception {
+      Map<BigInteger, X509Certificate> allCerts, String hostName, String scmId) throws Exception {
     Optional<X509Certificate> cert = allCerts.values().stream().filter(
         c -> c.getSubjectDN().getName()
-            .contains(OzoneConsts.SCM_SUB_CA_PREFIX) && c.getSubjectDN()
-            .getName().contains(hostName)).findFirst();
+            .contains(OzoneConsts.SCM_SUB_CA_PREFIX) && (c.getSubjectDN()
+            .getName().contains(hostName) || (scmId != null && c.getSubjectDN().getName()
+            .contains(OzoneConsts.SCM_SUB_CA_PREFIX + scmId)))).findFirst();
     if (!cert.isPresent()) {
       throw new Exception("Sub CA Cert not found in the DB for this host, Certs in the DB : " + allCerts.keySet());
     }

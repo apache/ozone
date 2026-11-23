@@ -240,6 +240,44 @@ public class TestDefaultCAServer {
   }
 
   /**
+   * Tests that SCM issues the given commonName instead of a CSR commonName longer than 64 characters, as from a
+   * client that predates CertificateSignRequest.commonName, and keeps a commonName that fits.
+   */
+  @Test
+  public void testRequestCertificateReplacesLongCommonName() throws Exception {
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
+    String replacement = "om@" + UUID.randomUUID();
+    CertificateServer testCA = new DefaultCAServer("testCA", clusterId, scmId, caStore, new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    testCA.init(securityConfig, CAType.ROOT);
+
+    String longSubject = "om@aaaa-ozone-000-manager-1.aaa-ozone-000-manager-headless.aaaa-data.svc.cluster.local";
+    assertEquals(replacement, signedCommonName(testCA, longSubject, scmId, clusterId, replacement));
+    assertEquals("om@host1.example.com",
+        signedCommonName(testCA, "om@host1.example.com", scmId, clusterId, replacement));
+  }
+
+  private String signedCommonName(CertificateServer ca, String subject, String scmId, String clusterId,
+      String commonNameIfTooLong) throws Exception {
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .setCA(false)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject(subject)
+        .setConfiguration(securityConfig)
+        .setKey(new HDDSKeyGenerator(securityConfig).generateKey())
+        .build()
+        .generateCSR();
+    Future<CertPath> holder = ca.requestCertificate(csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC,
+        OM, String.valueOf(System.nanoTime()), commonNameIfTooLong);
+    X509Certificate signedCert = CertificateCodec.firstCertificateFrom(holder.get());
+    return X500Name.getInstance(signedCert.getSubjectX500Principal().getEncoded())
+        .getRDNs(BCStyle.CN)[0].getFirst().getValue().toString();
+  }
+
+  /**
    * Tests that an internal-suffix DNS name in the CSR is retained as a
    * dNSName Subject Alternative Name in the issued certificate.
    * @throws Exception - on ERROR.

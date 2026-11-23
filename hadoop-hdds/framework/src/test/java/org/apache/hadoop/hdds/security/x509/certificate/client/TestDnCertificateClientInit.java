@@ -43,8 +43,11 @@ import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -142,6 +145,23 @@ public class TestDnCertificateClientInit {
       assertTrue(OzoneSecurityUtil.checkIfFileExist(
           securityConfig.getKeyLocation(DN_COMPONENT),
           securityConfig.getPublicKeyFileName()));
+    }
+  }
+
+  /** A user@FQDN longer than 64 characters, as on Kubernetes, is replaced by dn@UUID in the CSR. */
+  @Test
+  public void testCsrCommonNameForLongHostName() throws Exception {
+    dnKeyStorage.storeKeyPair(keyPair);
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    try (DNCertificateClient client = new DNCertificateClient(securityConfig, null, dn, null, null, null) {
+      @Override
+      protected String getLocalHostName() {
+        return "aaaa-ozone-000-datanode-1.aaa-ozone-000-datanode-headless.aaaa-data.svc.cluster.local";
+      }
+    }) {
+      PKCS10CertificationRequest csr = client.configureCSRBuilder().build().generateCSR();
+      assertEquals("dn@" + dn.getUuidString(),
+          csr.getSubject().getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
     }
   }
 
