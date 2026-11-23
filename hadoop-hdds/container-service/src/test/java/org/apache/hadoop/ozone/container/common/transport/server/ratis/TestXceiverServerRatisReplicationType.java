@@ -23,7 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -36,6 +41,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineCreateInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -43,6 +49,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -60,7 +67,8 @@ import org.junit.jupiter.params.provider.EnumSource;
  * Test that {@link XceiverServerRatis#addGroup} passes the {@link ReplicationType} to {@link ContainerStateMachine},
  * and that {@link XceiverServerRatis#removeGroup(RaftGroupId, org.apache.ratis.grpc.GrpcTlsConfig)}
  * removes the group from the peers only for {@link ReplicationType#RATIS},
- * and that the {@link ReplicationType} is persisted for restart.
+ * and that the {@link ReplicationType} is persisted for restart,
+ * and that the {@link ReplicationType#CHAINED} pipelines are closed after restart.
  */
 public class TestXceiverServerRatisReplicationType {
   @TempDir
@@ -182,7 +190,7 @@ public class TestXceiverServerRatisReplicationType {
       final DatanodeDetails datanode = MockPipeline.createPipeline(1).getFirstNode();
       final PipelineID pipelineID = PipelineID.randomId();
 
-      XceiverServerRatis s = newServer(datanode, conf, controller);
+      XceiverServerRatis s = newServer(datanode, conf, controller, null);
       try {
         s.addGroup(pipelineID, type, Collections.singletonList(datanode), Collections.singletonList(0));
         // only non-RATIS pipelines are stored
@@ -204,10 +212,14 @@ public class TestXceiverServerRatisReplicationType {
           .build());
 
       // restart: the group is reloaded from the Ratis storage
-      s = newServer(datanode, conf, controller);
+      final StateContext context = mock(StateContext.class, RETURNS_DEEP_STUBS);
+      s = newServer(datanode, conf, controller, context);
       try {
         assertReplicationType(type, pipelineID, s);
         assertFalse(table.isExist(noGroup));
+        // only CHAINED pipelines are closed
+        verify(context, type == ReplicationType.CHAINED ? times(1) : never())
+            .addPipelineActionIfAbsent(argThat(a -> isClose(a, pipelineID)));
 
         s.removeGroup(pipelineID.getGroupId(), null);
         assertFalse(table.isExist(pipelineID));
@@ -219,10 +231,15 @@ public class TestXceiverServerRatisReplicationType {
     }
   }
 
+  private static boolean isClose(PipelineAction action, PipelineID pipelineID) {
+    return action.getAction() == PipelineAction.Action.CLOSE
+        && PipelineID.getFromProtobuf(action.getClosePipeline().getPipelineID()).equals(pipelineID);
+  }
+
   private static XceiverServerRatis newServer(DatanodeDetails datanode, OzoneConfiguration conf,
-      ContainerController controller) throws Exception {
+      ContainerController controller, StateContext context) throws Exception {
     final XceiverServerRatis s = XceiverServerRatis.newXceiverServerRatis(null, datanode, conf,
-        ContainerTestUtils.getNoopContainerDispatcher(), controller, null, null);
+        ContainerTestUtils.getNoopContainerDispatcher(), controller, null, context);
     s.start();
     return s;
   }

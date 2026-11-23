@@ -308,6 +308,7 @@ message ClosePipelineInfo {
     PIPELINE_FAILED = 1;
     PIPELINE_LOG_FAILED = 2;
     STATEMACHINE_TRANSACTION_FAILED = 3;
+    DATANODE_RESTARTED = 4;
   }
   required PipelineID pipelineID = 1;
   optional Reason reason = 3;

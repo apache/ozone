@@ -312,6 +312,20 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     }
   }
 
+  /**
+   * Close the CHAINED pipelines reloaded on restart.
+   * Unlike RATIS, a CHAINED pipeline has no Raft log to replay,
+   * so this datanode cannot catch up with the writes it missed during the restart.
+   */
+  private void closeChainedPipelines() throws IOException {
+    for (RaftGroupId groupId : server.getGroupIds()) {
+      if (getReplicationType(groupId) == CHAINED) {
+        triggerPipelineClose(groupId, "Datanode " + datanodeDetails
+            + " is restarted", ClosePipelineInfo.Reason.DATANODE_RESTARTED);
+      }
+    }
+  }
+
   private void setUpRatisStream(RaftProperties properties) {
     // set the datastream config
     final int requestedPort;
@@ -633,6 +647,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       }
       server.start();
       cleanupPipelineCreateInfoTable();
+      closeChainedPipelines();
 
       RaftServerRpc serverRpc = server.getServerRpc();
       clientPort = updateDatanodePort(serverRpc.getClientServerAddress(),
