@@ -19,12 +19,17 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
+import com.google.common.collect.Sets;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ChainedReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
 /**
@@ -35,24 +40,50 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
  */
 public class ChainedPipelineProvider extends NCopyPipelineProvider<ChainedReplicationConfig> {
 
+  private static final Set<ReplicationFactor> supportedReplicationFactors =
+      Sets.newHashSet(ReplicationFactor.THREE, ReplicationFactor.ONE);
+
+  private final ScmVersionManager versionManager;
+
   public ChainedPipelineProvider(NodeManager nodeManager,
                                  PipelineStateManager stateManager,
                                  ConfigurationSource conf,
                                  EventPublisher eventPublisher,
-                                 SCMContext scmContext) {
+                                 SCMContext scmContext,
+                                 ScmVersionManager versionManager) {
     super(nodeManager, stateManager, conf, eventPublisher, scmContext);
+    this.versionManager = versionManager;
+  }
+
+  private void checkChainedPipelinesEnabled() throws SCMException {
+    if (versionManager == null || !versionManager.isAllowed(HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT)) {
+      throw new SCMException("Cluster is not finalized yet, it is"
+          + " not enabled to create pipelines with CHAINED replication type.",
+          SCMException.ResultCodes.INTERNAL_ERROR);
+    }
   }
 
   @Override
   public synchronized Pipeline create(ChainedReplicationConfig replicationConfig,
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
+    checkChainedPipelinesEnabled();
     final ReplicationFactor factor = replicationConfig.getReplicationFactor();
-    if (factor != ReplicationFactor.THREE) {
+    if (!supportedReplicationFactors.contains(factor)) {
       throw new IllegalArgumentException("Unsupported factor " + factor + " for " + replicationConfig);
     }
     final List<DatanodeDetails> dns = chooseThreeFactorDatanodes(excludedNodes, favoredNodes, factor.getNumber(),
         true, false);
     return createPipeline(replicationConfig, dns);
+  }
+
+  @Override
+  public Pipeline create(ChainedReplicationConfig replicationConfig, List<DatanodeDetails> nodes) {
+    try {
+      checkChainedPipelinesEnabled();
+    } catch (SCMException e) {
+      throw new IllegalStateException(e);
+    }
+    return super.create(replicationConfig, nodes);
   }
 }

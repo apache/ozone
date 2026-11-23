@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -130,7 +131,8 @@ public class PipelineManagerImpl implements PipelineManager {
       EventPublisher eventPublisher,
       SCMContext scmContext,
       SCMServiceManager serviceManager,
-      Clock clock) throws IOException {
+      Clock clock,
+      ScmVersionManager versionManager) throws IOException {
 
     // Create PipelineStateManagerImpl
     PipelineStateManager stateManager = PipelineStateManagerImpl
@@ -142,7 +144,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
     // Create PipelineFactory
     PipelineFactory pipelineFactory = new PipelineFactory(
-        nodeManager, stateManager, conf, eventPublisher, scmContext);
+        nodeManager, stateManager, conf, eventPublisher, scmContext, versionManager);
 
     // Create PipelineManager
     PipelineManagerImpl pipelineManager = new PipelineManagerImpl(conf,

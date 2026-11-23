@@ -17,10 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.RATIS_DATASTREAM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -38,6 +41,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -58,6 +62,10 @@ public class TestChainedPipelineProvider extends AbstractNCopyPipelineProviderTe
   private ChainedPipelineProvider provider;
 
   private void init(int numStreamNodes, int numNonStreamNodes) throws Exception {
+    init(numStreamNodes, numNonStreamNodes, true);
+  }
+
+  private void init(int numStreamNodes, int numNonStreamNodes, boolean chainedPipelinesEnabled) throws Exception {
     final List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < numStreamNodes; i++) {
       nodes.add(createDatanodeDetails(true));
@@ -79,8 +87,10 @@ public class TestChainedPipelineProvider extends AbstractNCopyPipelineProviderTe
         .setNodeManager(nodeManager)
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .build();
+    ScmVersionManager versionManager = mock(ScmVersionManager.class);
+    when(versionManager.isAllowed(STREAM_PUTBLOCK_WITHOUT_RAFT)).thenReturn(chainedPipelinesEnabled);
     provider = new ChainedPipelineProvider(nodeManager, stateManager, conf, new EventQueue(),
-        SCMContext.emptyContext());
+        SCMContext.emptyContext(), versionManager);
   }
 
   @AfterEach
@@ -110,9 +120,17 @@ public class TestChainedPipelineProvider extends AbstractNCopyPipelineProviderTe
   }
 
   @Test
+  public void testCreatePipelineBeforeUpgradeFinalized() throws Exception {
+    init(3, 0, false);
+    SCMException exception = assertThrows(SCMException.class, () -> provider.create(CHAINED_THREE));
+    assertTrue(exception.getMessage().contains("not finalized"));
+    assertTrue(exception.getMessage().contains("CHAINED"));
+  }
+
+  @Test
   public void testCreatePipelineUnsupportedFactor() throws Exception {
     init(3, 0);
     assertThrows(IllegalArgumentException.class,
-        () -> provider.create(ChainedReplicationConfig.getInstance(ReplicationFactor.ONE)));
+        () -> provider.create(ChainedReplicationConfig.getInstance(ReplicationFactor.ZERO)));
   }
 }

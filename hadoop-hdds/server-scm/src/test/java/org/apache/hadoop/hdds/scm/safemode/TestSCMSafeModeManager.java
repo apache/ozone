@@ -361,7 +361,7 @@ public class TestSCMSafeModeManager {
         queue,
         scmContext,
         serviceManager,
-        Clock.system(ZoneOffset.UTC));
+        Clock.system(ZoneOffset.UTC), null);
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
@@ -402,7 +402,7 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            Clock.system(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC), null);
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
             pipelineManager.getStateManager(), config);
@@ -680,7 +680,7 @@ public class TestSCMSafeModeManager {
         eventQueue,
         scmContext,
         serviceManager,
-        Clock.system(ZoneOffset.UTC));
+        Clock.system(ZoneOffset.UTC), null);
 
     ContainerManager containerManager = new ContainerManagerImpl(config,
         SCMHAManagerStub.getInstance(true), null, pipelineManager,
@@ -812,7 +812,7 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            Clock.system(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC), null);
 
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -951,7 +951,7 @@ public class TestSCMSafeModeManager {
             queue,
             scmContext,
             serviceManager,
-            Clock.system(ZoneOffset.UTC));
+            Clock.system(ZoneOffset.UTC), null);
 
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -1083,7 +1083,7 @@ public class TestSCMSafeModeManager {
         queue,
         scmContext,
         serviceManager,
-        Clock.system(ZoneOffset.UTC));
+        Clock.system(ZoneOffset.UTC), null);
 
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,

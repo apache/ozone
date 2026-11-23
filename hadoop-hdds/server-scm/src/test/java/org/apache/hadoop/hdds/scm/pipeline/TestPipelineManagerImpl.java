@@ -174,7 +174,8 @@ public class TestPipelineManagerImpl {
         new EventQueue(),
         scmContext,
         serviceManager,
-        testClock);
+        testClock,
+        null);
   }
 
   private PipelineManagerImpl createPipelineManager(
@@ -186,7 +187,8 @@ public class TestPipelineManagerImpl {
         new EventQueue(),
         SCMContext.emptyContext(),
         serviceManager,
-        new MockClock(Instant.now(), ZoneOffset.UTC));
+        new MockClock(Instant.now(), ZoneOffset.UTC),
+        null);
   }
 
   @Test

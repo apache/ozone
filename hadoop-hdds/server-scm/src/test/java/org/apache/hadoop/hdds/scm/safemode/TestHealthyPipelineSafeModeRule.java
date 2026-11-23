@@ -102,7 +102,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              Clock.system(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC), null);
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
               pipelineManager.getStateManager(), config);
@@ -154,7 +154,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              Clock.system(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC), null);
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -247,7 +247,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              Clock.system(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC), null);
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -337,7 +337,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              Clock.system(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC), null);
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -446,7 +446,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              Clock.system(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC), null);
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -530,7 +530,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              Clock.system(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC), null);
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager, pipelineManager.getStateManager(), config);
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS, mockRatisProvider);
@@ -613,7 +613,7 @@ public class TestHealthyPipelineSafeModeRule {
               eventQueue,
               scmContext,
               serviceManager,
-              Clock.system(ZoneOffset.UTC));
+              Clock.system(ZoneOffset.UTC), null);
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager, pipelineManager.getStateManager(), config);
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS, mockRatisProvider);

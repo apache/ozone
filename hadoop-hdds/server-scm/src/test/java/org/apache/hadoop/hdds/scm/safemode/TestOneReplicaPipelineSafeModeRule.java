@@ -103,7 +103,8 @@ public class TestOneReplicaPipelineSafeModeRule {
         eventQueue,
         scmContext,
         serviceManager,
-        new MockClock(Instant.now(), ZoneOffset.UTC));
+        new MockClock(Instant.now(), ZoneOffset.UTC),
+        null);
 
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
