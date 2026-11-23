@@ -101,10 +101,9 @@ Assume Role And Get Temporary Credentials
     ${cmd} =                      Set Variable If               '${duration_seconds}' != '${EMPTY}'    ${cmd} --duration-seconds ${duration_seconds}    ${cmd}
     ${cmd} =                      Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --policy '${policy_json}'    ${cmd}
 
+    ${before} =                   Get Current Date              time_zone=UTC
     ${json} =                     Execute                       ${cmd}
-
-    # Don't include the latency of the AssumeRole call when checking the expiration
-    ${now} =                      Get Current Date              time_zone=UTC
+    ${after} =                    Get Current Date              time_zone=UTC
 
     Should Contain                ${json}                       Credentials
 
@@ -126,20 +125,23 @@ Assume Role And Get Temporary Credentials
     ${minimum_expected} =         Evaluate                      int(${expected_duration}) - 2
     ${maximum_expected} =         Evaluate                      int(${expected_duration}) + 2
 
-    # Verify Expiration based on requested duration (or default 1h), with small grace (plus or minus 2 seconds) for clock skew.
+    # Expiration must fall within the requested duration window with a small grace (+/- 2 seconds) for clock skew and second truncation.
     ${expiration} =               Execute                       echo '${json}' | jq -r '.Credentials.Expiration'
-    ${time_diff} =                Subtract Date From Date       ${expiration}    ${now}
-    Should Be True                ${time_diff} >= ${minimum_expected}           Expected expiration to be at least ${minimum_expected}s in the future, but was ${time_diff}s
-    Should Be True                ${time_diff} <= ${maximum_expected}           Expected expiration to be at most ${maximum_expected}s in the future, but was ${time_diff}s
+    ${time_diff_from_before} =    Subtract Date From Date       ${expiration}    ${before}
+    ${time_diff_from_after} =     Subtract Date From Date       ${expiration}    ${after}
+    Should Be True                ${time_diff_from_before} >= ${minimum_expected}    Expected expiration to be at least ${minimum_expected}s after request start, but was ${time_diff_from_before}s
+    Should Be True                ${time_diff_from_after} <= ${maximum_expected}     Expected expiration to be at most ${maximum_expected}s after request end, but was ${time_diff_from_after}s
 
 Assume Role And Store Expired STS Token Credentials
-    # Issue a 900s STS credential and store it in EXPIRED_STS_TOKEN_* globals only (it should never be used/modified until the "Expired STS temporary credentials return ExpiredToken on S3 APIs" test).
-    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${role_arn}  ${duration_seconds}=900
-    Configure AWS Profile         permanent  ${perm_access_key_id}  ${perm_secret_key}
+    # Issue a short-lived STS credential (default 5s) and store it in EXPIRED_STS_TOKEN_* globals only (unused until the expired-token S3 API test).
+    # Profile expired_sts_token_issuer disables botocore parameter_validation so DurationSeconds can be below 900.
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${role_arn}  ${duration_seconds}=5
+    Configure AWS Profile         expired_sts_token_issuer  ${perm_access_key_id}  ${perm_secret_key}
+    Execute                       aws configure set parameter_validation false --profile expired_sts_token_issuer
     ${suffix} =                   Generate Random String        8    [LOWER]
     ${role_session_name} =        Set Variable                  expired-sts-token-${suffix}
 
-    ${cmd} =                      Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${role_arn} --role-session-name ${role_session_name} --duration-seconds ${duration_seconds} --output json --profile permanent
+    ${cmd} =                      Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${role_arn} --role-session-name ${role_session_name} --duration-seconds ${duration_seconds} --output json --profile expired_sts_token_issuer
 
     ${json} =                     Execute                       ${cmd}
     Should Contain                ${json}                       Credentials
@@ -159,14 +161,6 @@ Expired STS Token Credentials Should Be Available
     Should Not Be Empty           ${EXPIRED_STS_TOKEN_ACCESS_KEY_ID}         Expired STS token access key ID is unavailable.
     Should Not Be Empty           ${EXPIRED_STS_TOKEN_SECRET_ACCESS_KEY}     Expired STS token secret key is unavailable.
     Should Not Be Empty           ${EXPIRED_STS_TOKEN_SESSION_TOKEN}         Expired STS token session token is unavailable.
-
-Wait Until Expired STS Token Expiration Elapsed
-    # Matches the +/-2s skew tolerance used for AssumeRole duration checks.
-    Expired STS Token Credentials Should Be Available
-    ${now} =                      Get Current Date              time_zone=UTC
-    ${secondsUntilExpiration} =   Subtract Date From Date       ${EXPIRED_STS_TOKEN_EXPIRATION}    ${now}
-    ${remaining} =                Evaluate                      ${secondsUntilExpiration} + 2
-    Run Keyword If                ${remaining} > 0              Sleep  ${remaining}
 
 Configure Expired STS Token S3 Profile
     Expired STS Token Credentials Should Be Available

@@ -32,9 +32,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.DomainPeer;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
 import org.apache.hadoop.hdds.utils.FaultInjector;
@@ -129,16 +129,6 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
     return this.port;
   }
 
-  /**
-   * Returns the Replication type supported by this end-point.
-   *
-   * @return enum STAND_ALONE
-   */
-  @Override
-  public HddsProtos.ReplicationType getServerType() {
-    return HddsProtos.ReplicationType.STAND_ALONE;
-  }
-
   @Override
   public void start() throws IOException {
     if (isRunning.compareAndSet(false, true)) {
@@ -187,13 +177,12 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   }
 
   @Override
-  public void submitRequest(ContainerCommandRequestProto request,
-      HddsProtos.PipelineID pipelineID) throws IOException {
+  public void submitRequest(ContainerCommandRequestProto request, PipelineID pipelineID) throws IOException {
     throw new UnsupportedOperationException("Operation is not supported for " + this.getClass().getSimpleName());
   }
 
   @Override
-  public boolean isExist(HddsProtos.PipelineID pipelineId) {
+  public boolean isExist(PipelineID pipelineId) {
     throw new UnsupportedOperationException("Operation is not supported for " + this.getClass().getSimpleName());
   }
 

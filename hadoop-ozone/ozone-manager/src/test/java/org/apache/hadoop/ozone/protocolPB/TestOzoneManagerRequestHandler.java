@@ -50,6 +50,8 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
@@ -82,6 +84,42 @@ public class TestOzoneManagerRequestHandler {
     Mockito.when(ozoneManager.getConfig()).thenReturn(config);
     Mockito.when(ozoneManager.getConfiguration()).thenReturn(conf);
     return new OzoneManagerRequestHandler(ozoneManager);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testMultipartListingS3Context(boolean assumeContext) throws IOException {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager om = handler.getOzoneManager();
+    Mockito.when(om.listMultipartUploads(
+        "request-volume", "bucket", "prefix/", "previous", "previous-upload", 2, true, assumeContext))
+        .thenReturn(OmMultipartUploadList.newBuilder().setUploads(Collections.emptyList()).build());
+    Mockito.when(om.listParts("request-volume", "bucket", "key", "upload-id", 3, 2, assumeContext))
+        .thenReturn(new OmMultipartUploadListParts(
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), 0, false));
+    OzoneManagerProtocolProtos.OMRequest.Builder request = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setClientId("test-client");
+    if (assumeContext) {
+      request.setAssumeS3Context(true);
+    }
+    OzoneManagerProtocolProtos.OMResponse uploads = handler.handleReadRequest(request
+        .setCmdType(OzoneManagerProtocolProtos.Type.ListMultipartUploads)
+        .setListMultipartUploadsRequest(OzoneManagerProtocolProtos.ListMultipartUploadsRequest.newBuilder()
+            .setVolume("request-volume").setBucket("bucket").setPrefix("prefix/")
+            .setKeyMarker("previous").setUploadIdMarker("previous-upload").setMaxUploads(2).setWithPagination(true))
+        .build());
+    OzoneManagerProtocolProtos.OMResponse parts = handler.handleReadRequest(request
+        .clearListMultipartUploadsRequest().setCmdType(OzoneManagerProtocolProtos.Type.ListMultiPartUploadParts)
+        .setListMultipartUploadPartsRequest(OzoneManagerProtocolProtos.MultipartUploadListPartsRequest.newBuilder()
+            .setVolume("request-volume").setBucket("bucket").setKey("key").setUploadID("upload-id")
+            .setPartNumbermarker(3).setMaxParts(2)).build());
+
+    assertThat(uploads.getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+    assertThat(parts.getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+    Mockito.verify(om)
+        .listMultipartUploads("request-volume", "bucket", "prefix/", "previous", "previous-upload", 2, true,
+            assumeContext);
+    Mockito.verify(om).listParts("request-volume", "bucket", "key", "upload-id", 3, 2, assumeContext);
   }
 
   private OmKeyInfo getMockedOmKeyInfo() {

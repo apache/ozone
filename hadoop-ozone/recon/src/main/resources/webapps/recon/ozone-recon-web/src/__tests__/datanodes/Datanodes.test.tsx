@@ -19,6 +19,8 @@ import React from 'react';
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {vi} from 'vitest';
+import axios from 'axios';
+import { AUTO_RELOAD_INTERVAL_DEFAULT } from '@/constants/autoReload.constants';
 
 import Datanodes from '@/v2/pages/datanodes/datanodes';
 import * as commonUtils from '@/utils/common';
@@ -76,6 +78,29 @@ describe('Datanodes Component', () => {
     // Wait for the data to load
     const rows = await waitFor(() => screen.getAllByTestId(datanodeLocators.datanodeRowRegex));
     expect(rows).toHaveLength(5); // Based on the mocked DatanodeResponse
+  });
+
+  test('loads each endpoint once and does not poll when auto refresh is disabled', async () => {
+    sessionStorage.setItem('autoReloadEnabled', 'false');
+    const requests: string[] = [];
+    const interceptor = axios.interceptors.request.use(config => {
+      requests.push(config.url || '');
+      return config;
+    });
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
+    const { unmount } = render(<Datanodes />);
+    try {
+      await waitForDNTable();
+      for (const endpoint of ['/api/v1/datanodes', '/api/v1/datanodes/decommission/info']) {
+        expect(requests.filter(url => url === endpoint)).toHaveLength(1);
+      }
+      expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), AUTO_RELOAD_INTERVAL_DEFAULT);
+    } finally {
+      unmount();
+      setTimeoutSpy.mockRestore();
+      axios.interceptors.request.eject(interceptor);
+      sessionStorage.removeItem('autoReloadEnabled');
+    }
   });
 
   test('Loads data on mount', async () => {

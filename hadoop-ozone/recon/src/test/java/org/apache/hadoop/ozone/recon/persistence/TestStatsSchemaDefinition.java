@@ -27,10 +27,9 @@ import java.sql.ResultSet;
 import java.sql.Types;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.junit.jupiter.api.Test;
@@ -52,18 +51,17 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSet = metaData.getColumns(null, null,
         GLOBAL_STATS_TABLE_NAME, null);
 
-    List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
+    // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
+    List<ColumnNameAndType> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("key", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("value", Types.BIGINT));
-    expectedPairs.add(new ImmutablePair<>("last_updated_timestamp",
-        Types.TIMESTAMP));
+    expectedPairs.add(new ColumnNameAndType("key", Types.VARCHAR));
+    expectedPairs.add(new ColumnNameAndType("value", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("last_updated_timestamp", Types.VARCHAR));
 
-    List<Pair<String, Integer>> actualPairs = new ArrayList<>();
+    List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ImmutablePair<>(resultSet.getString("COLUMN_NAME"),
-          resultSet.getInt("DATA_TYPE")));
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"), resultSet.getInt("DATA_TYPE")));
     }
 
     assertEquals(3, actualPairs.size());
@@ -85,7 +83,8 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
     GlobalStatsDao dao = getDao(GlobalStatsDao.class);
 
-    LocalDateTime now = LocalDateTime.now(Clock.systemUTC().getZone());
+    // SQLite keeps timestamps at millisecond precision.
+    LocalDateTime now = LocalDateTime.now(Clock.systemUTC().getZone()).truncatedTo(ChronoUnit.MILLIS);
     GlobalStats newRecord = new GlobalStats();
     newRecord.setLastUpdatedTimestamp(now);
     newRecord.setKey("key1");

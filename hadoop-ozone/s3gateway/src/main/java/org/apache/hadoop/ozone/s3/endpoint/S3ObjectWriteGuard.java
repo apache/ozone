@@ -29,9 +29,8 @@ import java.util.function.Consumer;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.AwsChunkedInputStream;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
-import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
-import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.ratis.util.function.CheckedRunnable;
 
@@ -127,10 +126,8 @@ class S3ObjectWriteGuard implements AutoCloseable {
   static void verifyChunksComplete(InputStream body) throws IOException {
     InputStream chunks = body instanceof MultiDigestInputStream
         ? ((MultiDigestInputStream) body).getWrappedStream() : body;
-    if (chunks instanceof SignedChunksInputStream) {
-      ((SignedChunksInputStream) chunks).verifyComplete();
-    } else if (chunks instanceof UnsignedChunksInputStream) {
-      ((UnsignedChunksInputStream) chunks).verifyComplete();
+    if (chunks instanceof AwsChunkedInputStream) {
+      ((AwsChunkedInputStream) chunks).verifyComplete();
     }
   }
 

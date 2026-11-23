@@ -20,8 +20,11 @@ package org.apache.hadoop.ozone.client.checksum;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType.CRC32;
+import static org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode.COMPOSITE_CRC;
+import static org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -35,6 +38,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.fs.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
@@ -49,11 +54,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -69,6 +76,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.util.DataChecksum;
+import org.apache.hadoop.util.PureJavaCrc32C;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterEach;
@@ -81,6 +89,7 @@ import org.junit.jupiter.params.provider.EnumSource;
  * Unit tests for Replicated and EC FileChecksumHelper class.
  */
 public class TestFileChecksumHelper {
+  private static final int BYTES_PER_CRC = 512;
   private final FileChecksum noCachedChecksum = null;
   private OzoneClient client;
   private ObjectStore store;
@@ -205,6 +214,7 @@ public class TestFileChecksumHelper {
         new OmKeyLocationInfo.Builder()
             .setPipeline(pipeline)
             .setBlockID(blockID)
+            .setLength(10)
             .build();
     List<OmKeyLocationInfo> omKeyLocationInfoList =
         Collections.singletonList(omKeyLocationInfo);
@@ -250,6 +260,107 @@ public class TestFileChecksumHelper {
     fileChecksum = helper.getFileChecksum();
     assertInstanceOf(MD5MD5CRC32GzipFileChecksum.class, fileChecksum);
     assertEquals(1, helper.getKeyLocationInfoList().size());
+  }
+
+  @ParameterizedTest
+  @EnumSource(ChecksumCombineMode.class)
+  public void testZeroLengthKeyWithEmptyBlock(ChecksumCombineMode combineMode) throws IOException {
+    assertEquals(checksumOfBlocks(combineMode, Long.MAX_VALUE),
+        checksumOfBlocks(combineMode, Long.MAX_VALUE, new byte[0]));
+  }
+
+  @ParameterizedTest
+  @EnumSource(ChecksumCombineMode.class)
+  public void testEmptyBlockInTheMiddleIsSkipped(ChecksumCombineMode combineMode) throws IOException {
+    byte[] first = RandomUtils.secure().randomBytes(1000);
+    byte[] second = RandomUtils.secure().randomBytes(700);
+    assertEquals(checksumOfBlocks(combineMode, Long.MAX_VALUE, first, second),
+        checksumOfBlocks(combineMode, Long.MAX_VALUE, first, new byte[0], second));
+  }
+
+  @ParameterizedTest
+  @EnumSource(ChecksumCombineMode.class)
+  public void testTrailingEmptyBlockIsSkipped(ChecksumCombineMode combineMode) throws IOException {
+    byte[] first = RandomUtils.secure().randomBytes(1000);
+    assertEquals(checksumOfBlocks(combineMode, Long.MAX_VALUE, first),
+        checksumOfBlocks(combineMode, Long.MAX_VALUE, first, new byte[0]));
+  }
+
+  @Test
+  public void testCompositeCrcOfBlocksMatchesCrcOfKeyData() throws IOException {
+    byte[] first = RandomUtils.secure().randomBytes(1000);
+    byte[] second = RandomUtils.secure().randomBytes(700);
+    PureJavaCrc32C crc = new PureJavaCrc32C();
+    crc.update(first, 0, first.length);
+    crc.update(second, 0, second.length);
+    assertEquals(new CompositeCrcFileChecksum((int) crc.getValue(), DataChecksum.Type.CRC32C, BYTES_PER_CRC),
+        checksumOfBlocks(COMPOSITE_CRC, Long.MAX_VALUE, first, new byte[0], second));
+  }
+
+  @ParameterizedTest
+  @EnumSource(ChecksumCombineMode.class)
+  public void testBlocksBeyondRequestedLengthAreIgnored(ChecksumCombineMode combineMode) throws IOException {
+    byte[] first = RandomUtils.secure().randomBytes(1000);
+    byte[] second = RandomUtils.secure().randomBytes(700);
+    FileChecksum firstBlockOnly = checksumOfBlocks(combineMode, Long.MAX_VALUE, first);
+    assertEquals(firstBlockOnly, checksumOfBlocks(combineMode, 500, first, second));
+    // the requested length ends exactly at the block boundary
+    assertEquals(firstBlockOnly, checksumOfBlocks(combineMode, first.length, first, second));
+  }
+
+  /**
+   * Computes the checksum of a RATIS key whose blocks hold the given data. Each block checksum is derived from the
+   * block data, so no datanode is needed. An empty block must not be read.
+   */
+  private FileChecksum checksumOfBlocks(ChecksumCombineMode combineMode, long length, byte[]... blocks)
+      throws IOException {
+    List<OmKeyLocationInfo> locations = new ArrayList<>();
+    for (int i = 0; i < blocks.length; i++) {
+      locations.add(new OmKeyLocationInfo.Builder()
+          .setBlockID(new BlockID(1, i))
+          .setLength(blocks[i].length)
+          .build());
+    }
+    OmKeyInfo keyInfo = omKeyInfo(ReplicationType.RATIS, noCachedChecksum, locations);
+    BaseFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
+        "vol1", "bucket1", "dummy", length, combineMode, mock(RpcClient.class), keyInfo) {
+      private byte[] blockData;
+
+      @Override
+      protected List<ContainerProtos.ChunkInfo> getChunkInfos(OmKeyLocationInfo keyLocationInfo) {
+        blockData = blocks[(int) keyLocationInfo.getBlockID().getLocalID()];
+        assertNotEquals(0, blockData.length, "an empty block must not be read");
+        return Collections.singletonList(ContainerProtos.ChunkInfo.newBuilder()
+            .setChunkName("dummy_chunk")
+            .setOffset(0)
+            .setLen(blockData.length)
+            .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
+                .setType(ContainerProtos.ChecksumType.CRC32C)
+                .setBytesPerChecksum(BYTES_PER_CRC))
+            .build());
+      }
+
+      @Override
+      protected AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos,
+          long blockLength) {
+        final byte[] blockChecksum;
+        if (combineMode == MD5MD5CRC) {
+          blockChecksum = MD5Hash.digest(blockData).getDigest();
+        } else {
+          PureJavaCrc32C crc = new PureJavaCrc32C();
+          crc.update(blockData, 0, blockData.length);
+          blockChecksum = CrcUtil.intToBytes((int) crc.getValue());
+        }
+        return new AbstractBlockChecksumComputer() {
+          @Override
+          public void compute(ChecksumCombineMode mode) {
+            setOutBytes(blockChecksum);
+          }
+        };
+      }
+    };
+    helper.compute();
+    return helper.getFileChecksum();
   }
 
   private XceiverClientReply buildValidResponse(ReplicationType type) {

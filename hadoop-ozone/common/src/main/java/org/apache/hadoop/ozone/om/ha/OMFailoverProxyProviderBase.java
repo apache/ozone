@@ -30,7 +30,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
@@ -136,8 +135,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    * @throws IOException if any error occurs while trying to get the proxy
    */
   protected T createOMProxy(InetSocketAddress omAddress) throws IOException {
-    Configuration hadoopConf =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
+    Configuration hadoopConf = HddsUtils.getFailoverProxyConfiguration(getConf());
 
     RPC.setProtocolEngine(hadoopConf, getInterface(), ProtobufRpcEngine.class);
 

@@ -23,6 +23,7 @@ import static java.util.stream.Collectors.toSet;
 import static java.util.stream.IntStream.range;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
@@ -40,7 +41,8 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Function;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.StreamCapabilities;
@@ -573,10 +575,24 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     Queue<PendingRead> pendingReads = new ArrayDeque<>();
     for (int i : selectedIndexes) {
       ByteBuffer buf = decoderInputBuffers[i];
-      pendingReads.add(new PendingRead(i, executor.submit(() -> {
-        readIntoBuffer(i, buf);
-        return null;
-      })));
+      FutureTask<Void> task = new FutureTask<>(() -> {
+        // CallerRunsPolicy may run this task during execute(), before the wait loop below.
+        boolean interrupted = Thread.interrupted();
+        try {
+          readIntoBuffer(i, buf);
+          return null;
+        } finally {
+          if (interrupted) {
+            Thread.currentThread().interrupt();
+          }
+        }
+      });
+      pendingReads.add(new PendingRead(i, task));
+      try {
+        executor.execute(task);
+      } catch (RejectedExecutionException e) {
+        LOG.debug("{}: read [{}] rejected by the executor, running it here", this, i, e);
+      }
     }
     boolean exceptionOccurred = false;
     while (!pendingReads.isEmpty()) {
@@ -584,7 +600,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
       try {
         PendingRead pendingRead = pendingReads.poll();
         index = pendingRead.index;
-        // Should this future.get() have a timeout? At the end of the call chain
+        // Should this wait have a timeout? At the end of the call chain
         // we eventually call a grpc or ratis client to read the block data. Its
         // the call to the DNs which could potentially block. There is a timeout
         // on that call controlled by:
@@ -592,7 +608,14 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         // Which defaults to 30s. So if there is a DN communication problem, it
         // should timeout in the client which should propagate up the stack as
         // an IOException.
-        pendingRead.future.get();
+        // Run the read here if the executor has not started it, for example
+        // because no pool thread has reached it yet or the executor dropped it
+        // after shutdown; FutureTask.run does nothing once the read has been
+        // started. Wait even if interrupted, as the read writes into a buffer
+        // that the caller may reuse or release once this method returns.
+        // The interrupt status is restored and checked after all reads finish.
+        pendingRead.future.run();
+        Uninterruptibles.getUninterruptibly(pendingRead.future);
       } catch (ExecutionException ee) {
         boolean added = failedDataIndexes.add(index);
         Throwable t = ee.getCause() != null ? ee.getCause() : ee;
@@ -605,12 +628,6 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         LOG.info(msg.toString(), this, index, t);
 
         exceptionOccurred = true;
-      } catch (InterruptedException ie) {
-        // Catch each InterruptedException to ensure all the futures have been
-        // handled, and then throw the exception later
-        LOG.debug("{}: interrupted while waiting for reads to complete",
-            this, ie);
-        Thread.currentThread().interrupt();
       }
     }
     if (Thread.currentThread().isInterrupted()) {
@@ -628,9 +645,9 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    */
   private static final class PendingRead {
     private final int index;
-    private final Future<Void> future;
+    private final FutureTask<Void> future;
 
-    private PendingRead(int index, Future<Void> future) {
+    private PendingRead(int index, FutureTask<Void> future) {
       this.index = index;
       this.future = future;
     }
