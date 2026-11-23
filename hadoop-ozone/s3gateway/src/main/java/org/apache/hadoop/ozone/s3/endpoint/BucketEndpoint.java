@@ -30,10 +30,13 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
@@ -400,16 +403,77 @@ public class BucketEndpoint extends BucketOperationHandler {
     List<String> failedDeletes = new ArrayList<>();
 
     if (request.getObjects() != null) {
-      Map<String, ErrorInfo> undeletedKeyResultMap;
+      // DeleteObject has identity equality, so a key listed more than once keeps a condition and result per Object.
+      Map<DeleteObject, Long> conditionalDeletes = new HashMap<>();
+      Map<DeleteObject, ErrorInfo> undeletedObjects = new HashMap<>();
+      // Validate every Object before any key is deleted, so an invalid Object rejects the whole request.
       for (DeleteObject keyToDelete : request.getObjects()) {
+        if (StringUtils.isEmpty(keyToDelete.getKey()) || keyToDelete.hasRepeatedCondition()) {
+          throw newError(S3ErrorTable.MALFORMED_XML, bucketName);
+        }
+        if (keyToDelete.getLastModifiedTime() != null) {
+          throw newError(S3ErrorTable.NOT_IMPLEMENTED, bucketName);
+        }
+        if (keyToDelete.getETag() != null && StringUtils.isBlank(keyToDelete.getETag())) {
+          OS3Exception ex = newError(S3ErrorTable.INVALID_REQUEST, keyToDelete.getKey());
+          ex.setErrorMessage("ETag cannot be empty.");
+          throw ex;
+        }
         deleteKeys.add(keyToDelete.getKey());
+        Long size = S3ConditionalRequest.parseExpectedSize(keyToDelete.getSize(), "Size", keyToDelete.getKey());
+        if (size != null || keyToDelete.getETag() != null) {
+          conditionalDeletes.put(keyToDelete, size);
+        }
       }
       long startNanos = context.getStartNanos();
       try {
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-        undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
+        // Objects are deleted in request order, so a key listed more than once is deleted by the first Object whose
+        // conditions hold. The batch delete request cannot carry conditions, so each conditional Object is deleted
+        // on its own, and the unconditional Objects between them are deleted in one batch.
+        List<DeleteObject> batch = new ArrayList<>();
+        // Objects whose delete has completed, whether or not the key was deleted.
+        Set<DeleteObject> processed = new HashSet<>();
+        boolean deleteFailed = false;
+        try {
+          for (DeleteObject d : request.getObjects()) {
+            if (!conditionalDeletes.containsKey(d)) {
+              batch.add(d);
+              continue;
+            }
+            deleteInBatch(bucket, batch, undeletedObjects, processed);
+            ErrorInfo error;
+            try {
+              error = deleteKeyIfConditionsMatch(bucket, d.getKey(), d.getETag(), conditionalDeletes.get(d));
+            } catch (IOException ex) {
+              // Report only this Object as failed, with the same S3 error as for a failed batch delete request.
+              deleteFailed = true;
+              LOG.error("Delete key {} failed: {}", d.getKey(), ex.getMessage());
+              error = toErrorInfo(ex);
+            }
+            if (error != null) {
+              undeletedObjects.put(d, error);
+            }
+            processed.add(d);
+          }
+          deleteInBatch(bucket, batch, undeletedObjects, processed);
+        } catch (IOException ex) {
+          if (processed.isEmpty()) {
+            // nothing has been deleted yet, so the request fails as a whole
+            throw ex;
+          }
+          // Earlier Objects are already done, so keep their results and report every other Object as failed.
+          deleteFailed = true;
+          LOG.error("Delete key failed: {}", ex.getMessage());
+          ErrorInfo error = toErrorInfo(ex);
+          for (DeleteObject d : request.getObjects()) {
+            if (!processed.contains(d)) {
+              undeletedObjects.put(d, error);
+            }
+          }
+        }
         for (DeleteObject d : request.getObjects()) {
-          ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
+          ErrorInfo error = undeletedObjects.get(d);
           boolean deleted = error == null ||
               // if the key is not found, it is assumed to be successfully deleted
               ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
@@ -426,7 +490,11 @@ public class BucketEndpoint extends BucketOperationHandler {
             result.addError(deleteError);
           }
         }
-        getMetrics().updateDeleteKeySuccessStats(startNanos);
+        if (deleteFailed) {
+          getMetrics().updateDeleteKeyFailureStats(startNanos);
+        } else {
+          getMetrics().updateDeleteKeySuccessStats(startNanos);
+        }
       } catch (IOException ex) {
         getMetrics().updateDeleteKeyFailureStats(startNanos);
         // the batch delete failed as a whole, so no key is reported as deleted
@@ -452,6 +520,66 @@ public class BucketEndpoint extends BucketOperationHandler {
     }
 
     return result;
+  }
+
+  /**
+   * Deletes the keys of the given Objects in one batch request, then moves them from the batch to processed.
+   * @param undeletedObjects receives the error for each Object whose key could not be deleted
+   */
+  private static void deleteInBatch(OzoneBucket bucket, List<DeleteObject> batch,
+      Map<DeleteObject, ErrorInfo> undeletedObjects, Set<DeleteObject> processed) throws IOException {
+    if (batch.isEmpty()) {
+      return;
+    }
+    List<String> keys = new ArrayList<>();
+    for (DeleteObject d : batch) {
+      keys.add(d.getKey());
+    }
+    Map<String, ErrorInfo> undeletedKeys = bucket.deleteKeys(keys, true);
+    for (DeleteObject d : batch) {
+      ErrorInfo error = undeletedKeys.get(d.getKey());
+      if (error != null) {
+        undeletedObjects.put(d, error);
+      }
+    }
+    processed.addAll(batch);
+    batch.clear();
+  }
+
+  private static ErrorInfo toErrorInfo(IOException ex) {
+    OMException omEx = (OMException) HddsClientUtils.containsException(ex, OMException.class);
+    // Use the same S3 error as when the whole request fails with this exception.
+    return omEx != null ? new ErrorInfo(S3ErrorTable.translateResultCode(omEx).getCode(), omEx.getMessage())
+        : new ErrorInfo(S3ErrorTable.INTERNAL_ERROR.getCode(), ex.getMessage());
+  }
+
+  /**
+   * Deletes the key only if its ETag and data size match.
+   * @param expectedETag expected ETag, or null for no ETag condition
+   * @param expectedSize expected data size, or null for no size condition
+   * @return null if the key was deleted, otherwise the error to report for the key
+   * @throws IOException if the delete failed for a reason other than the conditions
+   */
+  private ErrorInfo deleteKeyIfConditionsMatch(OzoneBucket bucket, String key, String expectedETag,
+      Long expectedSize) throws IOException {
+    try {
+      getClientProtocol().deleteKey(bucket.getVolumeName(), bucket.getName(), key, false,
+          expectedETag == null ? null : S3Utils.parseETag(expectedETag), expectedSize);
+      return null;
+    } catch (OMException ex) {
+      // As for a single DeleteObject, an ETag condition requires the key to exist, but a size condition alone
+      // does not.
+      if (ex.getResult() == ResultCodes.ETAG_MISMATCH || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE
+          || ex.getResult() == ResultCodes.DATA_SIZE_MISMATCH
+          || (ex.getResult() == ResultCodes.KEY_NOT_FOUND && expectedETag != null)) {
+        return new ErrorInfo(S3ErrorTable.PRECOND_FAILED.getCode(), S3ErrorTable.PRECOND_FAILED.getErrorMessage());
+      }
+      if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+        // the key is reported as deleted, as for a batch delete
+        return new ErrorInfo(ex.getResult().name(), ex.getMessage());
+      }
+      throw ex;
+    }
   }
 
   private void validateDeleteContentMD5(String bucketName, MultiDeleteRequest request) throws OS3Exception {

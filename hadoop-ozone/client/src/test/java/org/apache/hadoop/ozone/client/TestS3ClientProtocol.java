@@ -104,6 +104,16 @@ class TestS3ClientProtocol {
   }
 
   @Test
+  void resolvesVolumeForConditionalDeleteBySize() throws Exception {
+    when(delegate.getS3VolumeContext()).thenReturn(volumeContext("tenant-volume"));
+    ClientProtocol versionedClient = createClient(OzoneManagerVersion.ZDU);
+
+    versionedClient.deleteKey(null, "bucket", "key", false, "etag", 42L);
+
+    verify(delegate).deleteKey("tenant-volume", "bucket", "key", false, "etag", 42L);
+  }
+
+  @Test
   void resolvesTenantVolumeForEachRequest() throws Exception {
     when(delegate.getS3VolumeContext()).thenReturn(volumeContext("tenant-one"), volumeContext("tenant-two"));
     ClientProtocol versionedClient = createClient(OzoneManagerVersion.ZDU);

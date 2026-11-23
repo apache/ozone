@@ -28,6 +28,7 @@ import static org.apache.http.HttpStatus.SC_OK;
 import static org.apache.http.HttpStatus.SC_PARTIAL_CONTENT;
 import static org.apache.http.HttpStatus.SC_REQUESTED_RANGE_NOT_SATISFIABLE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -159,6 +160,7 @@ import software.amazon.awssdk.services.s3.model.Delete;
 import software.amazon.awssdk.services.s3.model.DeleteBucketRequest;
 import software.amazon.awssdk.services.s3.model.DeleteBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.DeleteObjectTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsResponse;
@@ -214,6 +216,7 @@ import software.amazon.awssdk.services.s3.model.PutBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectTaggingRequest;
+import software.amazon.awssdk.services.s3.model.S3Error;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.model.Tag;
@@ -1024,6 +1027,93 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
     assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
     assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
         b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectIfMatchSize() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatchSize((long) content.length()));
+
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectIfMatchSizeFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    PutObjectResponse initialResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatchSize(content.length() + 1L)));
+
+    assertEquals(412, exception.statusCode());
+    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+    assertEquals(initialResponse.eTag(), s3Client.headObject(b -> b.bucket(bucketName).key(keyName)).eTag());
+  }
+
+  @Test
+  public void testDeleteObjectIfMatchAndIfMatchSize() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    PutObjectResponse initialResponse = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.deleteObject(
+        b -> b.bucket(bucketName).key(keyName).ifMatch(initialResponse.eTag()).ifMatchSize(content.length() + 1L)));
+    assertEquals(412, exception.statusCode());
+    assertEquals(initialResponse.eTag(), s3Client.headObject(b -> b.bucket(bucketName).key(keyName)).eTag());
+
+    s3Client.deleteObject(
+        b -> b.bucket(bucketName).key(keyName).ifMatch(initialResponse.eTag()).ifMatchSize((long) content.length()));
+
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectIfMatchSizeMissingKey() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    DeleteObjectResponse response = s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName).ifMatchSize(0L));
+
+    assertEquals(204, response.sdkHttpResponse().statusCode());
+  }
+
+  @Test
+  public void testDeleteObjectsWithSize() {
+    final String bucketName = getBucketName();
+    final String matchingKey = getKeyName() + "-matching";
+    final String mismatchingKey = getKeyName() + "-mismatching";
+    final String eTagMismatchingKey = getKeyName() + "-etag-mismatching";
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    PutObjectResponse matching =
+        s3Client.putObject(b -> b.bucket(bucketName).key(matchingKey), RequestBody.fromString(content));
+    s3Client.putObject(b -> b.bucket(bucketName).key(mismatchingKey), RequestBody.fromString(content));
+    s3Client.putObject(b -> b.bucket(bucketName).key(eTagMismatchingKey), RequestBody.fromString(content));
+
+    DeleteObjectsResponse response = s3Client.deleteObjects(b -> b.bucket(bucketName).delete(d -> d.objects(
+        ObjectIdentifier.builder().key(matchingKey).eTag(matching.eTag()).size((long) content.length()).build(),
+        ObjectIdentifier.builder().key(mismatchingKey).size(content.length() + 1L).build(),
+        ObjectIdentifier.builder().key(eTagMismatchingKey).eTag("\"wrong\"").size((long) content.length()).build())));
+
+    assertThat(response.deleted()).extracting(DeletedObject::key).containsExactly(matchingKey);
+    assertThat(response.errors()).extracting(S3Error::key, S3Error::code).containsExactly(
+        tuple(mismatchingKey, "PreconditionFailed"), tuple(eTagMismatchingKey, "PreconditionFailed"));
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(matchingKey)));
+    s3Client.headObject(b -> b.bucket(bucketName).key(mismatchingKey));
+    s3Client.headObject(b -> b.bucket(bucketName).key(eTagMismatchingKey));
   }
 
   @Test

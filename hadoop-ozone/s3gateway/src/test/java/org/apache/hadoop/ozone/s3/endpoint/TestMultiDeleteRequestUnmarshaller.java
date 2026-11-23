@@ -19,7 +19,10 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -70,6 +73,35 @@ public class TestMultiDeleteRequestUnmarshaller {
 
     //THEN
     assertEquals(3, multiDeleteRequest.getObjects().size());
+  }
+
+  @Test
+  public void fromStreamWithConditions() throws IOException {
+    ByteArrayInputStream inputBody = new ByteArrayInputStream(("<Delete xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">"
+        + "<Object><Key>key1</Key><ETag>\"etag\"</ETag><LastModifiedTime>2026-01-01T00:00:00.000Z</LastModifiedTime>"
+        + "<Size>42</Size></Object><Object><Key>key2</Key></Object></Delete>")
+        .getBytes(UTF_8));
+
+    MultiDeleteRequest multiDeleteRequest = unmarshall(inputBody);
+
+    MultiDeleteRequest.DeleteObject withConditions = multiDeleteRequest.getObjects().get(0);
+    assertEquals("\"etag\"", withConditions.getETag());
+    assertEquals("2026-01-01T00:00:00.000Z", withConditions.getLastModifiedTime());
+    assertEquals("42", withConditions.getSize());
+    MultiDeleteRequest.DeleteObject withoutConditions = multiDeleteRequest.getObjects().get(1);
+    assertNull(withoutConditions.getETag());
+    assertNull(withoutConditions.getLastModifiedTime());
+    assertNull(withoutConditions.getSize());
+    assertFalse(withConditions.hasRepeatedCondition());
+    assertFalse(withoutConditions.hasRepeatedCondition());
+  }
+
+  @Test
+  public void fromStreamWithRepeatedSize() throws IOException {
+    ByteArrayInputStream inputBody = new ByteArrayInputStream(
+        "<Delete><Object><Key>key1</Key><Size>-1</Size><Size>0</Size></Object></Delete>".getBytes(UTF_8));
+
+    assertTrue(unmarshall(inputBody).getObjects().get(0).hasRepeatedCondition());
   }
 
   @Test

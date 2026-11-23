@@ -679,6 +679,22 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Deletes an existing key if the key's current ETag and data size match the given values.
+   * @param volumeName Name of the Volume, or null to resolve it from the S3 request context.
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param recursive recursive deletion of all sub path keys if true,
+   *                  otherwise non-recursive
+   * @param expectedETag expected ETag, "*" to require the key to exist, or null for no ETag condition
+   * @param expectedDataSize expected data size in bytes, or null for no size condition
+   * @throws OMException with ETAG_MISMATCH, ETAG_NOT_AVAILABLE, DATA_SIZE_MISMATCH or KEY_NOT_FOUND
+   *         if a condition is not met
+   */
+  void deleteKey(String volumeName, String bucketName, String keyName,
+                 boolean recursive, String expectedETag, Long expectedDataSize)
+      throws IOException;
+
+  /**
    * Deletes keys through the list.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

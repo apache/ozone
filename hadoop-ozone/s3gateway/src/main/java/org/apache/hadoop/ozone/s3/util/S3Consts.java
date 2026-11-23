@@ -151,6 +151,8 @@ public final class S3Consts {
   public static final String IF_MODIFIED_SINCE_HEADER = "If-Modified-Since";
   public static final String IF_UNMODIFIED_SINCE_HEADER =
       "If-Unmodified-Since";
+  public static final String IF_MATCH_SIZE_HEADER = "x-amz-if-match-size";
+  public static final String IF_MATCH_LAST_MODIFIED_TIME_HEADER = "x-amz-if-match-last-modified-time";
 
   // Constants related to S3 Express / ListDirectoryBuckets
   public static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;

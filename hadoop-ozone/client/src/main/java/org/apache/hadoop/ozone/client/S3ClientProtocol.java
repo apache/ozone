@@ -379,6 +379,12 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
+  public void deleteKey(String volumeName, String bucketName, String keyName, boolean recursive, String expectedETag,
+      Long expectedDataSize) throws IOException {
+    delegate.deleteKey(resolveVolumeName(volumeName), bucketName, keyName, recursive, expectedETag, expectedDataSize);
+  }
+
+  @Override
   public void deleteKeys(String volumeName, String bucketName, List<String> keyNameList) throws IOException {
     delegate.deleteKeys(volumeName, bucketName, keyNameList);
   }

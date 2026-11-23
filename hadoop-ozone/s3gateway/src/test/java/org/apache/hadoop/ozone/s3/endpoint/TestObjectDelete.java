@@ -24,10 +24,14 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.createObject
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.delete;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_OWNER_MISMATCH;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_LAST_MODIFIED_TIME_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_SIZE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -54,6 +58,8 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test delete object.
@@ -76,7 +82,7 @@ public class TestObjectDelete {
     verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
     verify(protocol, never()).getS3VolumeContext();
     verify(protocol, never()).getBucketDetails(any(), anyString());
-    verify(protocol).deleteKey(null, "b1", "key", false, null);
+    verify(protocol).deleteKey(null, "b1", "key", false, null, null);
   }
 
   @Test
@@ -98,8 +104,8 @@ public class TestObjectDelete {
     verify(protocol).getBucketDetails(null, "b1");
     verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
     verify(protocol, never()).getS3VolumeContext();
-    verify(protocol).deleteKey("tenant-volume", "b1", "key", false, null);
-    verify(protocol, never()).deleteKey(isNull(), anyString(), anyString(), anyBoolean(), any());
+    verify(protocol).deleteKey("tenant-volume", "b1", "key", false, null, null);
+    verify(protocol, never()).deleteKey(isNull(), anyString(), anyString(), anyBoolean(), any(), any());
   }
 
   @Test
@@ -117,7 +123,7 @@ public class TestObjectDelete {
 
     assertErrorResponse(BUCKET_OWNER_MISMATCH, () -> delete(endpoint, "b1", "key"));
 
-    verify(protocol, never()).deleteKey(any(), anyString(), anyString(), anyBoolean(), any());
+    verify(protocol, never()).deleteKey(any(), anyString(), anyString(), anyBoolean(), any(), any());
   }
 
   @Test
@@ -216,6 +222,122 @@ public class TestObjectDelete {
         .build();
 
     assertErrorResponse(PRECOND_FAILED, () -> delete(rest, "b1", "missing"));
+  }
+
+  @Test
+  void testDeleteIfMatchSizeWithMatchingSize() throws IOException, OS3Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder().setClient(client).setHeaders(headers).build();
+
+    assertStatus(HttpStatus.SC_OK, () -> put(rest, "b1", "key1", "content"));
+
+    when(headers.getHeaderString(IF_MATCH_SIZE_HEADER)).thenReturn(String.valueOf("content".length()));
+    assertStatus(HttpStatus.SC_NO_CONTENT, () -> delete(rest, "b1", "key1"));
+
+    assertFalse(bucket.listKeys("").hasNext(), "Bucket Should not contain any key after delete");
+  }
+
+  @Test
+  void testDeleteIfMatchSizeWithMismatchingSize() throws IOException, OS3Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder().setClient(client).setHeaders(headers).build();
+
+    assertStatus(HttpStatus.SC_OK, () -> put(rest, "b1", "key1", "content"));
+
+    when(headers.getHeaderString(IF_MATCH_SIZE_HEADER)).thenReturn(String.valueOf("content".length() + 1));
+    assertErrorResponse(PRECOND_FAILED, () -> delete(rest, "b1", "key1"));
+
+    assertNotNull(bucket.getKey("key1"));
+  }
+
+  @Test
+  void testDeleteIfMatchSizeWithMatchingETagAndMismatchingSize() throws IOException, OS3Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder().setClient(client).setHeaders(headers).build();
+
+    String eTag = put(rest, "b1", "key1", "content").getHeaderString(HttpHeaders.ETAG);
+
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn(eTag);
+    when(headers.getHeaderString(IF_MATCH_SIZE_HEADER)).thenReturn("0");
+    assertErrorResponse(PRECOND_FAILED, () -> delete(rest, "b1", "key1"));
+    assertNotNull(bucket.getKey("key1"));
+
+    when(headers.getHeaderString(IF_MATCH_SIZE_HEADER)).thenReturn(String.valueOf("content".length()));
+    assertStatus(HttpStatus.SC_NO_CONTENT, () -> delete(rest, "b1", "key1"));
+    assertFalse(bucket.listKeys("").hasNext(), "Bucket Should not contain any key after delete");
+  }
+
+  @Test
+  void testDeleteIfMatchLastModifiedTimeIsNotImplemented() throws IOException, OS3Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder().setClient(client).setHeaders(headers).build();
+
+    assertStatus(HttpStatus.SC_OK, () -> put(rest, "b1", "key1", "content"));
+
+    when(headers.getHeaderString(IF_MATCH_SIZE_HEADER)).thenReturn(String.valueOf("content".length()));
+    when(headers.getHeaderString(IF_MATCH_LAST_MODIFIED_TIME_HEADER)).thenReturn("Wed, 01 Jan 2020 00:00:00 GMT");
+    assertErrorResponse(NOT_IMPLEMENTED, () -> delete(rest, "b1", "key1"));
+
+    assertNotNull(bucket.getKey("key1"));
+  }
+
+  @Test
+  void testDeleteIfMatchSizeForMissingKeySucceeds() throws IOException {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(IF_MATCH_SIZE_HEADER)).thenReturn("0");
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder().setClient(client).setHeaders(headers).build();
+
+    assertStatus(HttpStatus.SC_NO_CONTENT, () -> delete(rest, "b1", "missing"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"abc", "-1", "", " ", "1.5"})
+  void testDeleteIfMatchSizeRejectsInvalidValue(String value) throws Exception {
+    OzoneVolume volume = mock(OzoneVolume.class);
+    ClientProtocol protocol = mock(ClientProtocol.class);
+    ObjectEndpoint original = createObjectEndpoint(protocol, volume, "b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(IF_MATCH_SIZE_HEADER)).thenReturn(value);
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(original.getClient()).setHeaders(headers).build();
+
+    assertErrorResponse(INVALID_ARGUMENT, () -> delete(endpoint, "b1", "key"));
+
+    verify(protocol, never()).deleteKey(any(), anyString(), anyString(), anyBoolean(), any(), any());
+  }
+
+  @Test
+  void testDeleteIfMatchSizePassesConditionsToOm() throws Exception {
+    OzoneVolume volume = mock(OzoneVolume.class);
+    ClientProtocol protocol = mock(ClientProtocol.class);
+    ObjectEndpoint original = createObjectEndpoint(protocol, volume, "b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn("\"etag\"");
+    when(headers.getHeaderString(IF_MATCH_SIZE_HEADER)).thenReturn(" 42 ");
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(original.getClient()).setHeaders(headers).build();
+
+    assertStatus(HttpStatus.SC_NO_CONTENT, () -> delete(endpoint, "b1", "key"));
+
+    verify(protocol).deleteKey(null, "b1", "key", false, "etag", 42L);
   }
 
   @Test

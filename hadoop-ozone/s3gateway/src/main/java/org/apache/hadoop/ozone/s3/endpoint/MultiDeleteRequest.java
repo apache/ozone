@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
@@ -82,6 +83,18 @@ public class MultiDeleteRequest {
     @XmlElement(name = "VersionId")
     private String versionId;
 
+    // The conditions are lists, so that an element repeated in one Object is detected instead of the last one
+    // silently replacing the others. Kept as text so that an invalid value is rejected instead of being dropped by
+    // JAXB.
+    @XmlElement(name = "ETag")
+    private List<String> eTag;
+
+    @XmlElement(name = "LastModifiedTime")
+    private List<String> lastModifiedTime;
+
+    @XmlElement(name = "Size")
+    private List<String> size;
+
     public DeleteObject() {
     }
 
@@ -103,6 +116,47 @@ public class MultiDeleteRequest {
 
     public void setVersionId(String versionId) {
       this.versionId = versionId;
+    }
+
+    public String getETag() {
+      return single(eTag);
+    }
+
+    public void setETag(String etag) {
+      this.eTag = list(etag);
+    }
+
+    public String getLastModifiedTime() {
+      return single(lastModifiedTime);
+    }
+
+    public void setLastModifiedTime(String lastModifiedTime) {
+      this.lastModifiedTime = list(lastModifiedTime);
+    }
+
+    public String getSize() {
+      return single(size);
+    }
+
+    public void setSize(String size) {
+      this.size = list(size);
+    }
+
+    /** @return true if a condition element appears more than once in this Object */
+    public boolean hasRepeatedCondition() {
+      return isRepeated(eTag) || isRepeated(lastModifiedTime) || isRepeated(size);
+    }
+
+    private static String single(List<String> values) {
+      return values == null || values.isEmpty() ? null : values.get(0);
+    }
+
+    private static List<String> list(String value) {
+      return value == null ? null : new ArrayList<>(Collections.singletonList(value));
+    }
+
+    private static boolean isRepeated(List<String> values) {
+      return values != null && values.size() > 1;
     }
   }
 }
