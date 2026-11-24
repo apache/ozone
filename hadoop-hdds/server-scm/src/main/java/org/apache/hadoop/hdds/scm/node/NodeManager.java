@@ -183,7 +183,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
         minApparentVersion = Math.min(minApparentVersion, dnApparentVersionInt);
         maxApparentVersion = Math.max(maxApparentVersion, dnApparentVersionInt);
 
-        // A datanode is counted as finalized only if it's software and apparent versions match each other
+        // A datanode is counted as finalized only if its software and apparent versions match each other
         // and SCM's software version
         if (softwareVersionMatchesScm && dnApparentVersion.equals(dnSoftwareVersion)) {
           finalizedNodes++;
