@@ -99,14 +99,14 @@ public enum OzoneManagerVersion implements ComponentVersion {
       "OzoneManager version that gives each multipart upload part in an "
           + "encrypted bucket its own IV"),
 
-  S3_IF_MATCH_LAST_MODIFIED_TIME(107,
-      "OzoneManager version that supports x-amz-if-match-last-modified-time"
-          + " conditional key deletion"),
   RENAME_KEY_REJECTS_NON_FSO(106,
       "OzoneManager version that rejects renameKey on buckets that are not "
           + "FILE_SYSTEM_OPTIMIZED when the request sets requireFileSystemOptimized, "
           + "so file system clients no longer need the client-side InfoBucket "
           + "layout check for rename"),
+  S3_IF_MATCH_LAST_MODIFIED_TIME(107,
+      "OzoneManager version that supports x-amz-if-match-last-modified-time"
+          + " conditional key deletion"),
 
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
