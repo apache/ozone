@@ -54,59 +54,6 @@ scrape_configs:
          - "127.0.0.1:9876" 
 ```
 
-### OM storage-policy committed bytes
-
-`OMStoragePolicyMetrics` exports the `CommittedBytes` counter. Its Prometheus name is
-`om_storage_policy_metrics_committed_bytes`. It counts logical key bytes at the same successful final-commit
-boundary as `OMMetrics.TotalDataCommitted`, including overwrites. It excludes intermediate hsync calls, failed
-commits, multipart-upload parts and multipart completion. Empty keys add no bytes. It is a traffic counter,
-not the size of currently retained data or replicated physical storage.
-
-Each accepted committed block contributes its written logical bytes to its selected tier and outcome series.
-A key spanning SSD and DISK therefore contributes bytes to both series, without double counting:
-
-| Prometheus label | Meaning |
-|---|---|
-| `policy` | Recorded key policy: `HOT`, `WARM`, `COLD`, or `UNKNOWN`. |
-| `requestedtier` | Creation tier of that policy: `SSD`, `DISK`, `ARCHIVE`, or `UNKNOWN`. |
-| `actualtier` | SCM-selected tier of the committed blocks: `SSD`, `DISK`, `ARCHIVE`, or `UNKNOWN`. |
-| `outcome` | `fallback` if this block used fallback; `preferred` if its allocation tier matches the requested tier without fallback; otherwise `unknown`. |
-
-OM uses its original allocation metadata, rather than attributes echoed by the client, and ignores unused
-preallocated blocks. Missing allocation evidence is reported as `UNKNOWN`; it is not assumed to mean DISK.
-Bytes not covered by committed block lengths are also `UNKNOWN`. If lengths are negative or exceed the key size,
-the entire key size is counted as `UNKNOWN/unknown`, preserving the total without guessing a split or failing the commit.
-The selected allocation tier does not measure the current physical volume of each replica. Use storage-policy
-compliance reporting to inspect current placement.
-
-For example, a 12 MiB HOT key with 8 MiB allocated on SSD and 4 MiB allocated on DISK by fallback adds:
-
-| Policy | Requested tier | Actual tier | Outcome | Bytes added |
-|---|---|---|---|---|
-| HOT | SSD | SSD | preferred | 8 MiB |
-| HOT | SSD | DISK | fallback | 4 MiB |
-
-Administrators can graph committed bytes per second separately for each selected tier:
-
-```promql
-sum by (actualtier) (rate(om_storage_policy_metrics_committed_bytes{instance="om-host:9874",policy="HOT"}[5m]))
-```
-
-The fallback ratio below measures the share of committed logical bytes allocated through fallback. In this example,
-it is 4/12, or approximately 33%. It does not measure current physical storage on those volumes:
-
-```promql
-(sum(rate(om_storage_policy_metrics_committed_bytes{instance="om-host:9874",policy="HOT",outcome="fallback"}[5m])) or vector(0))
-/
-sum(rate(om_storage_policy_metrics_committed_bytes{instance="om-host:9874",policy="HOT"}[5m]))
-```
-
-Replace `instance` with the selected OM's scrape target. Series appear after the first positive-byte commit in
-that category; an absent series is not evidence of fallback. Inspect `outcome="unknown"` when assessing coverage.
-Counters reset on OM restart and do not backfill existing keys. Like `TotalDataCommitted`, each OM counts the
-transactions it applies, including follower application. Do not sum replicated OM instances as independent write
-traffic. Compare outcomes on the same OM; selecting a single instance also avoids counting replicated commits twice.
-
 ## Grafana
 
 Once Prometheus is up and running, Grafana can be configured to monitor and visualize Ozone metrics.
