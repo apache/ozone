@@ -193,8 +193,9 @@ public class SCMStateMachine extends BaseStateMachine {
   public CompletableFuture<Message> applyTransaction(
       final TransactionContext trx) {
     if (!isInitialized) {
-      LOG.warn("Skipping applyTransaction {} on the bootstrap state machine", TermIndex.valueOf(trx.getLogEntry()));
-      return CompletableFuture.completedFuture(Message.EMPTY);
+      final String message = "Unexpected applyTransaction " + TermIndex.valueOf(trx.getLogEntry())
+          + " on the bootstrap state machine used by SCM init";
+      ExitUtils.terminate(1, message, new IllegalStateException(message), StateMachine.LOG);
     }
     final CompletableFuture<Message> applyTransactionFuture =
         new CompletableFuture<>();

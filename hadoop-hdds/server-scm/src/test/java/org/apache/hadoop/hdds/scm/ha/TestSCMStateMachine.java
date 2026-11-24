@@ -324,12 +324,13 @@ public class TestSCMStateMachine {
   }
 
   @Test
-  void testBootstrapStateMachineSkipsApplyTransaction() throws Exception {
+  void testBootstrapStateMachineTerminatesOnApplyTransaction() throws Exception {
+    ExitUtils.disableSystemExit();
     try (SCMStateMachine bootstrap = new SCMStateMachine()) {
-      CompletableFuture<Message> future = bootstrap.applyTransaction(newTransaction(RequestType.CONTAINER, 1));
-
-      assertTrue(future.isDone());
-      assertThat(future.get()).isSameAs(Message.EMPTY);
+      assertThrows(ExitUtils.ExitException.class,
+          () -> bootstrap.applyTransaction(newTransaction(RequestType.CONTAINER, 1)));
+    } finally {
+      ExitUtils.clear();
     }
   }
 

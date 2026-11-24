@@ -35,7 +35,6 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -288,32 +287,28 @@ public class TestSCMRatisServerImpl {
   }
 
   @Test
-  public void testInitializeFailsWithStaleRaftGroup() throws Exception {
-    final int port;
-    try (ServerSocket socket = new ServerSocket(0)) {
-      port = socket.getLocalPort();
-    }
+  public void testVerifyRaftGroups() throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR, tempDir.resolve("ratis").toString());
-    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, port);
-    final SCMNodeDetails details = new SCMNodeDetails.Builder()
-        .setRpcAddress(new InetSocketAddress("localhost", 0))
-        .setRatisPort(port)
-        .setSCMNodeId("scm1")
-        .build();
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR, tempDir.toString());
+    final RaftGroupId ownGroup = SCMRatisServerImpl.buildRaftGroupId("CID-" + UUID.randomUUID());
 
     SCMRatisServerImpl.verifyNoRaftGroup(conf);
+    assertTrue(new File(tempDir.toFile(), "snapshot").mkdirs());
+    assertTrue(new File(tempDir.toFile(), "1-1-1-1-1").mkdirs());
+    SCMRatisServerImpl.verifyNoRaftGroup(conf);
 
-    final String clusterId = "CID-" + UUID.randomUUID();
-    final String scmId = UUID.randomUUID().toString();
-    SCMRatisServerImpl.initialize(clusterId, scmId, details, conf);
-    final File ratisDir = new File(SCMHAUtils.getSCMRatisDirectory(conf));
-    assertTrue(new File(ratisDir, SCMRatisServerImpl.buildRaftGroupId(clusterId).getUuid().toString()).isDirectory());
-
-    SCMRatisServerImpl.initialize(clusterId, scmId, details, conf);
-
+    assertTrue(new File(tempDir.toFile(), ownGroup.getUuid().toString()).mkdirs());
     assertThrows(IOException.class, () -> SCMRatisServerImpl.verifyNoRaftGroup(conf));
-    assertThrows(IOException.class,
-        () -> SCMRatisServerImpl.initialize("CID-" + UUID.randomUUID(), scmId, details, conf));
+    final StorageContainerManager scm = mock(StorageContainerManager.class);
+    final SCMNodeDetails details = new SCMNodeDetails.Builder()
+        .setRpcAddress(new InetSocketAddress("localhost", 0)).setSCMNodeId("scm1").build();
+    assertTrue(new File(tempDir.toFile(), UUID.randomUUID().toString()).mkdirs());
+    when(scm.getClusterId()).thenReturn("CID-" + UUID.randomUUID());
+    assertThat(assertThrows(IOException.class,
+        () -> SCMRatisServerImpl.initialize("CID-" + UUID.randomUUID(), UUID.randomUUID().toString(), details, conf)))
+        .hasMessageContaining("stale Raft group");
+    assertThat(assertThrows(IOException.class,
+        () -> new SCMRatisServerImpl(conf, scm, mock(SCMHADBTransactionBuffer.class))))
+        .hasMessageContaining("stale Raft group");
   }
 }
