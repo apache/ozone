@@ -46,6 +46,10 @@ public class OMExecutionFlow {
       Type.SnapshotMoveTableKeys, Type.SnapshotPurge, Type.SetSnapshotProperty, Type.SetRangerServiceVersion,
       Type.QuotaRepair, Type.DeleteRevokedSTSTokens, Type.SaveLifecycleScanState, Type.CompleteFinalizeUpgrade);
 
+  // Types whose OMClientRequest overrides postExecute.  The retry cache hits of other types skip creating the request.
+  // A new override must be added here, which TestOMExecutionFlow#postExecuteCmdTypesMatchOverrides enforces.
+  private static final Set<Type> POST_EXECUTE_CMD_TYPES = EnumSet.of(Type.RecoverLease);
+
   private final OzoneManager ozoneManager;
   private final OMPerformanceMetrics perfMetrics;
 
@@ -109,6 +113,9 @@ public class OMExecutionFlow {
    * Runs post-execute steps on a successful write response served from the Ratis retry cache.
    */
   public OMResponse postExecute(OMRequest request, OMResponse response) {
+    if (!hasPostExecute(request.getCmdType())) {
+      return response;
+    }
     final OMClientRequest omClientRequest;
     try {
       omClientRequest = createClientRequest(request);
@@ -126,6 +133,10 @@ public class OMExecutionFlow {
     } catch (IOException ex) {
       return createPostExecuteErrorResponse(request, response, ex);
     }
+  }
+
+  static boolean hasPostExecute(Type cmdType) {
+    return POST_EXECUTE_CMD_TYPES.contains(cmdType);
   }
 
   private OMClientRequest createClientRequest(OMRequest request) throws IOException {

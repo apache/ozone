@@ -142,7 +142,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    *
    * Called from the RPC context on the leader after the request has been applied successfully. When the response is
    * served from the Ratis retry cache, this is called on a new request instance on which {@link #preExecute} has not
-   * run.
+   * run, and only if the command type is registered in {@code OMExecutionFlow.POST_EXECUTE_CMD_TYPES}.
    *
    * @return OMResponse that will be returned to the client.
    */

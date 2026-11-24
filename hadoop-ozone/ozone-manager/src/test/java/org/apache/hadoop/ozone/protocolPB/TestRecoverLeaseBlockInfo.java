@@ -54,8 +54,6 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMLockDetailsProto;
@@ -174,25 +172,14 @@ class TestRecoverLeaseBlockInfo {
 
   @Test
   void testCachedWriteSucceedsAfterBucketDeleted() throws Exception {
-    final OMRequest deleteKeyRequest = OMRequest.newBuilder()
-        .setCmdType(Type.DeleteKey)
-        .setClientId("client")
-        .setDeleteKeyRequest(
-            DeleteKeyRequest.newBuilder()
-                .setKeyArgs(
-                    KeyArgs.newBuilder()
-                        .setVolumeName("volume")
-                        .setBucketName("deleted-bucket")
-                        .setKeyName("key")))
-        .build();
-    final OMResponse cached = OMResponse.newBuilder().setCmdType(Type.DeleteKey)
-        .setStatus(Status.OK).setSuccess(true).build();
+    final OMResponse cached = appliedResponse();
     when(ratis.checkRetryCache()).thenReturn(cached);
 
-    final OMResponse result = translator.processRequest(deleteKeyRequest);
+    final OMResponse result = translator.processRequest(request("deleted-bucket"));
 
     assertThat(result).isEqualTo(cached);
     verify(ratis, never()).submitRequest(any(), anyBoolean());
+    verify(containerClient, never()).getContainerWithPipeline(anyLong());
   }
 
   @ParameterizedTest
@@ -215,9 +202,13 @@ class TestRecoverLeaseBlockInfo {
   }
 
   private static OMRequest request() {
+    return request("bucket");
+  }
+
+  private static OMRequest request(String bucketName) {
     return OMRequest.newBuilder().setCmdType(Type.RecoverLease).setClientId("client")
         .setRecoverLeaseRequest(RecoverLeaseRequest.newBuilder()
-            .setVolumeName("volume").setBucketName("bucket").setKeyName("key"))
+            .setVolumeName("volume").setBucketName(bucketName).setKeyName("key"))
         .build();
   }
 
