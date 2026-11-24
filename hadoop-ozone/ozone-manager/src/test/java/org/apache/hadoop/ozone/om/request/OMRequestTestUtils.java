@@ -40,8 +40,10 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
@@ -153,6 +155,19 @@ public final class OMRequestTestUtils {
     }
 
     addBucketToDB(omMetadataManager, builder);
+  }
+
+  /** Adds the volume (if missing) and a bucket with the given storage policy and fallback flag to the OM DB. */
+  public static OmBucketInfo addVolumeAndBucketToDB(String volumeName, String bucketName,
+      OMMetadataManager omMetadataManager, BucketLayout bucketLayout, StoragePolicy storagePolicy,
+      boolean allowFallbackStoragePolicy) throws Exception {
+    if (!omMetadataManager.getVolumeTable().isExist(omMetadataManager.getVolumeKey(volumeName))) {
+      addVolumeToDB(volumeName, omMetadataManager);
+    }
+    return addBucketToDB(omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+            .setBucketLayout(bucketLayout)
+            .setStoragePolicy(storagePolicy).setAllowFallbackStoragePolicy(allowFallbackStoragePolicy));
   }
 
   @SuppressWarnings("parameterNumber")
@@ -1062,17 +1077,27 @@ public final class OMRequestTestUtils {
   public static OMRequest createInitiateMPURequest(String volumeName,
       String bucketName, String keyName, Map<String, String> metadata,
       Map<String, String> tags) {
-    MultipartInfoInitiateRequest
-        multipartInfoInitiateRequest =
-        MultipartInfoInitiateRequest.newBuilder().setKeyArgs(
-            KeyArgs.newBuilder()
-                .setVolumeName(volumeName)
-                .setKeyName(keyName)
-                .setBucketName(bucketName)
-                .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
-                .addAllTags(KeyValueUtil.toProtobuf(tags))
-            )
-            .build();
+    return createInitiateMPURequest(volumeName, bucketName, keyName, metadata, tags, null);
+  }
+
+  /**
+   * Create OMRequest which encapsulates InitiateMultipartUpload request.
+   * @param storagePolicy storage policy of the key, or null if the request carries none
+   */
+  public static OMRequest createInitiateMPURequest(String volumeName,
+      String bucketName, String keyName, Map<String, String> metadata,
+      Map<String, String> tags, StoragePolicy storagePolicy) {
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setKeyName(keyName)
+        .setBucketName(bucketName)
+        .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
+        .addAllTags(KeyValueUtil.toProtobuf(tags));
+    if (storagePolicy != null) {
+      keyArgs.setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy));
+    }
+    MultipartInfoInitiateRequest multipartInfoInitiateRequest =
+        MultipartInfoInitiateRequest.newBuilder().setKeyArgs(keyArgs).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.InitiateMultiPartUpload)

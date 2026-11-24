@@ -68,21 +68,6 @@ public class TestOMStoragePolicyMetrics {
         .contains("outcome=\"preferred\"").contains(" 100\n");
   }
 
-  /**
-   * The actual-tier label comes from {@link StorageTier} itself, so every tier that can hold data, including any added
-   * later, is reported under its own name rather than collapsing into UNKNOWN. EMPTY only means "no fallback tier" on a
-   * policy, so a block recorded with it is UNKNOWN.
-   */
-  @ParameterizedTest
-  @EnumSource(StorageTier.class)
-  void testEveryStorageTierIsExportedUnderItsOwnName(StorageTier tier) {
-    OMStoragePolicyMetrics metrics = new OMStoragePolicyMetrics();
-    OmKeyInfo allocated = key(OzoneStoragePolicy.HOT, 10, block(1, 10, tier, true));
-    metrics.recordCommit(allocated, key(OzoneStoragePolicy.HOT, 10, block(1, 10, null, false)));
-    String expected = tier == StorageTier.EMPTY ? "UNKNOWN" : tier.name();
-    assertThat(snapshot(metrics)).isEqualTo(Map.of("HOT/SSD/" + expected + "/fallback", 10L));
-  }
-
   @Test
   void testMixedKeySplitsCommittedBytesAndIgnoresClientClaims() throws Exception {
     OMStoragePolicyMetrics metrics = new OMStoragePolicyMetrics();

@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -1063,7 +1064,24 @@ public class OzoneBucket extends WithMetadata {
       ReplicationConfig config, Map<String, String> metadata,
       Map<String, String> tags)
       throws IOException {
-    return proxy.initiateMultipartUpload(volumeName, name, keyName, config, metadata, tags);
+    return initiateMultipartUpload(keyName, new MultipartUploadOptions.Builder()
+        .setReplicationConfig(config)
+        .setMetadata(metadata)
+        .setTags(tags)
+        .build());
+  }
+
+  /**
+   * Initiate multipart upload for a specified key.
+   * @param keyName Name of the key to be created when the multipart upload is completed.
+   * @param options Replication config, metadata, tags and storage policy of the key.
+   * @return OmMultipartInfo
+   * @throws IOException
+   */
+  public OmMultipartInfo initiateMultipartUpload(String keyName, MultipartUploadOptions options)
+      throws IOException {
+    Objects.requireNonNull(options, "options == null");
+    return proxy.initiateMultipartUpload(volumeName, name, keyName, options);
   }
 
   /**

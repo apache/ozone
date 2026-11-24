@@ -441,6 +441,7 @@ public class DiskBalancerService extends BackgroundService {
       return queue;
     }
 
+    boolean rejectedCandidate = false;
     for (int i = 0; i < availableTaskCount; i++) {
       ContainerCandidate candidate = volumeContainerChoosingPolicy.chooseVolumesAndContainer(
           ozoneContainer, volumeSet, deltaSizes, inProgressContainers, threshold, movableContainerStates);
@@ -449,6 +450,15 @@ public class DiskBalancerService extends BackgroundService {
         HddsVolume destVolume = candidate.getDestVolume();
         ContainerData toBalanceContainer = candidate.getContainerData();
         if (toBalanceContainer != null) {
+          if (sourceVolume.getStorageType() != destVolume.getStorageType()) {
+            LOG.warn("Container {}: Source volume storage type ({}) differs from destination volume storage type ({}). "
+                    + "Skipping the disk balancing move.",
+                toBalanceContainer.getContainerID(), sourceVolume.getStorageType(), destVolume.getStorageType());
+            // The policy reserved destination space, but no task will run postCall() to release it.
+            destVolume.incCommittedBytes(0 - toBalanceContainer.getBytesUsed());
+            rejectedCandidate = true;
+            continue;
+          }
           DiskBalancerTask task = new DiskBalancerTask(toBalanceContainer, sourceVolume,
               destVolume);
           queue.add(task);
@@ -463,8 +473,14 @@ public class DiskBalancerService extends BackgroundService {
         // Containers only move between volumes of the same StorageType, so no volume pair is also
         // reported when every StorageType has fewer than two volumes, even if those volumes are
         // unevenly used.
-        LOG.info("Disk balancer is stopped because no volume pair of the same StorageType needs" +
-            " balancing as the property StopAfterDiskEven is set to true.");
+        if (rejectedCandidate) {
+          LOG.warn("Disk balancer is stopped because the container choosing policy {} provided no valid" +
+                  " same-StorageType move candidates as the property StopAfterDiskEven is set to true.",
+              volumeContainerChoosingPolicy.getClass().getName());
+        } else {
+          LOG.info("Disk balancer is stopped because no volume pair of the same StorageType needs" +
+              " balancing as the property StopAfterDiskEven is set to true.");
+        }
         this.operationalState = DiskBalancerRunningStatus.STOPPED;
         try {
           // Persist the updated shouldRun status into the YAML file
@@ -544,7 +560,6 @@ public class DiskBalancerService extends BackgroundService {
           LOG.warn("Container {} is in {} state, skipping move process.", containerId, containerState);
           return BackgroundTaskResult.EmptyTaskResult.newResult();
         }
-
         // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
             .resolve(String.valueOf(containerId));
