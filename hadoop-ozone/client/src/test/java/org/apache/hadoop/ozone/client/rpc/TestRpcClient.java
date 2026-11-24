@@ -59,6 +59,8 @@ import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -751,6 +753,73 @@ public class TestRpcClient {
     }
   }
 
+  /**
+   * A single CreateKeyOptions carrying both a storage policy and derived key piggybacking must send both to the OM.
+   */
+  @Test
+  void testCreateKeyOptionsMappedToRequest() throws IOException {
+    AtomicReference<CreateKeyRequest> captured = new AtomicReference<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return super.submitRequest(request).toBuilder()
+              .setServiceListResponse(ServiceListResponse.newBuilder()
+                  .addServiceInfo(OzoneManagerProtocolProtos.ServiceInfo.newBuilder()
+                      .setNodeType(HddsProtos.NodeType.OM).setHostname("new-om")
+                      .setOMVersion(OzoneManagerVersion.STORAGE_POLICY_SUPPORT.serialize())))
+              .build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          captured.set(request.getCreateKeyRequest());
+          throw new IOException("Captured CreateKey request");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      CreateKeyOptions options = CreateKeyOptions.builder()
+          .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+          .setStoragePolicy(OzoneStoragePolicy.HOT)
+          .setDerivedKeyPiggyBacking(true)
+          .build();
+
+      assertThatThrownBy(() -> client.createKey("volume", "bucket", "key", options))
+          .isInstanceOf(IOException.class)
+          .hasMessage("Captured CreateKey request");
+      assertThat(captured.get()).isNotNull();
+      assertThat(captured.get().getDerivedKeyPiggyBacking()).isTrue();
+      assertThat(captured.get().getKeyArgs().getStoragePolicy()).isEqualTo(HddsProtos.StoragePolicyProto.HOT);
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  public void testCreateKeyRejectsNullOptions() throws IOException {
+    RpcClient client = createRpcClient();
+    try {
+      assertThatThrownBy(() -> client.createKey("vol", "bucket", "key", (CreateKeyOptions) null))
+          .isInstanceOf(NullPointerException.class)
+          .hasMessage("options == null");
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  public void testCreateFileRejectsNullOptions() throws IOException {
+    RpcClient client = createRpcClient();
+    try {
+      assertThatThrownBy(() -> client.createFile("vol", "bucket", "key", (CreateFileOptions) null))
+          .isInstanceOf(NullPointerException.class)
+          .hasMessage("options == null");
+    } finally {
+      client.close();
+    }
+  }
+
   @Test
   public void testInitiateMultipartUploadRejectsNullOptions() throws IOException {
     RpcClient client = createRpcClient();
@@ -790,9 +859,9 @@ public class TestRpcClient {
     try {
       ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
       IOException withoutPolicyError = assertThrows(IOException.class, () -> client.initiateMultipartUpload(
-          "vol", "bucket", "key", new MultipartUploadOptions.Builder().setReplicationConfig(replication).build()));
+          "vol", "bucket", "key", MultipartUploadOptions.builder().setReplicationConfig(replication).build()));
       IOException withPolicyError = assertThrows(IOException.class, () -> client.initiateMultipartUpload(
-          "vol", "bucket", "key", new MultipartUploadOptions.Builder().setReplicationConfig(replication)
+          "vol", "bucket", "key", MultipartUploadOptions.builder().setReplicationConfig(replication)
               .setStoragePolicy(OzoneStoragePolicy.COLD).build()));
 
       assertThat(withoutPolicyError).hasMessage("captured");

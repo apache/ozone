@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -257,9 +258,10 @@ public class TestOzoneStoragePolicy {
 
     OzoneBucket bucket = createBucket(null, BucketLayout.OBJECT_STORE);
     String keyName = UUID.randomUUID().toString();
-    try (OzoneOutputStream out = bucket.createKey(keyName, 0, RATIS_THREE,
-        Collections.emptyMap(), Collections.emptyMap(),
-        OzoneStoragePolicy.COLD)) {
+    try (OzoneOutputStream out = bucket.createKey(keyName, CreateKeyOptions.builder()
+        .setReplicationConfig(RATIS_THREE)
+        .setStoragePolicy(OzoneStoragePolicy.COLD)
+        .build())) {
       // Intentionally write nothing.
       assertNotNull(out);
     }
@@ -291,9 +293,10 @@ public class TestOzoneStoragePolicy {
     // allocateBlock round trip. Write enough to span more than one block.
     byte[] data = new byte[(int) (2 * ozoneManager.getScmBlockSize() + 1024)];
     Arrays.fill(data, (byte) 'p');
-    try (OzoneOutputStream out = bucket.createKey(keyName, 0, RATIS_THREE,
-        Collections.emptyMap(), Collections.emptyMap(),
-        OzoneStoragePolicy.COLD)) {
+    try (OzoneOutputStream out = bucket.createKey(keyName, CreateKeyOptions.builder()
+        .setReplicationConfig(RATIS_THREE)
+        .setStoragePolicy(OzoneStoragePolicy.COLD)
+        .build())) {
       out.write(data);
     }
 
@@ -574,7 +577,7 @@ public class TestOzoneStoragePolicy {
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
       OzoneStoragePolicy storagePolicy) throws IOException {
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        new MultipartUploadOptions.Builder().setReplicationConfig(RATIS_THREE).setStoragePolicy(storagePolicy).build());
+        MultipartUploadOptions.builder().setReplicationConfig(RATIS_THREE).setStoragePolicy(storagePolicy).build());
     assertThat(multipartInfo.getUploadID()).isNotNull();
     return multipartInfo.getUploadID();
   }
@@ -629,9 +632,11 @@ public class TestOzoneStoragePolicy {
   private void writeKey(OzoneBucket bucket, String keyName,
       OzoneStoragePolicy storagePolicy) throws IOException {
     byte[] data = UUID.randomUUID().toString().getBytes(UTF_8);
-    try (OzoneOutputStream out = bucket.createKey(keyName, data.length,
-        RATIS_THREE, Collections.emptyMap(), Collections.emptyMap(),
-        storagePolicy)) {
+    try (OzoneOutputStream out = bucket.createKey(keyName, CreateKeyOptions.builder()
+        .setSize(data.length)
+        .setReplicationConfig(RATIS_THREE)
+        .setStoragePolicy(storagePolicy)
+        .build())) {
       out.write(data);
     }
   }
