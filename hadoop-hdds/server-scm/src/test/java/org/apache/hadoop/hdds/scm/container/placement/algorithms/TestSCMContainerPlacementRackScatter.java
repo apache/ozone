@@ -936,7 +936,7 @@ public class TestSCMContainerPlacementRackScatter {
   }
 
   @Test
-  public void chooseExtraNodesFromRandomRacksWhenMoreNodesThanRacks() throws SCMException {
+  void chooseExtraNodesFromRandomRacksWhenMoreNodesThanRacks() throws SCMException {
     // 8 racks with 2 datanodes each, choosing 14 nodes as for rs-10-4
     setup(16, 2);
     int nodesRequired = 14;
