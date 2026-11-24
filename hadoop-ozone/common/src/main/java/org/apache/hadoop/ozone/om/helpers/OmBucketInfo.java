@@ -688,7 +688,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (owner != null) {
       bib.setOwner(owner);
     }
-    bib.setObjectLockEnabled(objectLockEnabled);
+    if (objectLockEnabled) {
+      bib.setObjectLockEnabled(true);
+    }
     if (defaultRetention != null) {
       bib.setDefaultRetention(defaultRetention.toProto());
     }

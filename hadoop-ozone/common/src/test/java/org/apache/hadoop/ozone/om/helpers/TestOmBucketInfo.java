@@ -48,6 +48,7 @@ public class TestOmBucketInfo {
         new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.DAYS, 30), null);
     OmBucketInfo bucket = OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("bucket")
         .setObjectLockEnabled(true).setDefaultRetention(retention).build();
+    assertTrue(bucket.getProtobuf().hasObjectLockEnabled());
     OmBucketInfo decoded = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
     for (OmBucketInfo value : new OmBucketInfo[]{decoded, bucket.copyObject(), bucket.toBuilder().build(),
         OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("link").build()
@@ -59,6 +60,11 @@ public class TestOmBucketInfo {
         .clearObjectLockEnabled().clearDefaultRetention().build());
     assertFalse(legacy.isObjectLockEnabled());
     assertNull(legacy.getDefaultRetention());
+    assertFalse(legacy.getProtobuf().hasObjectLockEnabled());
+    assertFalse(legacy.getProtobuf().getObjectLockEnabled());
+    assertFalse(OmBucketInfo.getFromProtobuf(legacy.getProtobuf()).isObjectLockEnabled());
+    assertFalse(OmBucketInfo.getFromProtobuf(bucket.getProtobuf().toBuilder()
+        .setObjectLockEnabled(false).build()).isObjectLockEnabled());
   }
 
   @Test
