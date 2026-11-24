@@ -2998,7 +2998,7 @@
                 <configuration>
                   <rules>
                     <requireOS>
-                      <family>unix</family>
+                      <name>Linux</name>
                     </requireOS>
                   </rules>
                 </configuration>
