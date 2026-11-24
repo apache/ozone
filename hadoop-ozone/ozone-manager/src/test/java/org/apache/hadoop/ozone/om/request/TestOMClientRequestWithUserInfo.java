@@ -28,9 +28,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import io.grpc.Context;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,13 +49,15 @@ import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -92,9 +94,7 @@ public class TestOMClientRequestWithUserInfo {
     when(omConfig.isFileSystemPathEnabled()).thenReturn(false);
     when(ozoneManager.getConfig()).thenReturn(omConfig);
 
-    // Mock version manager to avoid NPE in preExecute
-    OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion()).thenReturn(0);
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
     when(ozoneManager.getVersionManager()).thenReturn(versionManager);
 
     inetAddress = InetAddress.getByName("127.0.0.1");
@@ -183,6 +183,19 @@ public class TestOMClientRequestWithUserInfo {
         new OMKeyCommitRequest(request, mock(BucketLayout.class));
 
     assertEquals("AccessId", omClientRequest.getUserInfo().getUserName());
+  }
+
+  @Test
+  public void testUserInfoWithoutRemoteAddress() throws Exception {
+    when(ozoneManager.getOmRpcServerAddr()).thenReturn(new InetSocketAddress(inetAddress, 9862));
+
+    OMRequest request = createRequestWithS3Credentials("AccessId", "Signature", "StringToSign");
+    OMClientRequest omClientRequest = new OMKeyCommitRequest(request, mock(BucketLayout.class));
+
+    OzoneManagerProtocolProtos.UserInfo userInfo = omClientRequest.getUserIfNotExists(ozoneManager);
+
+    assertEquals("AccessId", userInfo.getUserName());
+    assertEquals(inetAddress.getHostAddress(), userInfo.getRemoteAddress());
   }
 
   @Test

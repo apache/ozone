@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -55,8 +56,8 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -69,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * from cblock clients.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestContainerOperations implements NonHATests.TestCase {
+public abstract class TestContainerOperations implements ClusterForTests.TestCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestContainerOperations.class);
   private static final int CONTAINER_LIST_LIMIT = 1;
@@ -171,7 +172,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
         .getScmNodeManager()
         .getAllNodes()
         .get(0);
-    dn.setCurrentVersion(0);
+    dn.setCurrentVersion(HDDSVersion.DEFAULT_VERSION);
 
     List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
         storageClient.getDatanodeUsageInfo(

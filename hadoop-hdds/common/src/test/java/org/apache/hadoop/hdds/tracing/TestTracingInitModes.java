@@ -20,16 +20,23 @@ package org.apache.hadoop.hdds.tracing;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.Service;
+import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.ServiceImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,10 +61,24 @@ public class TestTracingInitModes {
   }
 
   /**
+   * Builds a recording tracer provider that exports nothing, so tests stay offline.
+   * A span processor is required: without one, the SDK hands out noop tracers.
+   * Fails fast if the provider cannot create valid spans, so the negative assertions below cannot pass vacuously.
+   */
+  private static SdkTracerProvider noExportTracerProvider() {
+    SdkTracerProvider provider =
+        SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(SpanExporter.noop())).build();
+    Span probe = provider.get("probe").spanBuilder("probe").startSpan();
+    probe.end();
+    assertTrue(probe.getSpanContext().isValid(), "Test tracer provider must create valid spans");
+    return provider;
+  }
+
+  /**
    * Puts a real GlobalOpenTelemetry in place with no exporter, so tests stay offline.
    */
   private static void installNoExportGlobalOpenTelemetry() {
-    SdkTracerProvider provider = SdkTracerProvider.builder().build();
+    SdkTracerProvider provider = noExportTracerProvider();
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
   }
@@ -103,7 +124,7 @@ public class TestTracingInitModes {
   /** app-aware + W3C parent on the wire: child span is created. */
   @Test
   public void testApplicationAwareExtendsExtractedContext() {
-    SdkTracerProvider provider = SdkTracerProvider.builder().build();
+    SdkTracerProvider provider = noExportTracerProvider();
     OpenTelemetrySdk external = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
 
     Span external1 = external.getTracer("external").spanBuilder("external-root").startSpan();
@@ -135,7 +156,7 @@ public class TestTracingInitModes {
   /** app-aware + GlobalOpenTelemetry set: still no root span without a parent. */
   @Test
   public void testApplicationAwareAdoptsGlobalTracer() {
-    SdkTracerProvider provider = SdkTracerProvider.builder().build();
+    SdkTracerProvider provider = noExportTracerProvider();
     OpenTelemetrySdk appGlobal = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(appGlobal);
 
@@ -148,6 +169,41 @@ public class TestTracingInitModes {
           "Application-aware (with adopted global) must NOT manufacture a root span");
     }
     provider.shutdown();
+  }
+
+  /** app-aware: a SpanKind proxy made with no current span still traces calls made under an app span. */
+  @Test
+  public void testApplicationAwareSpanKindProxyCreatedAtStartup() {
+    installNoExportGlobalOpenTelemetry();
+    MutableConfigurationSource conf = config(false, true);
+    TracingUtil.initTracing("app-aware-proxy", conf);
+    ServiceImpl delegate = new ServiceImpl();
+    assertSame(delegate, TracingUtil.createInternalProxy(delegate, Service.class, conf));
+    Service proxy = TracingUtil.createProxy(delegate, Service.class, SpanKind.INTERNAL);
+    assertNotSame(delegate, proxy);
+
+    proxy.normalMethod();
+    assertFalse(delegate.wasSpanActive(), "Application-aware mode must NOT manufacture a root span");
+
+    Span appSpan = GlobalOpenTelemetry.getTracer("app").spanBuilder("app-root").startSpan();
+    try (Scope ignored = appSpan.makeCurrent()) {
+      proxy.normalMethod();
+      assertTrue(delegate.wasSpanActive(), "Proxy call under an app span should create a child span");
+    } finally {
+      appSpan.end();
+    }
+  }
+
+  /** Failed init leaves the flags set but no tracer: skip the proxy instead of emitting noop spans. */
+  @Test
+  public void testSpanKindProxySkippedWhenInitFailed() {
+    MutableConfigurationSource conf = config(false, true);
+    conf.set("ozone.tracing.endpoint", "not a valid endpoint");
+    TracingUtil.initTracing("init-failure", conf);
+    assertFalse(TracingUtil.isTracingActive(conf), "Failed init must not report tracing as active");
+
+    ServiceImpl delegate = new ServiceImpl();
+    assertSame(delegate, TracingUtil.createProxy(delegate, Service.class, SpanKind.INTERNAL));
   }
 
   /** Both flags false: tracing is off. */

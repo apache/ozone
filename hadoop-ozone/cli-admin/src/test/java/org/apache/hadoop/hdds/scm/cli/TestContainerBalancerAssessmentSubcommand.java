@@ -167,7 +167,7 @@ class TestContainerBalancerAssessmentSubcommand {
         .build();
     long used = capacity - remaining;
     return DatanodeUsageInfoProto.newBuilder()
-        .setNode(datanode.toProto(DEFAULT_VERSION.toProtoValue()))
+        .setNode(datanode.toProto(DEFAULT_VERSION))
         .setCapacity(capacity)
         .setRemaining(remaining)
         .setUsed(used)

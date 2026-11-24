@@ -51,7 +51,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
@@ -70,7 +70,7 @@ public class ContainerOperationClient implements ScmClient {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerOperationClient.class);
-  private final StorageContainerLocationProtocol
+  private final StorageContainerLocationInternalInterface
       storageContainerLocationClient;
   private final SecretKeyProtocolScm secretKeyClient;
   private final boolean containerTokenEnabled;
@@ -119,12 +119,12 @@ public class ContainerOperationClient implements ScmClient {
     return manager;
   }
 
-  public static StorageContainerLocationProtocol newContainerRpcClient(
+  public static StorageContainerLocationInternalInterface newContainerRpcClient(
       ConfigurationSource configSource) {
     return HAUtils.getScmContainerClient(configSource);
   }
 
-  public static StorageContainerLocationProtocol newContainerRpcClientForNode(
+  public static StorageContainerLocationInternalInterface newContainerRpcClientForNode(
       ConfigurationSource configSource, ScmNodeTarget targetScmNode) {
     return HAUtils.getScmContainerClientForNode(configSource, targetScmNode);
   }
@@ -196,7 +196,7 @@ public class ContainerOperationClient implements ScmClient {
       HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
-        queryScope, poolName, ClientVersion.CURRENT_VERSION);
+        queryScope, poolName, ClientVersion.CURRENT);
   }
 
   @Override
@@ -352,7 +352,7 @@ public class ContainerOperationClient implements ScmClient {
   public List<ContainerReplicaInfo> getContainerReplicas(long containerId) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> protos =
         storageContainerLocationClient.getContainerReplicas(containerId,
-            ClientVersion.CURRENT_VERSION);
+            ClientVersion.CURRENT);
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
     for (HddsProtos.SCMContainerReplicaProto p : protos) {
       replicas.add(ContainerReplicaInfo.fromProto(p));
@@ -467,14 +467,14 @@ public class ContainerOperationClient implements ScmClient {
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String address, String uuid) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(address,
-        uuid, ClientVersion.CURRENT_VERSION);
+        uuid, ClientVersion.CURRENT);
   }
 
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count,
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
   }
 
   @Override

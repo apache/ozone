@@ -44,6 +44,10 @@
       <artifactId>jackson-datatype-jsr310</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.github.stephenc.jcip</groupId>
       <artifactId>jcip-annotations</artifactId>
     </dependency>
@@ -233,11 +237,7 @@
             <phase>generate-resources</phase>
             <configuration>
               <source>
-                <directory>${basedir}/../</directory>
-                <includes>
-                  <include>*/src/main/java/**/*.java</include>
-                  <include>*/src/main/proto/*.proto</include>
-                </includes>
+                <directory>${project.basedir}/src/main/resources</directory>
               </source>
             </configuration>
           </execution>

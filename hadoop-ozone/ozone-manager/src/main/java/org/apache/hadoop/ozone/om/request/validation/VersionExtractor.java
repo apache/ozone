@@ -18,17 +18,16 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import java.lang.annotation.Annotation;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
 /**
  * Class to extract version out of OM request.
  */
 public enum VersionExtractor {
   /**
-   * Extracts current metadata layout version.
+   * Extracts current apparent component version (legacy layout or {@link org.apache.hadoop.ozone.OzoneManagerVersion}).
    */
   LAYOUT_VERSION_EXTRACTOR,
 
@@ -37,15 +36,10 @@ public enum VersionExtractor {
    */
   CLIENT_VERSION_EXTRACTOR;
 
-  public Versioned extractVersion(OMRequest req, ValidationContext ctx) {
+  public ComponentVersion extractVersion(OMRequest req, ValidationContext ctx) {
     return switch (this) {
-    case LAYOUT_VERSION_EXTRACTOR -> {
-      LayoutVersionManager versionManager = ctx.versionManager();
-      yield versionManager.getFeature(versionManager.getMetadataLayoutVersion());
-    }
-    case CLIENT_VERSION_EXTRACTOR -> req.getVersion() > ClientVersion.CURRENT_VERSION
-        ? ClientVersion.FUTURE_VERSION
-        : ClientVersion.fromProtoValue(req.getVersion());
+    case LAYOUT_VERSION_EXTRACTOR -> ctx.versionManager().getApparentVersion();
+    case CLIENT_VERSION_EXTRACTOR -> ClientVersion.deserialize(req.getVersion());
     };
   }
 

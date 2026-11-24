@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -40,12 +42,14 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,6 +57,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InOrder;
 
 
@@ -134,12 +140,18 @@ public class TestOzoneManagerListPartsAcls {
     verify(metrics, never()).incNumListMultipartUploadPartFails();
   }
 
-  @Test
-  void testAclsEnabledChecksBucketReadThenKeyReadUsingResolvedNames() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testAclsEnabledChecksBucketReadThenKeyReadUsingResolvedNames(boolean assumeS3Context) throws Exception {
     setupS3Request();
     when(omSpy.getAclsEnabled()).thenReturn(true);
+    if (assumeS3Context) {
+      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume(REQUESTED_VOLUME)
+          .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(omSpy).getS3VolumeContext(true);
+    }
 
-    omSpy.listParts(REQUESTED_VOLUME, REQUESTED_BUCKET, KEY_NAME, UPLOAD_ID, 0, 10);
+    String volumeName = assumeS3Context ? "s3v" : REQUESTED_VOLUME;
+    omSpy.listParts(volumeName, REQUESTED_BUCKET, KEY_NAME, UPLOAD_ID, 0, 10, assumeS3Context);
 
     final InOrder inOrder = inOrder(omMetadataReader);
     inOrder.verify(omMetadataReader).checkAcls(BUCKET, OZONE, READ, REAL_VOLUME, REAL_BUCKET, null);
@@ -188,6 +200,20 @@ public class TestOzoneManagerListPartsAcls {
     verify(metrics, never()).incNumListMultipartUploadParts();
     verify(metrics).incNumListMultipartUploadPartFails();
     verify(omSpy).buildAuditMessageForFailure(any(), anyMap(), any(Throwable.class));
+  }
+
+  @Test
+  void testInvalidUploadIdFailsWithoutKeyManager() throws Exception {
+    setupS3Request();
+    when(omSpy.getAclsEnabled()).thenReturn(true);
+
+    OMException e = assertThrows(OMException.class,
+        () -> omSpy.listParts(REQUESTED_VOLUME, REQUESTED_BUCKET, KEY_NAME, "invalid/" + UPLOAD_ID, 0, 10));
+
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+    verify(omMetadataReader, never()).checkAcls(any(), any(), any(), any(), any(), any());
+    verify(keyManager, never()).listParts(anyString(), anyString(), anyString(), anyString(), anyInt(), anyInt());
+    verify(metrics).incNumListMultipartUploadPartFails();
   }
 
   private void setupS3Request() {

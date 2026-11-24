@@ -90,6 +90,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -231,6 +232,37 @@ public class TestOzoneContainerWithTLS {
       StorageContainerException exception = assertThrows(StorageContainerException.class,
           () -> ContainerProtocolCalls.getContainerChecksumInfo(
           finalClient, containerId, "invalidContainerToken"));
+      assertEquals(ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED, exception.getResult());
+    } finally {
+      if (container != null) {
+        container.stop();
+      }
+      if (client != null) {
+        clientManager.releaseClient(client, true);
+      }
+      IOUtils.closeQuietly(clientManager);
+    }
+  }
+
+  @Test
+  public void testEchoRequiresContainerToken() throws IOException {
+    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED, true);
+    OzoneContainer container = createAndStartOzoneContainerInstance();
+    XceiverClientManager clientManager =
+        new XceiverClientManager(conf, conf.getObject(ScmClientConfig.class), aClientTrustManager());
+    XceiverClientSpi client = null;
+    try {
+      client = clientManager.acquireClient(pipeline);
+      long containerId = createAndCloseContainer(client, true);
+      TokenHelper tokenHelper = new TokenHelper(new SecurityConfig(conf), keyClient);
+      String containerToken = encode(tokenHelper.getContainerToken(ContainerID.valueOf(containerId)));
+      assertNotNull(ContainerProtocolCalls.echo(client, containerToken, containerId, ByteString.EMPTY, 1, 0, true));
+
+      // A token that can be decoded is not enough, it has to be valid for the container.
+      String otherContainerToken = encode(tokenHelper.getContainerToken(ContainerID.valueOf(containerId + 1)));
+      XceiverClientSpi finalClient = client;
+      StorageContainerException exception = assertThrows(StorageContainerException.class, () ->
+          ContainerProtocolCalls.echo(finalClient, otherContainerToken, containerId, ByteString.EMPTY, 1, 0, true));
       assertEquals(ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED, exception.getResult());
     } finally {
       if (container != null) {

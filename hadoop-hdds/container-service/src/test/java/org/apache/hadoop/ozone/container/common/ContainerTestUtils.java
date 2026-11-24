@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common;
 
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -28,7 +29,9 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.time.Clock;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -36,6 +39,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -46,7 +50,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdfs.util.Canceler;
@@ -95,6 +101,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -174,6 +182,14 @@ public final class ContainerTestUtils {
     return context;
   }
 
+  public static DatanodeVersionManager mockDnVersionManager() {
+    DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
+    when(versionManager.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getVersionForClient()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    return versionManager;
+  }
+
   public static DatanodeDetails createDatanodeDetails() {
     Random random = new Random();
     String ipAddress =
@@ -220,7 +236,14 @@ public final class ContainerTestUtils {
   public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
       String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
       ContainerChecksumTreeManager checksumTreeManager) {
-    return new KeyValueHandler(config, datanodeId, contSet, volSet, metrics, c -> { }, checksumTreeManager);
+    return getKeyValueHandler(config, datanodeId, contSet, volSet, metrics, checksumTreeManager, null);
+  }
+
+  public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
+      String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
+      ContainerChecksumTreeManager checksumTreeManager, OzoneContainer ozoneContainer) {
+    return new KeyValueHandler(config, datanodeId, contSet, volSet, null, metrics,
+        c -> { }, Clock.systemUTC(), checksumTreeManager, ozoneContainer);
   }
 
   /**
@@ -444,10 +467,10 @@ public final class ContainerTestUtils {
         null, null);
   }
 
-  /** Initialize {@link DatanodeLayoutStorage}.  Normally this is done during {@link HddsDatanodeService} start,
+  /** Initialize {@link DatanodeStorage}.  Normally this is done during {@link HddsDatanodeService} start,
    * have to do the same for tests that create {@link OzoneContainer} manually. */
   public static void initializeDatanodeLayout(ConfigurationSource conf, DatanodeDetails dn) throws IOException {
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf, dn.getUuidString());
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf, dn.getUuidString());
     if (layoutStorage.getState() != INITIALIZED) {
       layoutStorage.initialize();
     }
@@ -475,4 +498,112 @@ public final class ContainerTestUtils {
       }
     }
   }
+
+  /**
+   * Creates a replicate container command filled in with the latest apparent
+   * version, so callers that do not exercise mixed-version handling don't need
+   * to specify it.
+   */
+  public static ReplicateContainerCommand getReplicateContainerCommand(
+      long containerID, DatanodeDetails target) {
+    return ReplicateContainerCommand.toTarget(
+        containerID, target, HDDSVersion.SOFTWARE_VERSION);
+  }
+
+  public static ContainerProtos.ContainerCommandResponseProto createContainerForTesting(XceiverClientSpi client,
+      long containerID) throws Exception {
+    // Create container
+    ContainerProtos.ContainerCommandRequestProto request =
+        ContainerTestHelper.getCreateContainerRequest(
+            containerID, client.getPipeline());
+    ContainerProtos.ContainerCommandResponseProto response =
+        client.sendCommand(request);
+    assertNotNull(response);
+    return response;
+  }
+
+  public static ContainerProtos.ContainerCommandRequestProto
+      writeChunkForContainer(XceiverClientSpi client,
+      long containerID, int dataLen) throws Exception {
+    // Write Chunk
+    BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+    ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
+        ContainerTestHelper.getWriteChunkRequest(client.getPipeline(),
+            blockID, dataLen);
+    ContainerProtos.ContainerCommandResponseProto response =
+        client.sendCommand(writeChunkRequest);
+    assertNotNull(response);
+    assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+    return writeChunkRequest;
+  }
+
+  public static void runTestOzoneContainerViaDataNode(
+      long testContainerID, XceiverClientSpi client) throws Exception {
+    ContainerProtos.ContainerCommandRequestProto
+        request, writeChunkRequest, putBlockRequest,
+        updateRequest1, updateRequest2;
+    ContainerProtos.ContainerCommandResponseProto response,
+        updateResponse1, updateResponse2;
+    try {
+      client.connect();
+
+      Pipeline pipeline = client.getPipeline();
+      createContainerForTesting(client, testContainerID);
+      writeChunkRequest = writeChunkForContainer(client, testContainerID,
+          1024);
+
+      // Read Chunk
+      request = ContainerTestHelper.getReadChunkRequest(
+          pipeline, writeChunkRequest.getWriteChunk());
+
+      response = client.sendCommand(request);
+      assertNotNull(response);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+      // Put Block
+      putBlockRequest = ContainerTestHelper.getPutBlockRequest(
+          pipeline, writeChunkRequest.getWriteChunk());
+
+
+      response = client.sendCommand(putBlockRequest);
+      assertNotNull(response);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+      // Get Block
+      request = ContainerTestHelper.
+          getBlockRequest(pipeline, putBlockRequest.getPutBlock());
+      response = client.sendCommand(request);
+      int chunksCount = putBlockRequest.getPutBlock().getBlockData().
+          getChunksCount();
+      ContainerTestHelper.verifyGetBlock(response, chunksCount);
+
+      // Delete Block and Delete Chunk are handled by BlockDeletingService
+      // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
+      // are deprecated
+
+      //Update an existing container
+      Map<String, String> containerUpdate = new HashMap<String, String>();
+      containerUpdate.put("container_updated_key", "container_updated_value");
+      updateRequest1 = ContainerTestHelper.getUpdateContainerRequest(
+          testContainerID, containerUpdate);
+      updateResponse1 = client.sendCommand(updateRequest1);
+      assertNotNull(updateResponse1);
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          response.getResult());
+
+      //Update an non-existing container
+      long nonExistingContinerID =
+          ContainerTestHelper.getTestContainerID();
+      updateRequest2 = ContainerTestHelper.getUpdateContainerRequest(
+          nonExistingContinerID, containerUpdate);
+      updateResponse2 = client.sendCommand(updateRequest2);
+      assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND,
+          updateResponse2.getResult());
+    } finally {
+      if (client != null) {
+        client.close();
+      }
+    }
+  }
+
 }

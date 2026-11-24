@@ -79,7 +79,6 @@ public class TestDatanodeSCMNodesReconfiguration {
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
-    conf.setQuietMode(false);
     scmServiceId = "scm-service-test1";
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")

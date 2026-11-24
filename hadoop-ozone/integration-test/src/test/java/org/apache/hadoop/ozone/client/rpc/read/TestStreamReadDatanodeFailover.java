@@ -63,6 +63,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Verifies that streaming block reads fail over to a healthy replica when the
@@ -203,6 +205,36 @@ class TestStreamReadDatanodeFailover {
             "Active streaming datanode should belong to the key pipeline");
         stopDatanode(activeDatanode);
         readRemaining(streamIn, content, 1);
+      }
+    }
+  }
+
+  /**
+   * Reads after {@code unbuffer()} must be served by a fresh stream from the current position, without
+   * timing out and excluding the healthy datanode, so they keep working after more unbuffer calls than replicas.
+   * The pre-read window is either smaller or larger than the key, which covers both ways a stale request mark
+   * would make the new stream request nothing.
+   */
+  @ParameterizedTest
+  @ValueSource(longs = {16 * 1024, 32 * 1024 * 1024})
+  void testStreamReadAfterUnbuffer(long preReadSize) throws Exception {
+    OzoneConfiguration streamConf = streamReadConfig(cluster.getConf());
+    OzoneClientConfig clientConfig = streamConf.getObject(OzoneClientConfig.class);
+    clientConfig.setStreamReadPreReadSize(preReadSize);
+    streamConf.setFromObject(clientConfig);
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(streamConf)) {
+      BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
+      String keyName = newKeyName();
+      byte[] content = bucket.writeRandomBytes(keyName, 32 * 1024);
+      int replicas = getPipelineDatanodes(cluster, bucket.delegate(), keyName).size();
+
+      try (KeyInputStream in = bucket.getKeyInputStream(keyName)) {
+        int offset = 0;
+        for (int i = 0; i <= replicas; i++) {
+          in.unbuffer();
+          assertEquals(Byte.toUnsignedInt(content[offset++]), in.read());
+        }
+        readRemaining(in, content, offset);
       }
     }
   }

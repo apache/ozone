@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonPathCapabilities.FS_ACLS;
 import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.corruptData;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -50,7 +53,9 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -160,6 +165,33 @@ public abstract class OzoneFileSystemTestBase {
     FileStatus[] fileStatuses = fs.listStatus(path.getParent());
     assertEquals(1, fileStatuses.length);
     assertFalse(fileStatuses[0] instanceof LocatedFileStatus);
+  }
+
+  /**
+   * Like HDFS, getFileStatus returns no block locations and getFileBlockLocations fetches them; for a file deleted
+   * after its getFileStatus, getFileBlockLocations fails with FileNotFoundException. Deletes the file.
+   */
+  static void fileBlockLocations(FileSystem fs, Path path, long length) throws IOException {
+    FileStatus status = fs.getFileStatus(path);
+    assertThat(status).isNotInstanceOf(LocatedFileStatus.class);
+    assertEquals(length, status.getLen());
+
+    BlockLocation[] expected = fs.listLocatedStatus(path).next().getBlockLocations();
+    assertThat(expected.length).isGreaterThanOrEqualTo(1);
+    for (BlockLocation[] blockLocations : new BlockLocation[][] {
+        fs.getFileBlockLocations(status, 0, status.getLen()), fs.getFileBlockLocations(path, 0, status.getLen())}) {
+      assertEquals(expected.length, blockLocations.length);
+      for (int i = 0; i < expected.length; i++) {
+        assertThat(blockLocations[i].getNames().length).isGreaterThanOrEqualTo(1);
+        // OM shuffles datanodes at the same distance, so the two lookups can order the hosts differently
+        assertThat(blockLocations[i].getHosts()).containsExactlyInAnyOrder(expected[i].getHosts());
+        assertEquals(expected[i].getOffset(), blockLocations[i].getOffset());
+        assertEquals(expected[i].getLength(), blockLocations[i].getLength());
+      }
+    }
+
+    fs.delete(path, false);
+    assertThrows(FileNotFoundException.class, () -> fs.getFileBlockLocations(status, 0, status.getLen()));
   }
 
   void createKeyWithECReplicationConfig(Path root, OzoneConfiguration conf) throws IOException {
@@ -379,6 +411,25 @@ public abstract class OzoneFileSystemTestBase {
     fileStatus = fs.getFileStatus(path);
     // Verify that mtime is NOT updated as expected.
     assertEquals(mtime, fileStatus.getModificationTime());
+  }
+
+  void setVerifyChecksum(MiniOzoneCluster cluster, Path path) throws Exception {
+    FileSystem fs = getFs();
+    byte[] data = "sample value".getBytes(UTF_8);
+    // Single replica, so that a read cannot fall back to a healthy one.
+    try (FSDataOutputStream stream = fs.create(path, (short) 1)) {
+      stream.write(data);
+    }
+    OzoneKeyDetails key = getKey(path, false);
+    assertEquals(1, key.getReplicationConfig().getRequiredNodes());
+    corruptData(cluster, getContainerByID(cluster, key.getOzoneKeyLocations().get(0).getContainerID()), key);
+
+    // Use a separate instance, the shared one must keep verifying.
+    try (FileSystem noChecksumFs = FileSystem.newInstance(fs.getUri(), fs.getConf())) {
+      noChecksumFs.setVerifyChecksum(false);
+      assertThat(ContractTestUtils.readDataset(noChecksumFs, path, data.length)).isNotEqualTo(data);
+      assertThrows(OzoneChecksumException.class, () -> ContractTestUtils.readDataset(fs, path, data.length));
+    }
   }
 
   void verifyListStatus(Path root, PathFilter filter) throws Exception {

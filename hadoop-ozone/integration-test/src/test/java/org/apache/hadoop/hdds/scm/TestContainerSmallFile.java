@@ -35,7 +35,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.junit.jupiter.api.AfterAll;
@@ -47,7 +47,7 @@ import org.junit.jupiter.api.TestInstance;
  * Test Container calls.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestContainerSmallFile implements NonHATests.TestCase {
+public abstract class TestContainerSmallFile implements ClusterForTests.TestCase {
 
   private OzoneConfiguration ozoneConfig;
   private StorageContainerLocationProtocolClientSideTranslatorPB

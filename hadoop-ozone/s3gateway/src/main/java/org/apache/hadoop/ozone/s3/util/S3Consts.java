@@ -32,6 +32,21 @@ public final class S3Consts {
   public static final String STORAGE_CLASS_HEADER = "x-amz-storage-class";
   public static final String ENCODING_TYPE = "url";
 
+  // Server-side encryption
+  // https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html
+  public static final String SSE_HEADER = "x-amz-server-side-encryption";
+  public static final String SSE_KMS_KEY_ID_HEADER = SSE_HEADER + "-aws-kms-key-id";
+  public static final String SSE_CONTEXT_HEADER = SSE_HEADER + "-context";
+  public static final String SSE_CUSTOMER_ALGORITHM_HEADER = SSE_HEADER + "-customer-algorithm";
+  public static final String SSE_CUSTOMER_KEY_HEADER = SSE_HEADER + "-customer-key";
+  public static final String SSE_CUSTOMER_KEY_MD5_HEADER = SSE_HEADER + "-customer-key-MD5";
+  public static final String COPY_SOURCE_SSE_CUSTOMER_ALGORITHM_HEADER =
+      "x-amz-copy-source-server-side-encryption-customer-algorithm";
+  public static final String COPY_SOURCE_SSE_CUSTOMER_KEY_HEADER =
+      "x-amz-copy-source-server-side-encryption-customer-key";
+  public static final String COPY_SOURCE_SSE_CUSTOMER_KEY_MD5_HEADER =
+      "x-amz-copy-source-server-side-encryption-customer-key-MD5";
+
   // Constants related to AWS Signature Version V4 calculation
   // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
   public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
@@ -83,6 +98,15 @@ public final class S3Consts {
   public static final String RESERVED_USER_METADATA_KEY_PREFIX = "ozone-s3-internal-";
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
   public static final String STORAGE_CONFIG_HEADER = "storage-config";
+  public static final String READ_CONSISTENCY_HEADER =
+      "x-ozone-read-consistency";
+  public static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
+      "x-ozone-local-lease-log-limit";
+  public static final String READ_CONSISTENCY_FOLLOWER_STALE =
+      "follower-stale";
+  public static final String READ_CONSISTENCY_FOLLOWER_LINEARIZABLE =
+      "follower-linearizable";
+  public static final String READ_CONSISTENCY_LEADER_ONLY = "leader-only";
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";
@@ -99,11 +123,20 @@ public final class S3Consts {
   public static final int TAG_VALUE_LENGTH_LIMIT = 256;
   // See https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_S3Tag.html
   // Also see https://docs.aws.amazon.com/directoryservice/latest/devguide/API_Tag.html for Java regex equivalent
-  public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
+  public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-@]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
 
   /** AWS S3 maximum number of keys per DeleteObjects request. */
   public static final int S3_DELETE_OBJECTS_MAX_KEYS = 1000;
+
+  /**
+   * Maximum DeleteObjects request body size, in bytes. It fits {@link #S3_DELETE_OBJECTS_MAX_KEYS} keys of
+   * the maximum S3 key length (1024 bytes) with XML escaping.
+   */
+  public static final int S3_DELETE_OBJECTS_MAX_BODY_SIZE = 8 * 1024 * 1024;
+
+  /** Version ID of an object in a bucket that never had versioning enabled. */
+  public static final String NULL_VERSION_ID = "null";
 
   // Bucket owner condition headers
   // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-owner-condition.html
@@ -183,6 +216,8 @@ public final class S3Consts {
     public static final String LIFECYCLE = "lifecycle";
     public static final String ATTRIBUTES = "attributes";
     public static final String VERSION_ID = "versionId";
+    public static final String VERSION_ID_MARKER = "version-id-marker";
+    public static final String VERSIONS = "versions";
 
     // Subresources of S3 APIs that are not implemented. They are only recognized so that the
     // request can be rejected with NotImplemented instead of falling through to another operation.
@@ -215,7 +250,6 @@ public final class S3Consts {
     public static final String RETENTION = "retention";
     public static final String SESSION = "session";
     public static final String VERSIONING = "versioning";
-    public static final String VERSIONS = "versions";
     public static final String WEBSITE = "website";
 
     private QueryParams() {

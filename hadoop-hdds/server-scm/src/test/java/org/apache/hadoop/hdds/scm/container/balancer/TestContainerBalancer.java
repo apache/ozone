@@ -290,6 +290,13 @@ public class TestContainerBalancer {
         () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 2, 20);
     assertThat(logCapturer.getOutput()).contains(expectedLog);
     stopBalancer();
+    assertThat(logCapturer.getOutput()).contains("Container Balancer was interrupted during the delayed start.");
+    assertThat(logCapturer.getOutput()).doesNotContain("Container Balancer is stopped abnormally");
+
+    ContainerBalancerStatusInfo statusInfo = containerBalancer.getBalancerStatusInfo();
+    assertNotNull(statusInfo);
+    assertEquals(ContainerBalancerStopReason.USER_REQUESTED.name(), statusInfo.getStopReason());
+    assertEquals(ContainerBalancerStopReason.USER_REQUESTED.getMessage(), statusInfo.getStopMessage());
   }
 
   @Test
@@ -458,6 +465,33 @@ public class TestContainerBalancer {
         "hdds.container.balancer.size.leaving.source.max should be less than or "
             + "equal to hdds.container.balancer.size.moved.max.per.iteration");
     assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+  }
+
+  /**
+   * Container Balancer runs iterations continuously with only a short wait in
+   * between, so the default balancing interval is 3 minutes.
+   */
+  @Test
+  public void testDefaultBalancingIntervalIsThreeMinutes() {
+    ContainerBalancerConfiguration defaultConfig =
+        new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+    assertEquals(3, defaultConfig.getBalancingInterval().toMinutes());
+  }
+
+  /**
+   * The freshness bound for the balancing interval is the node report interval
+   * and not the hourly du refresh period. The
+   * default 3m interval is above a typical 1m node report interval.
+   */
+  @Test
+  public void testBalancingIntervalNodeReportFreshnessBoundary() {
+    long nodeReportIntervalMs = TimeUnit.MINUTES.toMillis(1);
+    // Below the node report interval -> too short.
+    assertTrue(ContainerBalancer.isBalancingIntervalBelowNodeReportInterval(
+        TimeUnit.SECONDS.toMillis(30), nodeReportIntervalMs));
+    // The default 3m interval is above the node report interval -> acceptable.
+    assertFalse(ContainerBalancer.isBalancingIntervalBelowNodeReportInterval(
+        TimeUnit.MINUTES.toMillis(3), nodeReportIntervalMs));
   }
 
   /**

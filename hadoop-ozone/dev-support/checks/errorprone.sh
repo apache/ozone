@@ -21,17 +21,14 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/errorprone"}
-REPORT_FILE="$REPORT_DIR/summary.txt"
-DIAGNOSTIC_FILE="$REPORT_DIR/diagnostics.txt"
+CHECK=errorprone
+
+BASE_DIR="$(pwd -P)"
+REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/${CHECK}"}
 OUTPUT_LOG=$(mktemp)
 
-MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipDocs -DskipRecon -DskipShade -DskipTests'
-MAVEN_DIAGNOSTIC_PATTERN='^\[(ERROR|WARNING)\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
-JAVAC_DIAGNOSTIC_PATTERN='^.*:[0-9]+: (error|warning): \[[^]]+\]'
-MAVEN_ERROR_PATTERN='^\[ERROR\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
-JAVAC_ERROR_PATTERN='^.*:[0-9]+: error: \[[^]]+\]'
-ERROR_DIAGNOSTIC_PATTERN="${MAVEN_ERROR_PATTERN}|${JAVAC_ERROR_PATTERN}"
+MAVEN_OPTIONS='-B -fae -Perrorprone -DskipRecon -DskipShade -DskipTests'
+MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 # timestamp prefix breaks diagnostic patterns
 MAVEN_OPTIONS="$MAVEN_OPTIONS -Dorg.slf4j.simpleLogger.showDateTime=false"
@@ -47,16 +44,11 @@ declare -i rc
 trap 'rm -f "$OUTPUT_LOG"' EXIT
 
 #shellcheck disable=SC2086
-mvn $MAVEN_OPTIONS clean package "$@" 2>&1 | tee "$OUTPUT_LOG"
+./mvnw $MAVEN_OPTIONS clean package "$@" 2>&1 | tee "$OUTPUT_LOG"
 rc=$?
 
 mkdir -p "$REPORT_DIR"
 mv "$OUTPUT_LOG" "${REPORT_DIR}/output.log"
 trap - EXIT
 
-grep -E "${MAVEN_DIAGNOSTIC_PATTERN}|${JAVAC_DIAGNOSTIC_PATTERN}" "${REPORT_DIR}/output.log" \
-  | awk '!seen[$0]++' > "$DIAGNOSTIC_FILE"
-
-grep -E "$ERROR_DIAGNOSTIC_PATTERN" "$DIAGNOSTIC_FILE" > "$REPORT_FILE" || true
-
-source "${DIR}/_post_process.sh"
+source "${DIR}/_errorprone_report.sh"

@@ -110,6 +110,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -138,6 +139,8 @@ public class TestBlockDeletingService {
   private MutableVolumeSet volumeSet;
   private BlockDeletingServiceTestImpl blockDeletingService;
   private static final int BLOCK_CHUNK_SIZE = 100;
+  // If positive, delete transactions are created as for EC blocks with this many data replicas.
+  private int ecDataNum;
 
   @BeforeEach
   public void init() throws IOException {
@@ -283,12 +286,19 @@ public class TestBlockDeletingService {
   private void createTxn(KeyValueContainerData data, List<Long> containerBlocks,
       int txnID, long containerID) {
     try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
-      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx =
+      long sizePerReplica = containerBlocks.size() * BLOCK_CHUNK_SIZE;
+      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.Builder dtxBuilder =
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
               .newBuilder().setTxID(txnID).setContainerID(containerID)
               .addAllLocalID(containerBlocks)
-              .setTotalBlockSize(containerBlocks.size() * BLOCK_CHUNK_SIZE)
-              .setCount(0).build();
+              .setCount(0);
+      if (ecDataNum > 0) {
+        // Like SCM does for EC: logical block size spans all data replicas, each DN holds one share of it.
+        dtxBuilder.setTotalBlockSize(sizePerReplica * ecDataNum).setTotalSizePerReplica(sizePerReplica);
+      } else {
+        dtxBuilder.setTotalBlockSize(sizePerReplica);
+      }
+      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx = dtxBuilder.build();
       try (BatchOperation batch = metadata.getStore().getBatchHandler()
           .initBatchOperation()) {
         DatanodeStore ds = metadata.getStore();
@@ -740,6 +750,44 @@ public class TestBlockDeletingService {
     } catch (Exception ex) {
       ex.printStackTrace();
       fail("Test failed with exception: " + ex.getMessage());
+    }
+  }
+
+  /**
+   * For EC blocks, the DN adds totalSizePerReplica of a delete transaction to the pending deletion bytes.
+   * Processing the transaction must release the same amount, not the logical totalBlockSize.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPendingDeletionBytesForECTransactions(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    // Schema V1 does not use delete transactions on the DN.
+    Assumptions.assumeFalse(isSameSchemaVersion(schemaVersion, SCHEMA_V1));
+    ecDataNum = 3;
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(1);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
+    ContainerSet containerSet = newContainerSet();
+    // 3 transactions, one block each, each with per-replica size BLOCK_CHUNK_SIZE.
+    KeyValueContainerData data = createToDeleteBlocks(containerSet, 3, 1);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
+    createBlockDeletingService(containerSet, conf, keyValueHandler);
+    blockDeletingService.start();
+    GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
+    BlockDeletingServiceMetrics deletingServiceMetrics = blockDeletingService.getMetrics();
+
+    assertEquals(3 * BLOCK_CHUNK_SIZE, data.getBlockPendingDeletionBytes());
+
+    // Each interval processes one transaction, which should release only its per-replica size.
+    for (int processed = 1; processed <= 3; processed++) {
+      deleteAndWait(blockDeletingService, processed);
+      long remaining = 3 - processed;
+      GenericTestUtils.waitFor(() -> data.getNumPendingDeletionBlocks() == remaining, 100, 3000);
+      assertEquals(remaining * BLOCK_CHUNK_SIZE, data.getBlockPendingDeletionBytes());
+      // The metric is computed before the deletion in the same interval.
+      assertEquals((remaining + 1) * BLOCK_CHUNK_SIZE, deletingServiceMetrics.getTotalPendingBlockBytes());
     }
   }
 
@@ -1304,17 +1352,18 @@ public class TestBlockDeletingService {
   }
 
   private void assertDeletionsInChecksumFile(ContainerData data, int expectedNumBlocks) {
-    ContainerProtos.ContainerChecksumInfo checksumInfo = null;
+    // deleteAndWait only waits for the deleting tasks to be submitted, so the checksum file may not be written yet.
     try {
-      checksumInfo = readChecksumFile(data);
-    } catch (IOException ex) {
-      fail("Failed to read container checksum tree file: " + ex.getMessage());
+      LambdaTestUtils.await(3000, 100, () -> getNumDeletedBlocksInChecksumFile(data) >= expectedNumBlocks);
+      assertEquals(expectedNumBlocks, getNumDeletedBlocksInChecksumFile(data));
+    } catch (Exception ex) {
+      fail("Container checksum tree file did not record " + expectedNumBlocks + " deleted blocks", ex);
     }
-    assertNotNull(checksumInfo);
+  }
 
-    long numDeletedBlocks = checksumInfo.getContainerMerkleTree().getBlockMerkleTreeList().stream()
+  private static long getNumDeletedBlocksInChecksumFile(ContainerData data) throws IOException {
+    return readChecksumFile(data).getContainerMerkleTree().getBlockMerkleTreeList().stream()
         .filter(ContainerProtos.BlockMerkleTree::getDeleted)
         .count();
-    assertEquals(expectedNumBlocks, numDeletedBlocks);
   }
 }

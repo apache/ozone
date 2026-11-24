@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReconHeartbeatInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -238,9 +239,10 @@ public class EndpointStateMachine
     }
 
     if (missCounter == 0) {
-      long missedDurationSeconds = TimeUnit.MILLISECONDS.toSeconds(
-              this.getMissedCount() * getScmHeartbeatInterval(this.conf)
-      );
+      // Heartbeats to Recon are sent at the Recon heartbeat interval.
+      final long interval = isPassive && getState() == EndPointStates.HEARTBEAT
+          ? getReconHeartbeatInterval(conf) : getScmHeartbeatInterval(conf);
+      long missedDurationSeconds = TimeUnit.MILLISECONDS.toSeconds(this.getMissedCount() * interval);
       LOG.warn("Unable to communicate to {} server at {} past {} seconds.",
               serverName, hostAndPort, missedDurationSeconds, ex);
     }

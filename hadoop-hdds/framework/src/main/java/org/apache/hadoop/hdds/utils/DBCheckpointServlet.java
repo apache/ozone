@@ -180,10 +180,10 @@ public class DBCheckpointServlet extends HttpServlet
             UserGroupInformation.createRemoteUser(userPrincipalName);
         if (!hasPermission(ugi)) {
           LOG.error("Permission denied: User principal '{}' does not have"
-                  + " access to /dbCheckpoint.\nThis can happen when Ozone"
-                  + " Manager is started with a different user.\n"
-                  + " Please append '{}' to OM 'ozone.administrators'"
-                  + " config and restart OM to grant current"
+                  + " access to /dbCheckpoint.\nThis can happen when the"
+                  + " service is started with a different user.\n"
+                  + " Please append '{}' to 'ozone.administrators'"
+                  + " config and restart the service to grant current"
                   + " user access to this endpoint.",
               userPrincipalName, userPrincipalName);
           response.setStatus(HttpServletResponse.SC_FORBIDDEN);

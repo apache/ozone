@@ -43,9 +43,10 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
-import com.google.common.cache.Cache;
+import com.github.benmanes.caffeine.cache.Cache;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -63,6 +64,7 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -78,10 +80,11 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
+import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
@@ -96,6 +99,9 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
+import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
+import org.apache.hadoop.ozone.client.io.KeyInputStream;
+import org.apache.hadoop.ozone.client.io.LengthInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -113,6 +119,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -308,6 +315,17 @@ class TestOzoneAtRestEncryption {
     createAndVerifyKeyData(bucket);
     createAndVerifyStreamKeyData(bucket);
     createAndVerifyFileSystemData(bucket);
+
+    String keyName = UUID.randomUUID().toString();
+    byte[] data = generateRandomData(PositionedReadTestHelper.SOURCE_SIZE);
+    DataTestUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, ONE), data);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
+      assertInstanceOf(CryptoInputStream.class, inputStream.getInputStream());
+      inputStream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(data, inputStream::readFully);
+      assertEquals(123, inputStream.getPos());
+      assertEquals(Byte.toUnsignedInt(data[123]), inputStream.read());
+    }
   }
 
   @ParameterizedTest
@@ -658,6 +676,46 @@ class TestOzoneAtRestEncryption {
     testMultipartUploadWithEncryption(linkBucket, 2);
   }
 
+  @ParameterizedTest
+  @EnumSource
+  void mpuPartsHaveOwnIv(BucketLayout bucketLayout) throws Exception {
+    OzoneBucket bucket = createVolumeAndBucket(UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+        bucketLayout);
+    String keyName = "mpu_same_content";
+    byte[] data = generateRandomData(MPU_PART_MIN_SIZE);
+    String uploadID = initiateMultipartUpload(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, ONE));
+    Map<Integer, String> partsMap = new TreeMap<>();
+    partsMap.put(1, uploadPart(bucket, keyName, uploadID, 1, data));
+    partsMap.put(2, uploadPart(bucket, keyName, uploadID, 2, data));
+    completeMultipartUpload(bucket, keyName, uploadID, partsMap);
+
+    byte[] expected = new byte[2 * data.length];
+    System.arraycopy(data, 0, expected, 0, data.length);
+    System.arraycopy(data, 0, expected, data.length, data.length);
+    try (OzoneInputStream in = bucket.readKey(keyName)) {
+      assertArrayEquals(expected, in.readAllBytes());
+    }
+
+    // Read the stored bytes of each part without decrypting them.
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(bucket.getVolumeName())
+        .setBucketName(bucket.getName())
+        .setKeyName(keyName)
+        .build();
+    OmKeyInfo keyInfo = ozoneManager.getKeyInfo(keyArgs, false).getKeyInfo();
+    List<byte[]> storedParts = new ArrayList<>();
+    for (LengthInputStream part : KeyInputStream.getStreamsFromKeyInfo(keyInfo,
+        ((RpcClient) ozClient.getProxy()).getXceiverClientManager(), null, new BlockInputStreamFactoryImpl(),
+        conf.getObject(OzoneClientConfig.class)).values()) {
+      try (InputStream in = part) {
+        storedParts.add(in.readAllBytes());
+      }
+    }
+    assertThat(storedParts).hasSize(2);
+    assertThat(storedParts.get(0)).hasSameSizeAs(data).isNotEqualTo(data);
+    assertThat(storedParts.get(1)).hasSameSizeAs(data).isNotEqualTo(data).isNotEqualTo(storedParts.get(0));
+  }
+
   private void testMultipartUploadWithEncryption(OzoneBucket bucket,
       int numParts) throws Exception {
     testMultipartUploadWithEncryption(bucket, numParts, false);
@@ -721,6 +779,19 @@ class TestOzoneAtRestEncryption {
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
 
       assertInstanceOf(MultipartInputStream.class, inputStream.getInputStream());
+      if (numParts == 2) {
+        inputStream.seek(123);
+        PositionedReadTestHelper.runConcurrentPositionedReads(inputData, inputStream::readFully);
+        int offset = partsData.get(0).length - 17;
+        ByteBuffer destination = ByteBuffer.allocateDirect(DEFAULT_CRYPTO_BUFFER_SIZE + 37);
+        inputStream.readFully(offset, destination);
+        destination.flip();
+        byte[] actual = new byte[destination.remaining()];
+        destination.get(actual);
+        assertArrayEquals(Arrays.copyOfRange(inputData, offset, offset + actual.length), actual);
+        assertEquals(123, inputStream.getPos());
+        inputStream.seek(0);
+      }
 
       // Test complete read
       byte[] completeRead = new byte[keySize];

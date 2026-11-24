@@ -79,17 +79,27 @@ public class TestCreatePipelineCommandHandler {
 
   @Test
   public void testPipelineCreation() throws IOException {
+    // the leader also adds the group to the other two datanodes
+    runPipelineCreation(HddsProtos.ReplicationType.RATIS, 2);
+  }
 
+  @Test
+  public void testChainedPipelineCreation() throws IOException {
+    // each datanode adds the group from its own command
+    runPipelineCreation(HddsProtos.ReplicationType.CHAINED, 0);
+  }
+
+  private void runPipelineCreation(HddsProtos.ReplicationType type, int numPeerAdds) throws IOException {
     final List<DatanodeDetails> datanodes = getDatanodes();
     final PipelineID pipelineID = PipelineID.randomId();
     final SCMCommand<CreatePipelineCommandProto> command =
-        new CreatePipelineCommand(pipelineID, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, datanodes);
+        new CreatePipelineCommand(pipelineID, type,
+            HddsProtos.ReplicationFactor.THREE, datanodes, null);
     StateContext stateContext = ContainerTestUtils.getMockContext(datanodes.get(0), conf);
 
     final XceiverServerSpi writeChanel = mock(XceiverServerSpi.class);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChanel);
-    when(writeChanel.isExist(pipelineID.getProtobuf()))
+    when(writeChanel.isExist(pipelineID))
         .thenReturn(false);
 
     final CreatePipelineCommandHandler commandHandler =
@@ -102,9 +112,9 @@ public class TestCreatePipelineCommandHandler {
         new ArrayList<>(Collections.nCopies(datanodes.size(), 0));
 
     verify(writeChanel, times(1))
-        .addGroup(pipelineID.getProtobuf(), datanodes, priorityList);
+        .addGroup(pipelineID, type, datanodes, priorityList);
 
-    verify(raftClientGroupManager, times(2))
+    verify(raftClientGroupManager, times(numPeerAdds))
         .add(any(RaftGroup.class));
   }
 
@@ -114,21 +124,23 @@ public class TestCreatePipelineCommandHandler {
     final PipelineID pipelineID = PipelineID.randomId();
     final SCMCommand<CreatePipelineCommandProto> command =
         new CreatePipelineCommand(pipelineID, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, datanodes);
+            HddsProtos.ReplicationFactor.THREE, datanodes, null);
 
     final XceiverServerSpi writeChanel = mock(XceiverServerSpi.class);
     StateContext stateContext = ContainerTestUtils.getMockContext(datanodes.get(0), conf);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChanel);
-    when(writeChanel.isExist(pipelineID.getProtobuf()))
+    when(writeChanel.isExist(pipelineID))
         .thenReturn(true);
 
     final CreatePipelineCommandHandler commandHandler =
-        new CreatePipelineCommandHandler(conf, MoreExecutors.directExecutor());
+        new CreatePipelineCommandHandler((leader, tls) -> raftClient,
+            MoreExecutors.directExecutor());
     commandHandler.handle(command, ozoneContainer, stateContext,
         connectionManager);
 
     verify(writeChanel, times(0))
-        .addGroup(pipelineID.getProtobuf(), datanodes);
+        .addGroup(pipelineID, HddsProtos.ReplicationType.RATIS, datanodes,
+            Collections.nCopies(datanodes.size(), 0));
 
     verify(raftClientGroupManager, times(0))
         .add(any(RaftGroup.class));

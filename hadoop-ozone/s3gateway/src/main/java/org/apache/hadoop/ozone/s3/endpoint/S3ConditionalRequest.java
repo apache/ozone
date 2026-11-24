@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.parseETag;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.OptionalLong;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
@@ -61,7 +60,7 @@ final class S3ConditionalRequest {
         S3Consts.IF_UNMODIFIED_SINCE_HEADER),
 
     /**
-     * For CopyObject source validation. Always throws 412 Precondition Failed
+     * For CopyObject and UploadPartCopy source validation. Always throws 412 Precondition Failed
      * when any condition is not met (no 304 responses).
      */
     COPY_SOURCE(
@@ -131,27 +130,6 @@ final class S3ConditionalRequest {
     return null;
   }
 
-  static boolean checkCopySourceModificationTime(Long lastModificationTime,
-      String copySourceIfModifiedSinceStr,
-      String copySourceIfUnmodifiedSinceStr) {
-    long copySourceIfModifiedSince = Long.MIN_VALUE;
-    long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
-
-    OptionalLong modifiedDate =
-        parseAndValidatePastOrPresentDate(copySourceIfModifiedSinceStr);
-    if (modifiedDate.isPresent()) {
-      copySourceIfModifiedSince = modifiedDate.getAsLong();
-    }
-
-    OptionalLong unmodifiedDate =
-        parseAndValidatePastOrPresentDate(copySourceIfUnmodifiedSinceStr);
-    if (unmodifiedDate.isPresent()) {
-      copySourceIfUnmodifiedSince = unmodifiedDate.getAsLong();
-    }
-    return (copySourceIfModifiedSince <= lastModificationTime)
-        && (lastModificationTime <= copySourceIfUnmodifiedSince);
-  }
-
   static WriteConditions parseWriteConditions(HttpHeaders headers,
       String keyPath) throws OS3Exception {
     String ifNoneMatch = headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER);
@@ -175,14 +153,6 @@ final class S3ConditionalRequest {
       OS3Exception ex = newError(INVALID_REQUEST, keyPath);
       ex.setErrorMessage(
           "If-Match and If-None-Match cannot be specified together.");
-      throw ex;
-    }
-
-    if (trimmedIfNoneMatch != null
-        && !"*".equals(parseETag(trimmedIfNoneMatch))) {
-      OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-      ex.setErrorMessage(
-          "Only If-None-Match: * is supported for conditional put.");
       throw ex;
     }
 
@@ -224,8 +194,7 @@ final class S3ConditionalRequest {
     return false;
   }
 
-  private static boolean matchesIfModifiedSince(OzoneKey key,
-      String headerValue) {
+  private static boolean matchesIfModifiedSince(OzoneKey key, String headerValue) {
     Instant since = parseConditionalInstant(headerValue);
     if (since == null) {
       return true;
@@ -235,14 +204,12 @@ final class S3ConditionalRequest {
     return lastModified.isAfter(since);
   }
 
-  private static boolean matchesIfUnmodifiedSince(OzoneKey key,
-      String headerValue) {
+  private static boolean matchesIfUnmodifiedSince(OzoneKey key, String headerValue) {
     Instant since = parseConditionalInstant(headerValue);
     if (since == null) {
       return true;
     }
-    Instant lastModified = key.getModificationTime()
-        .truncatedTo(ChronoUnit.SECONDS);
+    Instant lastModified = key.getModificationTime().truncatedTo(ChronoUnit.SECONDS);
     return !lastModified.isAfter(since);
   }
 
@@ -251,31 +218,14 @@ final class S3ConditionalRequest {
       return null;
     }
     try {
-      return Instant.ofEpochMilli(OzoneUtils.formatDate(headerValue))
-          .truncatedTo(ChronoUnit.SECONDS);
+      Instant since = Instant.ofEpochMilli(OzoneUtils.formatDate(headerValue));
+      if (since.isAfter(Instant.now())) {
+        return null;
+      }
+      return since.truncatedTo(ChronoUnit.SECONDS);
     } catch (IllegalArgumentException | ParseException ex) {
       return null;
     }
-  }
-
-  private static OptionalLong parseAndValidatePastOrPresentDate(
-      String ozoneDateStr) {
-    if (ozoneDateStr == null) {
-      return OptionalLong.empty();
-    }
-
-    long ozoneDateInMs;
-    try {
-      ozoneDateInMs = OzoneUtils.formatDate(ozoneDateStr);
-    } catch (ParseException e) {
-      return OptionalLong.empty();
-    }
-
-    long currentDate = System.currentTimeMillis();
-    if (ozoneDateInMs <= currentDate) {
-      return OptionalLong.of(ozoneDateInMs);
-    }
-    return OptionalLong.empty();
   }
 
   static final class WriteConditions {
@@ -289,6 +239,14 @@ final class S3ConditionalRequest {
 
     boolean hasIfNoneMatch() {
       return ifNoneMatch != null;
+    }
+
+    boolean isCreateIfAbsent() {
+      return "*".equals(parseETag(ifNoneMatch));
+    }
+
+    String getExcludedETag() {
+      return isCreateIfAbsent() ? null : parseETag(ifNoneMatch);
     }
 
     boolean hasIfMatch() {

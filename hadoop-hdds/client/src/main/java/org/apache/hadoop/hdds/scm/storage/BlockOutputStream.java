@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
+import static org.apache.hadoop.hdds.HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
@@ -158,6 +158,10 @@ public class BlockOutputStream extends OutputStream {
 
   private CompletableFuture<Void> lastFlushFuture;
   private CompletableFuture<Void> allPendingFlushFutures = CompletableFuture.completedFuture(null);
+  // Completes once the reply of the latest PutBlock is handled. The next reply is handled only after it, since the
+  // responseExecutor may run the handlers in any order, and an earlier PutBlock handled last would move the bcsId back
+  // and leave acknowledged buffers that are not a prefix of the block.
+  private CompletableFuture<?> putBlockReplyHandled = CompletableFuture.completedFuture(null);
 
   /**
    * Creates a new BlockOutputStream.
@@ -278,8 +282,8 @@ public class BlockOutputStream extends OutputStream {
     // that supports PutBlock piggybacking.
     for (DatanodeDetails dn : pipeline.getNodes()) {
       LOG.debug("dn = {}, version = {}", dn, dn.getCurrentVersion());
-      if (dn.getCurrentVersion() <
-              COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue()) {
+      if (!COMBINED_PUTBLOCK_WRITECHUNK_RPC.isSupportedBy(
+          dn.getCurrentVersion())) {
         return false;
       }
     }
@@ -592,12 +596,8 @@ public class BlockOutputStream extends OutputStream {
       boolean isBlockFull = (blockSize != -1 && flushPos == blockSize);
       asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString, containerAutoCreate());
       CompletableFuture<ContainerCommandResponseProto> future = asyncReply.getResponse();
-      flushFuture = future.thenApplyAsync(e -> {
-        try {
-          validateResponse(e);
-        } catch (IOException sce) {
-          throw new CompletionException(sce);
-        }
+      flushFuture = future.thenCombineAsync(putBlockReplyHandled, (e, ignored) -> {
+        validateResponse(e, true);
         // if the ioException is not set, putBlock is successful
         if (getIoException() == null && !force) {
           handleSuccessfulPutBlock(e.getPutBlock().getCommittedBlockLength(),
@@ -614,6 +614,7 @@ public class BlockOutputStream extends OutputStream {
         setIoException(ce);
         throw ce;
       });
+      putBlockReplyHandled = flushFuture.handle((r, e) -> null);
     } catch (IOException | ExecutionException e) {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
@@ -795,21 +796,25 @@ public class BlockOutputStream extends OutputStream {
   void waitOnFlushFuture() throws InterruptedException, ExecutionException {
   }
 
-  void validateResponse(
-      ContainerCommandResponseProto responseProto)
-      throws IOException {
+  void validateResponse(ContainerCommandResponseProto responseProto, boolean throwCompletionException) {
     try {
       // if the ioException is already set, it means a prev request has failed
       // just throw the exception. The current operation will fail with the
       // original error
       IOException exception = getIoException();
       if (exception != null) {
-        throw exception;
+        if (throwCompletionException) {
+          throw new CompletionException(exception);
+        } else {
+          return;
+        }
       }
       ContainerProtocolCalls.validateContainerResponse(responseProto);
     } catch (StorageContainerException sce) {
       setIoException(sce);
-      throw sce;
+      if (throwCompletionException) {
+        throw new CompletionException(sce);
+      }
     }
   }
 
@@ -960,12 +965,8 @@ public class BlockOutputStream extends OutputStream {
           blockID.get(), data, tokenString, replicationIndex, blockData, close, containerAutoCreate());
       CompletableFuture<ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
-      validateFuture = respFuture.thenApplyAsync(e -> {
-        try {
-          validateResponse(e);
-        } catch (IOException sce) {
-          respFuture.completeExceptionally(sce);
-        }
+      validateFuture = respFuture.thenCombineAsync(putBlockReplyHandled, (e, ignored) -> {
+        validateResponse(e, true);
         // if the ioException is not set, putBlock is successful
         if (getIoException() == null && putBlockPiggybacking) {
           handleSuccessfulPutBlock(e.getWriteChunk().getCommittedBlockLength(),
@@ -980,6 +981,9 @@ public class BlockOutputStream extends OutputStream {
         setIoException(ce);
         throw ce;
       });
+      if (putBlockPiggybacking) {
+        putBlockReplyHandled = validateFuture.handle((r, e) -> null);
+      }
       clientMetrics.recordWriteChunk(pipeline, chunkInfo.getLen());
 
     } catch (IOException | ExecutionException e) {

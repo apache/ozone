@@ -73,7 +73,7 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
           LongCodec.get(),
           NSSummaryCodec.get());
 
-  // Container Replica History with bcsId tracking.
+  // Retained in the legacy DB for migration to ReconReplicaHistoryDBDefinition.
   public static final DBColumnFamilyDefinition
       <Long, ContainerReplicaHistoryList> REPLICA_HISTORY_V2 =
       new DBColumnFamilyDefinition<Long, ContainerReplicaHistoryList>(

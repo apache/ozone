@@ -82,7 +82,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
     }
     try {
       rejectVersionId(keyName);
-      getClientProtocol().deleteObjectTagging(context.getVolume().getName(), context.getBucketName(), keyName);
+      getClientProtocol().deleteObjectTagging(context.getCachedVolumeName(), context.getBucketName(), keyName);
       getMetrics().updateDeleteObjectTaggingSuccessStats(context.getStartNanos());
       return Response.noContent().build();
     } catch (OMException ex) {
@@ -107,8 +107,8 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
       return null;
     }
     try {
-      Map<String, String> tagMap = getClientProtocol().getObjectTagging(
-          context.getVolume().getName(), context.getBucketName(), keyName);
+      Map<String, String> tagMap = getClientProtocol().getObjectTagging(null,
+          context.getBucketName(), keyName);
       getMetrics().updateGetObjectTaggingSuccessStats(context.getStartNanos());
       return Response.ok(S3Tagging.fromMap(tagMap), MediaType.APPLICATION_XML_TYPE).build();
     } catch (Exception e) {
@@ -119,7 +119,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
 
   // Tagging a specific version is not implemented; ignoring versionId would modify the tags of the current object.
   private void rejectVersionId(String keyName) {
-    if (queryParams().get(S3Consts.QueryParams.VERSION_ID) != null) {
+    if (isUnsupportedVersionId(queryParams().get(S3Consts.QueryParams.VERSION_ID))) {
       throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, keyName);
     }
   }

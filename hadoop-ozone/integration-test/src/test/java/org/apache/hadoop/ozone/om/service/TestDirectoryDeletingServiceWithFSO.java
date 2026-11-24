@@ -38,7 +38,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -111,6 +110,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   private int snapshotCountAfterTest = -1;
   private boolean pendingSdsResume = false;
   private DirectoryDeletingService pendingResumeDds = null;
+  private DirectoryDeletingService pendingShutdownDds = null;
   private boolean needsTableCleanup = false;
   private String snapshotCleanupVolume = null;
   private String snapshotCleanupBucket = null;
@@ -161,6 +161,10 @@ public class TestDirectoryDeletingServiceWithFSO {
   @AfterEach
   public void cleanup() throws Exception {
     try {
+      if (pendingShutdownDds != null) {
+        pendingShutdownDds.shutdown();
+        pendingShutdownDds = null;
+      }
       if (pendingSdsResume) {
         cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService().resume();
         pendingSdsResume = false;
@@ -465,11 +469,11 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(dirTable, 5);
     assertTableRowCount(keyTable, 3);
 
-    // stop daemon to simulate blocked double buffer
+    // Pause flushing to simulate a blocked double buffer
     OzoneManagerStateMachine omStateMachine = cluster.getOzoneManager().getOmRatisServer().getOmStateMachine();
     OzoneManagerDoubleBuffer omDoubleBuffer = omStateMachine.getOzoneManagerDoubleBuffer();
     omDoubleBuffer.awaitFlush();
-    omDoubleBuffer.stopDaemon();
+    omDoubleBuffer.pause();
 
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
@@ -497,18 +501,9 @@ public class TestDirectoryDeletingServiceWithFSO {
     // verify bucket used namespace is not going -ve
     assertTrue(volume.getBucket(bucketName).getUsedNamespace() >= 0);
 
-    // re-init double buffer in state machine to resume further processing
-    omStateMachine.pause();
-    omStateMachine.unpause(omStateMachine.getLastAppliedTermIndex().getIndex(),
-        omStateMachine.getLatestSnapshot().getIndex());
-    // flush previous pending transaction manually
-    omDoubleBuffer.resume();
-    CompletableFuture.supplyAsync(() -> {
-      omDoubleBuffer.flushTransactions();
-      return null;
-    });
+    // Resume flushing the pending transactions.
+    omDoubleBuffer.unpause();
     omDoubleBuffer.awaitFlush();
-    omDoubleBuffer.stop();
     // verify deletion progress completion
     assertTableRowCount(deletedDirTable, 0);
     assertTableRowCount(keyTable, 0);
@@ -644,7 +639,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     when(ozoneManager.getOmSnapshotManager()).thenAnswer(i -> omSnapshotManager);
     DirectoryDeletingService service = Mockito.spy(new DirectoryDeletingService(1000, TimeUnit.MILLISECONDS, 1000,
         ozoneManager, cluster.getConf(), 1, false));
-    service.shutdown();
+    pendingShutdownDds = service;
     final int initialSnapshotCount =
         (int) cluster.getOzoneManager().getMetadataManager().countRowsInTable(snapshotInfoTable);
     snapshotCountAfterTest = initialSnapshotCount;
@@ -676,15 +671,14 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, initialDeletedCount + 1);
     assertTableRowCount(renameTable, initialRenameCount + 1);
     Mockito.doAnswer(i -> {
-      List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList = i.getArgument(4);
+      List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList = i.getArgument(1);
       for (OzoneManagerProtocolProtos.PurgePathRequest purgeRequest : purgePathRequestList) {
         Assertions.assertNotEquals(deletePathKey, purgeRequest.getDeletedDir());
       }
       return null;
-    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
-        anyLong(), anyList(), anyList(), eq(null), anyLong(), any(),
+    }).when(service).optimizeDirDeletesAndSubmitRequest(anyList(), anyList(), eq(null), anyLong(), any(),
         any(ReclaimableDirFilter.class), any(ReclaimableKeyFilter.class), anyMap(), any(),
-        anyLong(), any(AtomicInteger.class));
+        anyLong(), any(AtomicInteger.class), any());
 
     Mockito.doAnswer(i -> {
       store.createSnapshot(testVolumeName, testBucketName, snap2);

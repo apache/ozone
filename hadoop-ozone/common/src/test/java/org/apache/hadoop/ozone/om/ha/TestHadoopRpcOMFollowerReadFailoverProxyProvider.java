@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
@@ -44,6 +45,7 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -53,7 +55,6 @@ import java.util.StringJoiner;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io_.retry.RetryInvocationHandler;
 import org.apache.hadoop.ipc_.Client.ConnectionId;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.RemoteException;
@@ -108,7 +109,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
 
     assertHandledBy(2);
     assertEquals(ReadConsistency.DEFAULT.getHint(), omNodeAnswers[2].lastRequest.getReadConsistencyHint());
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
     // Although the write request is forwarded to the leader,
     // the follower read proxy provider should still point to first OM follower
     assertEquals(proxyProvider.getCurrentProxy().getNodeId(), omNodeIds[0]);
@@ -136,7 +137,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         "Write operation finished earlier than expected");
 
     assertHandledBy(0);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
   }
 
   @Test
@@ -173,7 +174,60 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     doRead();
 
     assertHandledBy(0);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
+  }
+
+  @Test
+  void testExplicitFollowerReadWhenDisabledByDefault() throws Exception {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, false);
+    setupProxyProvider(3, config);
+    omNodeAnswers[0].isLeader = true;
+
+    doRead();
+    assertHandledBy(0);
+
+    doRead(ReadConsistency.LOCAL_LEASE);
+    assertHandledBy(1);
+  }
+
+  @Test
+  void testLinearizableAllowFollowerReadSticksToCurrentProxy() throws Exception {
+    setupProxyProvider(3);
+    omNodeAnswers[2].isLeader = true;
+
+    doRead(ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER);
+    assertHandledBy(0);
+    doRead(ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER);
+    assertHandledBy(0);
+    doRead(ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER);
+    assertHandledBy(0);
+  }
+
+  @Test
+  void testLocalLeaseReadSticksToFollowerBeforeLeader() throws Exception {
+    setupProxyProvider(3);
+    omNodeAnswers[1].isLeader = true;
+    doWrite();
+
+    doRead(ReadConsistency.LOCAL_LEASE);
+    assertHandledBy(0);
+    doRead(ReadConsistency.LOCAL_LEASE);
+    assertHandledBy(0);
+    doRead(ReadConsistency.LOCAL_LEASE);
+    assertHandledBy(0);
+  }
+
+  @Test
+  void testLeaderOnlyReadBypassesFollowerReadProxy() throws Exception {
+    setupProxyProvider(3);
+    omNodeAnswers[0].isLeader = true;
+
+    doRead(ReadConsistency.LINEARIZABLE_LEADER_ONLY);
+
+    assertHandledBy(0);
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
+    assertEquals(proxyProvider.getCurrentProxy().getNodeId(), omNodeIds[0]);
   }
 
   @Test
@@ -185,7 +239,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
 
     // Follower read can still read from OM leader
     assertHandledBy(0);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
   }
 
   @Test
@@ -210,7 +264,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         "Read operation finished earlier than expected");
 
     assertHandledBy(0);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
   }
 
   @Test
@@ -227,7 +281,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     assertHandledBy(1);
     // Since OMNotLeaderException is thrown during follower read, the
     // proxy will keep sending reads from the leader from now on
-    assertFalse(proxyProvider.isUseFollowerRead());
+    assertFalse(proxyProvider.isOmServiceSupportsFollowerRead());
 
     // Try to simulate leader change
     omNodeAnswers[1].isLeader = false;
@@ -236,7 +290,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     doRead();
     assertHandledBy(2);
 
-    assertFalse(proxyProvider.isUseFollowerRead());
+    assertFalse(proxyProvider.isOmServiceSupportsFollowerRead());
   }
 
   @Test
@@ -360,7 +414,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     omNodeAnswers[0].unreachable = false;
     omNodeAnswers[0].isLeader = true;
     doRead();
-    assertFalse(proxyProvider.isUseFollowerRead());
+    assertFalse(proxyProvider.isOmServiceSupportsFollowerRead());
     assertSame(first, RPC.getConnectionIdForProxy(retryProxy));
 
     RPC.stopProxy(retryProxy);
@@ -386,7 +440,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     doRead();
 
     assertHandledBy(1);
-    assertFalse(proxyProvider.isUseFollowerRead());
+    assertFalse(proxyProvider.isOmServiceSupportsFollowerRead());
     assertEquals(ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER.getHint(),
         omNodeAnswers[1].lastRequest.getReadConsistencyHint());
 
@@ -398,7 +452,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   void testExplicitConsistencyAndController() throws Exception {
     setupProxyProvider(2);
     RpcController controller = mock(RpcController.class);
-    ReadConsistencyHint hint = ReadConsistency.LOCAL_LEASE.getHint();
+    ReadConsistencyHint hint = ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER.getHint();
     OMRequest request = OMRequest.newBuilder().setCmdType(Type.GetKeyInfo).setClientId("client")
         .setReadConsistencyHint(hint).build();
     OMResponse response = OMResponse.newBuilder().setCmdType(Type.GetKeyInfo)
@@ -444,8 +498,29 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     assertHandledBy(1);
   }
 
+  @Test
+  void testReadAfterAddressRefreshDropsCachedProxy() throws Exception {
+    setupProxyProvider(3);
+    doRead();
+    assertHandledBy(0);
+
+    // Stand in for the node having been rescheduled to a new IP: the cached address has to differ
+    // from what re-resolving localhost returns, so refreshAddressIfChanged() swaps it and drops the
+    // cached proxy. The port stays the node's own, since createOMProxy maps it back to its mock.
+    OMProxyInfo<OzoneManagerProtocolPB> current = proxyProvider.getCurrentProxy();
+    current.setCachedAddressForTest(new InetSocketAddress(InetAddress.getByName("127.0.0.99"), 0));
+    assertTrue(current.refreshAddressIfChanged());
+    assertNull(current.getProxy());
+
+    // The read has to recreate the dropped proxy rather than dial the null one.
+    doRead();
+    assertHandledBy(0);
+  }
+
   private void setupProxyProvider(int omNodeCount) throws Exception {
-    setupProxyProvider(omNodeCount, new OzoneConfiguration());
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    setupProxyProvider(omNodeCount, config);
   }
 
   private void setupProxyProvider(int omNodeCount, OzoneConfiguration config) throws Exception {
@@ -456,7 +531,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     for (int i = 0; i < omNodeCount; i++) {
       String nodeId = NODE_ID_BASE_STR + (i + 1); // 1-th indexed
       config.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
-          nodeId),  "0.0.0.0:" + i);
+          nodeId),  "localhost:" + i);
       allNodeIds.add(nodeId);
       omNodeIds[i] = nodeId;
       omNodeAnswers[i] = new OMAnswer();
@@ -524,17 +599,21 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         };
 
     // Wrap the leader-based failover proxy provider with follower read proxy provider
-    proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(underlyingProxyProvider);
-    assertTrue(proxyProvider.isUseFollowerRead());
+    boolean defaultFollowerReadEnabled = config.getBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(
+        underlyingProxyProvider, ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER,
+        ReadConsistency.DEFAULT, defaultFollowerReadEnabled);
+    assertTrue(proxyProvider.isOmServiceSupportsFollowerRead());
     // Wrap the follower read proxy provider in retry proxy to allow automatic failover
     retryProxy = OzoneManagerProtocolPB.newProxy(proxyProvider, 2 * omNodeCount);
-    // This is currently added to prevent IllegalStateException in
-    // Client#setCallIdAndRetryCount since it seems that callId is set but not unset properly
-    RetryInvocationHandler.SET_CALL_ID_FOR_TEST.set(false);
   }
 
   private void doRead() throws Exception {
     doRead(retryProxy);
+  }
+
+  private void doRead(ReadConsistency readConsistency) throws Exception {
+    doRead(retryProxy, readConsistency);
   }
 
   private void doWrite() throws Exception {
@@ -551,7 +630,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     req.setKeyArgs(keyArgs);
 
     OMRequest omRequest = OMRequest.newBuilder()
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setClientId(ClientId.randomId().toString())
         .setCmdType(Type.CreateKey)
         .setCreateKeyRequest(req)
@@ -561,6 +640,11 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   }
 
   private static void doRead(OzoneManagerProtocolPB client) throws Exception {
+    doRead(client, null);
+  }
+
+  private static void doRead(OzoneManagerProtocolPB client,
+      ReadConsistency readConsistency) throws Exception {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName("volume")
         .setBucketName("bucket")
@@ -569,14 +653,16 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     GetKeyInfoRequest.Builder req = GetKeyInfoRequest.newBuilder()
         .setKeyArgs(keyArgs);
 
-    OMRequest omRequest = OMRequest.newBuilder()
-        .setVersion(ClientVersion.CURRENT_VERSION)
+    OMRequest.Builder omRequest = OMRequest.newBuilder()
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setClientId(ClientId.randomId().toString())
         .setCmdType(Type.GetKeyInfo)
-        .setGetKeyInfoRequest(req)
-        .build();
+        .setGetKeyInfoRequest(req);
+    if (readConsistency != null) {
+      omRequest.setReadConsistencyHint(readConsistency.getHint());
+    }
 
-    client.submitRequest(null, omRequest);
+    client.submitRequest(null, omRequest.build());
   }
 
   private void assertHandledBy(int omNodeIdx) {
@@ -633,6 +719,16 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
           break;
         case GetKeyInfo:
           if (!isLeader) {
+            if (omRequest.hasReadConsistencyHint()
+                && ReadConsistency.fromProto(omRequest.getReadConsistencyHint().getReadConsistency())
+                    == ReadConsistency.LINEARIZABLE_LEADER_ONLY) {
+              throw new ServiceException(
+                  new RemoteException(
+                      OMNotLeaderException.class.getCanonicalName(),
+                      "Read can only be done on leader"
+                  )
+              );
+            }
             if (!isFollowerReadSupported) {
               throw new ServiceException(
                   new RemoteException(

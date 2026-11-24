@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -378,6 +379,34 @@ public class TestSnapshotChain {
     assertEquals(expectedChain, forwardChain);
     assertEquals(forwardChain, reverseChain);
 
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testSnapshotChainIteratorWhenNextSnapshotIsPurged(boolean reverse) throws IOException {
+    Table<String, SnapshotInfo> snapshotInfo = omMetadataManager.getSnapshotInfoTable();
+    List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
+    UUID prevSnapshotID = null;
+    long time = System.currentTimeMillis();
+    for (int i = 0; i < 3; i++) {
+      UUID snapshotID = UUID.randomUUID();
+      SnapshotInfo snapInfo = createSnapshotInfo(snapshotID, prevSnapshotID, prevSnapshotID, time++);
+      snapshotInfo.put(snapshotID.toString(), snapInfo);
+      prevSnapshotID = snapshotID;
+      snapshotInfoList.add(snapInfo);
+    }
+    chainManager = new SnapshotChainManager(omMetadataManager);
+    Iterator<UUID> iterator = chainManager.iterator(reverse);
+    assertEquals(snapshotInfoList.get(reverse ? 2 : 0).getSnapshotId(), iterator.next());
+
+    // Purge the snapshot the iterator moved to, as a concurrent snapshot purge would.
+    SnapshotInfo purged = snapshotInfoList.get(1);
+    assertTrue(chainManager.deleteSnapshot(purged));
+
+    assertTrue(iterator.hasNext());
+    assertEquals(purged.getSnapshotId(), iterator.next());
+    assertFalse(iterator.hasNext());
+    assertThrows(NoSuchElementException.class, iterator::next);
   }
 
   private static Stream<? extends Arguments> invalidSnapshotChain() {

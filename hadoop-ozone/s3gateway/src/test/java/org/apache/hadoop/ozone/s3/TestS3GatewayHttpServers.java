@@ -17,18 +17,31 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import static org.apache.hadoop.ozone.om.helpers.S3STSUtils.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
 import org.apache.hadoop.ozone.s3sts.S3STSConfigKeys;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHandler;
 import org.apache.ozone.test.GenericTestUtils.PortAllocator;
+import org.eclipse.jetty.ee8.servlet.FilterHolder;
 import org.eclipse.jetty.ee8.webapp.WebAppContext;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -45,6 +58,36 @@ class TestS3GatewayHttpServers {
 
   @TempDir
   private Path tempDir;
+
+  /**
+   * Switching {@link UserGroupInformation} to Kerberos reads the default
+   * realm, which the JDK resolves from these properties when there is no
+   * krb5.conf, as in CI.
+   */
+  private static String previousKerberosRealm;
+  private static String previousKerberosKdc;
+
+  @BeforeAll
+  static void fakeKerberosRealm() {
+    previousKerberosRealm = System.getProperty("java.security.krb5.realm");
+    previousKerberosKdc = System.getProperty("java.security.krb5.kdc");
+    System.setProperty("java.security.krb5.realm", "EXAMPLE.COM");
+    System.setProperty("java.security.krb5.kdc", "localhost");
+  }
+
+  @AfterAll
+  static void clearKerberosRealm() {
+    if (previousKerberosRealm == null) {
+      System.clearProperty("java.security.krb5.realm");
+    } else {
+      System.setProperty("java.security.krb5.realm", previousKerberosRealm);
+    }
+    if (previousKerberosKdc == null) {
+      System.clearProperty("java.security.krb5.kdc");
+    } else {
+      System.setProperty("java.security.krb5.kdc", previousKerberosKdc);
+    }
+  }
 
   /**
    * An enabled server gets Jetty's CDI integration attribute, without which
@@ -77,6 +120,79 @@ class TestS3GatewayHttpServers {
     assertDoesNotThrow(() -> new S3STSHttpServer(conf, "s3g-sts"));
   }
 
+  @Test
+  void disabledStsServerIgnoresInvalidMinDurationConfig() {
+    final OzoneConfiguration conf = newConf();
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 0);
+
+    assertDoesNotThrow(
+        () -> {
+          try (S3STSHttpServer server = new S3STSHttpServer(conf, "s3g-sts")) {
+            assertNull(server.getHttpAddress());
+          }
+        });
+  }
+
+  @Test
+  void enabledStsServerRejectsInvalidMinDurationConfig() {
+    final OzoneConfiguration conf = newConf();
+    conf.setBoolean(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY, true);
+    conf.set(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ADDRESS_KEY, PortAllocator.localhostWithFreePort());
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 0);
+
+    assertThrows(
+        IllegalArgumentException.class, () -> {
+          try (S3STSHttpServer ignored = new S3STSHttpServer(conf, "s3g-sts")) {
+            fail("Expected invalid minimum duration configuration to be rejected");
+          }
+        });
+  }
+
+  @Test
+  void enabledStsServerAcceptsValidMinDurationConfig() {
+    final OzoneConfiguration conf = newConf();
+    conf.setBoolean(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY, true);
+    conf.set(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ADDRESS_KEY, PortAllocator.localhostWithFreePort());
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 10);
+
+    assertDoesNotThrow(
+        () -> {
+          try (S3STSHttpServer server = new S3STSHttpServer(conf, "s3g-sts")) {
+            assertNotNull(server.getHttpAddress());
+          }
+        });
+  }
+
+  /**
+   * The secret endpoint expands {@code _HOST} in its SPNEGO principal from the
+   * advertised web admin address, not from the bind host, which here is the
+   * IPv6 wildcard that no keytab entry can match.
+   */
+  @Test
+  void secretEndpointPrincipalNamesAdvertisedHost() throws Exception {
+    OzoneConfiguration conf = newConf();
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY, "::");
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY,
+        "s3g1.example.com:" + PortAllocator.getFreePort());
+    conf.setBoolean(S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY, true);
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL,
+        "HTTP/_HOST@EXAMPLE.COM");
+
+    Configuration hadoopConf = new Configuration();
+    hadoopConf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
+        "kerberos");
+    UserGroupInformation.setConfiguration(hadoopConf);
+    try (ExposedS3GatewayWebAdminServer server =
+        new ExposedS3GatewayWebAdminServer(conf)) {
+      FilterHolder secretFilter = server.context().getServletHandler()
+          .getFilter("secretAuthentication");
+      assertEquals("HTTP/s3g1.example.com@EXAMPLE.COM",
+          secretFilter.getInitParameter(KerberosAuthenticationHandler.PRINCIPAL));
+    } finally {
+      UserGroupInformation.reset();
+    }
+  }
+
   private OzoneConfiguration newConf() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
@@ -91,6 +207,20 @@ class TestS3GatewayHttpServers {
     ExposedS3GatewayHttpServer(MutableConfigurationSource conf)
         throws IOException {
       super(conf, "s3gateway");
+    }
+
+    WebAppContext context() {
+      return getWebAppContext();
+    }
+  }
+
+  /** Exposes the web app context, which BaseHttpServer keeps protected. */
+  private static final class ExposedS3GatewayWebAdminServer
+      extends S3GatewayWebAdminServer {
+
+    ExposedS3GatewayWebAdminServer(MutableConfigurationSource conf)
+        throws IOException {
+      super(conf, "s3g-web");
     }
 
     WebAppContext context() {

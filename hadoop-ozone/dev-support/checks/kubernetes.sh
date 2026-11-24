@@ -21,6 +21,13 @@ cd "$DIR/../../.." || exit 1
 
 OZONE_ROOT=$(pwd -P)
 
+: ${OZONE_KUBERNETES_SUITE:="${1:-}"}
+: ${OZONE_TEST_SELECTOR:=""}
+
+if [[ -n "${OZONE_KUBERNETES_SUITE}" ]] && [[ -z "${OZONE_TEST_SELECTOR}" ]]; then
+  export OZONE_TEST_SELECTOR="/${OZONE_KUBERNETES_SUITE}/test.sh"
+fi
+
 export KUBECONFIG
 
 REPORT_DIR=${OUTPUT_DIR:-"${OZONE_ROOT}/target/kubernetes"}
@@ -36,7 +43,7 @@ else
   source "${DIR}/install/k3s.sh"
 fi
 
-OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
+OZONE_VERSION=$(get_version ozone)
 DIST_DIR="${OZONE_ROOT}/hadoop-ozone/dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then

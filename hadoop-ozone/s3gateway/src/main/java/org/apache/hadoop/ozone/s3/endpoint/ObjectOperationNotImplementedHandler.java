@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableSet;
 import java.io.InputStream;
 import java.util.Set;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint.ObjectRequestContext;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 
@@ -42,12 +43,6 @@ class ObjectOperationNotImplementedHandler extends ObjectOperationHandler {
       QueryParams.ANNOTATION, QueryParams.ENCRYPTION, QueryParams.LEGAL_HOLD, QueryParams.RENAME_OBJECT,
       QueryParams.RETENTION, QueryParams.UPLOADS);
 
-  // DeleteObject with versionId targets a specific version; ignoring it would delete the current object instead.
-  private static final Set<String> DELETE_SUBRESOURCES = ImmutableSet.<String>builder()
-      .addAll(SUBRESOURCES)
-      .add(QueryParams.VERSION_ID)
-      .build();
-
   @Override
   Response handleGetRequest(ObjectRequestContext context, String keyName) {
     return rejectNotImplemented(context, SUBRESOURCES, keyName);
@@ -60,6 +55,10 @@ class ObjectOperationNotImplementedHandler extends ObjectOperationHandler {
 
   @Override
   Response handleDeleteRequest(ObjectRequestContext context, String keyName) {
-    return rejectNotImplemented(context, DELETE_SUBRESOURCES, keyName);
+    // DeleteObject with versionId targets a specific version; ignoring it would delete the current object instead.
+    if (isUnsupportedVersionId(queryParams().get(QueryParams.VERSION_ID))) {
+      return rejectNotImplemented(context, S3GAction.NOT_IMPLEMENTED, keyName);
+    }
+    return rejectNotImplemented(context, SUBRESOURCES, keyName);
   }
 }

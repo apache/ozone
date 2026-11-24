@@ -51,7 +51,7 @@ jobs:
     permissions:
       contents: read
     secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
       SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
     with:
       ratis_args: ${{ needs.ratis.outputs.build-args }}

@@ -18,12 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerAdvisor;
 import org.apache.hadoop.ozone.OzoneConsts;
 import picocli.CommandLine.Option;
@@ -69,7 +64,7 @@ public class ContainerBalancerConfigOptions {
 
   @Option(names = {"--balancing-iteration-interval-minutes"},
       description = "The interval period in minutes between each iteration of Container Balancer. " +
-          "The value should be positive, with a default of 70 (specify '70' for 70 minutes).")
+          "The value should be positive, with a default of 3 (specify '3' for 3 minutes).")
   private Optional<Integer> balancingInterval;
 
   @Option(names = {"--move-timeout-minutes"},
@@ -159,17 +154,7 @@ public class ContainerBalancerConfigOptions {
         request.setMoveTimeoutMillis(Duration.ofMinutes(minutes).toMillis()));
     moveReplicationTimeout.ifPresent(minutes ->
         request.setMoveReplicationTimeoutMillis(Duration.ofMinutes(minutes).toMillis()));
-    includeNodes.ifPresent(value -> request.setIncludeNodes(parseNodeSet(value)));
-    excludeNodes.ifPresent(value -> request.setExcludeNodes(parseNodeSet(value)));
-  }
-
-  private static Set<String> parseNodeSet(String nodes) {
-    if (StringUtils.isBlank(nodes)) {
-      return Collections.emptySet();
-    }
-    return Arrays.stream(nodes.split(","))
-        .map(String::trim)
-        .filter(s -> !s.isEmpty())
-        .collect(Collectors.toSet());
+    includeNodes.ifPresent(value -> request.setIncludeNodes(ContainerBalancerCliHelper.parseNodeSet(value)));
+    excludeNodes.ifPresent(value -> request.setExcludeNodes(ContainerBalancerCliHelper.parseNodeSet(value)));
   }
 }

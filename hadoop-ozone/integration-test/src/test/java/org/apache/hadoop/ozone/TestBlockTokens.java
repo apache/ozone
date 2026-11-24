@@ -56,7 +56,6 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -86,6 +85,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -205,13 +205,7 @@ public final class TestBlockTokens {
         EXPIRY_DURATION_IN_MS);
     assertTrue(secretKey.isExpired());
     // verify that the read is denied because of the expired secret key.
-    readData(keyInfo, k -> {
-      try {
-        return getTestKeyInfo();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    });
+    readData(keyInfo, k -> getTestKeyInfo());
   }
 
   @Test
@@ -283,7 +277,7 @@ public final class TestBlockTokens {
   }
 
   private void readData(OmKeyInfo keyInfo,
-      Function<OmKeyInfo, OmKeyInfo> retryFunc) throws IOException {
+      CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunc) throws IOException {
     XceiverClientFactory xceiverClientManager =
         ((RpcClient) client.getProxy()).getXceiverClientManager();
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);

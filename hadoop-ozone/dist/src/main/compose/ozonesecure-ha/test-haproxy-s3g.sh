@@ -36,9 +36,7 @@ start_docker_env
 
 execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
-exclude=""
-for bucket in encrypted; do
-  execute_robot_test recon -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
-  # some tests are independent of the bucket type, only need to be run once
-  exclude="--exclude no-bucket-type"
-done
+# some S3 tests are independent of the bucket type, only need to be run once: here (i.e. no exclusions)
+bucket=encrypted
+layout=OBJECT_STORE
+execute_robot_test recon -v BUCKET:${bucket} -v BUCKET_LAYOUT:${layout} -N s3-${layout}-${bucket} s3

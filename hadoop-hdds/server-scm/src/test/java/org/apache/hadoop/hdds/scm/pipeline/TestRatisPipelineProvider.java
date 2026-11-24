@@ -34,9 +34,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -75,7 +73,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 /**
  * Test for {@link RatisPipelineProvider}.
  */
-public class TestRatisPipelineProvider {
+public class TestRatisPipelineProvider extends AbstractNCopyPipelineProviderTest {
 
   private static final HddsProtos.ReplicationType REPLICATION_TYPE =
       HddsProtos.ReplicationType.RATIS;
@@ -156,14 +154,14 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(pipeline);
 
     Pipeline pipeline1 = provider.create(RatisReplicationConfig
         .getInstance(factor));
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     // New pipeline should not overlap with the previous created pipeline
@@ -205,7 +203,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto);
 
     factor = HddsProtos.ReplicationFactor.ONE;
@@ -214,7 +212,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto1);
     // With enough pipeline quote on datanodes, they should not share
     // the same set of datanodes.
@@ -259,30 +257,6 @@ public class TestRatisPipelineProvider {
 
     assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
     assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
-  }
-
-  private DatanodeDetails createDatanodeDetails(boolean supportRatisStreaming) {
-    Random random = ThreadLocalRandom.current();
-    String ipAddress = random.nextInt(256)
-        + "." + random.nextInt(256)
-        + "." + random.nextInt(256)
-        + "." + random.nextInt(256);
-
-    DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
-        .setID(DatanodeID.randomID())
-        .setHostName("localhost" + "-" + ipAddress)
-        .setIpAddress(ipAddress)
-        .setNetworkLocation(null)
-        .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
-        .setPersistedOpStateExpiry(0);
-
-    for (DatanodeDetails.Port.Name name : DatanodeDetails.Port.Name.values()) {
-      if (!supportRatisStreaming && name == DatanodeDetails.Port.Name.RATIS_DATASTREAM) {
-        continue;
-      }
-      dn.addPort(DatanodeDetails.newPort(name, 0));
-    }
-    return dn.build();
   }
 
   @Test
@@ -367,7 +341,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     nodeManager.addPipeline(pipeline);
     stateManager.addPipeline(pipelineProto);
 
@@ -494,7 +468,7 @@ public class TestRatisPipelineProvider {
       Pipeline p = provider.create(
           RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
           new ArrayList<>(), new ArrayList<>());
-      stateManager.addPipeline(p.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+      stateManager.addPipeline(p.getProtobufMessage(ClientVersion.CURRENT));
     }
 
     // Next pipeline creation should fail with default limit message.
@@ -519,7 +493,7 @@ public class TestRatisPipelineProvider {
     for (int i = 0; i < pipelineCount; i++) {
       stateManager.addPipeline(
           provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
-              new ArrayList<>(), new ArrayList<>()).getProtobufMessage(ClientVersion.CURRENT_VERSION)
+              new ArrayList<>(), new ArrayList<>()).getProtobufMessage(ClientVersion.CURRENT)
       );
     }
 
@@ -546,7 +520,7 @@ public class TestRatisPipelineProvider {
         .setId(PipelineID.randomId())
         .build();
     HddsProtos.Pipeline pipelineProto = openPipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
 
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(openPipeline);

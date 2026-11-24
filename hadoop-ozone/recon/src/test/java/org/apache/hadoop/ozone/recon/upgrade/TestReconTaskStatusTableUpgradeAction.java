@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.apache.ozone.recon.schema.SqlDbUtils.constraintExists;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -34,8 +37,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
+import org.apache.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.jooq.DSLContext;
-import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +54,8 @@ public class TestReconTaskStatusTableUpgradeAction
       "last_task_run_status";
   private static final String IS_CURRENT_TASK_RUNNING =
       "is_current_task_running";
+  private static final String UNHEALTHY_CONTAINERS_CONSTRAINT =
+      UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
 
   private DataSource dataSource;
   private DSLContext dslContext;
@@ -59,11 +64,7 @@ public class TestReconTaskStatusTableUpgradeAction
   @BeforeEach
   public void setUp() throws SQLException {
     dataSource = getDataSource();
-    // Use the Derby dialect explicitly. The shared DSLContext from the base
-    // class uses SQLDialect.DEFAULT, which renders Derby-incompatible DDL
-    // (e.g. "DROP TABLE IF EXISTS" and "bigint null"); a Derby-dialect context
-    // generates SQL that the embedded Derby database accepts.
-    dslContext = DSL.using(dataSource, SQLDialect.DERBY);
+    dslContext = getDslContext();
     upgradeAction = new ReconTaskStatusTableUpgradeAction();
     createLegacyTaskStatusTable();
   }
@@ -119,6 +120,35 @@ public class TestReconTaskStatusTableUpgradeAction
         () -> upgradeAction.execute(failingDataSource));
   }
 
+  @Test
+  public void testNoOpWhenTableMissing() throws SQLException {
+    dropTaskStatusTableIfPresent();
+
+    assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
+  }
+
+  @Test
+  public void testExecuteIsIdempotentOnCurrentSchema() throws SQLException {
+    // Rebuild the table from the production schema definition instead of the
+    // legacy fixture, so the repair is exercised against the real schema.
+    dropTaskStatusTableIfPresent();
+    getSchemaDefinition(ReconTaskSchemaDefinition.class).initializeSchema();
+
+    assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
+    assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
+  }
+
+  @Test
+  public void testExecuteAppliesUnhealthyContainersConstraint() throws Exception {
+    createUnhealthyContainersTableWithoutCheckConstraint();
+
+    upgradeAction.execute(dataSource);
+
+    try (Connection conn = dataSource.getConnection()) {
+      assertTrue(constraintExists(conn, UNHEALTHY_CONTAINERS_TABLE_NAME, UNHEALTHY_CONTAINERS_CONSTRAINT));
+    }
+  }
+
   private void createLegacyTaskStatusTable() throws SQLException {
     // The base class always creates RECON_TASK_STATUS before this runs, so a
     // plain DROP TABLE is safe (no IF EXISTS needed).
@@ -134,6 +164,28 @@ public class TestReconTaskStatusTableUpgradeAction
             field(name("last_updated_timestamp")),
             field(name("last_updated_seq_number")))
         .values("OmDeltaRequest", 1L, 1L)
+        .execute();
+  }
+
+  private void dropTaskStatusTableIfPresent() throws SQLException {
+    try (Connection conn = dataSource.getConnection()) {
+      if (TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
+        dslContext.dropTable(RECON_TASK_STATUS_TABLE_NAME).execute();
+      }
+    }
+  }
+
+  private void createUnhealthyContainersTableWithoutCheckConstraint() throws SQLException {
+    try (Connection conn = dataSource.getConnection()) {
+      if (TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+        dslContext.dropTable(UNHEALTHY_CONTAINERS_TABLE_NAME).execute();
+      }
+    }
+    dslContext.createTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
+        .column("container_id", SQLDataType.BIGINT.nullable(false))
+        .column("container_state", SQLDataType.VARCHAR(16).nullable(false))
+        .constraint(DSL.constraint("pk_container_id")
+            .primaryKey(name("container_id"), name("container_state")))
         .execute();
   }
 

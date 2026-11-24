@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -42,9 +41,13 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
@@ -53,9 +56,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Class tests OMKeysDeleteRequest.
@@ -187,6 +192,42 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
         omMetadataManager.getBucketTable().getSkipCache(bucketKey).getUsedNamespace());
   }
 
+  @Test
+  public void testDuplicateKeysReleaseQuotaOnce() throws Exception {
+    createPreRequisites();
+    DeleteKeyArgs keys = omRequest.getDeleteKeysRequest().getDeleteKeys();
+    OMRequest request = omRequest.toBuilder().setDeleteKeysRequest(omRequest.getDeleteKeysRequest().toBuilder()
+        .setDeleteKeys(keys.toBuilder().addAllKeys(deleteKeyList))).build();
+    checkDuplicateKeysReleaseQuotaOnce(request, deleteKeyList.size());
+  }
+
+  protected void checkDuplicateKeysReleaseQuotaOnce(OMRequest request, int uniqueKeys) throws Exception {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    // The fixtures insert entries directly, so account for the entries being deleted here.
+    omMetadataManager.getBucketTable().getCacheValue(new CacheKey<>(bucketKey))
+        .getCacheValue().incrUsedNamespace(uniqueKeys);
+    long usedNamespace = omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+    long totalNamespace = omMetadataManager.getBucketTable().get(bucketKey).getTotalBucketNamespace();
+    OMClientResponse response = getOmKeysDeleteRequest(request).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(Status.OK, response.getOMResponse().getStatus());
+    assertEquals(0, response.getOMResponse().getDeleteKeysResponse().getUnDeletedKeys().getKeysCount());
+    assertEquals(0, response.getOMResponse().getDeleteKeysResponse().getErrorsCount());
+    assertEquals(usedNamespace - uniqueKeys, omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
+    if (!getBucketLayout().isFileSystemOptimized()) {
+      // The base fixture contains empty keys, whose namespace is released immediately.
+      assertEquals(totalNamespace - uniqueKeys,
+          omMetadataManager.getBucketTable().get(bucketKey).getTotalBucketNamespace());
+    }
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    assertEquals(usedNamespace - uniqueKeys,
+        omMetadataManager.getBucketTable().getSkipCache(bucketKey).getUsedNamespace());
+    assertEquals(uniqueKeys, ozoneManager.getMetrics().getNumKeyDeletes());
+  }
+
   protected long expectedNamespaceReleasedOnPartialDelete() {
     return KEY_COUNT;
   }
@@ -210,11 +251,50 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
     checkDeleteKeysResponseForFailure(omKeysDeleteRequest, Status.INVALID_REQUEST);
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testScanStateSavedOnlyIfLifecycleExists(boolean lifecycleExists) throws Exception {
+    createPreRequisites(RequestSource.LIFECYCLE);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    long lccUpdateID = 10L;
+    if (lifecycleExists) {
+      omMetadataManager.getLifecycleConfigurationTable().put(bucketKey, new OmLifecycleConfiguration.Builder()
+          .setVolume(volumeName)
+          .setBucket(bucketName)
+          .setBucketLayout(getBucketLayout())
+          .addRule(new OmLCRule.Builder().setPrefix("")
+              .addAction(new OmLCExpiration.Builder().setDays(30).build())
+              .build())
+          .setCreationTime(Time.now())
+          .setObjectID(1L)
+          .setUpdateID(lccUpdateID)
+          .build());
+    }
+    omRequest = omRequest.toBuilder().setDeleteKeysRequest(omRequest.getDeleteKeysRequest().toBuilder()
+        .setScanState(LifecycleScanState.newBuilder()
+            .setBucketKey(bucketKey)
+            .setBucketObjID(omMetadataManager.getBucketTable().get(bucketKey).getObjectID())
+            .setLifecycleConfigurationUpdateID(lccUpdateID)
+            .setScanStartTime(1L))).build();
+
+    OMClientResponse response = getOmKeysDeleteRequest(omRequest).validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(Status.OK, response.getOMResponse().getStatus());
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    assertEquals(lifecycleExists, omMetadataManager.getLifecycleScanStateTable().get(bucketKey) != null);
+    // keys are deleted regardless of the scan state
+    for (String deleteKey : deleteKeyList) {
+      assertNull(omMetadataManager.getKeyTable(getBucketLayout())
+          .get(omMetadataManager.getOzoneKey(volumeName, bucketName, deleteKey)));
+    }
+  }
+
   @Test
   public void testPreExecuteAdminCheckForPiggybackedScanState() throws Exception {
     OzoneManager ozoneManager = mock(OzoneManager.class);
-    OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
     when(ozoneManager.getVersionManager()).thenReturn(versionManager);
 
     when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(true);

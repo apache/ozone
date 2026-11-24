@@ -213,7 +213,7 @@ public class OzoneClientConfig {
       description = "Ozone client to verify checksum of the checksum "
           + "blocksize data.",
       tags = ConfigTag.CLIENT)
-  private boolean checksumVerify = true;
+  private volatile boolean checksumVerify = true;
 
   @Config(key = "ozone.client.max.ec.stripe.write.retries",
       defaultValue = "10",
@@ -257,6 +257,25 @@ public class OzoneClientConfig {
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   private int ecReconstructStripeWritePoolLimit = 10 * 3;
+
+  @Config(key = "ozone.client.ec.parallel.read.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "When enabled, a read of an EC block that spans more than one cell reads the cells of different" +
+          " data indexes from their datanodes in parallel, instead of one cell at a time. Reads within a single" +
+          " cell, and reads that need reconstruction, are not affected.",
+      tags = ConfigTag.CLIENT)
+  private boolean ecParallelReadEnabled = false;
+
+  @Config(key = "ozone.client.ec.parallel.read.pool.limit",
+      defaultValue = "30",
+      description = "Thread pool max size for reading the cells of an EC block in parallel, when" +
+          " ozone.client.ec.parallel.read.enabled is true. When the pool is saturated, the reading thread reads" +
+          " the remaining cells itself.",
+      tags = ConfigTag.CLIENT)
+  // For the largest recommended EC policy rs-10-4-1024k, a read can span
+  // 10 data indexes, so this allows 3 such reads in parallel.
+  private int ecParallelReadPoolLimit = 10 * 3;
 
   @Config(key = "ozone.client.checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
@@ -317,13 +336,21 @@ public class OzoneClientConfig {
           tags = ConfigTag.CLIENT)
   private boolean enablePutblockPiggybacking = false;
 
-  @Config(key = "ozone.client.datastream.putblock.on.close.enabled",
+  static final String OZONE_CLIENT_DATASTREAM_PUTBLOCK_WITHOUT_RAFT_ENABLED
+      = "ozone.client.datastream.putblock.without.raft.enabled";
+  @Config(key = OZONE_CLIENT_DATASTREAM_PUTBLOCK_WITHOUT_RAFT_ENABLED,
+      experimental = true,
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
-      description = "When enabled, use StreamInitWithPutBlock so datanodes commit PutBlock " +
-          "when the Ratis data stream closes instead of via a separate WriteAsync PutBlock.",
+      description = "WARNING: This is an experimental feature; use at your own risk. " +
+          "When enabled, the PutBlock of a Ratis data stream is committed through the data stream " +
+          "instead of a separate WriteAsync PutBlock, so that it does not go through the Raft log: " +
+          "StreamInitWithPutBlock is used so that datanodes commit PutBlock when the data stream closes, " +
+          "and the PutBlock triggered by a flush in the middle of the stream is sent as a data stream command. " +
+          "It takes effect only for pipelines whose datanodes all support committing PutBlock through the data " +
+          "stream; otherwise PutBlock goes through the Raft log.",
       tags = ConfigTag.CLIENT)
-  private boolean datastreamPutBlockOnCloseEnabled = false;
+  private boolean datastreamPutBlockWithoutRaftEnabled = false;
 
   @Config(key = "ozone.client.key.write.concurrency",
       defaultValue = "1",
@@ -347,7 +374,9 @@ public class OzoneClientConfig {
       defaultValue = "1048576",
       type = ConfigType.INT,
       tags = {ConfigTag.CLIENT},
-      description = "Chunk size of streaming read responses from datanodes.")
+      description = "Amount of block data the datanode sends in each streaming read response. "
+          + "A response must fit in the 32 MB gRPC message limit, and 1 MB of that is reserved for metadata "
+          + "such as checksums, so the datanode caps this value at 31 MB.")
   private int streamReadResponseDataSize = 1 << 20;
 
   @Config(key = "ozone.client.stream.read.timeout",
@@ -356,6 +385,34 @@ public class OzoneClientConfig {
       tags = {ConfigTag.CLIENT},
       description = "Timeout for receiving streaming read responses.")
   private Duration streamReadTimeout = Duration.ofSeconds(10);
+
+  @Config(key = "ozone.client.stream.read.max-concurrent-streams",
+      defaultValue = "-1",
+      type = ConfigType.INT,
+      tags = {ConfigTag.CLIENT},
+      description = "Maximum number of concurrently open streaming read block streams per pipeline client. "
+          + "Each open block input stream holds one slot until it is closed; opening a stream beyond the limit "
+          + "waits up to ozone.client.stream.read.timeout for a slot; a wait that times out is retried under the "
+          + "read retry policy (ozone.client.read.max.retries) before the read fails. A positioned read and every "
+          + "block a key input stream has seeked into each hold a slot, so the limit must exceed the number of "
+          + "block streams one reader keeps open at once. Each open stream can buffer up to "
+          + "ozone.client.stream.read.pre-read-size bytes, so this limit also bounds client memory per pipeline. "
+          + "Any non-positive value (the default) makes the limit follow "
+          + "hdds.ratis.raft.client.async.outstanding-requests.max, preserving the capacity streaming reads "
+          + "had when they were counted against the request limit. Streaming reads no longer consume permits "
+          + "from hdds.ratis.raft.client.async.outstanding-requests.max; that limit now applies to unary "
+          + "requests only.")
+  private int streamReadMaxConcurrentStreams = -1;
+
+  @Config(key = "ozone.client.netty.warmup.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.CLIENT},
+      description = "When the client is created, initialize Netty, and netty-tcnative (BoringSSL) if gRPC TLS is " +
+          "enabled, on a background thread, so the first datanode connection does not wait for them. This takes " +
+          "about 0.1 s in a new JVM, so it matters for short-lived clients such as YARN containers and CLI " +
+          "commands. It needs a spare CPU core to help.")
+  private boolean nettyWarmUpEnabled = true;
 
   @PostConstruct
   public void validate() {
@@ -381,6 +438,12 @@ public class OzoneClientConfig {
           OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE);
       bytesPerChecksum =
           OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
+    }
+
+    if (ecParallelReadPoolLimit < 1) {
+      LOG.warn("ozone.client.ec.parallel.read.pool.limit ({}) must be at least 1, resetting to 1.",
+          ecParallelReadPoolLimit);
+      ecParallelReadPoolLimit = 1;
     }
 
     // Verify client configs related to HBase enhancements
@@ -442,6 +505,14 @@ public class OzoneClientConfig {
 
   public boolean isShortCircuitEnabled() {
     return shortCircuitEnabled;
+  }
+
+  public boolean isNettyWarmUpEnabled() {
+    return nettyWarmUpEnabled;
+  }
+
+  public void setNettyWarmUpEnabled(boolean nettyWarmUpEnabled) {
+    this.nettyWarmUpEnabled = nettyWarmUpEnabled;
   }
 
   public void setShortCircuit(boolean enabled) {
@@ -622,6 +693,22 @@ public class OzoneClientConfig {
     return ecReconstructStripeWritePoolLimit;
   }
 
+  public boolean isEcParallelReadEnabled() {
+    return ecParallelReadEnabled;
+  }
+
+  public void setEcParallelReadEnabled(boolean ecParallelReadEnabled) {
+    this.ecParallelReadEnabled = ecParallelReadEnabled;
+  }
+
+  public int getEcParallelReadPoolLimit() {
+    return ecParallelReadPoolLimit;
+  }
+
+  public void setEcParallelReadPoolLimit(int poolLimit) {
+    this.ecParallelReadPoolLimit = poolLimit;
+  }
+
   public void setFsDefaultBucketLayout(String bucketLayout) {
     if (!bucketLayout.isEmpty()) {
       this.fsDefaultBucketLayout = bucketLayout;
@@ -708,12 +795,20 @@ public class OzoneClientConfig {
     this.streamReadTimeout = streamReadTimeout;
   }
 
-  public boolean isDatastreamPutBlockOnCloseEnabled() {
-    return datastreamPutBlockOnCloseEnabled;
+  public int getStreamReadMaxConcurrentStreams() {
+    return streamReadMaxConcurrentStreams;
   }
 
-  public void setDatastreamPutBlockOnCloseEnabled(boolean datastreamPutBlockOnCloseEnabled) {
-    this.datastreamPutBlockOnCloseEnabled = datastreamPutBlockOnCloseEnabled;
+  public void setStreamReadMaxConcurrentStreams(int streamReadMaxConcurrentStreams) {
+    this.streamReadMaxConcurrentStreams = streamReadMaxConcurrentStreams;
+  }
+
+  public boolean isDatastreamPutBlockWithoutRaftEnabled() {
+    return datastreamPutBlockWithoutRaftEnabled;
+  }
+
+  public void setDatastreamPutBlockWithoutRaftEnabled(boolean datastreamPutBlockWithoutRaftEnabled) {
+    this.datastreamPutBlockWithoutRaftEnabled = datastreamPutBlockWithoutRaftEnabled;
   }
 
   /**

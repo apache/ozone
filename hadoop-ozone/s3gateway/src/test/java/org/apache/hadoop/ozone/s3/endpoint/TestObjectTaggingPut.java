@@ -22,12 +22,14 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSuccee
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.createObjectEndpoint;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putTagging;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -60,7 +62,7 @@ public class TestObjectTaggingPut {
 
   private static final String BUCKET_NAME = "b1";
   private static final String KEY_NAME = "key=value/1";
-  private static final Map<String, String> TAGS = ImmutableMap.of("tag1", "val1", "tag2", "val2");
+  private static final Map<String, String> TAGS = ImmutableMap.of("tag1", "val1", "tag2", "a@b");
 
   @BeforeEach
   void setup() throws Exception {
@@ -88,7 +90,7 @@ public class TestObjectTaggingPut {
     putTagging(endpoint, BUCKET_NAME, KEY_NAME, twoTags());
 
     verify(volume, never()).getBucket(anyString());
-    verify(protocol, never()).getBucketDetails(anyString(), anyString());
+    verify(protocol, never()).getBucketDetails(any(), anyString());
     verify(protocol).putObjectTagging("s3Volume", BUCKET_NAME, KEY_NAME, TAGS);
   }
 
@@ -117,11 +119,28 @@ public class TestObjectTaggingPut {
   }
 
   @Test
-  public void testPutObjectTaggingWithVersionIdIsNotImplemented() throws Exception {
+  public void testPutObjectTaggingWithNonNullVersionIdIsNotImplemented() throws Exception {
     objectEndpoint.queryParamsForTest().set(S3Consts.QueryParams.VERSION_ID, "nonexistent");
 
     assertErrorResponse(NOT_IMPLEMENTED, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, twoTags()));
     assertThat(clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME).getTags()).isEmpty();
+  }
+
+  @Test
+  public void testPutObjectTaggingWithEmptyVersionIdIsInvalidArgument() throws Exception {
+    objectEndpoint.queryParamsForTest().set(S3Consts.QueryParams.VERSION_ID, "");
+
+    assertErrorResponse(INVALID_ARGUMENT, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, twoTags()));
+    assertThat(clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME).getTags()).isEmpty();
+  }
+
+  @Test
+  public void testPutObjectTaggingWithNullVersionId() throws Exception {
+    objectEndpoint.queryParamsForTest().set(S3Consts.QueryParams.VERSION_ID, S3Consts.NULL_VERSION_ID);
+
+    assertSucceeds(() -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, twoTags()));
+    assertThat(clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME).getTags())
+        .containsExactlyEntriesOf(TAGS);
   }
 
   @Test
@@ -179,7 +198,7 @@ public class TestObjectTaggingPut {
             "      </Tag>" +
             "      <Tag>" +
             "         <Key>tag2</Key>" +
-            "         <Value>val2</Value>" +
+            "         <Value>a@b</Value>" +
             "      </Tag>" +
             "   </TagSet>" +
             "</Tagging>";

@@ -20,7 +20,7 @@
 
 services:
   polaris:
-    image: ${POLARIS_IMAGE}
+    image: ${POLARIS_IMAGE}:${POLARIS_IMAGE_VERSION}
     hostname: polaris
     dns_search: .
     ports:
@@ -67,7 +67,7 @@ services:
       ozone_net: {}
 
   spark-sql:
-    image: ${SPARK_SQL_IMAGE}
+    image: ${SPARK_SQL_IMAGE}:${SPARK_SQL_IMAGE_VERSION}
     user: "0:0"
     dns_search: .
     volumes:

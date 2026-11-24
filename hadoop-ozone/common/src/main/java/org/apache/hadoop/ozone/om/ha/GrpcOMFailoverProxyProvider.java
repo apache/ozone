@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.om.ha;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -38,6 +36,8 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransport;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +79,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
       if (hostAddr.isPresent()) {
         int port = hostport
             .orElse(config.getObject(GrpcOmTransport.GrpcOmTransportConfig.class).getPort());
-        String rpcAddrStr = hostAddr.get() + ":" + port;
+        String rpcAddrStr = HddsUtils.getHostPortString(hostAddr.get(), port);
         omProxies.add(OMProxyInfo.newInstance(createOMProxy(), omSvcId, nodeId, rpcAddrStr));
       } else {
         LOG.error("expected host address not defined for: {}", rpcAddrKey);
@@ -126,10 +126,6 @@ public class GrpcOMFailoverProxyProvider<T> extends
       }
     }
     return super.shouldFailover(ex);
-  }
-
-  public synchronized boolean shouldFailoverForFollowerRead(Exception ex) {
-    return shouldFailover(ex);
   }
 
   @Override

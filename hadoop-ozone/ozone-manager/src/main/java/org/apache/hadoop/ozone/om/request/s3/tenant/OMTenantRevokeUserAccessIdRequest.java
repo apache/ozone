@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SC
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.S3SecretRequestHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMTenantRevokeUserAccessIdResponse;
@@ -49,6 +51,7 @@ import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest.Builder;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RevokeSTSTokenRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantRevokeUserAccessIdResponse;
 import org.slf4j.Logger;
@@ -69,6 +72,8 @@ import org.slf4j.LoggerFactory;
 public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
   private static final Logger LOG = LoggerFactory.getLogger(
       OMTenantRevokeUserAccessIdRequest.class);
+
+  private static final Clock CLOCK = Clock.systemUTC();
 
   public OMTenantRevokeUserAccessIdRequest(OMRequest omRequest) {
     super(omRequest);
@@ -136,6 +141,9 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     }
 
     final Builder omRequestBuilder = omRequest.toBuilder()
+        .setRevokeSTSTokenRequest(RevokeSTSTokenRequest.newBuilder()
+            .setOriginalAccessKeyId(accessId)
+            .setRevocationTimeMillis(CLOCK.millis()))
         .setTenantRevokeUserAccessIdRequest(
             TenantRevokeUserAccessIdRequest.newBuilder()
                 .setAccessId(accessId)
@@ -210,13 +218,16 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       // Update tenant cache
       multiTenantManager.getCacheOp().revokeUserAccessId(accessId, tenantId);
 
+      Long stsRevocationCutoff = S3SecretRequestHelper.updateStsRevocationCutoff(
+          omMetadataManager, getOmRequest(), accessId, transactionLogIndex);
+
       // Generate response
       omResponse.setTenantRevokeUserAccessIdResponse(
           TenantRevokeUserAccessIdResponse.newBuilder()
               .build());
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
           omResponse.build(), accessId, userPrincipal, principalInfo,
-          s3SecretManager);
+          s3SecretManager, stsRevocationCutoff);
 
     } catch (IOException | InvalidPathException ex) {
       exception = ex;

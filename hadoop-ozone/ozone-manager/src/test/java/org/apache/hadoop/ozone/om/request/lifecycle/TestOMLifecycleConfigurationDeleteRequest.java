@@ -39,18 +39,20 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -106,6 +108,9 @@ public class TestOMLifecycleConfigurationDeleteRequest extends
     addLifecycleConfigurationToDB(volumeName, bucketName, "ownername");
     assertNotNull(omMetadataManager.getLifecycleConfigurationTable()
         .get(omMetadataManager.getBucketKey(volumeName, bucketName)));
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    omMetadataManager.getLifecycleScanStateTable().put(bucketKey,
+        new OmLifecycleScanState.Builder().setBucketKey(bucketKey).setScanStartTime(Time.now()).build());
 
     OMRequest omRequest =
         createDeleteLifecycleConfigurationRequest(volumeName, bucketName);
@@ -117,6 +122,7 @@ public class TestOMLifecycleConfigurationDeleteRequest extends
 
     assertNull(omMetadataManager.getLifecycleConfigurationTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
+    assertNull(omMetadataManager.getLifecycleScanStateTable().get(bucketKey));
   }
 
   @Test
@@ -170,9 +176,7 @@ public class TestOMLifecycleConfigurationDeleteRequest extends
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
-    when(versionManager.isAllowed(OMLayoutFeature.S3_LIFECYCLE_SUPPORT)).thenReturn(false);
-
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager();
     ValidationContext ctx = of(versionManager, omMetadataManager);
     OMRequest request = createDeleteLifecycleConfigurationRequest(volumeName, bucketName);
 
@@ -286,9 +290,7 @@ public class TestOMLifecycleConfigurationDeleteRequest extends
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
-    when(versionManager.isAllowed(OMLayoutFeature.S3_LIFECYCLE_SUPPORT)).thenReturn(true);
-
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
     ValidationContext ctx = of(versionManager, omMetadataManager);
     OMRequest request = createDeleteLifecycleConfigurationRequest(volumeName, bucketName);
 
