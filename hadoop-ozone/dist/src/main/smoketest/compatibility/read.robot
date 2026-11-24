@@ -81,13 +81,12 @@ Key Read From Bucket With Replication
     ${get_from_ratis_bucket} =    Get Key Later    /vol1/ratis-${CLUSTER_VERSION}/key-${DATA_VERSION}
     Assert Later    Compare Files    ${get_from_ratis_bucket}    ${TESTFILE}
 
-    ${ec_local} =    Get Next Filename    ${BATCH_OUTPUT_DIR}/key-get
-    ${ec_result} =    Execute Later ozone sh    key get /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} ${ec_local}
-
     IF    '${CLIENT_VERSION}' >= '${EC_VERSION}' or '${DATA_VERSION}' == '${CLIENT_VERSION}'
+        ${ec_local} =    Get Next Filename    ${BATCH_OUTPUT_DIR}/key-get
+        ${ec_result} =    Execute Later ozone sh    key get /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} ${ec_local}
         Assert Later    Compare Files    ${ec_local}    ${TESTFILE}
     ELSE
-        Assert Later    File ${ec_result} Should    Contain    NOT_SUPPORTED_OPERATION
+        Assert Unsupported    ozone sh key get -f /vol1/ecbucket-${CLUSTER_VERSION}/key-${DATA_VERSION} /dev/null
     END
 
 Dir Can Be Listed
@@ -136,13 +135,13 @@ Key List In Bucket With Replication
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
 
     ${ratis_result} =     Execute Later ozone sh    key list /vol1/ratis-${CLUSTER_VERSION}
-    ${ec_result} =     Execute Later ozone sh    key list /vol1/ecbucket-${CLUSTER_VERSION}
 
     IF    '${CLIENT_VERSION}' < '${EC_VERSION}'
         Assert Later    File ${ratis_result} Filtered By ${KEY_REPLICATION_FILTER} Should    Contain    key-${DATA_VERSION} RATIS 3
-        Assert Later    File ${ec_result} Should    Contain    NOT_SUPPORTED_OPERATION
+        Assert Unsupported    ozone sh key list /vol1/ecbucket-${CLUSTER_VERSION}/
     ELSE
         Assert Later    File ${ratis_result} Should    Contain    key-${DATA_VERSION}
+        ${ec_result} =     Execute Later ozone sh    key list /vol1/ecbucket-${CLUSTER_VERSION}
         Assert Later    File ${ec_result} Should    Contain    key-${DATA_VERSION}
     END
 
