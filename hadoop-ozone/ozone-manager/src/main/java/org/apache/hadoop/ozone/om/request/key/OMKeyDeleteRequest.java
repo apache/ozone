@@ -156,6 +156,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       }
 
       validateIfMatchETag(keyArgs, omKeyInfo);
+      validateIfMatchLastModifiedTime(keyArgs, omKeyInfo);
       if (deleteKeyRequest.hasUpdateID() && omKeyInfo.getUpdateID() != deleteKeyRequest.getUpdateID()) {
         throw new OMException("UpdateID does not match. Key: " + keyName +
             ", Expected UpdateID: " + omKeyInfo.getUpdateID() +

@@ -1043,6 +1043,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (args.getExpectedETag() != null) {
       keyArgs.setExpectedETag(args.getExpectedETag());
     }
+    if (args.getExpectedLastModifiedTime() != null) {
+      keyArgs.setExpectedLastModifiedTime(args.getExpectedLastModifiedTime());
+    }
     req.setKeyArgs(keyArgs);
 
     OMRequest.Builder omRequest = createOMRequest(Type.DeleteKey)

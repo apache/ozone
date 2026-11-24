@@ -1465,6 +1465,31 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
   }
 
+  /**
+   * Validates the x-amz-if-match-last-modified-time condition.
+   * <p>
+   * This method checks if the existing key's modification time matches the
+   * expected value (epoch milliseconds).
+   *
+   * @param keyArgs the key arguments containing the expected modification time
+   * @param dbKeyInfo the existing key info from the database
+   * @throws OMException if validation fails
+   */
+  protected void validateIfMatchLastModifiedTime(KeyArgs keyArgs,
+      OmKeyInfo dbKeyInfo) throws OMException {
+    if (!keyArgs.hasExpectedLastModifiedTime()) {
+      return;
+    }
+    if (dbKeyInfo == null) {
+      throw new OMException("Key not found for last modified time match",
+          OMException.ResultCodes.KEY_NOT_FOUND);
+    }
+    if (dbKeyInfo.getModificationTime() != keyArgs.getExpectedLastModifiedTime()) {
+      throw new OMException("Last modified time mismatch",
+          OMException.ResultCodes.LAST_MODIFIED_TIME_MISMATCH);
+    }
+  }
+
   protected void validateIfNoneMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
     if (keyArgs.hasExcludedETag() && dbKeyInfo != null && dbKeyInfo.isEtagEquals(keyArgs.getExcludedETag())) {
       throw new OMException("ETag matches If-None-Match", OMException.ResultCodes.KEY_ALREADY_EXISTS);

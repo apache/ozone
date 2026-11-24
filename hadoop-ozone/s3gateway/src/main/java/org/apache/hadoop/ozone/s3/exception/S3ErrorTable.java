@@ -277,6 +277,7 @@ public enum S3ErrorTable {
       return ENTITY_TOO_SMALL;
     case ETAG_MISMATCH:
     case ETAG_NOT_AVAILABLE:
+    case LAST_MODIFIED_TIME_MISMATCH:
     case KEY_ALREADY_EXISTS:
       return PRECOND_FAILED;
     case TOKEN_EXPIRED:

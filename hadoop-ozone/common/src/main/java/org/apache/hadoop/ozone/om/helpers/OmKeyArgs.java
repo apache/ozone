@@ -73,6 +73,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   private final boolean requireFileSystemOptimized;
   private final String expectedETag;
   private final String excludedETag;
+  private final Long expectedLastModifiedTime;
   private final boolean derivedKeyPiggyBacking;
 
   private OmKeyArgs(Builder b) {
@@ -101,6 +102,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.requireFileSystemOptimized = b.requireFileSystemOptimized;
     this.expectedETag = b.expectedETag;
     this.excludedETag = b.excludedETag;
+    this.expectedLastModifiedTime = b.expectedLastModifiedTime;
     this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
   }
 
@@ -220,6 +222,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return excludedETag;
   }
 
+  public Long getExpectedLastModifiedTime() {
+    return expectedLastModifiedTime;
+  }
+
   public boolean isDerivedKeyPiggyBacking() {
     return derivedKeyPiggyBacking;
   }
@@ -275,6 +281,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     if (excludedETag != null) {
       builder.setExcludedETag(excludedETag);
     }
+    if (expectedLastModifiedTime != null) {
+      builder.setExpectedLastModifiedTime(expectedLastModifiedTime);
+    }
     return builder.build();
   }
 
@@ -306,6 +315,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private boolean requireFileSystemOptimized;
     private String expectedETag;
     private String excludedETag;
+    private Long expectedLastModifiedTime;
     private boolean derivedKeyPiggyBacking;
 
     public Builder() {
@@ -355,6 +365,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
       this.excludedETag = obj.excludedETag;
+      this.expectedLastModifiedTime = obj.expectedLastModifiedTime;
       this.derivedKeyPiggyBacking = obj.derivedKeyPiggyBacking;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
@@ -521,6 +532,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setExcludedETag(String eTag) {
       this.excludedETag = eTag;
+      return this;
+    }
+
+    public Builder setExpectedLastModifiedTime(Long lastModifiedTime) {
+      this.expectedLastModifiedTime = lastModifiedTime;
       return this;
     }
 

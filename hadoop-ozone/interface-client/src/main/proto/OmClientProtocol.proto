@@ -641,6 +641,8 @@ enum Status {
     UPDATE_ID_NOT_MATCH = 103;
     REVOKED_TOKEN = 104;
     MALFORMED_POLICY_DOCUMENT = 105;
+
+    LAST_MODIFIED_TIME_MISMATCH = 106;
 }
 
 /**
@@ -1174,6 +1176,12 @@ message KeyArgs {
     // part is created, the part is encrypted with it instead of the IV in the
     // FileEncryptionInfo, which is still used to decrypt the EDEK.
     optional bytes partIv = 26;
+
+    // expectedLastModifiedTime (epoch milliseconds), when set, indicates that
+    // the existing key must have the given modification time for the operation
+    // to succeed. This is used for S3 conditional delete with the
+    // x-amz-if-match-last-modified-time header.
+    optional uint64 expectedLastModifiedTime = 27;
 }
 
 message KeyLocation {
