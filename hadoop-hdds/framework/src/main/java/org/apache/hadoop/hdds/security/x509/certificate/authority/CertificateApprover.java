@@ -54,7 +54,7 @@ public interface CertificateApprover {
    * @throws CertificateException - on Error.
    */
   @SuppressWarnings("ParameterNumber")
-  default X509Certificate sign(
+  X509Certificate sign(
       SecurityConfig config,
       PrivateKey caPrivate,
       X509Certificate caCertificate,
@@ -64,21 +64,19 @@ public interface CertificateApprover {
       String scmId,
       String clusterId,
       String certSerialId)
-      throws IOException, CertificateException {
-    return sign(config, caPrivate, caCertificate, validFrom, validTill, certificationRequest, scmId, clusterId,
-        certSerialId, null);
-  }
+      throws IOException, CertificateException;
 
   /**
    * Like {@link #sign(SecurityConfig, PrivateKey, X509Certificate, Date, Date, PKCS10CertificationRequest, String,
    * String, String)}, with the commonName to use instead of the CSR's when that is longer than RFC 5280
    * ub-common-name, as in a CSR from a client that predates
    * {@link org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest#commonName}.
+   * The default ignores {@code commonNameIfTooLong}, so an implementation without this method still works.
    *
    * @param commonNameIfTooLong - commonName for a CSR commonName longer than 64 characters, or null to keep it.
    */
   @SuppressWarnings("ParameterNumber")
-  X509Certificate sign(
+  default X509Certificate sign(
       SecurityConfig config,
       PrivateKey caPrivate,
       X509Certificate caCertificate,
@@ -89,7 +87,10 @@ public interface CertificateApprover {
       String clusterId,
       String certSerialId,
       String commonNameIfTooLong)
-      throws IOException, CertificateException;
+      throws IOException, CertificateException {
+    return sign(config, caPrivate, caCertificate, validFrom, validTill, certificationRequest, scmId, clusterId,
+        certSerialId);
+  }
 
   /**
    * Approval Types for a certificate request.

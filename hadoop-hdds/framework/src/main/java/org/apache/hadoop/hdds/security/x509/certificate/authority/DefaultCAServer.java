@@ -210,6 +210,14 @@ public class DefaultCAServer implements CertificateServer {
   public Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
       CertificateApprover.ApprovalType approverType, NodeType role,
+      String certSerialId) {
+    return requestCertificate(csr, approverType, role, certSerialId, null);
+  }
+
+  @Override
+  public Future<CertPath> requestCertificate(
+      PKCS10CertificationRequest csr,
+      CertificateApprover.ApprovalType approverType, NodeType role,
       String certSerialId, String commonNameIfTooLong) {
     Duration certDuration = getDuration(role);
 

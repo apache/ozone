@@ -31,9 +31,14 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.when;
 
@@ -243,6 +248,24 @@ public class TestDefaultCAServer {
     assertEquals(subject, getCommonName(signedCert));
     assertEquals(scmId, name.getRDNs(BCStyle.OU)[0].getFirst().getValue().toString());
     assertEquals(clusterId, name.getRDNs(BCStyle.O)[0].getFirst().getValue().toString());
+  }
+
+  /**
+   * Tests that an implementation with only the methods without commonNameIfTooLong, as before HDDS-17879, still
+   * serves the overloads with it: the defaults ignore the replacement commonName.
+   */
+  @Test
+  public void testOverloadsWithCommonNameDefaultToOldMethods() throws Exception {
+    CertificateServer server = mock(CertificateServer.class, CALLS_REAL_METHODS);
+    Future<CertPath> future = CompletableFuture.completedFuture(null);
+    doReturn(future).when(server).requestCertificate(any(), any(), any(), anyString());
+    assertSame(future, server.requestCertificate(null, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM, "1",
+        "om@id"));
+
+    CertificateApprover approver = mock(CertificateApprover.class, CALLS_REAL_METHODS);
+    X509Certificate cert = mock(X509Certificate.class);
+    doReturn(cert).when(approver).sign(any(), any(), any(), any(), any(), any(), any(), any(), anyString());
+    assertSame(cert, approver.sign(null, null, null, null, null, null, null, null, "1", "om@id"));
   }
 
   /**

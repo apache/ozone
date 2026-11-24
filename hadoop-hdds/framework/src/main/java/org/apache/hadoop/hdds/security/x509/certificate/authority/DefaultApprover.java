@@ -88,6 +88,22 @@ public class DefaultApprover implements CertificateApprover {
     this.securityConfig = Objects.requireNonNull(config);
   }
 
+  @SuppressWarnings("ParameterNumber")
+  @Override
+  public X509Certificate sign(
+      SecurityConfig config,
+      PrivateKey caPrivate,
+      X509Certificate caCertificate,
+      Date validFrom,
+      Date validTill,
+      PKCS10CertificationRequest certificationRequest,
+      String scmId,
+      String clusterId,
+      String certSerialId) throws IOException, CertificateException {
+    return sign(config, caPrivate, caCertificate, validFrom, validTill, certificationRequest, scmId, clusterId,
+        certSerialId, null);
+  }
+
   /**
    * Sign function signs a Certificate.
    *
