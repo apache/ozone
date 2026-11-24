@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.client;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,10 +29,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.UUID;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.crypto.CryptoCodec;
+import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfigValidator;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -217,6 +223,69 @@ public class TestOzoneClient {
       }
       OzoneKey key = bucket.getKey(keyName);
       assertEquals(keyName, key.getName());
+    }
+  }
+
+  @Test
+  public void testInterruptedCloseOfEncryptedKeyDoesNotCommit() throws IOException {
+    final OzoneBucket bucket = getOzoneBucket();
+    final String keyName = UUID.randomUUID().toString();
+    final byte[] previous = "previous value".getBytes(UTF_8);
+    final byte[] value = "sample value".getBytes(UTF_8);
+    writeKey(bucket, keyName, previous);
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, value.length);
+         // RpcClient wraps the key stream this way for a key in an encrypted bucket
+         CryptoOutputStream cryptoOut = new CryptoOutputStream(
+             out.getKeyOutputStream(), CryptoCodec.getInstance(new OzoneConfiguration()), new byte[16], new byte[16])) {
+      // The value stays in the crypto buffer until close.
+      cryptoOut.write(value);
+      Thread.currentThread().interrupt();
+      try {
+        assertThatThrownBy(cryptoOut::close).isInstanceOf(InterruptedIOException.class);
+      } finally {
+        // Also clears the flag so it cannot affect subsequent tests.
+        assertThat(Thread.interrupted()).isTrue();
+      }
+    }
+
+    assertKeyContent(bucket, keyName, previous);
+  }
+
+  @Test
+  public void testCloseAfterInterruptedWriteDoesNotCommit() throws IOException {
+    final OzoneBucket bucket = getOzoneBucket();
+    final String keyName = UUID.randomUUID().toString();
+    final byte[] previous = "previous value".getBytes(UTF_8);
+    final byte[] value = "sample value".getBytes(UTF_8);
+    writeKey(bucket, keyName, previous);
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, value.length)) {
+      Thread.currentThread().interrupt();
+      try {
+        assertThatThrownBy(() -> out.write(value)).isInstanceOf(InterruptedIOException.class);
+        assertThatThrownBy(out::close).isInstanceOf(InterruptedIOException.class);
+      } finally {
+        assertThat(Thread.interrupted()).isTrue();
+      }
+    }
+
+    assertKeyContent(bucket, keyName, previous);
+    // Once the interrupt is cleared, the key can be written again.
+    writeKey(bucket, keyName, value);
+    assertKeyContent(bucket, keyName, value);
+  }
+
+  private static void writeKey(OzoneBucket bucket, String keyName, byte[] content) throws IOException {
+    try (OzoneOutputStream out = bucket.createKey(keyName, content.length)) {
+      out.write(content);
+    }
+  }
+
+  private static void assertKeyContent(OzoneBucket bucket, String keyName, byte[] content) throws IOException {
+    assertEquals(content.length, bucket.getKey(keyName).getDataSize(), "data size is unexpected");
+    try (OzoneInputStream in = bucket.readKey(keyName)) {
+      assertThat(IOUtils.toByteArray(in)).isEqualTo(content);
     }
   }
 

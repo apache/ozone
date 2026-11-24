@@ -136,6 +136,8 @@ on:
 
 env:
   HADOOP_IMAGE: ghcr.io/apache/hadoop
+  # JAVA_VERSION, MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
+  JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   MVNW_VERBOSE: true
@@ -182,7 +184,7 @@ jobs:
 
       - name: Cache for NPM dependencies
         if: ${{ inputs.needs-npm-cache }}
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/.pnpm-store

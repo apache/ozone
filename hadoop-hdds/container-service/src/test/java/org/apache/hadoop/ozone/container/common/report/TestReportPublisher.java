@@ -18,7 +18,8 @@
 package org.apache.hadoop.ozone.container.common.report;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -26,6 +27,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.Message;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -34,6 +37,7 @@ import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
@@ -73,7 +77,7 @@ public class TestReportPublisher {
     @Override
     protected Message getReport() {
       getReportCount++;
-      return null;
+      return CommandStatusReportsProto.getDefaultInstance();
     }
   }
 
@@ -123,7 +127,8 @@ public class TestReportPublisher {
     executorService.shutdown();
     assertEquals(1,
         ((DummyReportPublisher) publisher).getReportCount);
-    verify(dummyContext, times(1)).refreshFullReport(null);
+    verify(dummyContext, times(1)).refreshFullReport(
+        CommandStatusReportsProto.getDefaultInstance());
     // After executor shutdown, no new reports should be published
     Thread.sleep(100);
     assertEquals(1,
@@ -143,8 +148,9 @@ public class TestReportPublisher {
             new ThreadFactoryBuilder().setDaemon(true)
                 .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
-    assertNull(
-        ((CommandStatusReportPublisher) publisher).getReport());
+    assertTrue(
+        ((CommandStatusReportPublisher) publisher)
+            .getIncrementalReports().isEmpty());
 
     // Insert to status object to state context map and then get the report.
     CommandStatus obj1 = CommandStatus.CommandStatusBuilder.newBuilder()
@@ -160,10 +166,51 @@ public class TestReportPublisher {
     cmdStatusMap.put(obj1.getCmdId(), obj1);
     cmdStatusMap.put(obj2.getCmdId(), obj2);
     // We will sending the commands whose status is PENDING and EXECUTED
-    assertEquals(2,
-        ((CommandStatusReportPublisher) publisher).getReport()
-            .getCmdStatusCount(),
-        "Should publish report with 2 status objects");
+    List<CommandStatusReportsProto> reports =
+        ((CommandStatusReportPublisher) publisher).getIncrementalReports();
+    assertEquals(2, reports.size());
+    assertTrue(reports.stream()
+        .allMatch(report -> report.getCmdStatusCount() == 1),
+        "Should publish one report for each status object");
+    assertTrue(cmdStatusMap.containsKey(obj1.getCmdId()));
+    assertFalse(cmdStatusMap.containsKey(obj2.getCmdId()));
     executorService.shutdown();
+  }
+
+  @Test
+  public void testCommandStatusPublisherReturnsOneStatusPerReport() {
+    StateContext context = mock(StateContext.class);
+    Map<Long, CommandStatus> commandStatuses = new ConcurrentHashMap<>();
+    when(context.getCommandStatusMap()).thenReturn(commandStatuses);
+
+    CommandStatus first = newCommandStatus(1, 128);
+    CommandStatus second = newCommandStatus(2, 128);
+    CommandStatus third = newCommandStatus(3, 128);
+    commandStatuses.put(first.getCmdId(), first);
+    commandStatuses.put(second.getCmdId(), second);
+    commandStatuses.put(third.getCmdId(), third);
+
+    CommandStatusReportPublisher publisher =
+        new CommandStatusReportPublisher();
+    publisher.setConf(config);
+    ScheduledExecutorService executor = mock(ScheduledExecutorService.class);
+    publisher.init(context, executor);
+
+    List<CommandStatusReportsProto> reports =
+        publisher.getIncrementalReports();
+
+    assertEquals(3, reports.size());
+    assertTrue(reports.stream()
+        .allMatch(report -> report.getCmdStatusCount() == 1));
+  }
+
+  private static CommandStatus newCommandStatus(
+      long commandId, int messageSize) {
+    return CommandStatus.CommandStatusBuilder.newBuilder()
+        .setCmdId(commandId)
+        .setType(Type.deleteBlocksCommand)
+        .setStatus(Status.EXECUTED)
+        .setMsg(String.join("", Collections.nCopies(messageSize, "x")))
+        .build();
   }
 }

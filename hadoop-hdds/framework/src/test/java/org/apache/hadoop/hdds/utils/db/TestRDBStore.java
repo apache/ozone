@@ -18,11 +18,14 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,6 +35,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,9 +49,11 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -118,6 +124,30 @@ public class TestRDBStore {
       rdbStore.close();
     }
     CodecBuffer.assertNoLeaks();
+  }
+
+  @Test
+  void testMetricsRemainRegisteredAfterStoreClose(@TempDir Path tempDir) throws Exception {
+    RDBMetrics metrics = rdbStore.getMetrics();
+    long keyGets = metrics.getNumDBKeyGets();
+
+    try (RDBStore otherStore = DBStoreBuilder.newBuilder(new OzoneConfiguration())
+        .setPath(tempDir).setName("other.db").build()) {
+      assertSame(metrics, otherStore.getMetrics());
+    }
+
+    assertNotNull(DefaultMetricsSystem.instance().getSource("RDBMetrics"));
+    assertSame(metrics, rdbStore.getMetrics());
+    metrics.incNumDBKeyGets();
+    assertCounter("NumDBKeyGets", keyGets + 1, getMetrics("RDBMetrics"));
+    rdbStore.close();
+
+    try (RDBStore reopenedStore = DBStoreBuilder.newBuilder(new OzoneConfiguration())
+        .setPath(tempDir).setName("other.db").build()) {
+      assertSame(metrics, reopenedStore.getMetrics());
+      assertNotNull(DefaultMetricsSystem.instance().getSource("RDBMetrics"));
+      assertCounter("NumDBKeyGets", keyGets + 1, getMetrics("RDBMetrics"));
+    }
   }
 
   public void insertRandomData(RDBStore dbStore, int familyIndex)

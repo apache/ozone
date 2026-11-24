@@ -553,6 +553,16 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       return;
     }
 
+    // A batch that failed both attempts only raises tasksFailed. The next sync drains this buffer and
+    // rebuilds from a checkpoint that already contains every queued batch. Applying the batches still
+    // waiting would move the task cursor up to the OmDeltaRequest cursor, so a restart before that
+    // rebuild would find nothing to redo and the failed batch would be lost.
+    if (hasTasksFailed()) {
+      LOG.debug("Skipping buffered OM update batch ending at sequence {} because a task has failed and " +
+          "reinitialization is pending.", events.getLastSequenceNumber());
+      return;
+    }
+
     Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
     List<ReconOmTask.TaskResult> failedTasks = new ArrayList<>();
 
