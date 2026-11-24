@@ -69,6 +69,12 @@ public class ManagedReadOptions extends ReadOptions {
     return bytes != null ? Arrays.copyOf(bytes, bytes.length) : null;
   }
 
+  /** Read as of the given snapshot; the snapshot is not owned by this. */
+  public ManagedReadOptions setSnapshot(ManagedSnapshot snapshot) {
+    setSnapshot(snapshot.get());
+    return this;
+  }
+
   public byte[] getLowerBound() {
     return copy(lowerBound);
   }

@@ -49,6 +49,7 @@ class RDBTable implements Table<byte[], byte[]> {
   private final RocksDatabase db;
   private final ColumnFamily family;
   private final RDBMetrics rdbMetrics;
+  private final ParallelScanConfig parallelScanConfig;
 
   /**
    * Constructs a TableStore.
@@ -58,9 +59,41 @@ class RDBTable implements Table<byte[], byte[]> {
    */
   RDBTable(RocksDatabase db, ColumnFamily family,
       RDBMetrics rdbMetrics) {
+    this(db, family, rdbMetrics, ParallelScanConfig.DISABLED);
+  }
+
+  RDBTable(RocksDatabase db, ColumnFamily family,
+      RDBMetrics rdbMetrics, ParallelScanConfig parallelScanConfig) {
     this.db = db;
     this.family = family;
     this.rdbMetrics = rdbMetrics;
+    this.parallelScanConfig = parallelScanConfig;
+  }
+
+  @Override
+  public long parallelScan(byte[] prefix, int numThreads, IteratorType type,
+      java.util.function.Consumer<KeyValue<byte[], byte[]>> consumer)
+      throws RocksDatabaseException {
+    return parallelScanWithResult(prefix, numThreads, type, consumer).getKeys();
+  }
+
+  RDBParallelScanner.Result parallelScanWithResult(byte[] prefix,
+      int numThreads,
+      java.util.function.Consumer<KeyValue<byte[], byte[]>> consumer)
+      throws RocksDatabaseException {
+    return parallelScanWithResult(prefix, numThreads, IteratorType.KEY_AND_VALUE, consumer);
+  }
+
+  RDBParallelScanner.Result parallelScanWithResult(byte[] prefix,
+      int numThreads, IteratorType type,
+      java.util.function.Consumer<KeyValue<byte[], byte[]>> consumer)
+      throws RocksDatabaseException {
+    return RDBParallelScanner.scan(db, family, prefix, numThreads, type,
+        parallelScanConfig, consumer);
+  }
+
+  RocksDatabase getDb() {
+    return db;
   }
 
   public ColumnFamily getColumnFamily() {
