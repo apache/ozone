@@ -118,6 +118,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -457,8 +459,9 @@ public class TestPipelineManagerImpl {
     pipelineManager.close();
   }
 
-  @Test
-  public void testPipelineOpenOnlyWhenLeaderReported() throws Exception {
+  @ParameterizedTest
+  @EnumSource(value = ReplicationFactor.class, names = {"ONE", "THREE"})
+  public void testPipelineOpenOnlyWhenLeaderReported(ReplicationFactor factor) throws Exception {
     SCMHADBTransactionBuffer buffer1 =
         new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
@@ -466,7 +469,7 @@ public class TestPipelineManagerImpl {
 
     Pipeline pipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
-            .getInstance(ReplicationFactor.THREE));
+            .getInstance(factor));
     // close manager
     buffer1.close();
     pipelineManager.close();
@@ -484,7 +487,7 @@ public class TestPipelineManagerImpl {
 
     // Report pipelines with leaders
     List<DatanodeDetails> nodes = pipeline.getNodes();
-    assertEquals(3, nodes.size());
+    assertEquals(factor.getNumber(), nodes.size());
     // Send report for all but no leader
     nodes.forEach(dn -> sendPipelineReport(dn, pipeline, pipelineReportHandler,
         false));
@@ -492,8 +495,7 @@ public class TestPipelineManagerImpl {
     assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
-    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
-        pipelineReportHandler, false));
+    nodes.subList(0, nodes.size() - 1).forEach(dn -> sendPipelineReport(dn, pipeline, pipelineReportHandler, false));
     sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
         pipelineReportHandler, true);
 

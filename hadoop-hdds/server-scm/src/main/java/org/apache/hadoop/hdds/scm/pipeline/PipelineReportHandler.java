@@ -20,10 +20,8 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.TimeoutException;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -147,10 +145,8 @@ public class PipelineReportHandler implements
   protected void setPipelineLeaderId(PipelineReport report,
                                      Pipeline pipeline,
                                      DatanodeDetails dn) {
-    // ONE replica pipeline doesn't have leader flag
-    if (report.getIsLeader() ||
-        RatisReplicationConfig.hasFactor(pipeline.getReplicationConfig(),
-            ReplicationFactor.ONE)) {
+    // Datanodes set the leader flag once the Ratis leader is ready
+    if (report.getIsLeader()) {
       pipeline.setLeaderId(dn.getID());
     }
   }
