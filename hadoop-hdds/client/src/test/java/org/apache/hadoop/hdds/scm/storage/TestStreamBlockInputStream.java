@@ -889,6 +889,38 @@ public class TestStreamBlockInputStream {
     }
   }
 
+  /**
+   * A seek that reuses the buffered response must not rewind the requested length: once the buffer is drained,
+   * the next request must continue from the current position instead of re-requesting the buffered data.
+   */
+  @Test
+  public void testSeekReuseDoesNotRefetchBufferedData() throws Exception {
+    final int chunkSize = 16;
+    final byte[] data = new byte[2 * chunkSize];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+    XceiverClientGrpc client = mockOffsetAwareStreamingReadClient(data, mock(ClientCallStreamObserver.class));
+
+    try (StreamBlockInputStream sbis = newStreamForBlock(
+        newBlockInfo(new BlockID(1L, 15595L), data.length), mockStandalonePipeline(), client)) {
+      assertEquals(chunkSize, sbis.read(ByteBuffer.allocate(chunkSize)));
+
+      // Seek back into the buffered response and drain it: no new request is needed.
+      sbis.seek(4);
+      assertEquals(chunkSize - 4, sbis.read(ByteBuffer.allocate(chunkSize - 4)));
+      assertEquals(chunkSize, sbis.getPos());
+
+      // The first byte past the buffered response triggers the next request.
+      assertEquals(data[chunkSize], sbis.read());
+    }
+
+    ArgumentCaptor<ContainerCommandRequestProto> requests = ArgumentCaptor.forClass(ContainerCommandRequestProto.class);
+    verify(client, times(2)).streamRead(requests.capture(), any(StreamingReadResponse.class));
+    assertEquals(0, requests.getAllValues().get(0).getReadBlock().getOffset());
+    assertEquals(chunkSize, requests.getAllValues().get(1).getReadBlock().getOffset());
+  }
+
   /** A single-byte read returns the byte as 0 to 255: 0xFF must not look like the end of the stream. */
   @Test
   public void testReadReturnsUnsignedByte() throws Exception {

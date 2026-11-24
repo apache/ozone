@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.container.common.helpers.ReadBlockContext;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -166,5 +167,22 @@ class TestGrpcXceiverService {
     assertTrue(channelRef.get().isOpen());
     requestObserver.onError(new RuntimeException("client went away"));
     assertFalse(channelRef.get().isOpen(), "stream teardown must close the block file");
+  }
+
+  @Test
+  void cancelledCallIsNotDispatched() {
+    ContainerDispatcher dispatcher = mock(ContainerDispatcher.class);
+    service = new GrpcXceiverService(dispatcher, IDLE_TIMEOUT, "test-");
+    StreamObserver<ContainerCommandResponseProto> responseObserver = mock(StreamObserver.class);
+    StreamObserver<ContainerCommandRequestProto> requestObserver = service.send(responseObserver);
+
+    // gRPC cancels the call context when the client deadline expires, even if the request is still queued.
+    Context.CancellableContext call = Context.current().withCancellation();
+    call.cancel(null);
+    call.run(() -> requestObserver.onNext(readBlockRequest()));
+
+    verify(dispatcher, never()).streamDataReadOnly(any(), any(), any(), any());
+    verify(dispatcher, never()).dispatch(any(), any());
+    verify(responseObserver, never()).onNext(any());
   }
 }

@@ -19,10 +19,11 @@ package org.apache.hadoop.ozone.container.common.report;
 
 import com.google.protobuf.Message;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.slf4j.Logger;
@@ -77,11 +78,12 @@ public abstract class ReportPublisher<T extends Message>
    */
   private void publishReport() {
     try {
-      Message report = getReport();
-      if (report instanceof CommandStatusReportsProto) {
-        context.addIncrementalReport(report);
-      } else {
+      T report = getReport();
+      if (report != null) {
         context.refreshFullReport(report);
+      }
+      for (Message incrementalReport : getIncrementalReports()) {
+        context.addIncrementalReport(incrementalReport);
       }
     } catch (IOException e) {
       LOG.error("Exception while publishing report.", e);
@@ -96,11 +98,22 @@ public abstract class ReportPublisher<T extends Message>
   protected abstract long getReportFrequency();
 
   /**
-   * Generate and returns the report which has to be sent as part of heartbeat.
+   * Generates and returns the full report which has to be sent as part of
+   * heartbeat.
    *
    * @return datanode report
    */
   protected abstract T getReport() throws IOException;
+
+  /**
+   * Generates and returns incremental reports which have to be sent as part of
+   * heartbeat.
+   *
+   * @return incremental datanode reports
+   */
+  protected List<T> getIncrementalReports() throws IOException {
+    return Collections.emptyList();
+  }
 
   /**
    * Returns {@link StateContext}.
