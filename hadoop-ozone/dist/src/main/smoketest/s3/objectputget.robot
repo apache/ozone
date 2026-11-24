@@ -384,3 +384,13 @@ Put object with customer-provided encryption key
                                 Should contain             ${result}    NotImplemented
     ${result} =                 Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/putobject/ssec/key1    255
                                 Should contain             ${result}    404
+
+Get directory in FSO bucket reports directory content type
+    Pass Execution If   '${BUCKET_LAYOUT}' != 'FILE_SYSTEM_OPTIMIZED'    only applies to FSO buckets
+                        Execute                    echo "Randomtext" > /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/getobject/fsodir/f1 --body /tmp/testfile --content-type video/mp4
+    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/getobject/fsodir/ /tmp/fsodir.result
+                        Should contain             ${result}         "ContentType": "application/x-directory"
+    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/getobject/fsodir/f1 /tmp/fsodir.result
+                        Should contain             ${result}         "ContentType": "video/mp4"
+    ${result} =         Execute AWSS3ApiCli        delete-object --bucket ${BUCKET} --key ${PREFIX}/getobject/fsodir/f1
