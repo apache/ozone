@@ -636,9 +636,8 @@ public class RpcClient implements ClientProtocol {
             + " not support Erasure Coded replication.");
       }
     }
-    if ((bucketArgs.getStoragePolicy() != null || bucketArgs.getAllowFallbackStoragePolicy() != null)
-        && !OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
-      throw new IOException("OzoneManager does not support storage policy");
+    if (bucketArgs.getStoragePolicy() != null || bucketArgs.getAllowFallbackStoragePolicy() != null) {
+      checkStoragePolicySupported();
     }
 
     final String owner;
@@ -1254,9 +1253,7 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(storagePolicy, "storagePolicy == null");
-    if (!OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
-      throw new IOException("OzoneManager does not support storage policy");
-    }
+    checkStoragePolicySupported();
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1269,9 +1266,7 @@ public class RpcClient implements ClientProtocol {
     Objects.requireNonNull(args, "args == null");
     verifyVolumeName(args.getVolumeName());
     verifyBucketName(args.getBucketName());
-    if (!OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
-      throw new IOException("OzoneManager does not support storage policy");
-    }
+    checkStoragePolicySupported();
     ozoneManagerClient.setBucketProperty(args);
   }
 
@@ -1576,6 +1571,12 @@ public class RpcClient implements ClientProtocol {
   private void checkIfNoneMatchETagSupport() throws IOException {
     if (omVersion.compareTo(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) < 0) {
       throw new IOException("OzoneManager does not support If-None-Match entity ETags for writes.");
+    }
+  }
+
+  private void checkStoragePolicySupported() throws IOException {
+    if (!OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
+      throw new IOException("OzoneManager does not support storage policy");
     }
   }
 
@@ -2257,8 +2258,8 @@ public class RpcClient implements ClientProtocol {
       }
     }
 
-    if (storagePolicy != null && !OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
-      throw new IOException("OzoneManager does not support storage policy");
+    if (storagePolicy != null) {
+      checkStoragePolicySupported();
     }
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
