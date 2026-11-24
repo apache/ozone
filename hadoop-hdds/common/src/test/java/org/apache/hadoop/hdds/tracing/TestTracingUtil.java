@@ -217,6 +217,19 @@ public class TestTracingUtil {
   }
 
   @Test
+  public void testIsCurrentSpanSampled() {
+    assertFalse(TracingUtil.isCurrentSpanSampled());
+    try (Scope ignored = spanContext(PARENT_SPAN_ID).makeCurrent()) {
+      assertTrue(TracingUtil.isCurrentSpanSampled());
+    }
+    Span unsampled = Span.wrap(
+        SpanContext.create(TRACE_ID, PARENT_SPAN_ID, TraceFlags.getDefault(), TraceState.getDefault()));
+    try (Scope ignored = unsampled.makeCurrent()) {
+      assertFalse(TracingUtil.isCurrentSpanSampled());
+    }
+  }
+
+  @Test
   public void testExecuteInNewSpanUsesParentWhenContextHasActiveSpan() {
     TracingUtil.initTracing("nested-span", tracingEnabled().getObject(TracingConfig.class));
     try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("outer")) {

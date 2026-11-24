@@ -100,9 +100,8 @@ public final class SCMRatisRequest {
     final SCMRatisRequestProto.Builder requestProtoBuilder =
         SCMRatisRequestProto.newBuilder();
     requestProtoBuilder.setType(type);
-    final String currentTraceID = TracingUtil.exportCurrentSpan();
-    if (!currentTraceID.isEmpty()) {
-      requestProtoBuilder.setTraceID(currentTraceID);
+    if (TracingUtil.isCurrentSpanSampled()) {
+      requestProtoBuilder.setTraceID(TracingUtil.exportCurrentSpan());
     }
 
     final Method.Builder methodBuilder = Method.newBuilder();

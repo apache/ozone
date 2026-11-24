@@ -22,6 +22,11 @@ import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.TraceFlags;
+import io.opentelemetry.api.trace.TraceState;
+import io.opentelemetry.context.Scope;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -62,6 +67,16 @@ public class TestSCMRatisRequest {
             message.getContent().asReadOnlyByteBuffer()).getTraceID());
         assertEquals(traceID, SCMRatisRequest.decode(message).getTraceID());
       });
+    }
+  }
+
+  @Test
+  public void testEncodeSkipsTraceIDOfUnsampledSpan() throws Exception {
+    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, "test", new Class[0]);
+    Span unsampled = Span.wrap(SpanContext.create("0af7651916cd43dd8448eb211c80319c", "b7ad6b7169203331",
+        TraceFlags.getDefault(), TraceState.getDefault()));
+    try (Scope ignored = unsampled.makeCurrent()) {
+      assertEquals("", SCMRatisRequest.decode(request.encode()).getTraceID());
     }
   }
 

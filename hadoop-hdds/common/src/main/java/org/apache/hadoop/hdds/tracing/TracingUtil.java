@@ -312,6 +312,10 @@ public final class TracingUtil {
     return tracingEnabled;
   }
 
+  public static boolean isCurrentSpanSampled() {
+    return Span.current().getSpanContext().isSampled();
+  }
+
   /**
    * Export the active tracing span as a string.
    * When tracing is disabled, not initialized, or no valid span is in scope,
