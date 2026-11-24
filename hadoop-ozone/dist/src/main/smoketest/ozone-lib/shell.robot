@@ -26,6 +26,8 @@ Ozone Shell Batch
 
 Ozone Batch ${subcmd}
     [arguments]    @{commands}
+    ${len} =    Get Length    ${commands}
+    Return From Keyword If    ${len} == 0
     ${cmd} =    Catenate    SEPARATOR=' --execute '    @{commands}
     Run    ozone ${subcmd} --continue-batch-on-error --execute '${cmd}' &> ${TEMP_DIR}/batch.out
     ${output} =    Get File    ${TEMP_DIR}/batch.out
