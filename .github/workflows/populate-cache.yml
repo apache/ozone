@@ -192,6 +192,7 @@ jobs:
           path: |
             ~/.pnpm-store
           key: ${{ steps.cache-key.outputs.value }}
+          lookup-only: true
 
       - name: Fetch NPM dependencies
         if: steps.restore-pnpm.outputs.cache-hit != 'true'
