@@ -1449,7 +1449,7 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata, Map<String, String> tags,
       boolean derivedKeyPiggyBacking) throws IOException {
-    return createKey(volumeName, bucketName, keyName, new CreateKeyOptions.Builder()
+    return createKey(volumeName, bucketName, keyName, CreateKeyOptions.builder()
         .setSize(size)
         .setReplicationConfig(replicationConfig)
         .setMetadata(metadata)
@@ -2212,7 +2212,7 @@ public class RpcClient implements ClientProtocol {
       Map<String, String> metadata,
       Map<String, String> tags)
       throws IOException {
-    return initiateMultipartUpload(volumeName, bucketName, keyName, new MultipartUploadOptions.Builder()
+    return initiateMultipartUpload(volumeName, bucketName, keyName, MultipartUploadOptions.builder()
         .setReplicationConfig(replicationConfig)
         .setMetadata(metadata)
         .setTags(tags)
@@ -2643,7 +2643,7 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       boolean overWrite, boolean recursive) throws IOException {
-    return createFile(volumeName, bucketName, keyName, new CreateFileOptions.Builder()
+    return createFile(volumeName, bucketName, keyName, CreateFileOptions.builder()
         .setSize(size)
         .setReplicationConfig(replicationConfig)
         .setOverWrite(overWrite)

@@ -37,6 +37,10 @@ public final class CreateFileOptions {
     this.recursive = b.recursive;
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /** @return the size of the data to be written. */
   public long getSize() {
     return size;
@@ -55,6 +59,14 @@ public final class CreateFileOptions {
   /** @return true if the file is created even if parent directories do not exist. */
   public boolean isRecursive() {
     return recursive;
+  }
+
+  @Override
+  public String toString() {
+    return "CreateFileOptions{size=" + size
+        + ", replicationConfig=" + replicationConfig
+        + ", overWrite=" + overWrite
+        + ", recursive=" + recursive + "}";
   }
 
   /**

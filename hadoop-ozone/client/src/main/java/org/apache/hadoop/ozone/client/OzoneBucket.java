@@ -1054,7 +1054,7 @@ public class OzoneBucket extends WithMetadata {
       ReplicationConfig config, Map<String, String> metadata,
       Map<String, String> tags)
       throws IOException {
-    return initiateMultipartUpload(keyName, new MultipartUploadOptions.Builder()
+    return initiateMultipartUpload(keyName, MultipartUploadOptions.builder()
         .setReplicationConfig(config)
         .setMetadata(metadata)
         .setTags(tags)

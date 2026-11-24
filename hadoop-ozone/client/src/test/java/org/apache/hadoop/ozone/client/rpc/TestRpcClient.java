@@ -779,7 +779,7 @@ public class TestRpcClient {
     };
     RpcClient client = createRpcClient(transport);
     try {
-      CreateKeyOptions options = new CreateKeyOptions.Builder()
+      CreateKeyOptions options = CreateKeyOptions.builder()
           .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
           .setStoragePolicy(OzoneStoragePolicy.HOT)
           .setDerivedKeyPiggyBacking(true)
@@ -859,9 +859,9 @@ public class TestRpcClient {
     try {
       ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
       IOException withoutPolicyError = assertThrows(IOException.class, () -> client.initiateMultipartUpload(
-          "vol", "bucket", "key", new MultipartUploadOptions.Builder().setReplicationConfig(replication).build()));
+          "vol", "bucket", "key", MultipartUploadOptions.builder().setReplicationConfig(replication).build()));
       IOException withPolicyError = assertThrows(IOException.class, () -> client.initiateMultipartUpload(
-          "vol", "bucket", "key", new MultipartUploadOptions.Builder().setReplicationConfig(replication)
+          "vol", "bucket", "key", MultipartUploadOptions.builder().setReplicationConfig(replication)
               .setStoragePolicy(OzoneStoragePolicy.COLD).build()));
 
       assertThat(withoutPolicyError).hasMessage("captured");

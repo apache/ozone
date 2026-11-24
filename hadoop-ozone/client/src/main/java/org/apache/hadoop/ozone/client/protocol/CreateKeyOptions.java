@@ -45,6 +45,10 @@ public final class CreateKeyOptions {
     this.storagePolicy = b.storagePolicy;
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /** @return the size of the data to be written. */
   public long getSize() {
     return size;
@@ -74,6 +78,14 @@ public final class CreateKeyOptions {
   @Nullable
   public StoragePolicy getStoragePolicy() {
     return storagePolicy;
+  }
+
+  @Override
+  public String toString() {
+    return "CreateKeyOptions{size=" + size
+        + ", replicationConfig=" + replicationConfig
+        + ", derivedKeyPiggyBacking=" + derivedKeyPiggyBacking
+        + ", storagePolicy=" + storagePolicy + "}";
   }
 
   /**
