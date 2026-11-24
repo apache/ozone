@@ -22,7 +22,7 @@ on:
     branches:
       - master
     paths:
-      - 'pom.xml'
+      - '**/pnpm-lock.yaml'
       - '**/pom.xml'
       - 'dev-support/ci/populate-cache.sh'
       - '.github/actions/setup-java-with-cache/action.yml'
