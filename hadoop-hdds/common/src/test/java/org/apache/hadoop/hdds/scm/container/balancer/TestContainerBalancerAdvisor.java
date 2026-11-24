@@ -279,6 +279,21 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
+  void testRecommendRationaleReflectsUserOverrides() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    List<ContainerBalancerRecommendation> results = ContainerBalancerAdvisor.recommend(
+        conf,
+        new ContainerBalancerAdvisor.AdvisorRequest()
+            .setNodes(buildCluster(70, 14, 14))
+            .setProfile(ContainerBalancerProfile.MEDIUM)
+            .setMoveTimeoutMillis(70L * 60 * 1000));
+
+    assertEquals(1, results.size());
+    assertThat(results.get(0).getRationale().get("moveTimeout")).contains("user override");
+    assertThat(results.get(0).getRationale().get("moveReplicationTimeout")).contains("default");
+  }
+
+  @Test
   void testComputeRecommendedMaxSizeToMoveFloorsAtProfileLimits() {
     ContainerBalancerEstimation estimation = ContainerBalancerEstimation.newBuilder()
         .setProfile(ContainerBalancerProfile.SLOW)
