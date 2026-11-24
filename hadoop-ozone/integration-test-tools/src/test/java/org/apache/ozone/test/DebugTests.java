@@ -20,6 +20,8 @@ package org.apache.ozone.test;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.shell.TestOzoneDebugReplicasVerify;
 import org.apache.hadoop.ozone.shell.TestOzoneDebugShell;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 
@@ -31,7 +33,17 @@ import org.junit.jupiter.api.TestInstance;
  * same cluster.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class DebugTests extends ClusterForTests<MiniOzoneCluster> {
+abstract class DebugTests extends ClusterForTests<MiniOzoneCluster> {
+
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
+  }
 
   @Nested
   class OzoneDebugShell extends TestOzoneDebugShell {

@@ -315,6 +315,12 @@ public interface Table<KEY, VALUE> {
   }
 
   /**
+   * Stop the background cleanup of the table cache, once the table is no longer used.
+   */
+  default void closeCache() {
+  }
+
+  /**
    * Return cache iterator maintained for this table.
    */
   default Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>>

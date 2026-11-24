@@ -374,6 +374,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   private synchronized void closeReader(String reason) {
     readBuffer = null;
+    // Requested-but-unreceived data dies with the stream; a fresh stream must re-request from position.
+    requestedLength = position;
     if (streamingReader == null) {
       return;
     }

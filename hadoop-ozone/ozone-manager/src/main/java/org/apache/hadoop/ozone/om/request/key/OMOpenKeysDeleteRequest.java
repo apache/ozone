@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -42,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMOpenKeysDeleteResponse;
+import org.apache.hadoop.ozone.om.response.key.OMOpenKeysDeleteResponse.OpenKeyToDelete;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
@@ -96,8 +96,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     Exception exception = null;
     OMClientResponse omClientResponse = null;
     Result result = null;
-    // Map containing a pair of BucketId and delete key info.
-    Map<String, Pair<Long, OmKeyInfo>> deletedOpenKeys = new HashMap<>();
+    // Map containing the bucket ID and key info of each open key to delete.
+    Map<String, OpenKeyToDelete> deletedOpenKeys = new HashMap<>();
     Map<String, String> auditParams = new LinkedHashMap<>();
     try {
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBuckets) {
@@ -113,8 +113,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       result = Result.SUCCESS;
 
       List<String> deletedOpenKeysLight = new ArrayList<>(deletedOpenKeys.size());
-      for (Pair<Long, OmKeyInfo> key : deletedOpenKeys.values()) {
-        OmKeyInfo keyInfo = key.getRight();
+      for (OpenKeyToDelete key : deletedOpenKeys.values()) {
+        OmKeyInfo keyInfo = key.keyInfo();
         OzoneManagerProtocolProtos.KeyArgs keyArgs = OzoneManagerProtocolProtos.KeyArgs.newBuilder()
             .setVolumeName(keyInfo.getVolumeName())
             .setBucketName(keyInfo.getBucketName())
@@ -166,7 +166,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
 
   protected void updateOpenKeyTableCache(OzoneManager ozoneManager,
       long trxnLogIndex, OpenKeyBucket keysPerBucket,
-      Map<String, Pair<Long, OmKeyInfo>> deletedOpenKeys) throws IOException {
+      Map<String, OpenKeyToDelete> deletedOpenKeys) throws IOException {
 
     boolean acquiredLock = false;
     String volumeName = keysPerBucket.getVolumeName();
@@ -199,7 +199,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           omKeyInfo = omKeyInfo.toBuilder()
               .setUpdateID(trxnLogIndex)
               .build();
-          deletedOpenKeys.put(fullKeyName, Pair.of(bucketId, omKeyInfo));
+          deletedOpenKeys.put(fullKeyName, new OpenKeyToDelete(bucketId, omKeyInfo));
 
           // Update openKeyTable cache.
           omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(

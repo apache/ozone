@@ -34,6 +34,7 @@ public class OmLifecycleScanState {
   private String lastScannedKey;
   private String lastScannedDir;
   private String lastScannedDirKey;
+  private String lastScannedMpuKey;
 
   private static final Codec<OmLifecycleScanState> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(LifecycleScanState.getDefaultInstance()),
@@ -59,6 +60,7 @@ public class OmLifecycleScanState {
     this.lastScannedKey = builder.lastScannedKey;
     this.lastScannedDir = builder.lastScannedDir;
     this.lastScannedDirKey = builder.lastScannedDirKey;
+    this.lastScannedMpuKey = builder.lastScannedMpuKey;
   }
 
   public String getBucketKey() {
@@ -105,6 +107,10 @@ public class OmLifecycleScanState {
     return lastScannedDirKey;
   }
 
+  public String getLastScannedMpuKey() {
+    return lastScannedMpuKey;
+  }
+
   public LifecycleScanState getProtobuf() {
     LifecycleScanState.Builder builder = LifecycleScanState.newBuilder()
         .setBucketKey(bucketKey)
@@ -123,6 +129,9 @@ public class OmLifecycleScanState {
     }
     if (lastScannedDirKey != null) {
       builder.setLastScannedDirKey(lastScannedDirKey);
+    }
+    if (lastScannedMpuKey != null) {
+      builder.setLastScannedMpuKey(lastScannedMpuKey);
     }
     return builder.build();
   }
@@ -146,6 +155,9 @@ public class OmLifecycleScanState {
     if (proto.hasLastScannedDirKey()) {
       builder.setLastScannedDirKey(proto.getLastScannedDirKey());
     }
+    if (proto.hasLastScannedMpuKey()) {
+      builder.setLastScannedMpuKey(proto.getLastScannedMpuKey());
+    }
     return builder.build();
   }
 
@@ -160,6 +172,7 @@ public class OmLifecycleScanState {
         ", lastScannedKey='" + lastScannedKey + '\'' +
         ", lastScannedDir='" + lastScannedDir + '\'' +
         ", lastScannedDirKey='" + lastScannedDirKey + '\'' +
+        ", lastScannedMpuKey='" + lastScannedMpuKey + '\'' +
         '}';
   }
 
@@ -172,7 +185,8 @@ public class OmLifecycleScanState {
         .setScanEndTime(scanEndTime)
         .setLastScannedKey(lastScannedKey)
         .setLastScannedDir(lastScannedDir)
-        .setLastScannedDirKey(lastScannedDirKey);
+        .setLastScannedDirKey(lastScannedDirKey)
+        .setLastScannedMpuKey(lastScannedMpuKey);
   }
 
   /**
@@ -187,6 +201,7 @@ public class OmLifecycleScanState {
     private String lastScannedKey;
     private String lastScannedDir;
     private String lastScannedDirKey;
+    private String lastScannedMpuKey;
 
     public Builder setBucketKey(String bucketKey) {
       this.bucketKey = bucketKey;
@@ -245,6 +260,15 @@ public class OmLifecycleScanState {
 
     public Builder setLastScannedDirKey(String lastScannedDirKey) {
       this.lastScannedDirKey = lastScannedDirKey;
+      return this;
+    }
+
+    public String getLastScannedMpuKey() {
+      return lastScannedMpuKey;
+    }
+
+    public Builder setLastScannedMpuKey(String multipartInfoTableKey) {
+      this.lastScannedMpuKey = multipartInfoTableKey;
       return this;
     }
 

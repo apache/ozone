@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.recon.api.ExportJobManager;
+import org.apache.hadoop.ozone.recon.api.SnapshotTrappedBytesJobManager;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotModule;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
@@ -86,6 +87,7 @@ import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDa
 import org.apache.ratis.protocol.ClientId;
 import org.jooq.Configuration;
 import org.jooq.DAO;
+import org.jooq.SQLDialect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,6 +118,7 @@ public class ReconControllerModule extends AbstractModule {
 
     bind(ContainerHealthSchemaManager.class).in(Singleton.class);
     bind(ExportJobManager.class).in(Singleton.class);
+    bind(SnapshotTrappedBytesJobManager.class).in(Singleton.class);
     bind(ReconContainerMetadataManager.class)
         .to(ReconContainerMetadataManagerImpl.class).in(Singleton.class);
     bind(ReconFileMetadataManager.class)
@@ -228,18 +231,32 @@ public class ReconControllerModule extends AbstractModule {
   }
 
   @Provides
+  @Singleton
   DataSourceConfiguration getDataSourceConfiguration(
       final OzoneConfiguration ozoneConfiguration) {
 
     ReconSqlDbConfig sqlDbConfig =
         ozoneConfiguration.getObject(ReconSqlDbConfig.class);
 
-    if (StringUtils.contains(sqlDbConfig.getJdbcUrl(), OZONE_RECON_DB_DIR)) {
+    if (StringUtils.startsWith(sqlDbConfig.getJdbcUrl(), "jdbc:derby:")) {
+      LOG.warn("Derby is no longer supported for the Recon SQL DB. Ignoring the configured {} and using the SQLite "
+          + "defaults.", sqlDbConfig.getJdbcUrl());
+      sqlDbConfig.setJdbcUrl(ReconSqlDbConfig.DEFAULT_JDBC_URL);
+    }
+
+    // ${ozone.recon.db.dir} is left unresolved when the key is not set, so resolve it with the same fallback
+    // (ozone.metadata.dirs) as the other Recon DBs.
+    String reconDbDirPlaceholder = "${" + OZONE_RECON_DB_DIR + "}";
+    if (StringUtils.contains(sqlDbConfig.getJdbcUrl(), reconDbDirPlaceholder)) {
       ReconUtils reconUtils = new ReconUtils();
       File reconDbDir =
           reconUtils.getReconDbDir(ozoneConfiguration, OZONE_RECON_DB_DIR);
-      sqlDbConfig.setJdbcUrl(
-          "jdbc:derby:" + reconDbDir.getPath() + "/ozone_recon_derby.db");
+      sqlDbConfig.setJdbcUrl(StringUtils.replace(sqlDbConfig.getJdbcUrl(), reconDbDirPlaceholder,
+          reconDbDir.getPath()));
+    }
+    // Only the SQLITE dialect works with SQLite, so setting the URL is enough to switch to SQLite.
+    if (StringUtils.startsWith(sqlDbConfig.getJdbcUrl(), "jdbc:sqlite:")) {
+      sqlDbConfig.setSqlDbDialect(SQLDialect.SQLITE.name());
     }
 
     return new DataSourceConfiguration() {

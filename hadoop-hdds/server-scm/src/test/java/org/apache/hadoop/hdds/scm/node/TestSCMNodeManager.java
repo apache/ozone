@@ -1302,7 +1302,7 @@ public class TestSCMNodeManager {
     SCMCommand<?> createPipelineCommand =
         new CreatePipelineCommand(PipelineID.randomId(),
             HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, emptyList());
+            HddsProtos.ReplicationFactor.THREE, emptyList(), null);
 
     nodeManager.onMessage(
         new CommandForDatanode<>(datanode1, closeContainerCommand), null);

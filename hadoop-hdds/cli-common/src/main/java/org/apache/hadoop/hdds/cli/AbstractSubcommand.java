@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.cli;
 
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.PrintStream;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -94,11 +94,15 @@ public abstract class AbstractSubcommand {
     }
   }
 
-  protected PrintWriter out() {
-    return spec().commandLine().getOut();
+  protected PrintStream out() {
+    return System.out;
+    // until https://github.com/remkop/picocli/issues/2546 is fixed
+    // return spec().commandLine().getOut();
   }
 
-  protected PrintWriter err() {
-    return spec().commandLine().getErr();
+  protected PrintStream err() {
+    return System.err;
+    // until https://github.com/remkop/picocli/issues/2546 is fixed
+    // return spec().commandLine().getErr();
   }
 }

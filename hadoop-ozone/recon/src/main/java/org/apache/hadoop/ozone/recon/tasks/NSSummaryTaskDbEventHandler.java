@@ -17,11 +17,14 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
+
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -354,8 +357,19 @@ public class NSSummaryTaskDbEventHandler {
       return;
     }
 
-    // Remove the deleted directory ID from parent's childDir set
-    parentNsSummary.removeChildDir(deletedDirObjectId);
+    // A rename is a DELETE of the old key and a PUT of the new key, which may arrive in either order. If the
+    // PUT was processed first, the stored summary already describes the new key (other parent or other name).
+    // NSSummary.setDirName stores names without the trailing slash Legacy directory keys carry.
+    String deletedDirName = directoryInfo.getName() == null
+        ? null : removeTrailingSlashIfNeeded(directoryInfo.getName());
+    boolean putAlreadyApplied = deletedDirSummary != null
+        && (deletedDirSummary.getParentId() != parentObjectId
+            || !Objects.equals(deletedDirSummary.getDirName(), deletedDirName));
+
+    // Remove the deleted directory ID from parent's childDir set, unless the PUT re-added it under the same parent
+    if (!putAlreadyApplied || deletedDirSummary.getParentId() != parentObjectId) {
+      parentNsSummary.removeChildDir(deletedDirObjectId);
+    }
 
     // If deleted directory exists with content, update immediate parent's stats
     if (deletedDirSummary != null) {
@@ -378,18 +392,26 @@ public class NSSummaryTaskDbEventHandler {
       // Propagate to grandparents and beyond
       propagateSizeUpwards(parentObjectId, -deletedSize, -deletedReplSize, -deletedNumFiles, nsSummaryMap);
       
-      // Set the deleted directory's parentId to 0 (unlink it)
-      deletedDirSummary.setParentId(0);
-      nsSummaryMap.put(deletedDirObjectId, deletedDirSummary);
+      // Set the deleted directory's parentId to 0 (unlink it), unless it was already relinked by the PUT
+      if (!putAlreadyApplied) {
+        deletedDirSummary.setParentId(0);
+        nsSummaryMap.put(deletedDirObjectId, deletedDirSummary);
+      }
     } else {
       nsSummaryMap.put(parentObjectId, parentNsSummary);
     }
   }
 
+  /**
+   * Flush and commit NSSummary to DB.
+   *
+   * @param nsSummaryMap Map of objectId to NSSummary
+   * @return true if successful, false otherwise
+   */
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
     try {
       updateNSSummariesToDB(nsSummaryMap, Collections.emptyList());
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
       return false;
     } finally {
@@ -409,7 +431,7 @@ public class NSSummaryTaskDbEventHandler {
                                                 Collection<Long> objectIdsToBeDeleted) {
     try {
       updateNSSummariesToDB(nsSummaryMap, objectIdsToBeDeleted);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB. batchSize={}", nsSummaryMap.size(), e);
       return false;
     } finally {
@@ -460,4 +482,10 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
+  /**
+   * The seek position reached by an NSSummary sub-task paired with whether it processed the events successfully,
+   * used as the result of processing an event batch.
+   */
+  public record ProcessResult(int seekPosition, boolean success) {
+  }
 }

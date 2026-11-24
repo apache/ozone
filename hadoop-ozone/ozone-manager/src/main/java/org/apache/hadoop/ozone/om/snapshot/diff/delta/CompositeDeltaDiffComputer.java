@@ -64,12 +64,15 @@ public class CompositeDeltaDiffComputer extends FileLinkDeltaFileComputer {
   private final RDBDifferComputer differComputer;
   private final FullDiffComputer fullDiffComputer;
   private final boolean nonNativeDiff;
+  private final boolean fullDiff;
+  private boolean fullDiffFallback;
 
   public CompositeDeltaDiffComputer(OmSnapshotManager snapshotManager,
       OMMetadataManager activeMetadataManager, Path deltaDirPath,
       Consumer<SnapshotDiffResponse.SubStatus> activityReporter, boolean fullDiff,
       boolean nonNativeDiff) throws IOException {
     super(snapshotManager, activeMetadataManager, deltaDirPath, activityReporter);
+    this.fullDiff = fullDiff;
     differComputer = fullDiff ? null : new RDBDifferComputer(snapshotManager, activeMetadataManager,
         deltaDirPath.resolve("rdbDiffer"), activityReporter);
     fullDiffComputer = new FullDiffComputer(snapshotManager, activeMetadataManager,
@@ -95,6 +98,7 @@ public class CompositeDeltaDiffComputer extends FileLinkDeltaFileComputer {
     }
     if (deltaFiles == null) {
       updateActivity(SnapshotDiffResponse.SubStatus.SST_FILE_DELTA_FULL_DIFF);
+      fullDiffFallback = true;
       deltaFiles = fullDiffComputer.computeDeltaFiles(fromSnapshotInfo, toSnapshotInfo, tablesToLookup,
               tablePrefixInfo).orElse(null);
       if (deltaFiles == null) {
@@ -118,6 +122,14 @@ public class CompositeDeltaDiffComputer extends FileLinkDeltaFileComputer {
       }
     }
     return Optional.of(deltaFiles);
+  }
+
+  public boolean isFullDiff() {
+    return fullDiff || fullDiffFallback;
+  }
+
+  public void resetFullDiffFallback() {
+    fullDiffFallback = false;
   }
 
   @Override
