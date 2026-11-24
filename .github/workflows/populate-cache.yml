@@ -62,32 +62,6 @@ jobs:
         with:
           only-exact-hit: true
 
-      - name: Restore NPM dependencies
-        id: restore-pnpm
-        uses: actions/cache/restore@v6
-        with:
-          path: |
-            ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-
-      - name: Fetch NPM dependencies
-        if: steps.restore-pnpm.outputs.cache-hit != 'true'
-        run: |
-          ./mvnw -pl :ozone-recon com.github.eirslett:frontend-maven-plugin:install-node-and-pnpm
-          run_pnpm() {
-            ./mvnw -pl :ozone-recon com.github.eirslett:frontend-maven-plugin:pnpm -Dfrontend.pnpm.arguments="$1"
-          }
-          run_pnpm "config set store-dir ~/.pnpm-store"
-          run_pnpm fetch
-
-      - name: Save NPM dependencies
-        if: steps.restore-pnpm.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: |
-            ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-
       - name: Fetch dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
@@ -192,3 +166,42 @@ jobs:
             !~/.m2/repository/org/apache/ozone
             ~/.m2/wrapper
           key: ${{ steps.restore-cache.outputs.cache-key }}
+  npm:
+    needs:
+      - build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Java
+        id: restore-cache
+        uses: $/.github/actions/setup-java-with-cache
+
+      - name: Restore NPM dependencies
+        id: restore-pnpm
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Fetch NPM dependencies
+        if: steps.restore-pnpm.outputs.cache-hit != 'true'
+        run: |
+          ./mvnw -pl :ozone-recon com.github.eirslett:frontend-maven-plugin:install-node-and-pnpm
+          run_pnpm() {
+            ./mvnw -pl :ozone-recon com.github.eirslett:frontend-maven-plugin:pnpm -Dfrontend.pnpm.arguments="$1"
+          }
+          run_pnpm "config set store-dir ~/.pnpm-store"
+          run_pnpm fetch
+
+      - name: Save NPM dependencies
+        if: steps.restore-pnpm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
