@@ -180,13 +180,18 @@ jobs:
         id: restore-cache
         uses: $/.github/actions/setup-java-with-cache
 
+      - name: Calculate cache key
+        id: cache-key
+        run: |
+          echo "value=${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}" >> "$GITHUB_OUTPUT"
+
       - name: Restore NPM dependencies
         id: restore-pnpm
         uses: actions/cache/restore@v6
         with:
           path: |
             ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ steps.cache-key.outputs.value }}
 
       - name: Fetch NPM dependencies
         if: steps.restore-pnpm.outputs.cache-hit != 'true'
@@ -204,4 +209,4 @@ jobs:
         with:
           path: |
             ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ steps.cache-key.outputs.value }}
