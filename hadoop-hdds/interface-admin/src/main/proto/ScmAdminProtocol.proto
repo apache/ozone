@@ -773,6 +773,7 @@ message SubmitContainerIdExportRequestProto {
   optional int64 maxRows = 4;
   optional int32 batchSize = 5;
   optional int32 partSize = 6;
+  optional string requestId = 7;
 }
 
 message SubmitContainerIdExportResponseProto {
@@ -801,6 +802,8 @@ message GetContainerIdExportStatusResponseProto {
   optional int64 elapsedMs = 9;
   optional string tarPath = 10;
   optional string errorMessage = 11;
+  optional ContainerID startContainerID = 12;
+  optional string scmHostname = 13;
 }
 
 /**

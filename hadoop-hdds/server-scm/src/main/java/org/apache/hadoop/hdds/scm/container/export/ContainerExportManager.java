@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container.export;
 
 import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.DEFAULT_BATCH_SIZE;
 import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.DEFAULT_PART_SIZE;
+import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.MAX_PARTS;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -75,6 +76,7 @@ public class ContainerExportManager {
   private static final int DEFAULT_MAX_RETAINED = 10;
 
   private final Map<ExportJob.Id, ExportJob> jobMap = new ConcurrentHashMap<>();
+  private final Map<String, ExportJob> jobsByRequestId = new ConcurrentHashMap<>();
   private final AtomicReference<ExportJob> runningJob = new AtomicReference<>();
   private final ExecutorService workerPool;
   private final ContainerManager containerManager;
@@ -82,6 +84,7 @@ public class ContainerExportManager {
   private final BooleanSupplier isLeaderReady;
   private final ExportSizing defaultSizing;
   private final int maxRetained;
+  private final int maxParts;
   // Both deque are only touched by the single worker thread, and by start() before any job is submitted.
   private final Deque<ExportJob.Id> finishedJobIds = new ArrayDeque<>();
   private final Deque<String> completedArchiveNames = new ArrayDeque<>();
@@ -89,16 +92,21 @@ public class ContainerExportManager {
   public ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
       OzoneConfiguration conf) {
     this(scmId, containerManager, isLeaderReady,
-        ExportFileManager.resolveExportDirectory(conf), DEFAULT_PART_SIZE, DEFAULT_BATCH_SIZE, DEFAULT_MAX_RETAINED);
+        ExportFileManager.resolveExportDirectory(conf),
+        new ExportSizing(0, 0, 0, DEFAULT_BATCH_SIZE, DEFAULT_PART_SIZE), DEFAULT_MAX_RETAINED, MAX_PARTS);
   }
 
   ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
-      String exportDirectory, int partSize, int batchSize, int maxRetained) {
+      String exportDirectory, ExportSizing defaultSizing, int maxRetained, int maxParts) {
     // With maxRetained 0, a finished job would be dropped from jobMap at once, so its status could never be read.
     if (maxRetained < 1) {
       throw new IllegalArgumentException("maxRetained must be at least 1 but is " + maxRetained);
     }
-    this.defaultSizing = new ExportSizing(0, 0, 0, batchSize, partSize);
+    if (maxParts < 1) {
+      throw new IllegalArgumentException("maxParts must be at least 1 but is " + maxParts);
+    }
+    this.maxParts = maxParts;
+    this.defaultSizing = Objects.requireNonNull(defaultSizing, "defaultSizing == null");
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");
     this.fileManager = new ExportFileManager(exportDirectory);
@@ -137,13 +145,16 @@ public class ContainerExportManager {
    * @param maxRows upper bound on exported container IDs; {@code 0} means no limit
    * @param requestBatchSize container IDs per listing query; {@code 0} means the manager default
    * @param requestPartSize container IDs per part file; {@code 0} means the manager default
-   * @return the submitted job
+   * @param requestId id the client keeps across retries of one submit; if a job was already started for it, that job
+   *                  is returned and nothing new is started.
+   * @return the submitted job, or the job already started for {@code requestId}
    * @throws IllegalArgumentException if a size is negative or above its {@link ExportLimits} maximum
    * @throws SCMException with {@link SCMException.ResultCodes#SCM_NOT_LEADER} if this SCM is not the ready leader
    * @throws IOException if another export is already running or the export worker is shut down
    */
-  public ExportJob submitJob(ContainerID start, LifeCycleState lifeCycleState, ContainerHealthState healthState,
-      long maxRows, int requestBatchSize, int requestPartSize) throws IOException {
+  public synchronized ExportJob submitJob(ContainerID start, LifeCycleState lifeCycleState,
+      ContainerHealthState healthState, long maxRows, int requestBatchSize, int requestPartSize, String requestId)
+      throws IOException {
     final ExportSizing sizing = new ExportSizing(maxRows, requestBatchSize, requestPartSize,
         defaultSizing.getBatchSize(), defaultSizing.getPartSize());
 
@@ -152,8 +163,17 @@ public class ContainerExportManager {
           SCMException.ResultCodes.SCM_NOT_LEADER);
     }
 
+    final String key = requestId == null || requestId.isEmpty() ? null : requestId;
+    if (key != null) {
+      final ExportJob existing = jobsByRequestId.get(key);
+      if (existing != null) {
+        LOG.info("Returning {} for the repeated submit with request id {}", existing, key);
+        return existing;
+      }
+    }
+
     final ExportScope scope = ExportScope.of(lifeCycleState, healthState);
-    final ExportJob job = new ExportJob(scope, start, sizing);
+    final ExportJob job = new ExportJob(scope, start, sizing, key);
     if (!runningJob.compareAndSet(null, job)) {
       // The running job may finish right after the failed compareAndSet, so the slot can already be empty here.
       final ExportJob running = runningJob.get();
@@ -162,10 +182,13 @@ public class ContainerExportManager {
     }
 
     jobMap.put(job.getId(), job);
+    if (key != null) {
+      jobsByRequestId.put(key, job);
+    }
     try {
       workerPool.submit(() -> executeExport(job));
     } catch (RejectedExecutionException e) {
-      jobMap.remove(job.getId());
+      forget(job);
       runningJob.compareAndSet(job, null);
       throw new IOException("Container ID export worker is shut down", e);
     }
@@ -191,7 +214,8 @@ public class ContainerExportManager {
         .setMaxRows(job.getMaxRows())
         .setBatchSize(job.getBatchSize())
         .setPartSize(job.getPartSize())
-        .setElapsedMs(status.getElapsedMs());
+        .setElapsedMs(status.getElapsedMs())
+        .setStartContainerID(job.getStartContainerId().getProtobuf());
     if (job.getLifeCycleState() != null) {
       builder.setLifecycleState(job.getLifeCycleState());
     }
@@ -199,7 +223,8 @@ public class ContainerExportManager {
       builder.setHealthState(job.getHealthState().name());
     }
     if (!status.isDone()) {
-      return builder.setState(GetContainerIdExportStatusResponseProto.ExecutionState.RUNNING).build();
+      return builder.setState(GetContainerIdExportStatusResponseProto.ExecutionState.RUNNING)
+          .setIdsWritten(job.getIdsWritten()).build();
     }
     final Throwable failure = status.getException();
     if (failure != null) {
@@ -289,11 +314,21 @@ public class ContainerExportManager {
   private void retain(ExportJob job, boolean hasArchive) {
     finishedJobIds.addLast(job.getId());
     while (finishedJobIds.size() > maxRetained) {
-      jobMap.remove(finishedJobIds.removeFirst());
+      final ExportJob evicted = jobMap.get(finishedJobIds.removeFirst());
+      if (evicted != null) {
+        forget(evicted);
+      }
     }
     if (hasArchive) {
       completedArchiveNames.addLast(job.getFileName());
       trimCompletedArchives();
+    }
+  }
+
+  private void forget(ExportJob job) {
+    jobMap.remove(job.getId());
+    if (job.getRequestId() != null) {
+      jobsByRequestId.remove(job.getRequestId(), job);
     }
   }
 
@@ -328,6 +363,10 @@ public class ContainerExportManager {
         cursor = nextCursor(batch);
       }
 
+      if (partNumber > maxParts) {
+        throw new IOException(job + " would need more than " + maxParts + " part files, which is the limit. "
+            + "Resubmit with a higher partSize or lower maxRows.");
+      }
       final ContainerID partStartContainerId = batch.get(batchIndex);
       try (OutputStream out = fileManager.newPartOutputStream(job.getId(), job.partFileName(partNumber))) {
         job.writeMetadataHeader(out, partNumber, partStartContainerId);
@@ -357,6 +396,7 @@ public class ContainerExportManager {
           offset += idBytes.length;
           idsWritten++;
           idsInCurrentPart++;
+          job.setIdsWritten(idsWritten);
         }
 
         if (offset > 0) {

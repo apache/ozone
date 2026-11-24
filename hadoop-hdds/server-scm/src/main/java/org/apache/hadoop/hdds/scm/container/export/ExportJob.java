@@ -42,6 +42,7 @@ public final class ExportJob {
   private final String jobStartTime = ExportFileManager.formatJobStartTime(Instant.now());
   private final ContainerID startContainerId;
   private final ExportSizing sizing;
+  private final String requestId;
   /** The .tar.gz output path, fixed at job creation; used by the worker to write the archive. */
   private final String fileName;
 
@@ -49,6 +50,7 @@ public final class ExportJob {
   private final long startMs = Time.monotonicNow();
   /** Set just before the future completes, so the elapsed time stops changing once the job is done. */
   private volatile long endMs = -1;
+  private volatile long idsWritten;
 
   /**
    * Unique job identifier.
@@ -143,12 +145,13 @@ public final class ExportJob {
     }
   }
 
-  ExportJob(ExportScope scope, ContainerID startContainerId, ExportSizing sizing) {
+  ExportJob(ExportScope scope, ContainerID startContainerId, ExportSizing sizing, String requestId) {
     this.id = Id.newId();
     this.scope = scope;
     this.startContainerId = startContainerId != null ? startContainerId : ContainerID.valueOf(0);
     this.fileName = ExportFileManager.archiveFileName(scope, jobStartTime, id);
     this.sizing = sizing;
+    this.requestId = requestId;
   }
 
   public Id getId() {
@@ -183,9 +186,21 @@ public final class ExportJob {
     return sizing.getPartSize();
   }
 
-  void complete(long idsWritten) {
+  String getRequestId() {
+    return requestId;
+  }
+
+  long getIdsWritten() {
+    return idsWritten;
+  }
+
+  void setIdsWritten(long written) {
+    this.idsWritten = written;
+  }
+
+  void complete(long totalIdsWritten) {
     endMs = Time.monotonicNow();
-    idsWrittenFuture.complete(idsWritten);
+    idsWrittenFuture.complete(totalIdsWritten);
   }
 
   void fail(Throwable cause) {

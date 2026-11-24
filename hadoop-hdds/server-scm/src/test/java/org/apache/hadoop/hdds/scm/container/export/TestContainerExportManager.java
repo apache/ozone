@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.container.export;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -121,15 +122,16 @@ public class TestContainerExportManager {
 
   @Test
   public void testRejectNonPositiveValues() {
-    // part size
-    assertThrows(IllegalArgumentException.class, () ->
-        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 0, 1, 1));
-    // batch size
-    assertThrows(IllegalArgumentException.class, () ->
-        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 1, 0, 1));
+    final ExportSizing sizing = new ExportSizing(0, 0, 0, 1, 1);
+    // part size and batch size: the default sizing itself is rejected
+    assertThrows(IllegalArgumentException.class, () -> new ExportSizing(0, 0, 0, 1, 0));
+    assertThrows(IllegalArgumentException.class, () -> new ExportSizing(0, 0, 0, 0, 1));
     // max retained
     assertThrows(IllegalArgumentException.class, () ->
-        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 1, 1, 0));
+        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), sizing, 0, 1));
+    // max parts
+    assertThrows(IllegalArgumentException.class, () ->
+        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), sizing, 1, 0));
   }
 
   @Test
@@ -348,8 +350,8 @@ public class TestContainerExportManager {
   @Test
   public void testLeadershipLostWhileArchivingLeavesNoArchive() throws Exception {
     ExportFileManager fileManager = new ExportFileManager(tempDir.getAbsolutePath());
-    ExportJob job = new ExportJob(ExportScope.of(null, ContainerHealthState.MISSING),
-        ContainerID.valueOf(0), new ExportSizing(0, TEST_BATCH_SIZE, TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_PART_SIZE));
+    ExportJob job = new ExportJob(ExportScope.of(null, ContainerHealthState.MISSING), ContainerID.valueOf(0), 
+        new ExportSizing(0, TEST_BATCH_SIZE, TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_PART_SIZE), null);
     fileManager.createJobDirectory(job.getId());
     try (OutputStream out = fileManager.newPartOutputStream(job.getId(), job.partFileName(1))) {
       job.writeMetadataHeader(out, 1, ContainerID.valueOf(1));
@@ -547,6 +549,127 @@ public class TestContainerExportManager {
   }
 
   @Test
+  public void testRepeatedSubmitWithSameRequestIdReturnsTheSameJob() throws Exception {
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenReturn(Collections.emptyList());
+
+    final ExportJob first = exportManager.submitJob(
+        ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0, 0, "req-1");
+    waitForDone(first.getId());
+    // The client lost the reply and sends the same request again, after the first export has finished.
+    final ExportJob again = exportManager.submitJob(
+        ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0, 0, "req-1");
+    assertEquals(first.getId(), again.getId());
+
+    // A different request id, or none, is a new export.
+    final ExportJob other = exportManager.submitJob(
+        ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0, 0, "req-2");
+    assertNotEquals(first.getId(), other.getId());
+    waitForDone(other.getId());
+    assertNotEquals(other.getId(), submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING).getId());
+  }
+
+  @Test
+  public void testRepeatedSubmitWhileRunningReturnsTheRunningJobNotAnError() throws Exception {
+    final CountDownLatch listing = new CountDownLatch(1);
+    final CountDownLatch release = new CountDownLatch(1);
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenAnswer(invocation -> {
+          listing.countDown();
+          release.await();
+          return Collections.emptyList();
+        });
+    final ExportJob first = exportManager.submitJob(
+        ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0, 0, "req-1");
+    assertTrue(listing.await(30, TimeUnit.SECONDS));
+
+    assertEquals(first.getId(), exportManager.submitJob(
+        ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0, 0, "req-1").getId());
+    release.countDown();
+    waitForDone(first.getId());
+  }
+
+  @Test
+  public void testRequestIdIsForgottenWhenItsJobIsEvicted() throws Exception {
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenReturn(Collections.emptyList());
+    final ExportJob first = exportManager.submitJob(
+        ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0, 0, "req-1");
+    waitForDone(first.getId());
+    // TEST_MAX_RETAINED is 2, so two more finished jobs push the first one out.
+    waitForDone(submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING).getId());
+    waitForDone(submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING).getId());
+    assertNull(statusOf(first.getId()));
+
+    final ExportJob again = exportManager.submitJob(
+        ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 0, 0, 0, "req-1");
+    assertNotEquals(first.getId(), again.getId());
+    waitForDone(again.getId());
+  }
+
+  @Test
+  public void testExportFailsWhenItWouldWriteTooManyParts() throws Exception {
+    // partSize 1 and no maxRows: more matching containers than the 3 part files this manager allows.
+    final int maxParts = 3;
+    exportManager.shutdown();
+    exportManager = newExportManager(1, 1_000, TEST_MAX_RETAINED, maxParts, () -> true);
+    final long[] firstBatch = new long[maxParts + 1];
+    Arrays.setAll(firstBatch, i -> i + 1L);
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenReturn(ids(firstBatch));
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(firstBatch.length + 1L)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenReturn(Collections.emptyList());
+
+    final ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    final GetContainerIdExportStatusResponseProto status = waitForDone(job.getId());
+
+    assertEquals(ExecutionState.FAILED, status.getState());
+    assertTrue(status.getErrorMessage().contains("more than " + maxParts + " part files"), status.getErrorMessage());
+    assertFalse(Files.exists(tempDir.toPath().resolve(ExportFileManager.exportJobDirName(job.getId()))));
+  }
+
+  @Test
+  public void testStatusReportsStartContainerIdAndProgressWhileRunning() throws Exception {
+    final CountDownLatch secondFetch = new CountDownLatch(1);
+    final CountDownLatch release = new CountDownLatch(1);
+    // batchSize 2: the first fetch returns two IDs, the second fetch blocks so the job stays RUNNING.
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenReturn(ids(5, 6));
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(7)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenAnswer(invocation -> {
+          secondFetch.countDown();
+          release.await();
+          return Collections.emptyList();
+        });
+    final ExportJob job = submit(ContainerID.valueOf(5), null, ContainerHealthState.MISSING);
+    assertTrue(secondFetch.await(30, TimeUnit.SECONDS));
+
+    final GetContainerIdExportStatusResponseProto status = statusOf(job.getId());
+    assertEquals(ExecutionState.RUNNING, status.getState());
+    assertEquals(5, status.getStartContainerID().getId());
+    assertEquals(2, status.getIdsWritten());
+
+    release.countDown();
+    assertEquals(2, waitForDone(job.getId()).getIdsWritten());
+  }
+
+  @Test
+  public void testStatusStartContainerIdDefaultsToZero() throws Exception {
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenReturn(Collections.emptyList());
+    final ExportJob job = submit(null, null, ContainerHealthState.MISSING);
+    assertEquals(0, waitForDone(job.getId()).getStartContainerID().getId());
+  }
+
+  @Test
   public void testContainerExportStatusOfRunningJob() throws Exception {
     final CountDownLatch listing = new CountDownLatch(1);
     final CountDownLatch release = new CountDownLatch(1);
@@ -557,7 +680,8 @@ public class TestContainerExportManager {
           release.await();
           return Collections.emptyList();
         });
-    final ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 5, 1, 2);
+    final ExportJob job = exportManager.submitJob(
+        ContainerID.valueOf(0), null, ContainerHealthState.MISSING, 5, 1, 2, null);
     assertTrue(listing.await(30, TimeUnit.SECONDS));
 
     final GetContainerIdExportStatusResponseProto status = statusOf(job.getId());
@@ -654,7 +778,7 @@ public class TestContainerExportManager {
   
   private ExportJob submit(ContainerID start, LifeCycleState lifeCycle, ContainerHealthState health)
       throws IOException {
-    return exportManager.submitJob(start, lifeCycle, health, 0, 0, 0);
+    return exportManager.submitJob(start, lifeCycle, health, 0, 0, 0, null);
   }
 
   private File archiveFile(ExportJob job) {
@@ -663,8 +787,13 @@ public class TestContainerExportManager {
 
   private ContainerExportManager newExportManager(int partSize, int batchSize, int maxRetained,
       BooleanSupplier isLeaderReady) throws Exception {
+    return newExportManager(partSize, batchSize, maxRetained, ExportLimits.MAX_PARTS, isLeaderReady);
+  }
+
+  private ContainerExportManager newExportManager(int partSize, int batchSize, int maxRetained, int maxParts,
+      BooleanSupplier isLeaderReady) throws Exception {
     ContainerExportManager manager = new ContainerExportManager(TEST_SCM_ID, containerManager, isLeaderReady,
-        tempDir.getAbsolutePath(), partSize, batchSize, maxRetained);
+        tempDir.getAbsolutePath(), new ExportSizing(0, 0, 0, batchSize, partSize), maxRetained, maxParts);
     manager.start();
     return manager;
   }

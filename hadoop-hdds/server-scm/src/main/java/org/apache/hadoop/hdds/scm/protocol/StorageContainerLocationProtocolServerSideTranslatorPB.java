@@ -1534,8 +1534,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         throw new NonRetriableException("Unknown health state: " + request.getHealthState());
       }
     }
-    final String jobId = impl.submitContainerIdExport(
-        start, lifeCycleState, healthState, request.getMaxRows(), request.getBatchSize(), request.getPartSize());
+    final String jobId = impl.submitContainerIdExport(start, lifeCycleState, healthState, request.getMaxRows(),
+        request.getBatchSize(), request.getPartSize(), request.getRequestId());
     return SubmitContainerIdExportResponseProto.newBuilder().setJobId(jobId).build();
   }
 

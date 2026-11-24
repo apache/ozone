@@ -579,11 +579,14 @@ public interface StorageContainerLocationInternalInterface extends Closeable {
    * @param maxRows upper bound on exported container IDs, or 0 for no limit
    * @param batchSize container IDs fetched per listing query, or 0 for the SCM default
    * @param partSize container IDs written per part file, or 0 for the SCM default
+   * @param requestId id the caller keeps across retries of one submit. If SCM already started a job for it, that
+   *                  job's id is returned and no second export starts.
    * @return the id of the submitted job
    * @throws IOException if the request is invalid, another export is running, or this is not the SCM leader
    */
   String submitContainerIdExport(ContainerID startContainerId, HddsProtos.LifeCycleState lifeCycleState,
-      ContainerHealthState healthState, long maxRows, int batchSize, int partSize) throws IOException;
+      ContainerHealthState healthState, long maxRows, int batchSize, int partSize, String requestId)
+      throws IOException;
 
   /**
    * Returns the status of a container ID export job.

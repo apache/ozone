@@ -170,17 +170,23 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
 
   @Test
   void testSubmitContainerIdExportRoundTrip() throws Exception {
-    when(impl.submitContainerIdExport(any(), any(), any(), anyLong(), anyInt(), anyInt())).thenReturn("job-1");
+    when(impl.submitContainerIdExport(any(), any(), any(), anyLong(), anyInt(), anyInt(), any())).thenReturn("job-1");
     StorageContainerLocationProtocolClientSideTranslatorPB client = metadataClient();
 
     assertEquals("job-1", client.submitContainerIdExport(
-        ContainerID.valueOf(7), LifeCycleState.CLOSED, ContainerHealthState.MISSING, 1000, 20, 30));
+        ContainerID.valueOf(7), LifeCycleState.CLOSED, ContainerHealthState.MISSING, 1000, 20, 30, "req-7"));
     verify(impl).submitContainerIdExport(
-        ContainerID.valueOf(7), LifeCycleState.CLOSED, ContainerHealthState.MISSING, 1000, 20, 30);
+        ContainerID.valueOf(7), LifeCycleState.CLOSED, ContainerHealthState.MISSING, 1000, 20, 30, "req-7");
 
-    // Every optional argument left out reaches the server as null / 0.
-    client.submitContainerIdExport(null, null, ContainerHealthState.EMPTY, 0, 0, 0);
-    verify(impl).submitContainerIdExport(isNull(), isNull(), eq(ContainerHealthState.EMPTY), eq(0L), eq(0), eq(0));
+    // The request id is what lets SCM recognise a resend of the same submit.
+    client.submitContainerIdExport(null, null, ContainerHealthState.EMPTY, 0, 0, 0, "resend-me");
+    verify(impl).submitContainerIdExport(isNull(), isNull(), eq(ContainerHealthState.EMPTY), eq(0L), eq(0), eq(0),
+        eq("resend-me"));
+
+    // Every optional argument left out reaches the server as null / 0, and an unset request id as "".
+    client.submitContainerIdExport(null, null, ContainerHealthState.EMPTY, 0, 0, 0, null);
+    verify(impl).submitContainerIdExport(isNull(), isNull(), eq(ContainerHealthState.EMPTY), eq(0L), eq(0), eq(0),
+        eq(""));
   }
 
   @Test
@@ -196,7 +202,7 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
     ServiceException e = assertThrows(ServiceException.class, () -> service.submitRequest(null, request));
     assertThat(e.getCause()).isInstanceOf(NonRetriableException.class);
     assertThat(e.getCause().getMessage()).contains("NOT_A_STATE");
-    verify(impl, never()).submitContainerIdExport(any(), any(), any(), anyLong(), anyInt(), anyInt());
+    verify(impl, never()).submitContainerIdExport(any(), any(), any(), anyLong(), anyInt(), anyInt(), any());
   }
 
   @Test

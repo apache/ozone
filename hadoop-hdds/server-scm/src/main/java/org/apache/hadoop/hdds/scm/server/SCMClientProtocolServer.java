@@ -1776,7 +1776,8 @@ public class SCMClientProtocolServer implements
 
   @Override
   public String submitContainerIdExport(ContainerID startContainerId, HddsProtos.LifeCycleState lifeCycleState,
-      ContainerHealthState healthState, long maxRows, int batchSize, int partSize) throws IOException {
+      ContainerHealthState healthState, long maxRows, int batchSize, int partSize, String requestId)
+      throws IOException {
     getScm().checkAdminAccess(getRemoteUser(), false);
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("startContainerID", String.valueOf(startContainerId));
@@ -1785,15 +1786,24 @@ public class SCMClientProtocolServer implements
     auditMap.put("maxRows", String.valueOf(maxRows));
     auditMap.put("batchSize", String.valueOf(batchSize));
     auditMap.put("partSize", String.valueOf(partSize));
+    auditMap.put("requestId", String.valueOf(requestId));
     try {
       final String jobId = scm.getContainerExportManager().submitJob(
-          startContainerId, lifeCycleState, healthState, maxRows, batchSize, partSize).getId().toString();
+          startContainerId, lifeCycleState, healthState, maxRows, batchSize, partSize, requestId).getId().toString();
       auditMap.put("jobId", jobId);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.EXPORT_CONTAINER_IDS, auditMap));
       return jobId;
     } catch (IllegalArgumentException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.EXPORT_CONTAINER_IDS, auditMap, ex));
       throw new NonRetriableException(ex.getMessage());
+    } catch (SCMException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.EXPORT_CONTAINER_IDS, auditMap, ex));
+      if (ex.getResult() == SCMException.ResultCodes.SCM_NOT_LEADER) {
+        // This SCM lost leadership after the request was accepted. SCMException is never retried by the client,
+        // so raise the Ratis not-leader error, which makes the client fail over to the new leader and resubmit.
+        throw scm.getScmHAManager().getRatisServer().triggerNotLeaderException();
+      }
+      throw ex;
     } catch (IOException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.EXPORT_CONTAINER_IDS, auditMap, ex));
       throw ex;
@@ -1805,16 +1815,23 @@ public class SCMClientProtocolServer implements
     getScm().checkAdminAccess(getRemoteUser(), true);
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("jobId", jobId);
-    final GetContainerIdExportStatusResponseProto status =
+    final GetContainerIdExportStatusResponseProto jobStatus =
         scm.getContainerExportManager().getContainerExportStatus(jobId);
-    if (status == null) {
+    if (jobStatus == null) {
+      // Jobs are kept in memory by the SCM leader that started them, so after a leader change the new leader does
+      // not know them either.
       final IOException ex = new NonRetriableException("Container ID export job not found: " + jobId
-          + ". It may have been evicted, or SCM may have restarted.");
+          + ". It may have been evicted, or this SCM may have restarted or taken over as leader after the SCM that"
+          + " started the job, since only that SCM knows the job. Submit the export again.");
       AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.GET_CONTAINER_ID_EXPORT_STATUS, auditMap, ex));
       throw ex;
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.GET_CONTAINER_ID_EXPORT_STATUS, auditMap));
-    return status;
+    final GetContainerIdExportStatusResponseProto.Builder status = jobStatus.toBuilder();
+    if (scm.getHostname() != null) {
+      status.setScmHostname(scm.getHostname());
+    }
+    return status.build();
   }
 
   private void persistContainerSuppression(long longContainerID, boolean suppress, SCMAction action)

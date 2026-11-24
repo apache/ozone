@@ -445,11 +445,15 @@ public interface ScmClient extends Closeable {
    * @param maxRows upper bound on exported container IDs, or 0 for no limit
    * @param batchSize container IDs fetched per listing query, or 0 for the SCM default
    * @param partSize container IDs written per part file, or 0 for the SCM default
+   * @param requestId id chosen by the caller for this one export request. If a reply is lost and the same request
+   *                  is sent again with the same id, SCM returns the job it already started instead of starting a
+   *                  second export. Use a new id for each new export.
    * @return the id of the submitted job
    * @throws IOException if the request is invalid, another export is running, or this is not the SCM leader
    */
   String submitContainerIdExport(ContainerID startContainerId, HddsProtos.LifeCycleState lifeCycleState,
-      ContainerHealthState healthState, long maxRows, int batchSize, int partSize) throws IOException;
+      ContainerHealthState healthState, long maxRows, int batchSize, int partSize, String requestId)
+      throws IOException;
 
   /**
    * Returns the status of a container ID export job.

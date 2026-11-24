@@ -517,9 +517,10 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public String submitContainerIdExport(ContainerID startContainerId, HddsProtos.LifeCycleState lifeCycleState,
-      ContainerHealthState healthState, long maxRows, int batchSize, int partSize) throws IOException {
+      ContainerHealthState healthState, long maxRows, int batchSize, int partSize, String requestId)
+      throws IOException {
     return storageContainerLocationClient.submitContainerIdExport(
-        startContainerId, lifeCycleState, healthState, maxRows, batchSize, partSize);
+        startContainerId, lifeCycleState, healthState, maxRows, batchSize, partSize, requestId);
   }
 
   @Override

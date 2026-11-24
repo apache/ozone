@@ -1363,11 +1363,15 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public String submitContainerIdExport(ContainerID startContainerId, HddsProtos.LifeCycleState lifeCycleState,
-      ContainerHealthState healthState, long maxRows, int batchSize, int partSize) throws IOException {
+      ContainerHealthState healthState, long maxRows, int batchSize, int partSize, String requestId)
+      throws IOException {
     final SubmitContainerIdExportRequestProto.Builder request = SubmitContainerIdExportRequestProto.newBuilder()
         .setMaxRows(maxRows)
         .setBatchSize(batchSize)
         .setPartSize(partSize);
+    if (requestId != null) {
+      request.setRequestId(requestId);
+    }
     if (startContainerId != null) {
       request.setStartContainerID(startContainerId.getProtobuf());
     }
