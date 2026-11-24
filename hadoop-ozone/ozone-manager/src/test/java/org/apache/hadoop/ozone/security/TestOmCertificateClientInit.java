@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CsrTestUtil;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -49,6 +50,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -154,6 +156,26 @@ public class TestOmCertificateClientInit {
       assertTrue(OzoneSecurityUtil.checkIfFileExist(
           securityConfig.getKeyLocation(OM_COMPONENT),
           securityConfig.getPublicKeyFileName()));
+    }
+  }
+
+  /**
+   * A user@host, or a bare host name without a DNS SAN, longer than 64 characters, as on Kubernetes, is replaced by
+   * om@UUID in the CSR.
+   */
+  @Test
+  public void testCsrCommonNameForLongHostName() throws Exception {
+    omKeyStorage.storeKeyPair(keyPair);
+    OMStorage storage = mock(OMStorage.class);
+    when(storage.getClusterID()).thenReturn("test");
+    String omId = UUID.randomUUID().toString();
+    HddsProtos.OzoneManagerDetailsProto omInfo = OzoneManager.getOmDetailsProto(new OzoneConfiguration(), omId)
+        .toBuilder()
+        .setHostName("aaaa-ozone-000-manager-1.aaa-ozone-000-manager-headless.aaaa-data.svc.cluster.local")
+        .build();
+    try (OMCertificateClient client = new OMCertificateClient(securityConfig, null, storage, omInfo, "", null, null,
+        null)) {
+      assertEquals("om@" + omId, CsrTestUtil.getCsrCommonName(client));
     }
   }
 

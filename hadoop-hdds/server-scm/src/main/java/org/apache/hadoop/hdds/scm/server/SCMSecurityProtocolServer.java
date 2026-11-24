@@ -332,15 +332,14 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     LOGGER.info("Processing CSR for scm {}, nodeId: {}",
         scmNodeDetails.getHostName(), scmNodeDetails.getScmNodeId());
 
-    return getEncodedCertToString(certSignReq, NodeType.SCM, null);
+    return getEncodedCertToString(certSignReq, NodeType.SCM, scmNodeDetails.getScmNodeId());
   }
 
   /**
    *  Request certificate for the specified role.
    * @param certSignReq - Certificate signing request.
    * @param nodeType - role OM/SCM/DATANODE
-   * @param nodeId - UUID of the requester, for its commonName if the CSR's is too long; ignored for SCM, whose SCM ID
-   *               is in the CSR subject.
+   * @param nodeId - UUID of the requester (SCM ID for SCM), for its commonName if the CSR's is too long.
    * @return String         - SCM signed pem encoded certificate.
    * @throws IOException
    */
@@ -354,8 +353,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
     Future<CertPath> future;
     PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
     // The same commonName as CertificateSignRequest.commonName gives a client of this version.
-    String commonNameIfTooLong = CertificateSignRequest.commonNamePrefix(nodeType) + "@"
-        + (nodeType == NodeType.SCM ? CertificateSignRequest.getScmId(csr) : nodeId);
+    String commonNameIfTooLong = CertificateSignRequest.commonNamePrefix(nodeType) + "@" + nodeId;
     if (nodeType == NodeType.SCM && rootCertificateServer != null) {
       future = rootCertificateServer.requestCertificate(csr,
           KERBEROS_TRUSTED, nodeType, getNextCertificateId(), commonNameIfTooLong);

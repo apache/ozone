@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedName;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameWithSN;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -322,7 +321,13 @@ public class TestCertificateSignRequest {
   public void testGenerateCSRWithLongSubject() throws Exception {
     String clusterID = UUID.randomUUID().toString();
     String scmID = UUID.randomUUID().toString();
-    assertThat(LONG_SUBJECT.length()).isGreaterThan(64);
+    // Bouncy Castle 1.85+ rejects a commonName longer than 64 characters when it parses a DN string.
+    String fits = "dn@" + StringUtils.repeat('a', 61);
+    new X500Name(String.format(DISTINGUISHED_NAME_FORMAT, fits, scmID, clusterID));
+    assertThrows(IllegalArgumentException.class,
+        () -> new X500Name(String.format(DISTINGUISHED_NAME_FORMAT, fits + "a", scmID, clusterID)));
+    assertThrows(IllegalArgumentException.class,
+        () -> new X500Name(String.format(DISTINGUISHED_NAME_FORMAT, LONG_SUBJECT, scmID, clusterID)));
     KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
 
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
@@ -335,7 +340,6 @@ public class TestCertificateSignRequest {
         .generateCSR();
 
     assertEquals(LONG_SUBJECT, csr.getSubject().getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
-    assertEquals(scmID, CertificateSignRequest.getScmId(csr));
     assertEquals(String.format(DISTINGUISHED_NAME_FORMAT, LONG_SUBJECT, scmID, clusterID),
         csr.getSubject().toString());
     ContentVerifierProvider verifierProvider = new JcaContentVerifierProviderBuilder()

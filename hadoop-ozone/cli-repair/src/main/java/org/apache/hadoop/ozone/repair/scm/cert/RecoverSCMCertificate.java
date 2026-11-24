@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERT
 import static org.apache.hadoop.hdds.security.x509.certificate.client.DefaultCertificateClient.CERT_FILE_NAME_FORMAT;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
 
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -114,14 +115,7 @@ public class RecoverSCMCertificate extends RepairTool {
         info("Sub cert serialID for this host: %s", subCertificate.getSerialNumber());
         info("Root cert serialID: %s", rootCertificate.getSerialNumber());
 
-        boolean isRootCA = false;
-
-        String caPrincipal = rootCertificate.getSubjectDN().getName();
-        if (caPrincipal.contains(hostName)
-            || (scmId != null && caPrincipal.contains(OzoneConsts.SCM_ROOT_CA_PREFIX + scmId))) {
-          isRootCA = true;
-        }
-        storeCerts(subCertificate, rootCertificate, isRootCA, securityConfig);
+        storeCerts(subCertificate, rootCertificate, isRootCA(rootCertificate, hostName, scmId), securityConfig);
       }
     } catch (RocksDBException | CertificateException exception) {
       error("Failed to recover scm cert");
@@ -164,7 +158,16 @@ public class RecoverSCMCertificate extends RepairTool {
     }
   }
 
-  private static X509Certificate getSubCertificate(
+  /** Whether this SCM issued {@code rootCertificate}: its subject has this host name or, if longer, this SCM ID. */
+  @VisibleForTesting
+  static boolean isRootCA(X509Certificate rootCertificate, String hostName, String scmId) {
+    String caPrincipal = rootCertificate.getSubjectDN().getName();
+    return caPrincipal.contains(hostName)
+        || (scmId != null && caPrincipal.contains(OzoneConsts.SCM_ROOT_CA_PREFIX + scmId));
+  }
+
+  @VisibleForTesting
+  static X509Certificate getSubCertificate(
       Map<BigInteger, X509Certificate> allCerts, String hostName, String scmId) throws Exception {
     Optional<X509Certificate> cert = allCerts.values().stream().filter(
         c -> c.getSubjectDN().getName()

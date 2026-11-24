@@ -43,13 +43,17 @@ import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.cert.CertPath;
+import java.security.cert.CertPathValidator;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
+import java.security.cert.PKIXParameters;
+import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -256,6 +260,42 @@ public class TestDefaultCAServer {
     assertEquals(replacement, signedCommonName(testCA, longSubject, scmId, clusterId, replacement));
     assertEquals("om@host1.example.com",
         signedCommonName(testCA, "om@host1.example.com", scmId, clusterId, replacement));
+  }
+
+  /**
+   * Tests that a CA whose own commonName is longer than 64 characters, like a root CA created before Bouncy Castle
+   * 1.85, still issues certificates that validate against it.
+   */
+  @Test
+  public void testCAWithLongSubjectSignsCertificate() throws Exception {
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
+    String caSubject = "scm@aaaa-ozone-000-scm-0.aaa-ozone-000-scm-headless.aaaa-data.svc.cluster.local";
+    CertificateServer testCA = new DefaultCAServer(caSubject, clusterId, scmId, caStore, new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    testCA.init(securityConfig, CAType.ROOT);
+    X509Certificate caCert = testCA.getCACertificate();
+    assertEquals(caSubject, X500Name.getInstance(caCert.getSubjectX500Principal().getEncoded())
+        .getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .setCA(false)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject("om@host1.example.com")
+        .setConfiguration(securityConfig)
+        .setKey(new HDDSKeyGenerator(securityConfig).generateKey())
+        .build()
+        .generateCSR();
+    X509Certificate signedCert = CertificateCodec.firstCertificateFrom(testCA.requestCertificate(csr,
+        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM, String.valueOf(System.nanoTime())).get());
+
+    assertEquals(caCert.getSubjectX500Principal(), signedCert.getIssuerX500Principal());
+    PKIXParameters params = new PKIXParameters(Collections.singleton(new TrustAnchor(caCert, null)));
+    params.setRevocationEnabled(false);
+    CertPathValidator.getInstance("PKIX").validate(
+        CertificateFactory.getInstance("X.509").generateCertPath(Collections.singletonList(signedCert)), params);
   }
 
   private String signedCommonName(CertificateServer ca, String subject, String scmId, String clusterId,

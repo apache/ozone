@@ -51,7 +51,6 @@ import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.asn1.DERUTF8String;
 import org.bouncycastle.asn1.pkcs.Attribute;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
-import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -132,12 +131,6 @@ public final class CertificateSignRequest {
    */
   public static String commonName(String preferred, String prefix, String id) {
     return preferred.length() <= MAX_COMMON_NAME_LENGTH ? preferred : prefix + "@" + id;
-  }
-
-  /** The SCM ID in the OU of a CSR subject, see {@link #getDistinguishedName}, or null without an OU. */
-  public static String getScmId(PKCS10CertificationRequest csr) {
-    RDN[] ou = csr.getSubject().getRDNs(BCStyle.OU);
-    return ou.length == 0 ? null : ou[0].getFirst().getValue().toString();
   }
 
   /** The {@link #commonName} prefix for a certificate of {@code role}. */
