@@ -197,6 +197,7 @@ jobs:
       - name: Fetch NPM dependencies
         if: steps.restore-pnpm.outputs.cache-hit != 'true'
         run: |
+          export MAVEN_ARGS="$MAVEN_ARGS --offline"
           ./mvnw -pl :ozone-recon com.github.eirslett:frontend-maven-plugin:install-node-and-pnpm
           run_pnpm() {
             ./mvnw -pl :ozone-recon com.github.eirslett:frontend-maven-plugin:pnpm -Dfrontend.pnpm.arguments="$1"
