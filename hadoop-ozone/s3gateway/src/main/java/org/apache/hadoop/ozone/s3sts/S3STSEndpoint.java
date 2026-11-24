@@ -124,9 +124,17 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   @Inject
   private RequestIdentifier requestIdentifier;
 
+  @Inject
+  private S3STSDurationConfig stsDurationConfig;
+
   @VisibleForTesting
   public void setRequestIdentifier(RequestIdentifier requestIdentifier) {
     this.requestIdentifier = requestIdentifier;
+  }
+
+  @VisibleForTesting
+  public void setS3STSDurationConfig(S3STSDurationConfig config) {
+    this.stsDurationConfig = config;
   }
 
   /**
@@ -225,7 +233,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     int duration = S3STSUtils.DEFAULT_DURATION_SECONDS;
     String durationValidationError = null;
     try {
-      duration = S3STSUtils.validateDuration(durationSeconds);
+      duration = S3STSUtils.validateDuration(durationSeconds, stsDurationConfig.getMinDurationSeconds());
     } catch (OMException e) {
       durationValidationError = e.getMessage();
     }

@@ -93,7 +93,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
         // committed key.
         throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId);
       }
-      Response r = abortMultipartUpload(context.getBucketName(), keyPath, uploadId);
+      Response r = abortMultipartUpload(context.getCachedVolumeName(), context.getBucketName(), keyPath, uploadId);
 
       getMetrics().updateAbortMultipartUploadSuccessStats(context.getStartNanos());
       return r;
@@ -104,10 +104,10 @@ class MultipartKeyHandler extends ObjectOperationHandler {
     }
   }
 
-  private Response abortMultipartUpload(String bucket,
+  private Response abortMultipartUpload(String volumeName, String bucket,
       String key, String uploadId) throws IOException, OS3Exception {
     try {
-      getClientProtocol().abortS3MultipartUpload(bucket, key, uploadId);
+      getClientProtocol().abortMultipartUpload(volumeName, bucket, key, uploadId);
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw newError(S3ErrorTable.NO_SUCH_UPLOAD, uploadId, ex);

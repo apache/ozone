@@ -20,11 +20,15 @@ package org.apache.hadoop.hdds.client;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.XOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -33,6 +37,11 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Unit test for ECReplicationConfig.
  */
 class TestECReplicationConfig {
+
+  @BeforeEach
+  void clearCache() {
+    ECReplicationConfig.clearCache();
+  }
 
   @Test
   void testSuccessfulStringParsing() {
@@ -59,6 +68,96 @@ class TestECReplicationConfig {
   void testUnsuccessfulStringParsing(String invalidValue) {
     assertThrows(IllegalArgumentException.class,
             () -> new ECReplicationConfig(invalidValue));
+    assertThrows(IllegalArgumentException.class, () -> ECReplicationConfig.getInstance(invalidValue));
+  }
+
+  @Test
+  void testGetInstanceReusesInstance() {
+    ECReplicationConfig config = ECReplicationConfig.getInstance("rs-6-3-1024k");
+    assertEquals(new ECReplicationConfig(6, 3, RS, 1024 * 1024), config);
+
+    assertSame(config, ECReplicationConfig.getInstance("RS-6-3-1024K"));
+    assertSame(config, ECReplicationConfig.getInstance(config.toProto()));
+    assertSame(config, ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null, config.toProto()));
+    assertSame(config, ReplicationConfig.parse(ReplicationType.EC, "rs-6-3-1024k", new OzoneConfiguration()));
+
+    assertNotSame(config, ECReplicationConfig.getInstance("rs-6-3-2048k"));
+  }
+
+  /** Any config is shared, not only the ones allowed by default, whichever form it is decoded from. */
+  @ParameterizedTest
+  @ValueSource(strings = {"rs-3-2-1024k", "rs-6-3-1024k", "rs-10-4-4096k", "rs-4-2-1024k", "xor-3-1-512k"})
+  void testGetInstanceSharesAnyConfig(String string) {
+    final ECReplicationConfig config = ECReplicationConfig.getInstance(string);
+    assertEquals(new ECReplicationConfig(string), config);
+
+    assertSame(config, ECReplicationConfig.getInstance(string));
+    assertSame(config, ECReplicationConfig.getInstance(string.toUpperCase()));
+    assertSame(config, ECReplicationConfig.getInstance(config.getCodec() + "-" + config.getData() + "-"
+        + config.getParity() + "-" + config.getEcChunkSize()));
+    assertSame(config, ECReplicationConfig.getInstance(config.toProto()));
+    assertSame(config, ECReplicationConfig.getInstance(config.toProto().toBuilder()
+        .setCodec(config.getCodec().name()).build()));
+  }
+
+  /** The constructor still creates a new object, also for a shared config. */
+  @ParameterizedTest
+  @ValueSource(strings = {"rs-6-3-1024k", "RS-6-3-1024K", "rs-4-2-1024k"})
+  void testConstructorCreatesNewInstance(String string) {
+    final ECReplicationConfig config = new ECReplicationConfig(string);
+    assertEquals(ECReplicationConfig.getInstance(string), config);
+    assertNotSame(ECReplicationConfig.getInstance(string), config);
+    assertNotSame(new ECReplicationConfig(string), config);
+  }
+
+  /** The cache is bounded, so a client sending arbitrary configs cannot grow it without limit. */
+  @Test
+  void testGetInstanceIsBounded() {
+    final ECReplicationConfig cachedFromString = ECReplicationConfig.getInstance("rs-6-3-1024k");
+    final ECReplicationConfig cachedFromProto = ECReplicationConfig.getInstance(new ECReplicationConfig(3, 2)
+        .toProto());
+    for (int data = 1; data <= ECReplicationConfig.MAX_CACHED_STRINGS; data++) {
+      final String string = "rs-" + data + "-1-1024k";
+      assertEquals(new ECReplicationConfig(string), ECReplicationConfig.getInstance(string));
+    }
+
+    // a new config is still decoded, but not shared any more
+    final String string = "rs-6-1-8192k";
+    final ECReplicationConfig expected = new ECReplicationConfig(string);
+    final ECReplicationConfig fromString = ECReplicationConfig.getInstance(string);
+    assertEquals(expected, fromString);
+    assertNotSame(fromString, ECReplicationConfig.getInstance(string));
+    final ECReplicationConfig fromProto = ECReplicationConfig.getInstance(expected.toProto());
+    assertEquals(expected, fromProto);
+    assertNotSame(fromProto, ECReplicationConfig.getInstance(expected.toProto()));
+
+    // the configs cached before are still shared
+    assertSame(cachedFromString, ECReplicationConfig.getInstance("rs-6-3-1024k"));
+    assertSame(cachedFromString, ECReplicationConfig.getInstance(cachedFromString.toProto()));
+    assertSame(cachedFromProto, ECReplicationConfig.getInstance(cachedFromProto.toProto()));
+    assertSame(cachedFromProto, ECReplicationConfig.getInstance("rs-3-2-1024k"));
+  }
+
+  /** Once the configs are full, a string is still cached, so the same string returns the same instance. */
+  @Test
+  void testGetInstanceCachesStringsAfterConfigsAreFull() {
+    for (int data = 1; data <= ECReplicationConfig.MAX_CACHED_CONFIGS; data++) {
+      ECReplicationConfig.getInstance(new ECReplicationConfig(data, 1).toProto());
+    }
+
+    final String string = "rs-6-1-8192k";
+    final ECReplicationConfig config = ECReplicationConfig.getInstance(string);
+    assertEquals(new ECReplicationConfig(string), config);
+    assertSame(config, ECReplicationConfig.getInstance(string));
+    assertNotSame(config, ECReplicationConfig.getInstance(config.toProto()));
+  }
+
+  @Test
+  void testGetInstanceRejectsUnknownCodec() {
+    final HddsProtos.ECReplicationConfig proto = new ECReplicationConfig(6, 3).toProto().toBuilder()
+        .setCodec("foo").build();
+    assertThrows(IllegalArgumentException.class, () -> new ECReplicationConfig(proto));
+    assertThrows(IllegalArgumentException.class, () -> ECReplicationConfig.getInstance(proto));
   }
 
   @Test

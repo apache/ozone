@@ -31,8 +31,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -80,8 +78,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     return Arrays.asList(FILE_TABLE, DIRECTORY_TABLE, DELETED_DIR_TABLE);
   }
 
-  public Pair<Integer, Boolean> processWithFSO(OMUpdateEventBatch events,
-                                               int seekPos) {
+  public ProcessResult processWithFSO(OMUpdateEventBatch events, int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     int itrPos = 0;
     while (eventIterator.hasNext() && itrPos < seekPos) {
@@ -120,7 +117,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           // Same list of objectIdsToBeDeleted is used for follow up flush operation as well and done intentionally
           // to make sure that after final flush all objectIds are deleted from NSSummary table.
           if (!flushAndCommitUpdatedNSToDB(nsSummaryMap, objectIdsToBeDeleted)) {
-            return new ImmutablePair<>(seekPos, false);
+            return new ProcessResult(seekPos, false);
           }
           seekPos = itrPos + eventCounter;
         }
@@ -128,7 +125,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
             ex);
         nsSummaryMap.clear();
-        return new ImmutablePair<>(seekPos, false);
+        return new ProcessResult(seekPos, false);
       }
     }
     // flush and commit left out entries at end.
@@ -136,11 +133,11 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     // Same list of objectIdsToBeDeleted is used this final flush operation as well and done intentionally
     // to make sure that after final flush all objectIds are deleted from NSSummary table.
     if (!flushAndCommitUpdatedNSToDB(nsSummaryMap, objectIdsToBeDeleted)) {
-      return new ImmutablePair<>(seekPos, false);
+      return new ProcessResult(seekPos, false);
     }
 
     LOG.debug("Completed a process run of NSSummaryTaskWithFSO");
-    return new ImmutablePair<>(itrPos + eventCounter, true);
+    return new ProcessResult(itrPos + eventCounter, true);
   }
 
   private void handleUpdateOnDirTable(OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent,

@@ -213,6 +213,54 @@ class TestS3ClientProtocol {
     verify(delegate, times(resolveOnOm ? 0 : 2)).getS3VolumeContext();
   }
 
+  @ParameterizedTest
+  @EnumSource(OzoneManagerVersion.class)
+  void resolvesS3ContextVolumeForMultipartAbort(OzoneManagerVersion version) throws Exception {
+    when(delegate.getOmVersion()).thenReturn(version);
+    when(delegate.getS3VolumeContext()).thenReturn(volumeContext("tenant-volume"));
+
+    client.abortMultipartUpload(null, "bucket", "key", "upload-id");
+
+    boolean resolveOnOm = OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version);
+    verify(delegate).abortMultipartUpload(resolveOnOm ? null : "tenant-volume", "bucket", "key", "upload-id");
+    verify(delegate, times(resolveOnOm ? 0 : 1)).getS3VolumeContext();
+  }
+
+  @ParameterizedTest
+  @EnumSource(OzoneManagerVersion.class)
+  void multipartAbortPreservesResolvedVolume(OzoneManagerVersion version) throws Exception {
+    ClientProtocol versionedClient = createClient(version);
+
+    versionedClient.abortMultipartUpload("tenant-volume", "bucket", "key", "upload-id");
+
+    verify(delegate).abortMultipartUpload("tenant-volume", "bucket", "key", "upload-id");
+    verify(delegate, never()).getS3VolumeContext();
+  }
+
+  @Test
+  void multipartAbortUsesCurrentOmVersion() throws Exception {
+    when(delegate.getOmVersion()).thenReturn(OzoneManagerVersion.ZDU, OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION);
+    when(delegate.getS3VolumeContext()).thenReturn(volumeContext("tenant-volume"));
+
+    client.abortMultipartUpload(null, "bucket", "key", "upload-id");
+    client.abortMultipartUpload(null, "bucket", "key", "upload-id");
+
+    verify(delegate).abortMultipartUpload("tenant-volume", "bucket", "key", "upload-id");
+    verify(delegate).abortMultipartUpload(null, "bucket", "key", "upload-id");
+    verify(delegate).getS3VolumeContext();
+  }
+
+  @Test
+  void doesNotAbortWhenVolumeResolutionFails() throws Exception {
+    when(delegate.getOmVersion()).thenReturn(OzoneManagerVersion.ZDU);
+    IOException failure = new IOException("Volume lookup failed");
+    when(delegate.getS3VolumeContext()).thenThrow(failure);
+
+    assertSame(failure,
+        assertThrows(IOException.class, () -> client.abortMultipartUpload(null, "bucket", "key", "upload-id")));
+    verify(delegate, never()).abortMultipartUpload(any(), anyString(), anyString(), anyString());
+  }
+
   @Test
   void multipartListingUsesCurrentOmVersion() throws Exception {
     when(delegate.getOmVersion()).thenReturn(OzoneManagerVersion.ZDU, OzoneManagerVersion.ZDU,
