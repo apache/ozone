@@ -33,9 +33,6 @@ public final class Retention {
   public Retention(RetentionMode retentionMode, RetentionDuration duration, RetentionDuration defaultEventHold) {
     this.retentionMode = Objects.requireNonNull(retentionMode, "retention mode is null");
     this.duration = duration;
-    if (defaultEventHold != null) {
-      RetentionUtil.validateEventHoldRule(defaultEventHold);
-    }
     this.defaultEventHold = defaultEventHold;
   }
 
