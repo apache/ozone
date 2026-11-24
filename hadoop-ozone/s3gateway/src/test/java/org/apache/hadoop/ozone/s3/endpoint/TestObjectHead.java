@@ -323,7 +323,9 @@ public class TestObjectHead {
     bucket.createDirectory(keyPath);
 
     // THEN
-    assertSucceeds(() -> keyEndpoint.head(bucketName, keyPath));
+    Response response = keyEndpoint.head(bucketName, keyPath);
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    assertEquals("application/x-directory", response.getHeaderString(HttpHeaders.CONTENT_TYPE));
   }
 
   @Test

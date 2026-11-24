@@ -128,6 +128,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   private static final String PATH = "path";
   // Default Content-Type for objects stored without one, matching S3.
   private static final String DEFAULT_CONTENT_TYPE = "binary/octet-stream";
+  // Content-Type of FSO directory keys, the marker clients use to recognize directories.
+  private static final String DIRECTORY_CONTENT_TYPE = "application/x-directory";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ObjectEndpoint.class);
@@ -585,8 +587,14 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
   }
 
-  /** Returns the object's stored Content-Type, or the default if absent. */
+  /**
+   * Returns {@code application/x-directory} for FSO directory keys, otherwise
+   * the object's stored Content-Type, or the default if absent.
+   */
   private static String contentTypeOf(OzoneKey key) {
+    if (!key.isFile()) {
+      return DIRECTORY_CONTENT_TYPE;
+    }
     String contentType = key.getMetadata().get(HttpHeaders.CONTENT_TYPE);
     return contentType != null ? contentType : DEFAULT_CONTENT_TYPE;
   }

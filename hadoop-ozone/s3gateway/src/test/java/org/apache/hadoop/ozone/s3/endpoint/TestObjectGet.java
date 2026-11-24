@@ -514,6 +514,20 @@ public class TestObjectGet {
     assertErrorResponse(NO_SUCH_KEY, () -> get(rest, BUCKET_NAME, keyPath));
   }
 
+  @Test
+  public void testGetWhenKeyIsDirectoryAndEndsWithASlash()
+      throws IOException, OS3Exception {
+    final String keyPath = "keyDir/";
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
+    rest.setOzoneConfiguration(config);
+    bucket.createDirectory(keyPath);
+
+    Response response = get(rest, BUCKET_NAME, keyPath);
+    assertEquals(200, response.getStatus());
+    assertEquals("application/x-directory", response.getHeaderString("Content-Type"));
+  }
+
   private static String formatHttpDate(Instant instant) {
     return RFC1123Util.FORMAT.format(
         instant.atZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE)));
