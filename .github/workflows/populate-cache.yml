@@ -179,6 +179,8 @@ jobs:
       - name: Setup Java
         id: restore-cache
         uses: $/.github/actions/setup-java-with-cache
+        with:
+          only-exact-hit: true
 
       - name: Calculate cache key
         id: cache-key
