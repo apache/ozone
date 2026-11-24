@@ -161,7 +161,8 @@ class TestRetention {
       EventHold hold = new EventHold(true, invalid);
       Retention retention = new Retention(RetentionMode.GOVERNANCE, null, invalid);
       assertEquals(retention, Retention.fromProto(retention.toProto()));
-      assertThrows(IllegalArgumentException.class, () -> new ObjectRetention(RetentionMode.GOVERNANCE, null, hold));
+      ObjectRetention objectRetention = new ObjectRetention(RetentionMode.GOVERNANCE, null, hold);
+      assertEquals(objectRetention, ObjectRetention.fromProto(objectRetention.toProto()));
       RetentionUtil.validateRule(invalid);
       new Retention(RetentionMode.GOVERNANCE, invalid, null);
     }

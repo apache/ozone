@@ -32,9 +32,6 @@ public final class ObjectRetention {
   public ObjectRetention(RetentionMode retentionMode, Long retentionDate, EventHold eventHold) {
     this.retentionMode = Objects.requireNonNull(retentionMode, "retention mode is null");
     this.retentionDate = retentionDate;
-    if (eventHold != null) {
-      RetentionUtil.validateEventHoldRule(eventHold.getDuration());
-    }
     this.eventHold = eventHold;
   }
 
