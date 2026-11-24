@@ -139,6 +139,7 @@ class TestOzoneClientConfig {
   @Test
   void testNoDuplicatedKeys() {
     ConfigurationReflectionUtil.assertNoDuplicatedKeys(OzoneClientConfig.class);
+    ConfigurationReflectionUtil.assertNoDuplicatedKeys(XceiverClientManager.class);
   }
 
   @Test
