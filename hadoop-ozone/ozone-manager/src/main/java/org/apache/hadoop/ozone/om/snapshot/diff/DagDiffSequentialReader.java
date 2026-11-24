@@ -50,9 +50,8 @@ import org.apache.hadoop.ozone.util.ClosableIterator;
  * persisted protobuf bytes and compare signatures match on-disk layout.
  *
  * <p>File/key from-side loads are driven by delta table keys batched at {@code writeBatchSize}.
- * Directory {@code DiffCandidateSet} membership is populated only from directory delta SSTs and
- * consulted during the from-side directory scan; directory delta tombstones are tracked in a
- * separate spilled key set with the same in-memory limit.
+ * Directory delta SST keys (puts and tombstones) are recorded in a spilled lookup set consulted
+ * during the from-side directory scan.
  *
  * <p>Sequence gating ({@code fromSnapshot.dbTxSequenceNumber}) is passed to the K-way merge
  * iterator; this reader consumes only entries the iterator emits (tombstones and rows with
@@ -198,16 +197,14 @@ public class DagDiffSequentialReader {
         processedDeltaKeys++;
         SnapDiffProgressHelper.reportEveryTenPercentInSlice(progress, 0.0, DIRECTORY_DELTA_PROGRESS_END,
             processedDeltaKeys, estimatedDeltaKeys, checkpoint);
-        if (entry.isTombstone()) {
-          store.addDirTombstoneKey(entry.getUserKey());
-          continue;
+        store.addDirLookupKey(entry.getUserKey());
+        if (!entry.isTombstone()) {
+          byte[] value = entry.getValue();
+          SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, true);
+          byte[] signature = computeSignature(value, true);
+          store.putNewList(info.getObjectId(),
+              new EntryValue(info.getParentId(), info.getName(), true, signature).toBytes());
         }
-        byte[] value = entry.getValue();
-        SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, true);
-        store.addDiffCandidate(info.getObjectId());
-        byte[] signature = computeSignature(value, true);
-        store.putNewList(info.getObjectId(),
-            new EntryValue(info.getParentId(), info.getName(), true, signature).toBytes());
       }
     } finally {
       entries.close();
@@ -234,7 +231,7 @@ public class DagDiffSequentialReader {
         long objectId = info.getObjectId();
         store.putFromEdge(info.getParentId(), objectId, nameBytes(info.getName()));
 
-        if (store.isDiffCandidate(objectId) || store.isDirTombstoneKey(tableKey)) {
+        if (store.isDirLookupKey(tableKey)) {
           byte[] signature = computeSignature(value, true);
           store.putOldList(objectId,
               new EntryValue(info.getParentId(), info.getName(), true, signature).toBytes());
@@ -247,7 +244,7 @@ public class DagDiffSequentialReader {
       throw new IOException(e);
     }
     store.clearDiffCandidates();
-    store.clearDirTombstoneKeys();
+    store.clearDirLookupKeys();
     store.flushWrites();
     if (progress != null) {
       progress.accept(DIRECTORY_FROM_PROGRESS_END);

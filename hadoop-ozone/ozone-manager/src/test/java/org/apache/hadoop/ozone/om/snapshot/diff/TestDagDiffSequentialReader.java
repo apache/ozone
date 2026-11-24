@@ -159,37 +159,57 @@ class TestDagDiffSequentialReader {
     byte[] oldNameKey = userKey("oldname");
     byte[] newNameKey = userKey("newname");
     byte[] deletedKey = userKey("deleted");
+    byte[] recreatedKey = userKey("recreated");
+    byte[] reoccupiedKey = userKey("reoccupied");
+    byte[] reoccupiedFromKey = userKey("reoccupiedFrom");
 
     byte[] modifyFrom = keyBytes("modify", 2L, 0L, 100L);
     byte[] modifyTo = keyBytes("modify", 2L, 0L, 200L);
     byte[] oldRename = keyBytes("oldname", 3L, 0L, 100L);
     byte[] newRename = keyBytes("newname", 3L, 0L, 100L);
     byte[] deletedFrom = keyBytes("deleted", 4L, 0L, 100L);
+    byte[] oldRecreated = keyBytes("recreated", 5L, 0L, 100L);
+    byte[] newRecreated = keyBytes("recreated", 8L, 0L, 200L);
+    byte[] oldReoccupied = keyBytes("reoccupied", 6L, 0L, 100L);
+    byte[] reoccupiedFrom = keyBytes("reoccupiedFrom", 7L, 0L, 100L);
+    byte[] newReoccupied = keyBytes("reoccupied", 7L, 0L, 100L);
 
     List<MergedKeyValue> delta = Arrays.asList(
         toMergedKV(modifyKey, 70L, 1, modifyTo),
         toMergedKV(oldNameKey, 70L, 0, null),
         toMergedKV(newNameKey, 80L, 1, newRename),
         toMergedKV(deletedKey, 70L, 0, null),
-        toMergedKV(userKey("create"), 80L, 1, keyBytes("create", 1L, 0L, 100L)));
+        toMergedKV(userKey("create"), 80L, 1, keyBytes("create", 1L, 0L, 100L)),
+        toMergedKV(recreatedKey, 80L, 1, newRecreated),
+        toMergedKV(reoccupiedFromKey, 80L, 0, reoccupiedFrom),
+        toMergedKV(reoccupiedKey, 80L, 1, newReoccupied));
 
     DirectoryTables directoryTables = directoryTables(InMemoryTestTable.forRawBytes(DIRECTORY_TABLE),
         InMemoryTestTable.forRawBytes(DIRECTORY_TABLE));
 
     try (SnapDiffJobStore store = newStore(false)) {
       runReader(store, false, gate, delta, Collections.emptyList(),
-          rawFileTable(modifyKey, modifyFrom, oldNameKey, oldRename, deletedKey, deletedFrom),
+          rawFileTable(modifyKey, modifyFrom, oldNameKey, oldRename, deletedKey, deletedFrom,
+              recreatedKey, oldRecreated, reoccupiedKey, oldReoccupied, reoccupiedFromKey, reoccupiedFrom),
           directoryTables);
 
       assertNotNull(store.getNewList(1L)); // CREATE
       assertNotNull(store.getNewList(2L)); // MODIFY
       assertNotNull(store.getNewList(3L)); // RENAME target
       assertNull(store.getNewList(4L));    // DELETE tombstone only
+      assertNotNull(store.getNewList(8L)); // RECREATED key new entry
+      assertNull(store.getNewList(5L));
+      assertNotNull(store.getNewList(7L)); // REOCCUPIED path new entry
+      assertNull(store.getNewList(6L));
 
       assertNull(store.getOldList(1L));    // CREATE has no from entry
       assertNotNull(store.getOldList(2L));
       assertNotNull(store.getOldList(3L));
       assertNotNull(store.getOldList(4L));
+      assertNotNull(store.getOldList(5L)); // RECREATED key old entry which is deleted and recreated
+      assertNotNull(store.getOldList(6L)); // REOCCUPIED path old entry that is deleted
+      assertNotNull(store.getOldList(7L)); // source of REOCCUPIED path new entry
+
       assertEquals(0, store.getDiffCandidateCount());
 
       EntryValue newRenameVal = EntryValue.fromBytes(store.getNewList(3L));
@@ -212,6 +232,9 @@ class TestDagDiffSequentialReader {
     byte[] oldNameKey = userKey("oldname");
     byte[] newNameKey = userKey("newname");
     byte[] deletedKey = userKey("deleted");
+    byte[] recreatedKey = userKey("recreated");
+    byte[] reoccupiedKey = userKey("reoccupied");
+    byte[] reoccupiedFromKey = userKey("reoccupiedFrom");
 
     byte[] createTo = dirBytes("create", 1L, BUCKET_OBJECT_ID);
     byte[] modifyFrom = dirBytes("modify", 2L, BUCKET_OBJECT_ID, metadata("ver", "from"));
@@ -219,17 +242,27 @@ class TestDagDiffSequentialReader {
     byte[] oldRename = dirBytes("oldname", 3L, BUCKET_OBJECT_ID);
     byte[] newRename = dirBytes("newname", 3L, BUCKET_OBJECT_ID);
     byte[] deletedFrom = dirBytes("deleted", 4L, BUCKET_OBJECT_ID);
+    byte[] oldRecreated = dirBytes("recreated", 5L, BUCKET_OBJECT_ID);
+    byte[] newRecreated = dirBytes("recreated", 8L, BUCKET_OBJECT_ID);
+    byte[] oldReoccupied = dirBytes("reoccupied", 6L, BUCKET_OBJECT_ID);
+    byte[] reoccupiedFrom = dirBytes("reoccupiedFrom", 7L, BUCKET_OBJECT_ID);
+    byte[] newReoccupied = dirBytes("reoccupied", 7L, BUCKET_OBJECT_ID);
 
     List<MergedKeyValue> dirDelta = Arrays.asList(
         toMergedKV(modifyKey, 70L, 1, modifyTo),
         toMergedKV(oldNameKey, 70L, 0, null),
         toMergedKV(newNameKey, 80L, 1, newRename),
         toMergedKV(deletedKey, 70L, 0, null),
-        toMergedKV(createKey, 80L, 1, createTo));
+        toMergedKV(createKey, 80L, 1, createTo),
+        toMergedKV(recreatedKey, 80L, 1, newRecreated),
+        toMergedKV(reoccupiedFromKey, 80L, 0, reoccupiedFrom),
+        toMergedKV(reoccupiedKey, 80L, 1, newReoccupied));
 
     DirectoryTables dirTables = directoryTables(
-        rawDirectoryTable(modifyKey, modifyFrom, oldNameKey, oldRename, deletedKey, deletedFrom),
-        rawDirectoryTable(createKey, createTo, modifyKey, modifyTo, newNameKey, newRename));
+        rawDirectoryTable(modifyKey, modifyFrom, oldNameKey, oldRename, deletedKey, deletedFrom,
+            recreatedKey, oldRecreated, reoccupiedKey, oldReoccupied, reoccupiedFromKey, reoccupiedFrom),
+        rawDirectoryTable(createKey, createTo, modifyKey, modifyTo, newNameKey, newRename,
+            recreatedKey, newRecreated, reoccupiedKey, newReoccupied));
 
     try (SnapDiffJobStore store = newStore(true)) {
       runReader(store, true, gate, Collections.emptyList(), dirDelta, rawFileTable(), dirTables);
@@ -238,11 +271,18 @@ class TestDagDiffSequentialReader {
       assertNotNull(store.getNewList(2L)); // MODIFY
       assertNotNull(store.getNewList(3L)); // RENAME target
       assertNull(store.getNewList(4L));    // DELETE tombstone only
+      assertNotNull(store.getNewList(8L)); // RECREATED dir new entry
+      assertNull(store.getNewList(5L));
+      assertNotNull(store.getNewList(7L)); // REOCCUPIED dir new entry
+      assertNull(store.getNewList(6L));
 
       assertNull(store.getOldList(1L));    // CREATE has no from entry
       assertNotNull(store.getOldList(2L));
       assertNotNull(store.getOldList(3L));
       assertNotNull(store.getOldList(4L));
+      assertNotNull(store.getOldList(5L)); // RECREATED dir old entry which is deleted and recreated
+      assertNotNull(store.getOldList(6L)); // REOCCUPIED dir old entry that is deleted
+      assertNotNull(store.getOldList(7L)); // source of REOCCUPIED path new entry
       assertEquals(0, store.getDiffCandidateCount());
 
       EntryValue createVal = EntryValue.fromBytes(store.getNewList(1L));
@@ -266,11 +306,15 @@ class TestDagDiffSequentialReader {
       assertFromEdge(store, 2L, BUCKET_OBJECT_ID, "modify");
       assertFromEdge(store, 3L, BUCKET_OBJECT_ID, "oldname");
       assertFromEdge(store, 4L, BUCKET_OBJECT_ID, "deleted");
+      assertFromEdge(store, 5L, BUCKET_OBJECT_ID, "recreated");
+      assertFromEdge(store, 6L, BUCKET_OBJECT_ID, "reoccupied");
 
       assertToEdge(store, 1L, BUCKET_OBJECT_ID, "create");
       assertToEdge(store, 2L, BUCKET_OBJECT_ID, "modify");
       assertToEdge(store, 3L, BUCKET_OBJECT_ID, "newname");
       assertToEdge(store, 4L, null, null);
+      assertToEdge(store, 8L, BUCKET_OBJECT_ID, "recreated");
+      assertToEdge(store, 7L, BUCKET_OBJECT_ID, "reoccupied");
     }
   }
 

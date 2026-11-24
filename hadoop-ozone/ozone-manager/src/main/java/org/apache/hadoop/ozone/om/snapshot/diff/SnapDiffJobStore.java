@@ -62,7 +62,7 @@ import org.rocksdb.RocksDBException;
  * Owns the per-job temporary RocksDB column families and batched writes shared
  * between optimized snapshot diff pipeline stages.
  *
- * <p>Diff-candidate {@code objectId}s and DAG directory tombstone table keys are held in
+ * <p>Full-diff diff-candidate {@code objectId}s and DAG directory table-key lookup sets are held in
  * memory while their count is at most {@code maxInMemoryEntries}; larger sets spill to a
  * temporary column family. Deleted and renamed directory object ids collected during merge
  * join use the same in-memory limit and spill policy.
@@ -86,13 +86,13 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /** Reverse edge value header: parentId (8 BE) + nameLen (4 BE). */
   static final int EDGE_LINK_HEADER_BYTES = Long.BYTES + Integer.BYTES;
 
-  private static final Comparator<byte[]> TOMBSTONE_KEY_COMPARATOR =
+  private static final Comparator<byte[]> LOOKUP_KEY_COMPARATOR =
       UnsignedBytes.lexicographicalComparator();
 
   private static final String NEW_LIST_SUFFIX = "-new-list";
   private static final String OLD_LIST_SUFFIX = "-old-list";
   private static final String CAND_IDS_SUFFIX = "-cand-ids";
-  private static final String DIR_TOMBSTONE_KEYS_SUFFIX = "-dir-tombstone-keys";
+  private static final String DIR_LOOKUP_KEYS_SUFFIX = "-dir-lookup-keys";
   private static final String TO_EDGES_SUFFIX = "-to-edges";
   private static final String FROM_EDGES_SUFFIX = "-from-edges";
   private static final String CLASSIFIED_CREATE_SUFFIX = "-cls-create";
@@ -128,10 +128,10 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private ColumnFamilyHandle diffCandidatesCf;
   private boolean diffCandidatesSpilled;
 
-  private String dirTombstoneKeysCfName;
-  private final NavigableSet<byte[]> dirTombstoneKeys;
-  private ColumnFamilyHandle dirTombstoneKeysCf;
-  private boolean dirTombstoneKeysSpilled;
+  private String dirLookupKeysCfName;
+  private final NavigableSet<byte[]> dirLookupKeys;
+  private ColumnFamilyHandle dirLookupKeysCf;
+  private boolean dirLookupKeysSpilled;
 
   private final Set<Long> deletedDirectoryIds;
   private final Set<Long> renamedDirectoryIds;
@@ -178,7 +178,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     this.writeOptions = new ManagedWriteOptions();
     this.pendingOps = 0;
     this.diffCandidates = new HashSet<>();
-    this.dirTombstoneKeys = new TreeSet<>(TOMBSTONE_KEY_COMPARATOR);
+    this.dirLookupKeys = new TreeSet<>(LOOKUP_KEY_COMPARATOR);
     this.deletedDirectoryIds = new HashSet<>();
     this.renamedDirectoryIds = new HashSet<>();
   }
@@ -484,36 +484,36 @@ public final class SnapDiffJobStore implements AutoCloseable {
     return diffCandidates.size();
   }
 
-  /** Records a directory-table tombstone key from a DAG delta SST scan. */
-  public void addDirTombstoneKey(byte[] tableKey) throws IOException {
-    if (dirTombstoneKeysSpilled) {
-      batchPut(dirTombstoneKeysCf, tableKey, presentMarker);
+  /** Records a directory-table key touched in a DAG delta SST scan (put or tombstone). */
+  public void addDirLookupKey(byte[] tableKey) throws IOException {
+    if (dirLookupKeysSpilled) {
+      batchPut(dirLookupKeysCf, tableKey, presentMarker);
       return;
     }
-    if (dirTombstoneKeys.size() >= maxInMemoryEntries) {
-      spillDirTombstoneKeys();
+    if (dirLookupKeys.size() >= maxInMemoryEntries) {
+      spillDirLookupKeys();
     }
-    if (dirTombstoneKeysSpilled) {
-      batchPut(dirTombstoneKeysCf, tableKey, presentMarker);
+    if (dirLookupKeysSpilled) {
+      batchPut(dirLookupKeysCf, tableKey, presentMarker);
     } else {
-      dirTombstoneKeys.add(tableKey);
+      dirLookupKeys.add(tableKey);
     }
   }
 
-  /** Returns whether {@code tableKey} was recorded as a directory delta tombstone. */
-  public boolean isDirTombstoneKey(byte[] tableKey) throws IOException {
-    if (dirTombstoneKeysSpilled) {
-      return get(dirTombstoneKeysCf, tableKey) != null;
+  /** Returns whether {@code tableKey} was recorded from a directory delta SST scan. */
+  public boolean isDirLookupKey(byte[] tableKey) throws IOException {
+    if (dirLookupKeysSpilled) {
+      return get(dirLookupKeysCf, tableKey) != null;
     }
-    return dirTombstoneKeys.contains(tableKey);
+    return dirLookupKeys.contains(tableKey);
   }
 
-  /** Clears directory tombstone keys after the from-side directory scan. */
-  public void clearDirTombstoneKeys() {
-    dirTombstoneKeys.clear();
-    if (dirTombstoneKeysSpilled) {
-      dropAndClose(dirTombstoneKeysCf);
-      dirTombstoneKeysSpilled = false;
+  /** Clears directory delta lookup keys after the from-side directory scan. */
+  public void clearDirLookupKeys() {
+    dirLookupKeys.clear();
+    if (dirLookupKeysSpilled) {
+      dropAndClose(dirLookupKeysCf);
+      dirLookupKeysSpilled = false;
     }
   }
 
@@ -706,7 +706,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     newListCf = createColumnFamily(this.jobId + NEW_LIST_SUFFIX);
     oldListCf = createColumnFamily(this.jobId + OLD_LIST_SUFFIX);
     diffCandCfName = this.jobId + CAND_IDS_SUFFIX;
-    dirTombstoneKeysCfName = this.jobId + DIR_TOMBSTONE_KEYS_SUFFIX;
+    dirLookupKeysCfName = this.jobId + DIR_LOOKUP_KEYS_SUFFIX;
     deletedDirectoryIdsCfName = this.jobId + DELETED_DIR_IDS_SUFFIX;
     renamedDirectoryIdsCfName = this.jobId + RENAMED_DIR_IDS_SUFFIX;
     classifiedCreateCf = createColumnFamily(this.jobId + CLASSIFIED_CREATE_SUFFIX);
@@ -734,19 +734,19 @@ public final class SnapDiffJobStore implements AutoCloseable {
     diffCandidatesSpilled = true;
   }
 
-  private void spillDirTombstoneKeys() throws IOException {
+  private void spillDirLookupKeys() throws IOException {
     try {
-      dirTombstoneKeysCf = createColumnFamily(dirTombstoneKeysCfName);
+      dirLookupKeysCf = createColumnFamily(dirLookupKeysCfName);
     } catch (RocksDBException e) {
-      throw new IOException("Failed to create directory tombstone key column family "
-          + dirTombstoneKeysCfName, e);
+      throw new IOException("Failed to create directory delta lookup key column family "
+          + dirLookupKeysCfName, e);
     }
-    for (byte[] tableKey : dirTombstoneKeys) {
-      batchPut(dirTombstoneKeysCf, tableKey, presentMarker);
+    for (byte[] tableKey : dirLookupKeys) {
+      batchPut(dirLookupKeysCf, tableKey, presentMarker);
     }
-    dirTombstoneKeys.clear();
+    dirLookupKeys.clear();
     flushWrites();
-    dirTombstoneKeysSpilled = true;
+    dirLookupKeysSpilled = true;
   }
 
   private void spillDeletedDirectoryIds() throws IOException {
