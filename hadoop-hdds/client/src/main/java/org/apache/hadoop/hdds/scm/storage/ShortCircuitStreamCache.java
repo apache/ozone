@@ -60,7 +60,7 @@ public class ShortCircuitStreamCache implements Closeable {
     this.cache = Caffeine.newBuilder()
         .recordStats()
         .maximumSize(maxSize)
-        .expireAfterWrite(expiryMs, MILLISECONDS)
+        .expireAfterAccess(expiryMs, MILLISECONDS)
         // run the maintenance and the removal listener on the calling thread, so that close() collects the clients
         .executor(Runnable::run)
         .removalListener((key, info, cause) -> onRemoval((Replica) info))

@@ -110,6 +110,10 @@ public class LocalChunkInputStream extends ChunkInputStream
   private long readAtOffset(ByteBuffer buffer, long fileOffset) throws IOException {
     long pos = fileOffset;
     while (buffer.hasRemaining()) {
+      // Reads from the shared FileInputStream's FileChannel.
+      // If this thread is interrupted, Java NIO closes the channel and throws
+      // ClosedByInterruptException; other threads get AsynchronousCloseException
+      // or ClosedChannelException.
       final int n = dataIn.read(buffer, pos);
       if (n < 0) {
         break;

@@ -17,39 +17,54 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -61,6 +76,8 @@ import org.junit.jupiter.api.io.TempDir;
 class TestShortCircuitStreamCache {
 
   private static final long EXPIRY_MS = TimeUnit.MINUTES.toMillis(5);
+  private static final int CHUNK_LEN = 512;
+  private static final int BLOCK_LEN = 2 * CHUNK_LEN;
 
   @TempDir
   private Path dir;
@@ -90,7 +107,7 @@ class TestShortCircuitStreamCache {
       Thread.sleep(10);
 
       assertNull(cache.acquire(blockID(1, 5), 100));
-      assertTrue(replica.isClosed());
+      GenericTestUtils.waitFor(replica::isClosed, 10, 1000);
     }
   }
 
@@ -222,6 +239,129 @@ class TestShortCircuitStreamCache {
     }
   }
 
+  @Test
+  void testInterruptedReaderDoesNotFailOtherSequentialReader() throws Exception {
+    assertOtherReaderRecoversFromInterruptedReader((stream, buffer) -> { },
+        (stream, buffer) -> assertEquals(BLOCK_LEN, stream.read(buffer, 0, BLOCK_LEN)));
+  }
+
+  @Test
+  void testInterruptedReaderDoesNotResetOtherSequentialReaderPosition() throws Exception {
+    final int firstLen = CHUNK_LEN + CHUNK_LEN / 2;
+    assertOtherReaderRecoversFromInterruptedReader(
+        (stream, buffer) -> assertEquals(firstLen, stream.read(buffer, 0, firstLen)),
+        (stream, buffer) -> assertEquals(BLOCK_LEN - firstLen, stream.read(buffer, firstLen, BLOCK_LEN - firstLen)));
+  }
+
+  @Test
+  void testInterruptedReaderDoesNotFailOtherPositionedReader() throws Exception {
+    assertOtherReaderRecoversFromInterruptedReader((stream, buffer) -> { },
+        (stream, buffer) -> assertEquals(BLOCK_LEN, stream.read(0, ByteBuffer.wrap(buffer))));
+  }
+
+  @Test
+  void testInterruptedReaderDoesNotFailOtherPositionedReaderFromNonZeroOffset() throws Exception {
+    final int firstLen = CHUNK_LEN + CHUNK_LEN / 2;
+    assertOtherReaderRecoversFromInterruptedReader(
+        (stream, buffer) -> assertEquals(firstLen, stream.read(0, ByteBuffer.wrap(buffer, 0, firstLen))),
+        (stream, buffer) -> assertEquals(BLOCK_LEN - firstLen,
+            stream.read(firstLen, ByteBuffer.wrap(buffer, firstLen, BLOCK_LEN - firstLen))));
+  }
+
+  @Test
+  void testInterruptedReaderDoesNotFailOtherPositionedReader2() throws Exception {
+    final int firstLen = CHUNK_LEN + CHUNK_LEN / 2;
+    assertOtherReaderRecoversFromInterruptedReader(
+        (stream, buffer) -> assertEquals(firstLen, stream.read(buffer, 0, firstLen)),
+        (stream, buffer) -> assertEquals(BLOCK_LEN - firstLen, stream.read(buffer, firstLen, BLOCK_LEN - firstLen)));
+  }
+
+  /** Reads into the buffer from the given stream. */
+  @FunctionalInterface
+  private interface BlockRead {
+    void read(BlockInputStream stream, byte[] buffer) throws IOException;
+  }
+
+  /**
+   * Two streams share a cached replica. Interrupting one of them while reading closes the shared channel; the other
+   * stream must still read the whole block, through {@code beforeInterrupt} and then {@code afterInterrupt}.
+   */
+  private void assertOtherReaderRecoversFromInterruptedReader(BlockRead beforeInterrupt, BlockRead afterInterrupt)
+      throws Exception {
+    final int len = BLOCK_LEN;
+    final byte[] data = new byte[len];
+    ThreadLocalRandom.current().nextBytes(data);
+
+    try (ShortCircuitStreamCache cache = new ShortCircuitStreamCache(10, EXPIRY_MS, closeExecutor, cleanupExecutor)) {
+      BlockData.Builder blockDataBuilder = blockData(1, 5, len).toBuilder();
+      for (int offset = 0; offset < len; offset += CHUNK_LEN) {
+        blockDataBuilder.addChunks(ChunkInfo.newBuilder().setChunkName("chunk_" + offset).setOffset(offset)
+            .setLen(CHUNK_LEN)
+            .setChecksumData(ChecksumData.newBuilder().setType(ChecksumType.NONE).setBytesPerChecksum(CHUNK_LEN)));
+      }
+      BlockData blockData = blockDataBuilder.build();
+      ShortCircuitStreamCache.Replica replica = cache.put(blockID(1, 5), blockData, newStream(data));
+      cache.release(replica);
+
+      // After the cached replica is invalidated, GetBlock is sent again and returns a new file descriptor.
+      Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+      XceiverClientShortCircuit shortCircuitClient = mock(XceiverClientShortCircuit.class);
+      when(shortCircuitClient.getDn()).thenReturn(pipeline.getFirstNode());
+      when(shortCircuitClient.getClientId()).thenReturn(ByteString.copyFromUtf8("client"));
+      when(shortCircuitClient.sendCommand(any(), any())).thenReturn(ContainerCommandResponseProto.newBuilder()
+          .setCmdType(Type.GetBlock)
+          .setResult(Result.SUCCESS)
+          .setGetBlock(GetBlockResponseProto.newBuilder().setBlockData(blockData))
+          .build());
+      when(shortCircuitClient.getFileInputStream(anyLong(), anyLong())).thenAnswer(invocation -> newStream(data));
+
+      XceiverClientFactory clientFactory = mock(XceiverClientFactory.class);
+      when(clientFactory.getShortCircuitStreamCache()).thenReturn(cache);
+      when(clientFactory.isShortCircuitReady()).thenReturn(true);
+      when(clientFactory.acquireClientForReadData(any(), eq(true))).thenReturn(shortCircuitClient);
+      OzoneClientConfig config = new OzoneConfiguration().getObject(OzoneClientConfig.class);
+      config.setChecksumVerify(false);
+      config.setReadRetryInterval(0);
+
+      try (BlockInputStream interrupted = newBlockInputStream(clientFactory, pipeline, config, len);
+           BlockInputStream other = newBlockInputStream(clientFactory, pipeline, config, len)) {
+        interrupted.initialize();
+        other.initialize();
+        assertSame(replica.getStream(), interrupted.getBlockFileInputStream());
+        assertSame(replica.getStream(), other.getBlockFileInputStream());
+
+        byte[] buffer = new byte[len];
+        beforeInterrupt.read(other, buffer);
+
+        // FileChannel closes itself when a read starts on an interrupted thread.
+        AtomicReference<Throwable> interruptedFailure = new AtomicReference<>();
+        Thread reader = new Thread(() -> {
+          Thread.currentThread().interrupt();
+          try {
+            interrupted.read(new byte[len], 0, len);
+          } catch (Throwable t) {
+            interruptedFailure.set(t);
+          }
+        });
+        reader.start();
+        reader.join();
+        assertNotNull(interruptedFailure.get());
+
+        afterInterrupt.read(other, buffer);
+        assertArrayEquals(data, buffer);
+        verify(shortCircuitClient).getFileInputStream(anyLong(), anyLong());
+        assertNotSame(replica.getStream(), other.getBlockFileInputStream());
+      }
+    }
+  }
+
+  private static BlockInputStream newBlockInputStream(XceiverClientFactory clientFactory, Pipeline pipeline,
+      OzoneClientConfig config, long length) throws IOException {
+    return new BlockInputStream(
+        new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID(1, 5)).setLength(length)),
+        pipeline, null, clientFactory, null, config);
+  }
+
   private static BlockID blockID(long localID, long bcsId) {
     BlockID blockID = new BlockID(1, localID);
     blockID.setBlockCommitSequenceId(bcsId);
@@ -235,9 +375,13 @@ class TestShortCircuitStreamCache {
         .build();
   }
 
-  @SuppressWarnings("PMD.AvoidFileStream")
   private FileInputStream newStream() throws IOException {
-    File file = Files.createTempFile(dir, "block", ".data").toFile();
+    return newStream(new byte[0]);
+  }
+
+  @SuppressWarnings("PMD.AvoidFileStream")
+  private FileInputStream newStream(byte[] data) throws IOException {
+    File file = Files.write(Files.createTempFile(dir, "block", ".data"), data).toFile();
     return new FileInputStream(file);
   }
 }

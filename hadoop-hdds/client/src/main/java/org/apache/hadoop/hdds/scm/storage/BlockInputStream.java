@@ -23,7 +23,10 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -238,7 +241,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   /** @return the short-circuit stream cache if this block may be served from or added to it, otherwise null. */
   private ShortCircuitStreamCache getShortCircuitStreamCache() {
-    if (xceiverClientFactory == null || fallbackToGrpc.get() || blockInfo == null) {
+    if (xceiverClientFactory == null || fallbackToGrpc.get() || blockInfo == null || blockInfo.isUnderConstruction()) {
       return null;
     }
     return xceiverClientFactory.getShortCircuitStreamCache();
@@ -420,8 +423,11 @@ public class BlockInputStream extends BlockExtendedInputStream {
         }
       } catch (IOException ex) {
         invalidateCachedReplica();
+        checkInterrupted(ex);
         if (shouldRetryRead(ex, retryPolicy, ++retries)) {
-          if (isConnectivityIssue(ex)) {
+          if (isNonInterruptedChannelClose(ex) && cachedReplica != null) {
+            resetAllShortCircuitStream();
+          } else if (isConnectivityIssue(ex)) {
             handleReadError(ex);
           } else {
             current.releaseClient();
@@ -495,7 +501,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       final long chunkOffset = pos - offsets[index];
       final long readLength = Math.min(Math.min(dst.remaining(), chunk.getLength() - chunkOffset), blockLength - pos);
       if (readLength > 0) {
-        final int numBytesRead = readChunkAt(chunk, chunkOffset, (int) readLength, dst);
+        final int numBytesRead = readChunkAt(index, chunk, chunkOffset, (int) readLength, dst);
         totalReadLen += numBytesRead;
         pos += numBytesRead;
       }
@@ -505,7 +511,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   /** Read a chunk range with a request-local retry counter and buffer position. */
-  private int readChunkAt(ChunkInputStream chunk, long chunkOffset, int readLength, ByteBuffer dst) throws IOException {
+  private int readChunkAt(int index, ChunkInputStream chunkStream, long chunkOffset, int readLength, ByteBuffer dst)
+      throws IOException {
+    ChunkInputStream chunk = chunkStream;
     int preadRetries = 0;
     while (true) {
       checkOpen();
@@ -525,10 +533,13 @@ public class BlockInputStream extends BlockExtendedInputStream {
         continue;
       } catch (IOException ex) {
         invalidateCachedReplica();
+        checkInterrupted(ex);
         if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
           throw ex;
         }
-        if (isConnectivityIssue(ex)) {
+        if (isNonInterruptedChannelClose(ex) && cachedReplica != null) {
+          chunk = resetShortCircuitStream(index, chunk);
+        } else if (isConnectivityIssue(ex)) {
           refreshBlockInfo(ex);
         }
         continue;
@@ -733,4 +744,44 @@ public class BlockInputStream extends BlockExtendedInputStream {
     return blockData;
   }
 
+  private synchronized void resetAllShortCircuitStream() throws IOException {
+    // initialize() seeks back to blockPosition, so keep the sequential read position across the reset.
+    storePosition();
+    releaseCachedReplica();
+    if (chunkStreams != null) {
+      for (ChunkInputStream stream : chunkStreams) {
+        stream.close();
+      }
+      chunkStreams = null;
+    }
+    initialized = false;
+    initialize();
+  }
+
+  /**
+   * Rebuild the local chunk streams if {@code failed} is still the current stream at {@code index}, so that
+   * concurrent positioned readers failing on the same closed channel reset only once.
+   * @return the current chunk stream at {@code index}
+   */
+  private synchronized ChunkInputStream resetShortCircuitStream(int index, ChunkInputStream failed)
+      throws IOException {
+    if (blockFileInputStream != null && chunkStreams != null && chunkStreams.get(index) == failed) {
+      resetAllShortCircuitStream();
+    }
+    checkOpen();
+    return chunkStreams.get(index);
+  }
+
+  private void checkInterrupted(IOException e) throws IOException {
+    if (Thread.currentThread().isInterrupted() &&
+        (e instanceof ClosedByInterruptException ||
+            e instanceof InterruptedIOException)) {
+      LOG.debug("The reading thread has been interrupted.", e);
+      throw e;
+    }
+  }
+
+  private static boolean isNonInterruptedChannelClose(IOException ex) {
+    return ex instanceof ClosedChannelException && !Thread.currentThread().isInterrupted();
+  }
 }
