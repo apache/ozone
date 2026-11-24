@@ -18,24 +18,22 @@
 package org.apache.hadoop.ozone.recon.security;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCsrCommonName;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.withLocalHostName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import java.net.InetAddress;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CsrTestUtil;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.MockedStatic;
 
 /**
  * Tests {@link ReconCertificateClient}.
@@ -55,13 +53,8 @@ public class TestReconCertificateClient {
     when(storage.getReconId()).thenReturn(reconId);
     when(storage.getClusterID()).thenReturn(UUID.randomUUID().toString());
 
-    InetAddress localHost = mock(InetAddress.class);
-    when(localHost.getCanonicalHostName())
-        .thenReturn("aaaa-ozone-000-recon-0.aaa-ozone-000-recon-headless.aaaa-data.svc.cluster.local");
-    try (MockedStatic<InetAddress> inetAddress = mockStatic(InetAddress.class, CALLS_REAL_METHODS);
-        ReconCertificateClient client = new ReconCertificateClient(securityConfig, null, storage, null, null)) {
-      inetAddress.when(InetAddress::getLocalHost).thenReturn(localHost);
-      assertEquals("recon@" + reconId, CsrTestUtil.getCsrCommonName(client));
+    try (ReconCertificateClient client = new ReconCertificateClient(securityConfig, null, storage, null, null)) {
+      assertEquals("recon@" + reconId, withLocalHostName(LONG_HOST_NAME, () -> getCsrCommonName(client)));
     }
   }
 }

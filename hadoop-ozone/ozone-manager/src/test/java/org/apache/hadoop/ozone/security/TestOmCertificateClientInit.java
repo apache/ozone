@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.security.x509.certificate.client.Certificat
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCsrCommonName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -41,7 +43,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CsrTestUtil;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -171,11 +172,11 @@ public class TestOmCertificateClientInit {
     String omId = UUID.randomUUID().toString();
     HddsProtos.OzoneManagerDetailsProto omInfo = OzoneManager.getOmDetailsProto(new OzoneConfiguration(), omId)
         .toBuilder()
-        .setHostName("aaaa-ozone-000-manager-1.aaa-ozone-000-manager-headless.aaaa-data.svc.cluster.local")
+        .setHostName(LONG_HOST_NAME)
         .build();
     try (OMCertificateClient client = new OMCertificateClient(securityConfig, null, storage, omInfo, "", null, null,
         null)) {
-      assertEquals("om@" + omId, CsrTestUtil.getCsrCommonName(client));
+      assertEquals("om@" + omId, getCsrCommonName(client));
     }
   }
 

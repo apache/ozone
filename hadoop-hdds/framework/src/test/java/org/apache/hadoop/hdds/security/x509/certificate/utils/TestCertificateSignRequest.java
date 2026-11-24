@@ -21,6 +21,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedName;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameWithSN;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCommonName;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -54,7 +56,6 @@ import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.asn1.DLSequence;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
 import org.bouncycastle.asn1.x509.GeneralName;
@@ -75,8 +76,7 @@ public class TestCertificateSignRequest {
   private static final String DISTINGUISHED_NAME_FORMAT = "CN=%s,OU=%s,O=%s";
   private static final String DISTINGUISHED_NAME_WITH_SN_FORMAT = "CN=%s,OU=%s,O=%s,SERIALNUMBER=%s";
   /** Longer than the RFC 5280 ub-common-name (64), like user@FQDN of a Kubernetes pod. */
-  static final String LONG_SUBJECT =
-      "dn@aaaa-ozone-000-datanode-1.aaa-ozone-000-datanode-headless.aaaa-data.svc.cluster.local";
+  static final String LONG_SUBJECT = "dn@" + LONG_HOST_NAME;
 
   private SecurityConfig securityConfig;
 
@@ -339,7 +339,7 @@ public class TestCertificateSignRequest {
         .build()
         .generateCSR();
 
-    assertEquals(LONG_SUBJECT, csr.getSubject().getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+    assertEquals(LONG_SUBJECT, getCommonName(csr));
     assertEquals(String.format(DISTINGUISHED_NAME_FORMAT, LONG_SUBJECT, scmID, clusterID),
         csr.getSubject().toString());
     ContentVerifierProvider verifierProvider = new JcaContentVerifierProviderBuilder()

@@ -24,6 +24,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer.VerificationStatus;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCommonName;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -215,7 +217,7 @@ public class TestDefaultCAServer {
    */
   @Test
   public void testRequestCertificateWithLongSubject() throws Exception {
-    String subject = "dn@aaaa-ozone-000-datanode-1.aaa-ozone-000-datanode-headless.aaaa-data.svc.cluster.local";
+    String subject = "dn@" + LONG_HOST_NAME;
     String scmId = RandomStringUtils.secure().nextAlphabetic(4);
     String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
     KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
@@ -238,7 +240,7 @@ public class TestDefaultCAServer {
         OM, String.valueOf(System.nanoTime()));
     X509Certificate signedCert = CertificateCodec.firstCertificateFrom(holder.get());
     X500Name name = X500Name.getInstance(signedCert.getSubjectX500Principal().getEncoded());
-    assertEquals(subject, name.getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+    assertEquals(subject, getCommonName(signedCert));
     assertEquals(scmId, name.getRDNs(BCStyle.OU)[0].getFirst().getValue().toString());
     assertEquals(clusterId, name.getRDNs(BCStyle.O)[0].getFirst().getValue().toString());
   }
@@ -256,7 +258,7 @@ public class TestDefaultCAServer {
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(securityConfig, CAType.ROOT);
 
-    String longSubject = "om@aaaa-ozone-000-manager-1.aaa-ozone-000-manager-headless.aaaa-data.svc.cluster.local";
+    String longSubject = "om@" + LONG_HOST_NAME;
     assertEquals(replacement, signedCommonName(testCA, longSubject, scmId, clusterId, replacement));
     assertEquals("om@host1.example.com",
         signedCommonName(testCA, "om@host1.example.com", scmId, clusterId, replacement));
@@ -270,13 +272,12 @@ public class TestDefaultCAServer {
   public void testCAWithLongSubjectSignsCertificate() throws Exception {
     String scmId = RandomStringUtils.secure().nextAlphabetic(4);
     String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
-    String caSubject = "scm@aaaa-ozone-000-scm-0.aaa-ozone-000-scm-headless.aaaa-data.svc.cluster.local";
+    String caSubject = "scm@" + LONG_HOST_NAME;
     CertificateServer testCA = new DefaultCAServer(caSubject, clusterId, scmId, caStore, new DefaultProfile(),
         Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
     testCA.init(securityConfig, CAType.ROOT);
     X509Certificate caCert = testCA.getCACertificate();
-    assertEquals(caSubject, X500Name.getInstance(caCert.getSubjectX500Principal().getEncoded())
-        .getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+    assertEquals(caSubject, getCommonName(caCert));
 
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
@@ -313,8 +314,7 @@ public class TestDefaultCAServer {
     Future<CertPath> holder = ca.requestCertificate(csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC,
         OM, String.valueOf(System.nanoTime()), commonNameIfTooLong);
     X509Certificate signedCert = CertificateCodec.firstCertificateFrom(holder.get());
-    return X500Name.getInstance(signedCert.getSubjectX500Principal().getEncoded())
-        .getRDNs(BCStyle.CN)[0].getFirst().getValue().toString();
+    return getCommonName(signedCert);
   }
 
   /**

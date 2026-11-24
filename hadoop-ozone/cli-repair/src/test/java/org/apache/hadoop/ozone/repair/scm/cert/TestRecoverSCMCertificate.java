@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.repair.scm.cert;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -45,9 +46,6 @@ import org.junit.jupiter.api.io.TempDir;
  * commonName that would be longer than 64 characters with the host name.
  */
 public class TestRecoverSCMCertificate {
-  /** Longer than 64 characters with the scm-sub@ or scm@ prefix, so its certificates are named by SCM ID. */
-  private static final String LONG_HOST_NAME =
-      "aaaa-ozone-000-scm-0.aaa-ozone-000-scm-headless.aaaa-data.svc.cluster.local";
   private static final String SHORT_HOST_NAME = "scm1.example.com";
 
   private final String scmId = UUID.randomUUID().toString();

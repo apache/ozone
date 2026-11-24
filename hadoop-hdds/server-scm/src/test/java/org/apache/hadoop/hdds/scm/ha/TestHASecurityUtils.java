@@ -18,28 +18,24 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCommonName;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.withLocalHostName;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 
 import java.math.BigInteger;
-import java.net.InetAddress;
 import java.nio.file.Path;
 import java.util.UUID;
-import javax.naming.ldap.LdapName;
-import javax.naming.ldap.Rdn;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.MockedStatic;
 
 /**
  * Tests {@link HASecurityUtils}.
@@ -64,24 +60,13 @@ public class TestHASecurityUtils {
    */
   @Test
   public void testRootCaCommonName() throws Exception {
-    assertEquals("scm@" + scmId, rootCaCommonName(
-        "aaaa-ozone-000-scm-0.aaa-ozone-000-scm-headless.aaaa-data.svc.cluster.local", BigInteger.ONE));
+    assertEquals("scm@" + scmId, rootCaCommonName(LONG_HOST_NAME, BigInteger.ONE));
     assertEquals("scm@scm1.example.com", rootCaCommonName("scm1.example.com", BigInteger.TEN));
   }
 
   private String rootCaCommonName(String hostName, BigInteger rootCertId) throws Exception {
-    InetAddress localHost = InetAddress.getByAddress(hostName, new byte[] {127, 0, 0, 1});
-    try (MockedStatic<InetAddress> inetAddress = mockStatic(InetAddress.class, CALLS_REAL_METHODS)) {
-      inetAddress.when(InetAddress::getLocalHost).thenReturn(localHost);
-      CertificateServer rootCA = HASecurityUtils.initializeRootCertificateServer(new SecurityConfig(conf),
-          mock(CertificateStore.class), scmStorageConfig, rootCertId, new DefaultCAProfile(),
-          SCM_ROOT_CA_COMPONENT_NAME + "-" + rootCertId);
-      for (Rdn rdn : new LdapName(rootCA.getCACertificate().getSubjectX500Principal().getName()).getRdns()) {
-        if ("CN".equalsIgnoreCase(rdn.getType())) {
-          return rdn.getValue().toString();
-        }
-      }
-      return null;
-    }
+    return withLocalHostName(hostName, () -> getCommonName(HASecurityUtils.initializeRootCertificateServer(
+        new SecurityConfig(conf), mock(CertificateStore.class), scmStorageConfig, rootCertId, new DefaultCAProfile(),
+        SCM_ROOT_CA_COMPONENT_NAME + "-" + rootCertId).getCACertificate()));
   }
 }

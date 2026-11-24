@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -62,8 +63,7 @@ import org.junit.jupiter.api.io.TempDir;
  * {@link CertificateSignRequest#commonName}.
  */
 public class TestSCMSecurityProtocolServer {
-  private static final String LONG_SUBJECT =
-      "user@aaaa-ozone-000-node-1.aaa-ozone-000-node-headless.aaaa-data.svc.cluster.local";
+  private static final String LONG_SUBJECT = "user@" + LONG_HOST_NAME;
   private static final String HOST_NAME = "host1.example.com";
 
   private final String clusterId = UUID.randomUUID().toString();

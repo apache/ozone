@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_SCM_CERT
 import static org.apache.hadoop.hdds.security.x509.certificate.client.DefaultCertificateClient.CERT_FILE_NAME_FORMAT;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
 
-import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -159,14 +158,12 @@ public class RecoverSCMCertificate extends RepairTool {
   }
 
   /** Whether this SCM issued {@code rootCertificate}: its subject has this host name or, if longer, this SCM ID. */
-  @VisibleForTesting
   static boolean isRootCA(X509Certificate rootCertificate, String hostName, String scmId) {
     String caPrincipal = rootCertificate.getSubjectDN().getName();
     return caPrincipal.contains(hostName)
         || (scmId != null && caPrincipal.contains(OzoneConsts.SCM_ROOT_CA_PREFIX + scmId));
   }
 
-  @VisibleForTesting
   static X509Certificate getSubCertificate(
       Map<BigInteger, X509Certificate> allCerts, String hostName, String scmId) throws Exception {
     Optional<X509Certificate> cert = allCerts.values().stream().filter(

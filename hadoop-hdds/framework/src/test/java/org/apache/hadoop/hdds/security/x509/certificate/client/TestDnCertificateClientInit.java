@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.security.x509.certificate.client.Certificat
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCsrCommonName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -43,8 +45,6 @@ import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.bouncycastle.asn1.x500.style.BCStyle;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -156,12 +156,10 @@ public class TestDnCertificateClientInit {
     try (DNCertificateClient client = new DNCertificateClient(securityConfig, null, dn, null, null, null) {
       @Override
       protected String getLocalHostName() {
-        return "aaaa-ozone-000-datanode-1.aaa-ozone-000-datanode-headless.aaaa-data.svc.cluster.local";
+        return LONG_HOST_NAME;
       }
     }) {
-      PKCS10CertificationRequest csr = client.configureCSRBuilder().build().generateCSR();
-      assertEquals("dn@" + dn.getUuidString(),
-          csr.getSubject().getRDNs(BCStyle.CN)[0].getFirst().getValue().toString());
+      assertEquals("dn@" + dn.getUuidString(), getCsrCommonName(client));
     }
   }
 
