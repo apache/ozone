@@ -218,6 +218,10 @@ class TestDeletedContainerNotRecreated {
     assertAll(
         () -> assertTrue(refusals > 0, "DN1 did not refuse the stale WriteChunk with CLOSED_CONTAINER_IO"),
         () -> assertFalse(acknowledged, "the stale WriteChunk was acknowledged"),
+        // Both stages are refused as for a closed container, so the write does not fail DN1's state machine.
+        () -> assertTrue(((ContainerStateMachine) OzoneTestHelper.getStateMachine(
+            cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn1)), pipeline)).isStateMachineHealthy(),
+            "the stale WriteChunk made DN1's state machine for the pipeline unhealthy"),
         () -> assertNull(container(dn1).getContainerSet().getContainer(containerId), "DN1 recreated the replica"),
         () -> assertFalse(hasContainerDir(dn1, containerId), "DN1 created a directory for the container"),
         () -> assertDeletedEntry(dn1, containerId),
@@ -277,7 +281,7 @@ class TestDeletedContainerNotRecreated {
         .setStage(WriteChunkStage.COMMIT_DATA).setContainer2BCSIDMap(container2BCSID).build()).getResult();
     assertAll(
         () -> assertEquals(Result.CLOSED_CONTAINER_IO, writeStage, "write stage"),
-        () -> assertEquals(Result.CONTAINER_NOT_FOUND, commitStage, "commit stage"),
+        () -> assertEquals(Result.CLOSED_CONTAINER_IO, commitStage, "commit stage"),
         () -> assertNull(container(dn).getContainerSet().getContainer(containerId), "the replica was recreated"),
         () -> assertFalse(hasContainerDir(dn, containerId), "a directory was created for the container"),
         () -> assertDeletedEntry(dn, containerId));

@@ -693,10 +693,11 @@ public class TestHddsDispatcher {
   }
 
   /**
-   * A commit-stage WriteChunk for a deleted container is answered with CONTAINER_NOT_FOUND and creates nothing.
+   * A commit-stage WriteChunk for a deleted container is answered with CLOSED_CONTAINER_IO, as its write stage is, and
+   * creates nothing.
    */
   @Test
-  public void testCommitStageWriteToDeletedContainerIsNotFound() throws Exception {
+  public void testCommitStageWriteToDeletedContainerIsRefused() throws Exception {
     final long containerID = 1L;
     try {
       WitnessedDatanode dn = new WitnessedDatanode(testDir.getPath());
@@ -704,7 +705,7 @@ public class TestHddsDispatcher {
 
       ContainerCommandResponseProto response = dn.dispatcher.dispatch(
           getWriteChunkRequest(dn.dd.getUuidString(), containerID, 1L), COMMIT_STAGE);
-      assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
+      assertEquals(ContainerProtos.Result.CLOSED_CONTAINER_IO, response.getResult());
       assertNull(dn.containerSet.getContainer(containerID));
       assertFalse(dn.containerDirExists(containerID));
       ContainerCreateInfo entry = dn.table.get(ContainerID.valueOf(containerID));

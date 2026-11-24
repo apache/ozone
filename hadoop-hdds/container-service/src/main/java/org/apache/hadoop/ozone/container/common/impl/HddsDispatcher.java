@@ -348,6 +348,18 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         StorageContainerException sce = new StorageContainerException(
             "ContainerID " + containerID + " does not exist",
             ContainerProtos.Result.CONTAINER_NOT_FOUND);
+        if (isWriteCommitStage) {
+          // The write stage of this WriteChunk was refused if this datanode held the container before and deleted it.
+          // Answer the commit stage the same way, as a closed replica does, so that a late write does not close the
+          // pipeline.
+          try {
+            containerSet.ensureContainerNotWitnessed(containerID);
+          } catch (StorageContainerException e) {
+            if (e.getResult() == ContainerProtos.Result.CLOSED_CONTAINER_IO) {
+              sce = e;
+            }
+          }
+        }
         audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
         return ContainerUtils.logAndReturnError(LOG, sce, msg);
       }

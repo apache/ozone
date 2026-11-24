@@ -259,7 +259,19 @@ public class ContainerSet implements Iterable<Container<?>> {
     }
   }
 
-  private void updateContainerIdTable(long containerId, ContainerData containerData, boolean overwrite)
+  /**
+   * Records the replica that is being added in the witnessed container DB. The entry is written when:
+   * <ul>
+   *   <li>there is none: this is the first replica of the container on this datanode;</li>
+   *   <li>it is DELETED: this datanode deleted its replica, and now loads one from disk at startup or gets one through
+   *   repair. An ordinary create does not get here for a DELETED entry, KeyValueHandler refuses it;</li>
+   *   <li>it has no replica index: it was written in the older table format;</li>
+   *   <li>{@code replaceReplicaIndex} is set and the replica has another index than the entry: a repair replaces the
+   *   replica that this datanode held.</li>
+   * </ul>
+   * In all other cases the entry is kept as it is.
+   */
+  private void updateContainerIdTable(long containerId, ContainerData containerData, boolean replaceReplicaIndex)
       throws StorageContainerException {
     if (null != containerMetadataStore) {
       try {
@@ -267,8 +279,10 @@ public class ContainerSet implements Iterable<Container<?>> {
         Table<ContainerID, ContainerCreateInfo> containerCreateInfoTable =
             containerMetadataStore.getContainerCreateInfoTable();
         ContainerCreateInfo containerCreateInfo = containerCreateInfoTable.get(containerIdObj);
-        if (containerCreateInfo == null || containerCreateInfo.getReplicaIndex() == INVALID_REPLICA_INDEX
-            || (overwrite && containerCreateInfo.getReplicaIndex() != containerData.getReplicaIndex())) {
+        if (containerCreateInfo == null
+            || containerCreateInfo.getState() == State.DELETED
+            || containerCreateInfo.getReplicaIndex() == INVALID_REPLICA_INDEX
+            || (replaceReplicaIndex && containerCreateInfo.getReplicaIndex() != containerData.getReplicaIndex())) {
           containerCreateInfoTable.put(containerIdObj,
               ContainerCreateInfo.valueOf(containerData.getState(), containerData.getReplicaIndex()));
         }
@@ -447,7 +461,8 @@ public class ContainerSet implements Iterable<Container<?>> {
         containerMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(containerId),
             ContainerCreateInfo.valueOf(State.DELETED, INVALID_REPLICA_INDEX));
       } catch (IOException e) {
-        throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
+        throw new StorageContainerException("Failed to mark container " + containerId
+            + " deleted in the witnessed container DB", e, ContainerProtos.Result.IO_EXCEPTION);
       }
     }
   }

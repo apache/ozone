@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_MISSING;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getBlockRequest;
@@ -352,7 +351,7 @@ public class TestOzoneContainer {
         .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA).setContainer2BCSIDMap(new HashMap<>()).build();
     ContainerProtos.ContainerCommandRequestProto writeToDeleted =
         getWriteChunkRequest(pipeline, getTestBlockID(deletedId), 100);
-    assertEquals(CONTAINER_NOT_FOUND, container.getDispatcher().dispatch(writeToDeleted, commitStage).getResult());
+    assertEquals(CLOSED_CONTAINER_IO, container.getDispatcher().dispatch(writeToDeleted, commitStage).getResult());
     assertEquals(CONTAINER_MISSING, dispatch(container, getWriteChunkRequest(pipeline, getTestBlockID(lostId), 100)));
     assertEquals(CLOSED_CONTAINER_IO, dispatch(container, getCreateContainerRequest(deletedId, pipeline)));
     assertThat(containerDirectories(container, deletedId)).isEmpty();

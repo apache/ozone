@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -201,6 +202,7 @@ public class TestKeyValueHandler {
   private long maxContainerSize;
   private InMemoryTestTable<ContainerID, ContainerCreateInfo> witnessTable;
   private final AtomicBoolean failWitnessGet = new AtomicBoolean();
+  private final AtomicBoolean failWitnessPut = new AtomicBoolean();
 
   @BeforeEach
   public void setup() throws IOException {
@@ -865,6 +867,36 @@ public class TestKeyValueHandler {
     assertFalse(containerDirExists(handlerWithVolume, containerID));
   }
 
+  /**
+   * A delete fails with the witnessed container DB error, and leaves the replica loaded and unchanged, when the DELETED
+   * entry cannot be written. The delete succeeds when it is sent again.
+   */
+  @Test
+  public void testDeleteFailsWhenWitnessedEntryCannotBeWritten() throws Exception {
+    final long containerID = 1L;
+    HandlerWithVolumeSet handlerWithVolume = createHandlerWithWitnessTable();
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+    ContainerSet containerSet = handlerWithVolume.getContainerSet();
+    assertEquals(ContainerProtos.Result.SUCCESS, kvHandler.handleCreateContainer(
+        createContainerRequest(kvHandler.getDatanodeId(), containerID), null).getResult());
+    Container<?> container = containerSet.getContainer(containerID);
+    assertNotNull(container);
+
+    failWitnessPut.set(true);
+    StorageContainerException e = assertThrows(StorageContainerException.class,
+        () -> kvHandler.deleteContainer(container, true));
+    assertEquals(ContainerProtos.Result.IO_EXCEPTION, e.getResult());
+    assertThat(e.getMessage()).contains("witnessed container DB");
+    assertSame(container, containerSet.getContainer(containerID));
+    assertNotEquals(State.DELETED, container.getContainerState());
+    assertTrue(containerDirExists(handlerWithVolume, containerID));
+
+    failWitnessPut.set(false);
+    kvHandler.deleteContainer(container, true);
+    assertNull(containerSet.getContainer(containerID));
+    assertWitnessEntry(containerID, State.DELETED, -1);
+  }
+
   private static Answer<Object> failWhen(AtomicBoolean fail) {
     return invocation -> {
       if (fail.get()) {
@@ -875,12 +907,13 @@ public class TestKeyValueHandler {
   }
 
   /**
-   * Creates a handler over a real volume whose witnessed container table is {@link #witnessTable}. Reads of the table
-   * fail while {@link #failWitnessGet} is set.
+   * Creates a handler over a real volume whose witnessed container table is {@link #witnessTable}. Reads and writes of
+   * the table fail while {@link #failWitnessGet} or {@link #failWitnessPut} is set.
    */
   private HandlerWithVolumeSet createHandlerWithWitnessTable() throws IOException {
     witnessTable = spy(new InMemoryTestTable<ContainerID, ContainerCreateInfo>());
     doAnswer(failWhen(failWitnessGet)).when(witnessTable).get(any());
+    doAnswer(failWhen(failWitnessPut)).when(witnessTable).put(any(), any());
     WitnessedContainerMetadataStore store = mock(WitnessedContainerMetadataStore.class);
     when(store.getContainerCreateInfoTable()).thenReturn(witnessTable);
     return createKeyValueHandlerWithVolumeSet(tempDir, null, newContainerSet(1000, store));

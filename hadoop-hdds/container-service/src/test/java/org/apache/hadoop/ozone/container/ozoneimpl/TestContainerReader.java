@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
@@ -978,5 +979,32 @@ public class TestContainerReader {
     String schemaVersion = versionInfo.getSchemaVersion();
     conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  /**
+   * A delete writes the DELETED entry before it marks the replica deleted on disk. If the datanode stops between the
+   * two, the replica on disk is intact: it is loaded again at startup and the entry follows it.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testReplicaLoadsWhenWitnessEntryIsDeleted(ContainerTestVersionInfo versionInfo) throws Exception {
+    setup(versionInfo);
+    Table<ContainerID, ContainerCreateInfo> entries = mockMetadataStore.getContainerCreateInfoTable();
+    int[] replicaIndexes = {0, 3};
+    for (int i = 0; i < replicaIndexes.length; i++) {
+      createContainerWithId(2 + i, volumeSet, volumeChoosingPolicy, 10L, replicaIndexes[i]).close();
+      entries.put(ContainerID.valueOf(2 + i), ContainerCreateInfo.valueOf(DELETED, -1));
+    }
+    ContainerCache.getInstance(conf).shutdownCache();
+
+    new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true).run();
+
+    for (int i = 0; i < replicaIndexes.length; i++) {
+      Container<?> loaded = containerSet.getContainer(2 + i);
+      assertNotNull(loaded);
+      assertEquals(CLOSED, loaded.getContainerState());
+      ContainerCreateInfo entry = entries.get(ContainerID.valueOf(2 + i));
+      assertEquals(CLOSED, entry.getState());
+      assertEquals(replicaIndexes[i], entry.getReplicaIndex());
+    }
   }
 }
