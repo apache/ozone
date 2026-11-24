@@ -36,6 +36,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUti
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -70,6 +71,9 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -134,6 +138,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
@@ -141,6 +146,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.MockClock;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
@@ -706,6 +712,85 @@ public class TestKeyValueHandler {
     }
   }
 
+  @Test
+  public void testFailedCloseKeepsRecoveringContainerTracked() throws IOException {
+    HandlerWithVolumeSet handlerCtx = createKeyValueHandler(tempDir);
+    KeyValueHandler keyValueHandler = handlerCtx.getHandler();
+    ContainerSet containerSet = handlerCtx.getContainerSet();
+    try {
+      ContainerCommandRequestProto.Builder request = createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID)
+          .toBuilder();
+      request.getCreateContainerBuilder().setState(State.RECOVERING);
+      assertThat(keyValueHandler.handleCreateContainer(request.build(), null).getResult())
+          .isEqualTo(ContainerProtos.Result.SUCCESS);
+      KeyValueContainer container = (KeyValueContainer) containerSet.getContainer(DUMMY_CONTAINER_ID);
+      assertThat(container).isNotNull();
+      assertThat(container.getContainerState()).isEqualTo(State.RECOVERING);
+      assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
+
+      File metadataDir = new File(container.getContainerData().getMetadataPath());
+      assumeThat(metadataDir.setWritable(false)).isTrue();
+      assumeThat(Files.isWritable(metadataDir.toPath())).isFalse();
+      try {
+        StorageContainerException ex = assertThrows(StorageContainerException.class,
+            () -> keyValueHandler.markContainerForClose(container));
+        assertEquals(ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR, ex.getResult());
+      } finally {
+        assertThat(metadataDir.setWritable(true)).isTrue();
+      }
+      assertThat(container.getContainerState()).isEqualTo(State.RECOVERING);
+      assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
+
+      keyValueHandler.markContainerForClose(container);
+      assertThat(container.getContainerState()).isEqualTo(State.CLOSING);
+      assertThat(containerSet.getRecoveringContainerMap()).doesNotContainKey(DUMMY_CONTAINER_ID);
+    } finally {
+      keyValueHandler.stop();
+      handlerCtx.getVolumeSet().getVolumesList().forEach(StorageVolume::shutdown);
+    }
+  }
+
+  @Test
+  public void testFailedCloseRecoveringContainerScrubbedToUnhealthy() throws Exception {
+    MockClock testClock = new MockClock(Instant.now(), ZoneOffset.UTC);
+    HandlerWithVolumeSet handlerCtx = createKeyValueHandler(tempDir, newContainerSet(1000, testClock));
+    KeyValueHandler keyValueHandler = handlerCtx.getHandler();
+    ContainerSet containerSet = handlerCtx.getContainerSet();
+    try {
+      ContainerCommandRequestProto.Builder request = createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID)
+          .toBuilder();
+      request.getCreateContainerBuilder().setState(State.RECOVERING);
+      assertThat(keyValueHandler.handleCreateContainer(request.build(), null).getResult())
+          .isEqualTo(ContainerProtos.Result.SUCCESS);
+      KeyValueContainer container = (KeyValueContainer) containerSet.getContainer(DUMMY_CONTAINER_ID);
+      assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
+
+      File metadataDir = new File(container.getContainerData().getMetadataPath());
+      assumeThat(metadataDir.setWritable(false)).isTrue();
+      assumeThat(Files.isWritable(metadataDir.toPath())).isFalse();
+      try {
+        assertThrows(StorageContainerException.class,
+            () -> keyValueHandler.markContainerForClose(container));
+      } finally {
+        assertThat(metadataDir.setWritable(true)).isTrue();
+      }
+      assertThat(container.getContainerState()).isEqualTo(State.RECOVERING);
+      assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
+
+      testClock.fastForward(1000L);
+      StaleRecoveringContainerScrubbingService scrubbingService =
+          new StaleRecoveringContainerScrubbingService(
+              50, TimeUnit.MILLISECONDS, 10,
+              Duration.ofSeconds(300).toMillis(),
+              containerSet);
+      scrubbingService.runPeriodicalTaskNow();
+      assertThat(container.getContainerState()).isEqualTo(UNHEALTHY);
+    } finally {
+      keyValueHandler.stop();
+      handlerCtx.getVolumeSet().getVolumesList().forEach(StorageVolume::shutdown);
+    }
+  }
+
   /**
    * Tests that deleting a container decrements the cached used space of its volume.
    */
@@ -1111,7 +1196,10 @@ public class TestKeyValueHandler {
   }
 
   private HandlerWithVolumeSet createKeyValueHandler(Path path) throws IOException {
-    final ContainerSet containerSet = newContainerSet();
+    return createKeyValueHandler(path, newContainerSet());
+  }
+
+  private HandlerWithVolumeSet createKeyValueHandler(Path path, ContainerSet containerSet) throws IOException {
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
     HddsVolume hddsVolume = new HddsVolume.Builder(path.toString()).conf(conf)

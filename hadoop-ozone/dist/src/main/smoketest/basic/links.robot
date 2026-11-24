@@ -19,6 +19,7 @@ Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
 Resource            ../ozone-lib/batch.robot
+Resource            ../ozone-lib/batch-shell.robot
 Test Timeout        4 minute
 Suite Setup         Setup Suite
 Suite Teardown      Teardown Suite
@@ -103,13 +104,6 @@ Delete link loop
     Execute Later ozone sh    bucket delete ${target}/loop2
     Execute Later ozone sh    bucket delete ${target}/loop3
 
-Put and get key
-    [arguments]    ${put_to}    ${get_from}    ${put_from}=/etc/passwd
-    ${get_to} =    Get Next Filename    ${TEMP_DIR}/key-get
-    Execute Later ozone sh    key put ${put_to} ${put_from}
-    Execute Later ozone sh    key get -f ${get_from} ${get_to}
-    Assert Later    Compare Files    ${put_from}    ${get_to}
-
 
 *** Test Cases ***
 Link to non-existent bucket
@@ -132,11 +126,11 @@ Link chain to broken source
 
 Key create passthrough
     # put to link, get from bucket
-    Put and get key    put_to=${target}/link-to-existing-bucket/key1    get_from=${source}/bucket-in-source/key1
+    Put and Get Key Later    put_to=${target}/link-to-existing-bucket/key1    get_from=${source}/bucket-in-source/key1
 
 Key read passthrough
     # put to bucket, get from link
-    Put and get key    put_to=${source}/bucket-in-source/key2    get_from=${target}/link-to-existing-bucket/key2
+    Put and Get Key Later    put_to=${source}/bucket-in-source/key2    get_from=${target}/link-to-existing-bucket/key2
 
 Key list passthrough
     ${target_list} =    Execute Later ozone sh    key list ${target}/link-to-existing-bucket
@@ -241,8 +235,8 @@ Loop in link chain is detected
 
 Multiple links to same bucket are allowed
     Execute Later ozone sh    bucket link ${source}/bucket-in-source ${target}/another-link
-    Put and get key    put_to=${target}/another-link/key3    get_from=${target}/link-to-existing-bucket/key3    put_from=/etc/group
-    Put and get key    put_to=${target}/link-to-existing-bucket/key4    get_from=${target}/another-link/key4    put_from=/etc/hostname
+    Put and Get Key Later    put_to=${target}/another-link/key3    get_from=${target}/link-to-existing-bucket/key3    put_from=/etc/group
+    Put and Get Key Later    put_to=${target}/link-to-existing-bucket/key4    get_from=${target}/another-link/key4    put_from=/etc/hostname
 
 Source bucket not affected by deleting link
     Execute Later ozone sh    bucket link ${source}/bucket-in-source ${target}/link-to-be-deleted
