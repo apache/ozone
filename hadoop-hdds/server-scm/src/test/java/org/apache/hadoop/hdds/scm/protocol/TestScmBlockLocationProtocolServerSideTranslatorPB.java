@@ -100,7 +100,6 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
       .build();
 
   private ScmBlockLocationProtocol impl;
-  private StorageContainerManager scm;
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
   private Map<DatanodeID, DatanodeInfo> registry;
   private List<DatanodeDetails> nodes;
@@ -109,7 +108,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
   @BeforeEach
   void setUp() throws Exception {
     impl = mock(ScmBlockLocationProtocol.class);
-    scm = mock(StorageContainerManager.class);
+    StorageContainerManager scm = mock(StorageContainerManager.class);
     when(scm.checkLeader()).thenReturn(true);
     when(scm.getVersionManager()).thenReturn(mock(ScmVersionManager.class));
 
