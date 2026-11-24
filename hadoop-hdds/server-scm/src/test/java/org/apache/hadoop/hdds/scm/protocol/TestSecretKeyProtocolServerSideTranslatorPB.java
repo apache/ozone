@@ -28,9 +28,9 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecre
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.Type;
-import org.apache.hadoop.hdds.scm.ScmTracingAttributes;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
+import org.apache.hadoop.hdds.tracing.OzoneTracingAttributes;
 import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
@@ -64,7 +64,7 @@ class TestSecretKeyProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertEquals(Status.OK, service.submitRequest(null, request).getStatus());
       collector.assertNotError("GetAllSecretKeys");
-      collector.assertNoAttribute("GetAllSecretKeys", ScmTracingAttributes.STATUS);
+      collector.assertNoAttribute("GetAllSecretKeys", OzoneTracingAttributes.STATUS);
     }
   }
 
@@ -77,7 +77,7 @@ class TestSecretKeyProtocolServerSideTranslatorPB {
       SCMSecretKeyResponse response = service.submitRequest(null, REQUEST);
       assertEquals(Status.SECRET_KEY_NOT_INITIALIZED, response.getStatus());
       collector.assertError("GetCurrentSecretKey", "not initialized");
-      collector.assertAttribute("GetCurrentSecretKey", ScmTracingAttributes.STATUS, "SECRET_KEY_NOT_INITIALIZED");
+      collector.assertAttribute("GetCurrentSecretKey", OzoneTracingAttributes.STATUS, "SECRET_KEY_NOT_INITIALIZED");
       collector.assertExceptionRecorded("GetCurrentSecretKey", SCMSecretKeyException.class);
     }
   }
@@ -89,7 +89,7 @@ class TestSecretKeyProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertThrows(ServiceException.class, () -> service.submitRequest(null, REQUEST));
       collector.assertExceptionRecorded("GetCurrentSecretKey", ServiceException.class);
-      collector.assertNoAttribute("GetCurrentSecretKey", ScmTracingAttributes.STATUS);
+      collector.assertNoAttribute("GetCurrentSecretKey", OzoneTracingAttributes.STATUS);
     }
   }
 }

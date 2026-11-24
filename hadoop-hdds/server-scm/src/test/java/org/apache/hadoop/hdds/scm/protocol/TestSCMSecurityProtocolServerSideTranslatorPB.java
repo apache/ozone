@@ -28,9 +28,9 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecuri
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
-import org.apache.hadoop.hdds.scm.ScmTracingAttributes;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.tracing.OzoneTracingAttributes;
 import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,7 +61,7 @@ class TestSCMSecurityProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertEquals(Status.OK, service.submitRequest(null, REQUEST).getStatus());
       collector.assertNotError("ListCACertificate");
-      collector.assertNoAttribute("ListCACertificate", ScmTracingAttributes.STATUS);
+      collector.assertNoAttribute("ListCACertificate", OzoneTracingAttributes.STATUS);
     }
   }
 
@@ -74,7 +74,7 @@ class TestSCMSecurityProtocolServerSideTranslatorPB {
       SCMSecurityResponse response = service.submitRequest(null, REQUEST);
       assertEquals(Status.GET_CA_CERT_FAILED, response.getStatus());
       collector.assertError("ListCACertificate", "no CA");
-      collector.assertAttribute("ListCACertificate", ScmTracingAttributes.STATUS, "GET_CA_CERT_FAILED");
+      collector.assertAttribute("ListCACertificate", OzoneTracingAttributes.STATUS, "GET_CA_CERT_FAILED");
       collector.assertExceptionRecorded("ListCACertificate", SCMSecurityException.class);
     }
   }
@@ -88,7 +88,7 @@ class TestSCMSecurityProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertThrows(ServiceException.class, () -> service.submitRequest(null, REQUEST));
       collector.assertExceptionRecorded("ListCACertificate", ServiceException.class);
-      collector.assertNoAttribute("ListCACertificate", ScmTracingAttributes.STATUS);
+      collector.assertNoAttribute("ListCACertificate", OzoneTracingAttributes.STATUS);
     }
   }
 }

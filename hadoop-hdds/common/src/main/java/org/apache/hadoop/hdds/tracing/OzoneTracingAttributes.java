@@ -15,16 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm;
+package org.apache.hadoop.hdds.tracing;
 
 /**
- * Span attribute keys used by SCM.
+ * Span attribute keys shared by Ozone services.
  */
-public final class ScmTracingAttributes {
+public final class OzoneTracingAttributes {
 
   /** Status or result code of a failed request, for example SAFE_MODE_EXCEPTION. */
   public static final String STATUS = "ozone.status";
 
-  private ScmTracingAttributes() {
+  private OzoneTracingAttributes() {
   }
 }

@@ -55,7 +55,6 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMB
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.ScmTracingAttributes;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -70,6 +69,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
+import org.apache.hadoop.hdds.tracing.OzoneTracingAttributes;
 import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
@@ -359,7 +359,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertEquals(Status.OK, service.send(null, ALLOCATE_BLOCK).getStatus());
       collector.assertNotError("AllocateScmBlock");
-      collector.assertNoAttribute("AllocateScmBlock", ScmTracingAttributes.STATUS);
+      collector.assertNoAttribute("AllocateScmBlock", OzoneTracingAttributes.STATUS);
     }
   }
 
@@ -371,7 +371,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertEquals(Status.SAFE_MODE_EXCEPTION, service.send(null, ALLOCATE_BLOCK).getStatus());
       collector.assertError("AllocateScmBlock", "safe mode");
-      collector.assertAttribute("AllocateScmBlock", ScmTracingAttributes.STATUS, "SAFE_MODE_EXCEPTION");
+      collector.assertAttribute("AllocateScmBlock", OzoneTracingAttributes.STATUS, "SAFE_MODE_EXCEPTION");
       collector.assertExceptionRecorded("AllocateScmBlock", SCMException.class);
     }
   }
@@ -384,7 +384,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertThrows(ServiceException.class, () -> service.send(null, ALLOCATE_BLOCK));
       collector.assertExceptionRecorded("AllocateScmBlock", ServiceException.class);
-      collector.assertNoAttribute("AllocateScmBlock", ScmTracingAttributes.STATUS);
+      collector.assertNoAttribute("AllocateScmBlock", OzoneTracingAttributes.STATUS);
     }
   }
 }
