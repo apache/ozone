@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
@@ -55,6 +56,8 @@ import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.exceptions.RaftException;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -243,7 +246,7 @@ public class TestSCMRatisServerImpl {
   @Test
   public void testSubmitRequestIsTracedUnderTheCurrentSpan() throws Exception {
     ArgumentCaptor<RaftClientRequest> submitted = ArgumentCaptor.forClass(RaftClientRequest.class);
-    SCMRatisServerImpl scmRatisServer = newScmRatisServer(submitted);
+    SCMRatisServerImpl scmRatisServer = newScmRatisServer(submitted, null);
     SCMRatisRequest request = SCMRatisRequest.of(RequestType.PIPELINE, "op", new Class<?>[0]);
 
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
@@ -257,8 +260,26 @@ public class TestSCMRatisServerImpl {
     }
   }
 
-  /** Returns a server whose Ratis server accepts any request, and records it in {@code submitted}. */
-  private static SCMRatisServerImpl newScmRatisServer(ArgumentCaptor<RaftClientRequest> submitted) throws Exception {
+  @Test
+  public void testRejectedSubmitRequestIsRecordedOnSpan() throws Exception {
+    SCMRatisServerImpl scmRatisServer = newScmRatisServer(ArgumentCaptor.forClass(RaftClientRequest.class),
+        new StateMachineException("rejected"));
+    SCMRatisRequest request = SCMRatisRequest.of(RequestType.PIPELINE, "op", new Class<?>[0]);
+
+    try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      assertFalse(scmRatisServer.submitRequest(request).isSuccess());
+
+      collector.assertError("SCMRatisServerImpl.submit.op", "rejected");
+      collector.assertExceptionRecorded("SCMRatisServerImpl.submit.op", StateMachineException.class);
+    }
+  }
+
+  /**
+   * Returns a server whose Ratis server records each request in {@code submitted} and replies with {@code exception},
+   * or with success if it is null.
+   */
+  private static SCMRatisServerImpl newScmRatisServer(ArgumentCaptor<RaftClientRequest> submitted,
+      RaftException exception) throws Exception {
     try (
         MockedConstruction<SecurityConfig> mockedSecurityConfigConstruction = mockConstruction(SecurityConfig.class);
         MockedStatic<RaftServer> staticMockedRaftServer = mockStatic(RaftServer.class);
@@ -282,7 +303,8 @@ public class TestSCMRatisServerImpl {
       when(division.getGroup()).thenReturn(RaftGroup.valueOf(RaftGroupId.randomId(), peer));
 
       RaftClientReply reply = mock(RaftClientReply.class);
-      when(reply.isSuccess()).thenReturn(true);
+      when(reply.isSuccess()).thenReturn(exception == null);
+      when(reply.getException()).thenReturn(exception);
       when(reply.getMessage()).thenReturn(Message.EMPTY);
       RaftServer raftServer = mock(RaftServer.class);
       when(raftServer.getDivision(any())).thenReturn(division);

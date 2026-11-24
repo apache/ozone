@@ -250,7 +250,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
           server.submitClientRequestAsync(raftClientRequest)
               .get(requestTimeout, TimeUnit.MILLISECONDS);
       LOG.debug("request {} Reply {}", raftClientRequest, raftClientReply);
-      return SCMRatisResponse.decode(raftClientReply);
+      final SCMRatisResponse response = SCMRatisResponse.decode(raftClientReply);
+      if (!response.isSuccess()) {
+        TracingUtil.recordException(span, response.getException());
+      }
+      return response;
     } catch (Exception e) {
       TracingUtil.recordException(span, e);
       throw e;
