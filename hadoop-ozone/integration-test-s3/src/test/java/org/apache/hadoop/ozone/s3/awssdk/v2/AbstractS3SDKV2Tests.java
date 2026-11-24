@@ -137,6 +137,7 @@ import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.SdkHttpMethod;
 import software.amazon.awssdk.http.SdkHttpRequest;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
+import software.amazon.awssdk.services.s3.LegacyMd5Plugin;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
@@ -772,7 +773,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
 
     List<Tag> tagsPutOrder = Arrays.asList(
         Tag.builder().key("key2").value("val2").build(),
-        Tag.builder().key("key").value("val").build());
+        Tag.builder().key("key").value("a@b").build());
     s3Client.putObjectTagging(b -> b.bucket(bucketName).key(keyName)
         .tagging(Tagging.builder().tagSet(tagsPutOrder).build()));
 
@@ -780,7 +781,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
     List<Tag> tagSet = taggingResult.tagSet();
     assertEquals(2, tagSet.size());
     assertEquals("key", tagSet.get(0).key());
-    assertEquals("val", tagSet.get(0).value());
+    assertEquals("a@b", tagSet.get(0).value());
     assertEquals("key2", tagSet.get(1).key());
     assertEquals("val2", tagSet.get(1).value());
   }
@@ -1633,6 +1634,56 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
 
     // Verify the object was not uploaded
     assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectsWithMD5Header() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("bar"));
+
+    // SDK 2.30+ sends a CRC32 checksum instead of Content-MD5 by default; LegacyMd5Plugin restores Content-MD5.
+    List<String> sentContentMD5 = new ArrayList<>();
+    ExecutionInterceptor interceptor = new ExecutionInterceptor() {
+      @Override
+      public void beforeTransmission(Context.BeforeTransmission context, ExecutionAttributes executionAttributes) {
+        context.httpRequest().firstMatchingHeader(S3Consts.CHECKSUM_HEADER).ifPresent(sentContentMD5::add);
+      }
+    };
+
+    DeleteObjectsResponse response = s3Client.deleteObjects(b -> b.bucket(bucketName)
+        .delete(d -> d.objects(ObjectIdentifier.builder().key(keyName).build()))
+        .overrideConfiguration(o -> o.addPlugin(LegacyMd5Plugin.create())
+            .addPlugin(c -> c.overrideConfiguration(overrides -> overrides.addExecutionInterceptor(interceptor)))));
+
+    assertThat(sentContentMD5).hasSize(1);
+    assertThat(response.errors()).isEmpty();
+    assertThat(response.deleted()).extracting(DeletedObject::key).containsExactly(keyName);
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testDeleteObjectsWithWrongMD5Header(String contentMD5, String expectedErrorCode) {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.deleteObjects(b -> b
+        .bucket(bucketName)
+        .delete(d -> d.objects(ObjectIdentifier.builder().key(keyName).build()))
+        .overrideConfiguration(c -> c.putHeader(S3Consts.CHECKSUM_HEADER, contentMD5))));
+
+    assertEquals(400, exception.statusCode());
+    assertEquals(expectedErrorCode, exception.awsErrorDetails().errorCode());
+
+    HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", head.eTag());
+    assertEquals(content.length(), head.contentLength());
+    assertEquals(content, s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String());
   }
 
   @Test

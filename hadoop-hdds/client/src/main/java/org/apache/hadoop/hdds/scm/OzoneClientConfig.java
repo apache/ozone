@@ -336,10 +336,14 @@ public class OzoneClientConfig {
           tags = ConfigTag.CLIENT)
   private boolean enablePutblockPiggybacking = false;
 
-  @Config(key = "ozone.client.datastream.putblock.without.raft.enabled",
+  static final String OZONE_CLIENT_DATASTREAM_PUTBLOCK_WITHOUT_RAFT_ENABLED
+      = "ozone.client.datastream.putblock.without.raft.enabled";
+  @Config(key = OZONE_CLIENT_DATASTREAM_PUTBLOCK_WITHOUT_RAFT_ENABLED,
+      experimental = true,
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
-      description = "When enabled, the PutBlock of a Ratis data stream is committed through the data stream " +
+      description = "WARNING: This is an experimental feature; use at your own risk. " +
+          "When enabled, the PutBlock of a Ratis data stream is committed through the data stream " +
           "instead of a separate WriteAsync PutBlock, so that it does not go through the Raft log: " +
           "StreamInitWithPutBlock is used so that datanodes commit PutBlock when the data stream closes, " +
           "and the PutBlock triggered by a flush in the middle of the stream is sent as a data stream command. " +
