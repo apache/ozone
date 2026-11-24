@@ -223,6 +223,28 @@ public class TestRatisUnderReplicationHandler {
     assertTrue(commandsSent.isEmpty());
   }
 
+  @Test
+  public void testUnderReplicationDoesNotFallbackFromDiskOrMissingTier() throws IOException {
+    for (StorageTier tier : new StorageTier[] {StorageTier.DISK, null}) {
+      container = TestContainerInfo.newBuilderForTest()
+          .setContainerID(1)
+          .setReplicationConfig(RATIS_REPLICATION_CONFIG)
+          .setState(HddsProtos.LifeCycleState.CLOSED)
+          .setStorageTier(tier)
+          .build();
+      policy = mock(PlacementPolicy.class);
+      when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.DISK)))
+          .thenThrow(new SCMException("No DISK target", SCMException.ResultCodes.NO_SUCH_DATANODE));
+      RatisUnderReplicationHandler handler = new RatisUnderReplicationHandler(policy, conf, replicationManager);
+      Set<ContainerReplica> replicas = createReplicas(container.containerID(), State.CLOSED, 0, 0);
+
+      assertThrows(SCMException.class, () -> handler.processAndSendCommands(
+          replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 2));
+      assertTrue(commandsSent.isEmpty());
+      verify(policy).chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.DISK));
+    }
+  }
+
   /**
    * When the container is under replicated and unrecoverable (no replicas
    * exist), the handler will not create any commands.

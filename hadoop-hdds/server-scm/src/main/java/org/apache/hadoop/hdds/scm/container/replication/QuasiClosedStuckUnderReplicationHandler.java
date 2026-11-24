@@ -101,13 +101,23 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
     int totalRequiredReplicas = 0;
     int totalCommandsSent = 0;
     IOException firstException = null;
-    StorageType targetStorageType = ReplicationManagerUtil.getTargetStorageType(containerInfo);
+    StorageType preferredStorageType = ReplicationManagerUtil.getTargetStorageType(containerInfo);
     List<ContainerReplicaOp> mutablePendingOps = new ArrayList<>(pendingOps);
     for (QuasiClosedStuckReplicaCount.MisReplicatedOrigin origin : misReplicatedOrigins) {
       totalRequiredReplicas += origin.getReplicaDelta();
       List<DatanodeDetails> targets;
+      StorageType targetStorageType = preferredStorageType;
       try {
-        targets = getTargets(containerInfo, replicas, origin.getReplicaDelta(), mutablePendingOps, targetStorageType);
+        try {
+          targets = getTargets(containerInfo, replicas, origin.getReplicaDelta(), mutablePendingOps, targetStorageType);
+        } catch (SCMException e) {
+          StorageType fallback = ReplicationManagerUtil.getFallbackStorageType(preferredStorageType);
+          if (e.getResult() != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE || fallback == null) {
+            throw e;
+          }
+          targetStorageType = fallback;
+          targets = getTargets(containerInfo, replicas, origin.getReplicaDelta(), mutablePendingOps, targetStorageType);
+        }
       } catch (SCMException e) {
         if (firstException == null) {
           firstException = e;
@@ -126,7 +136,7 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
           // Add the pending op, so we exclude the node for subsequent origins
           mutablePendingOps.add(new ContainerReplicaOp(
               ContainerReplicaOp.PendingOpType.ADD, target, 0,
-              null, System.currentTimeMillis(), 0, null));
+              null, System.currentTimeMillis(), 0, targetStorageType));
           totalCommandsSent++;
         } catch (CommandTargetOverloadedException e) {
           LOG.warn("Cannot replicate container {} because all sources are overloaded.", containerInfo);

@@ -39,10 +39,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -179,6 +179,32 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
     for (Pair<DatanodeDetails, SCMCommand<?>> command : commandsSent) {
       assertEquals(StorageType.SSD,
           ((ReplicateContainerCommand) command.getRight()).getTargetVolumeStorageType());
+    }
+  }
+
+  @Test
+  public void testUnderReplicationFallsBackToDiskWhenSsdIsUnavailable() throws IOException {
+    container = TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RATIS_REPLICATION_CONFIG)
+        .setState(HddsProtos.LifeCycleState.QUASI_CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build();
+    PlacementPolicy policy = mock(PlacementPolicy.class);
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), any(Integer.class), anyLong(), anyLong(),
+        eq(StorageType.SSD))).thenThrow(new SCMException("No SSD target", SCMException.ResultCodes.NO_SUCH_DATANODE));
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(2), anyLong(), anyLong(), eq(StorageType.DISK)))
+        .thenReturn(List.of(MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails()));
+    handler = new QuasiClosedStuckUnderReplicationHandler(policy, conf, replicationManager);
+    DatanodeID origin = DatanodeID.randomID();
+    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
+        QUASI_CLOSED, Pair.of(origin, IN_SERVICE));
+
+    assertEquals(2, handler.processAndSendCommands(
+        replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1));
+    assertEquals(2, commandsSent.size());
+    for (Pair<DatanodeDetails, SCMCommand<?>> command : commandsSent) {
+      assertEquals(StorageType.DISK, ((ReplicateContainerCommand) command.getRight()).getTargetVolumeStorageType());
     }
   }
 

@@ -68,6 +68,10 @@ public final class ReplicationManagerUtil {
         ? StorageType.DEFAULT : storageTier.getUniformStorageType();
   }
 
+  static StorageType getFallbackStorageType(StorageType storageType) {
+    return storageType == StorageType.SSD ? StorageType.DISK : null;
+  }
+
   private static String formatDatanodeDetails(List<DatanodeDetails> dns) {
     if (dns == null) {
       return "[]";

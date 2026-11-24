@@ -28,8 +28,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
-import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -484,7 +482,7 @@ public class RatisUnderReplicationHandler
       if (e.getResult() != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) {
         throw e;
       }
-      StorageType fallbackStorageType = getFallbackStorageType(preferredStorageType);
+      StorageType fallbackStorageType = ReplicationManagerUtil.getFallbackStorageType(preferredStorageType);
       if (fallbackStorageType == null) {
         throw e;
       }
@@ -494,16 +492,6 @@ public class RatisUnderReplicationHandler
       }
       return new TargetSelection(targets, fallbackStorageType);
     }
-  }
-
-  private static StorageType getFallbackStorageType(StorageType storageType) {
-    for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
-      if (storagePolicy.getCreationTier().getUniformStorageType() == storageType) {
-        StorageTier fallbackTier = storagePolicy.getCreationFallbackTier();
-        return fallbackTier == StorageTier.EMPTY ? null : fallbackTier.getUniformStorageType();
-      }
-    }
-    return null;
   }
 
   @FunctionalInterface
