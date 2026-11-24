@@ -18,8 +18,11 @@
 package org.apache.hadoop.hdds.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.EnumSet;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -34,11 +37,25 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   public static final String EC_REPLICATION_PARAMS_DELIMITER = "-";
 
-  // Acceptable patterns are like:
-  //   rs-3-2-1024k
-  //   RS-3-2-2048
-  //   XOR-10-4-4096K
+  // <codec>-<data>-<parity>-<chunk size>, usually as getReplication() prints it, such as rs-6-3-1024k. The codec and
+  // the "k" suffix are case-insensitive, and without "k" the chunk size is in bytes, so RS-6-3-1024K and
+  // rs-6-3-1048576 are accepted too.
   private static final Pattern STRING_FORMAT = Pattern.compile("([a-zA-Z]+)-(\\d+)-(\\d+)-(\\d+)([kK])?");
+
+  /** The maximum number of configs cached by {@link #getInstance}. */
+  @VisibleForTesting
+  static final int MAX_CACHED_CONFIGS = 64;
+  /** The maximum number of strings cached by {@link #getInstance(String)}, more than configs for other spellings. */
+  @VisibleForTesting
+  static final int MAX_CACHED_STRINGS = 256;
+  /**
+   * The shared instance of each config by value. Only a few configs are used in practice, so they are shared instead
+   * of creating equal objects; the size is bounded since a client may send arbitrary configs.
+   */
+  private static final ConcurrentMap<ECReplicationConfig, ECReplicationConfig> INSTANCES = new ConcurrentHashMap<>();
+  /** The shared instances by their string form, such as rs-6-3-1024k, to look them up without the regex. */
+  private static final ConcurrentMap<String, ECReplicationConfig> BY_STRING = new ConcurrentHashMap<>();
+  private static final EcCodec[] CODECS = EcCodec.values();
 
   private final int data;
 
@@ -67,6 +84,61 @@ public class ECReplicationConfig implements ReplicationConfig {
     }
   }
 
+  /**
+   * Same as {@link #ECReplicationConfig(String)}, but returns a shared instance for a config seen before, up to
+   * {@link #MAX_CACHED_CONFIGS} configs and {@link #MAX_CACHED_STRINGS} strings.
+   */
+  public static ECReplicationConfig getInstance(String string) {
+    final ECReplicationConfig cached = BY_STRING.get(string);
+    if (cached != null) {
+      return cached;
+    }
+    final ECReplicationConfig config = intern(new ECReplicationConfig(string));
+    // The size check is not atomic with the put, so concurrent callers may exceed the bound by a few entries.
+    if (BY_STRING.size() < MAX_CACHED_STRINGS) {
+      BY_STRING.putIfAbsent(string, config);
+    }
+    return config;
+  }
+
+  /**
+   * Same as {@link #ECReplicationConfig(HddsProtos.ECReplicationConfig)}, but returns a shared instance for a config
+   * seen before, up to {@link #MAX_CACHED_CONFIGS} configs.
+   */
+  public static ECReplicationConfig getInstance(HddsProtos.ECReplicationConfig proto) {
+    return intern(new ECReplicationConfig(proto));
+  }
+
+  /** @return the shared instance equal to the given config, or the given config if the cache is full. */
+  private static ECReplicationConfig intern(ECReplicationConfig config) {
+    final ECReplicationConfig cached = INSTANCES.get(config);
+    if (cached != null) {
+      return cached;
+    }
+    // The size check is not atomic with the put, so concurrent callers may exceed the bound by a few entries.
+    if (INSTANCES.size() >= MAX_CACHED_CONFIGS) {
+      return config;
+    }
+    final ECReplicationConfig previous = INSTANCES.putIfAbsent(config, config);
+    return previous != null ? previous : config;
+  }
+
+  /** Like {@code EcCodec.valueOf(name.toUpperCase())}, but without creating a string for a valid codec. */
+  private static EcCodec getCodec(String name) {
+    for (EcCodec codec : CODECS) {
+      if (codec.name().equalsIgnoreCase(name)) {
+        return codec;
+      }
+    }
+    return EcCodec.valueOf(name.toUpperCase()); // throws the same exception as before
+  }
+
+  @VisibleForTesting
+  static void clearCache() {
+    BY_STRING.clear();
+    INSTANCES.clear();
+  }
+
   public ECReplicationConfig(int data, int parity) {
     this(data, parity, EcCodec.RS, 1024 * 1024);
   }
@@ -80,15 +152,16 @@ public class ECReplicationConfig implements ReplicationConfig {
   }
 
   /**
-   * Create an ECReplicationConfig object from a string representing the
-   * various parameters. Acceptable patterns are like:
-   *     rs-3-2-1024k
-   *     RS-3-2-2048k
-   *     XOR-10-4-4096K
-   * IllegalArgumentException will be thrown if the passed string does not
-   * match the defined pattern.
-   * @param string Parameters used to create ECReplicationConfig instances.
-   *       Format: &lt;codec&gt;-&lt;data&gt;-&lt;parity&gt;-&lt;chunksize&gt;
+   * Creates an ECReplicationConfig from a string in the form {@code <codec>-<data>-<parity>-<chunk size>}, usually
+   * as {@link #getReplication()} prints it, such as rs-6-3-1024k. The codec and the "k" suffix are case-insensitive,
+   * and without "k" the chunk size is in bytes, so RS-6-3-1024K and rs-6-3-1048576 are the same config as
+   * rs-6-3-1024k.
+   * <p>
+   * This always creates a new object; {@link #getInstance(String)} returns a shared one.
+   *
+   * @param string the EC replication config
+   * @throws IllegalArgumentException if the string is not in this form, or the codec, data, parity or chunk size is
+   *         invalid
    */
   public ECReplicationConfig(String string) {
     final Matcher matcher = STRING_FORMAT.matcher(string);
@@ -129,7 +202,7 @@ public class ECReplicationConfig implements ReplicationConfig {
       HddsProtos.ECReplicationConfig ecReplicationConfig) {
     this.data = ecReplicationConfig.getData();
     this.parity = ecReplicationConfig.getParity();
-    this.codec = EcCodec.valueOf(ecReplicationConfig.getCodec().toUpperCase());
+    this.codec = getCodec(ecReplicationConfig.getCodec());
     this.ecChunkSize = ecReplicationConfig.getEcChunkSize();
   }
 
@@ -200,7 +273,8 @@ public class ECReplicationConfig implements ReplicationConfig {
 
   @Override
   public int hashCode() {
-    return Objects.hash(data, parity, codec, ecChunkSize);
+    // Same value as Objects.hash(data, parity, codec, ecChunkSize), without boxing: getInstance looks up every config
+    return ((((31 + data) * 31 + parity) * 31 + Objects.hashCode(codec)) * 31) + ecChunkSize;
   }
 
   @Override

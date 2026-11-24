@@ -490,12 +490,7 @@ final class S3ClientProtocol implements ClientProtocol {
   @Override
   public void abortMultipartUpload(String volumeName, String bucketName, String keyName, String uploadID)
       throws IOException {
-    delegate.abortMultipartUpload(volumeName, bucketName, keyName, uploadID);
-  }
-
-  @Override
-  public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
-    delegate.abortS3MultipartUpload(bucketName, keyName, uploadID);
+    delegate.abortMultipartUpload(resolveVolumeName(volumeName), bucketName, keyName, uploadID);
   }
 
   @Override

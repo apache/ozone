@@ -213,7 +213,7 @@
     <sonar.projectKey>hadoop-ozone</sonar.projectKey>
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
-    <spring.version>6.2.19</spring.version>
+    <spring.version>7.0.10</spring.version>
     <sqlite.version>3.53.4.0</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
@@ -1695,9 +1695,9 @@
         <version>${spring.version}</version>
         <exclusions>
           <exclusion>
-            <!-- avoid conflict with Commons Logging -->
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-jcl</artifactId>
+            <!-- depend on jcl-over-slf4j instead -->
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
           </exclusion>
         </exclusions>
       </dependency>

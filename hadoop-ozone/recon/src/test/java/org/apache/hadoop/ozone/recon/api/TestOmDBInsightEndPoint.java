@@ -213,6 +213,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final long EMPTY_OBS_BUCKET_OBJECT_ID = 40L;
   private static final long EMPTY_FSO_BUCKET_OBJECT_ID = 41L;
 
+  private static final long DIR_SEVEN_OBJECT_ID = 42L;
+
   private static final long KEY_ONE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TWO_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_THREE_SIZE = OzoneConsts.KB + 1; // bin 1
@@ -819,8 +821,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         (DIR_FOUR + OM_KEY_PREFIX + DIR_SEVEN + OM_KEY_PREFIX),
         LEGACY_BUCKET,
         VOLUME_ONE,
-        DIR_FOUR,
-        DIR_FOUR_OBJECT_ID,
+        DIR_SEVEN,
+        DIR_SEVEN_OBJECT_ID,
         PARENT_OBJECT_ID_ZERO,
         LEGACY_BUCKET_OBJECT_ID,
         VOLUME_ONE_OBJECT_ID,
