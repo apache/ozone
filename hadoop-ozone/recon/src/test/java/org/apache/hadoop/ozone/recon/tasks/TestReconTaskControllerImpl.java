@@ -288,6 +288,40 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   }
 
   @Test
+  public void testBatchesBehindFailedBatchDoNotAdvanceTaskCursor() throws Exception {
+    ReconOmTask reconOmTaskMock = getMockTask("MockTask");
+    when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyMap()))
+        .thenReturn(new ReconOmTask.TaskResult.Builder().setTaskName("MockTask").setTaskSuccess(false).build())
+        .thenReturn(new ReconOmTask.TaskResult.Builder().setTaskName("MockTask").setTaskSuccess(false).build())
+        .thenReturn(new ReconOmTask.TaskResult.Builder().setTaskName("MockTask").setTaskSuccess(true).build());
+    reconTaskController.registerTask(reconOmTaskMock);
+
+    ReconTaskControllerImpl controller = (ReconTaskControllerImpl) reconTaskController;
+    controller.processReconEvent(eventBatch(100L));
+
+    assertTrue(controller.hasTasksFailed());
+    ReconTaskStatus failedStatus = reconTaskStatusDao.findById("MockTask");
+    assertEquals(0L, failedStatus.getLastUpdatedSeqNumber());
+
+    // This batch is already buffered behind the failed one and would succeed. It must not move the cursor.
+    controller.processReconEvent(eventBatch(200L));
+
+    ReconTaskStatus status = reconTaskStatusDao.findById("MockTask");
+    assertEquals(0L, status.getLastUpdatedSeqNumber());
+    verify(reconOmTaskMock, times(2)).process(any(), anyMap());
+  }
+
+  private OMUpdateEventBatch eventBatch(long sequenceNumber) {
+    OMUpdateEventBatch batch = mock(OMUpdateEventBatch.class);
+    when(batch.isEmpty()).thenReturn(false);
+    when(batch.getLastSequenceNumber()).thenReturn(sequenceNumber);
+    when(batch.getEvents()).thenReturn(new ArrayList<>());
+    when(batch.getEventType()).thenReturn(ReconEvent.EventType.OM_UPDATE_BATCH);
+    when(batch.getEventCount()).thenReturn(1);
+    return batch;
+  }
+
+  @Test
   @org.junit.jupiter.api.Disabled("Task removal logic not implemented in async processing")
   public void testBadBehavedTaskIsIgnored() throws Exception {
     String taskName = "Dummy_" + System.currentTimeMillis();
