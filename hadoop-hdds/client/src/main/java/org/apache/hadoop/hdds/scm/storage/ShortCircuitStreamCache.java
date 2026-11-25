@@ -106,13 +106,13 @@ public class ShortCircuitStreamCache implements Closeable {
   }
 
   public synchronized void release(Replica replica) {
+    Preconditions.checkState(replica.getRefCount().get() > 0,
+        "Replica %s is over-released", replica);
     if (replica.getRefCount().decrementAndGet() == 0) {
       if (replica.shouldClose()) {
         closeAsync(replica);
       }
     }
-    Preconditions.checkState(replica.getRefCount().get() >= 0, 
-        "Replica %s is over-released", replica);
   }
 
   /**

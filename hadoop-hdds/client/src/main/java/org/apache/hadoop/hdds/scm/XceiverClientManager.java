@@ -131,7 +131,7 @@ public class XceiverClientManager extends XceiverClientCreator {
     OzoneClientConfig ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
     int blockCacheSize = ozoneClientConfig.getShortCircuitBlockCacheSize();
     long blockCacheStaleThresholdMs = ozoneClientConfig.getShortCircuitBlockCacheExpiry().toMillis();
-    if (isShortCircuitEnabled() && blockCacheSize > 0) {
+    if (isShortCircuitEnabled() && blockCacheSize > 0 && blockCacheStaleThresholdMs > 0) {
       this.shortCircuitStreamCache = new ShortCircuitStreamCache(blockCacheSize,
           blockCacheStaleThresholdMs, closeExecutor, cleanupExecutor);
     }
