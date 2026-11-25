@@ -85,6 +85,7 @@ runs:
       with:
         path: ~/.m2/wrapper
         key: maven-wrapper-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties') }}
+        lookup-only: true
 
     # Maven Wrapper is required, small, simple to get,
     # so download and store it instead of relying on populate-cache.
