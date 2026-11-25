@@ -628,10 +628,15 @@ public final class TracingUtil {
   }
 
   public static void addAttributesToCurrentSpan(Map<String, String> attributes) {
-    if (attributes == null) {
+    Span span = Span.current();
+    if (attributes == null || !span.isRecording()) {
       return;
     }
-    attributes.forEach(TracingUtil::addAttributesToCurrentSpan);
+    attributes.forEach((key, value) -> {
+      if (value != null) {
+        span.setAttribute(key, value);
+      }
+    });
   }
 
   public static void addEventToCurrentSpan(String name, String key, String value) {
