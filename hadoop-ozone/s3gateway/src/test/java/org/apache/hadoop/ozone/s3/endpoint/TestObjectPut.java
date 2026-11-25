@@ -1175,6 +1175,35 @@ class TestObjectPut {
     assertEquals(policy, keyDetails.getStoragePolicy());
   }
 
+  static Stream<Arguments> ecStorageClassesOnEcBucket() {
+    ReplicationConfig bucketEc = new ECReplicationConfig("rs-6-3-1024k");
+    ReplicationConfig headerEc = new ECReplicationConfig("rs-3-2-1024k");
+    return Stream.of(
+        Arguments.of("STANDARD_IA", null, bucketEc, null),
+        Arguments.of("STANDARD_IA", "rs-3-2-1024k", headerEc, null),
+        Arguments.of("DEEP_ARCHIVE", null, bucketEc, OzoneStoragePolicy.COLD));
+  }
+
+  /**
+   * An EC storage class on an EC bucket takes its layout from the storage-config header, otherwise from the bucket.
+   * Before HDDS-17727 the gateway used EC 3-2 whenever the header was absent.
+   */
+  @ParameterizedTest
+  @MethodSource("ecStorageClassesOnEcBucket")
+  void testPutObjectWithEcStorageClassOnEcBucket(String storageClass, String storageConfig,
+      ReplicationConfig replication, StoragePolicy policy) throws Exception {
+    bucket.setReplicationConfig(new ECReplicationConfig("rs-6-3-1024k"));
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(storageClass);
+    when(headers.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + S3Consts.STORAGE_CONFIG_HEADER))
+        .thenReturn(storageConfig);
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertEquals(replication, keyDetails.getReplicationConfig());
+    assertEquals(policy, keyDetails.getStoragePolicy());
+  }
+
   /** A gateway storage policy setting for STANDARD is sent with the write. */
   @Test
   void testPutObjectWithConfiguredStandardStoragePolicy() throws Exception {
