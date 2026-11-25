@@ -133,7 +133,7 @@ public class OBSBucketHandler extends BucketHandler {
         if (keyInfo != null) {
           DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
           String objectName = keyInfo.getKeyName();
-          diskUsage.setSubpath(objectName);
+          diskUsage.setSubpath(buildSubpath(normalizedPath, objectName));
           diskUsage.setKey(true);
           diskUsage.setSize(keyInfo.getDataSize());
 

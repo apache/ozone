@@ -268,7 +268,9 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       return;
     }
 
-    const path = (curPath === '/') ? `${curPath}${subPath}` : `${curPath}/${subPath}`;
+    const duResponse = this.state.duResponse as unknown as IDUResponse;
+    const path = duResponse.subPaths?.[e.dataIndex]?.path
+      ?? ((curPath === '/') ? `${curPath}${subPath}` : `${curPath}/${subPath}`);
 
     // Reset to default everytime
     this.updatePieChart(path, DEFAULT_DISPLAY_LIMIT);
