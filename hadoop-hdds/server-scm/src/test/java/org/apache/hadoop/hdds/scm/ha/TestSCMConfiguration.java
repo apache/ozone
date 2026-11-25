@@ -46,8 +46,10 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.net.InetSocketAddress;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmRatisServerConfig;
@@ -210,15 +212,17 @@ class TestSCMConfiguration {
         ScmRatisServerConfig.class);
     assertEquals(0, scmRatisConfig.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
+    // The raw key may be absent (no generated defaults XML on the classpath),
+    // so the wait time must come from ScmRatisServerConfig alone.
     assertEquals(TimeDuration.ZERO,
         RaftServerConfigKeys.Log.Appender.waitTimeMin(
-            RatisUtil.newRaftProperties(conf)),
+            RatisUtil.newRaftProperties(withoutRawAppenderWaitTime())),
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
     scmRatisConfig.setLogAppenderWaitTimeMin(7);
     conf.setFromObject(scmRatisConfig);
     assertEquals(TimeDuration.valueOf(7, TimeUnit.MILLISECONDS),
         RaftServerConfigKeys.Log.Appender.waitTimeMin(
-            RatisUtil.newRaftProperties(conf)),
+            RatisUtil.newRaftProperties(withoutRawAppenderWaitTime())),
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
 
     assertFalse(scmRatisConfig.isAppendEntriesComposeEnabled(),
@@ -231,6 +235,18 @@ class TestSCMConfiguration {
     assertTrue(RaftServerConfigKeys.Log.appendEntriesComposeEnabled(
             RatisUtil.newRaftProperties(conf)),
         RaftServerConfigKeys.Log.APPEND_ENTRIES_COMPOSE_ENABLED_KEY);
+  }
+
+  private ConfigurationSource withoutRawAppenderWaitTime() {
+    return new OzoneConfiguration(conf) {
+      @Override
+      public Map<String, String> getPropsMatchPrefixAndTrimPrefix(String prefix) {
+        final Map<String, String> props = super.getPropsMatchPrefixAndTrimPrefix(prefix);
+        props.keySet().removeIf(key -> (prefix + key).endsWith(
+            RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY));
+        return props;
+      }
+    };
   }
 
   @ParameterizedTest
