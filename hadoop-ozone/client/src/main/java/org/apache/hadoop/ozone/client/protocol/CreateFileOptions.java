@@ -41,6 +41,10 @@ public final class CreateFileOptions {
     this.storagePolicy = b.storagePolicy;
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /** @return the size of the data to be written. */
   public long getSize() {
     return size;
@@ -65,6 +69,15 @@ public final class CreateFileOptions {
   @Nullable
   public StoragePolicy getStoragePolicy() {
     return storagePolicy;
+  }
+
+  @Override
+  public String toString() {
+    return "CreateFileOptions{size=" + size
+        + ", replicationConfig=" + replicationConfig
+        + ", overWrite=" + overWrite
+        + ", recursive=" + recursive
+        + ", storagePolicy=" + storagePolicy + "}";
   }
 
   /**

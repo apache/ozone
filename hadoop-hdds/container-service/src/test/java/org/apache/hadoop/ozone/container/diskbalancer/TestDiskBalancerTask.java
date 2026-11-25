@@ -21,19 +21,26 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DISK_BALANCER_DIR;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -55,6 +62,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -64,6 +72,7 @@ import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -71,6 +80,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -86,6 +96,8 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -102,10 +114,13 @@ import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -286,6 +301,255 @@ public class TestDiskBalancerTask {
   }
 
   @ParameterizedTest
+  @CsvSource({"SSD, DISK, true", "DISK, SSD, true", "SSD, ARCHIVE, true", "ARCHIVE, SSD, true",
+      "DISK, ARCHIVE, true", "ARCHIVE, DISK, true", "SSD, DISK, false", "DISK, SSD, false",
+      "SSD, ARCHIVE, false", "ARCHIVE, SSD, false", "DISK, ARCHIVE, false", "ARCHIVE, DISK, false"})
+  public void testCustomPolicyCannotMoveAcrossStorageTypes(StorageType sourceType, StorageType destinationType,
+      boolean stopAfterDiskEven) throws Exception {
+    // Keep the real volumes and container files, overriding only their configured type labels.
+    sourceVolume = spy(sourceVolume);
+    destVolume = spy(destVolume);
+    doReturn(sourceType).when(sourceVolume).getStorageType();
+    doReturn(destinationType).when(destVolume).getStorageType();
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    ContainerController controller = spy(ozoneContainer.getController());
+    when(ozoneContainer.getController()).thenReturn(controller);
+    byte[] originalYaml = Files.readAllBytes(container.getContainerFile().toPath());
+    long sourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
+    long destUsed = destVolume.getCurrentUsage().getUsedSpace();
+    // Existing reservations and deltas must survive rejection of this particular move.
+    destVolume.incCommittedBytes(42L);
+    long destCommitted = destVolume.getCommittedBytes();
+    diskBalancerService.getDeltaSizes().put(sourceVolume, 17L);
+    diskBalancerService.setParallelThread(2);
+    diskBalancerService.setStopAfterDiskEven(stopAfterDiskEven);
+    ContainerSet observedContainers = spy(containerSet);
+    when(ozoneContainer.getContainerSet()).thenReturn(observedContainers);
+    AtomicInteger selections = new AtomicInteger();
+    ContainerChoosingPolicy choosingPolicy = (ozone, volumes, deltas, inProgress, threshold, states) -> {
+      // Offer an invalid move, then no candidate, in each selection cycle.
+      if (selections.getAndIncrement() % 2 != 0) {
+        return null;
+      }
+      destVolume.incCommittedBytes(container.getContainerData().getBytesUsed());
+      return new ContainerCandidate(container.getContainerData(), sourceVolume, destVolume);
+    };
+    diskBalancerService.setVolumeContainerChoosingPolicy(choosingPolicy);
+
+    try (LogCapturer logs = LogCapturer.captureLogs(DiskBalancerService.class)) {
+      assertTrue(diskBalancerService.getTasks().isEmpty());
+      if (stopAfterDiskEven) {
+        assertThat(logs.getOutput()).contains("Disk balancer is stopped because the container choosing policy "
+            + choosingPolicy.getClass().getName() + " provided no valid same-StorageType move candidates");
+        assertThat(logs.getOutput()).doesNotContain("no volume pair of the same StorageType needs balancing");
+      } else {
+        assertThat(logs.getOutput()).doesNotContain("Disk balancer is stopped");
+      }
+    }
+    assertEquals(2, selections.get());
+    verify(observedContainers, never()).getContainer(CONTAINER_ID);
+
+    verify(controller, never()).copyContainer(any(), any());
+    assertSame(container, containerSet.getContainer(CONTAINER_ID));
+    assertSame(sourceVolume, container.getContainerData().getVolume());
+    assertEquals(State.CLOSED, container.getContainerState());
+    assertArrayEquals(originalYaml, Files.readAllBytes(container.getContainerFile().toPath()));
+    assertFalse(Files.exists(destVolume.getTmpDir().toPath().resolve(DISK_BALANCER_DIR)
+        .resolve(String.valueOf(CONTAINER_ID))));
+    assertFalse(destVolume.getContainerIterator().hasNext());
+    assertEquals(sourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(destUsed, destVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(destCommitted, destVolume.getCommittedBytes());
+    assertEquals(17L, diskBalancerService.getDeltaSizes().get(sourceVolume));
+    assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(0, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(0, diskBalancerService.getMetrics().getSuccessBytes());
+    assertCounter("MoveFailureTimeNumOps", 0L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
+    assertEquals(1, diskBalancerService.getMetrics().getIdleLoopNoAvailableVolumePairCount());
+    DiskBalancerRunningStatus expectedState =
+        stopAfterDiskEven ? DiskBalancerRunningStatus.STOPPED : DiskBalancerRunningStatus.RUNNING;
+    assertEquals(expectedState, diskBalancerService.getDiskBalancerInfo().getOperationalState());
+
+    if (stopAfterDiskEven) {
+      File infoFile = new File(testRoot, OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
+      assertEquals(DiskBalancerRunningStatus.STOPPED,
+          DiskBalancerYaml.readDiskBalancerInfoFile(infoFile).getOperationalState());
+      // Later scheduler calls must not select again or increment the idle counter while stopped.
+      for (int i = 0; i < 3; i++) {
+        assertTrue(diskBalancerService.getTasks().isEmpty());
+      }
+      assertEquals(2, selections.get());
+    } else {
+      // Wait for another eligible cycle: a back-to-back call can hit the existing same-millisecond delay.
+      GenericTestUtils.waitFor(() -> {
+        assertTrue(diskBalancerService.getTasks().isEmpty());
+        return selections.get() == 4;
+      }, 10, 5000);
+    }
+    assertEquals(destCommitted, destVolume.getCommittedBytes());
+    assertEquals(17L, diskBalancerService.getDeltaSizes().get(sourceVolume));
+    assertTrue(diskBalancerService.getInProgressContainers().isEmpty());
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 0L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
+    assertEquals(stopAfterDiskEven ? 1 : 2,
+        diskBalancerService.getMetrics().getIdleLoopNoAvailableVolumePairCount());
+    assertEquals(expectedState, diskBalancerService.getDiskBalancerInfo().getOperationalState());
+    verify(observedContainers, never()).getContainer(CONTAINER_ID);
+    verify(controller, never()).copyContainer(any(), any());
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"DISK", "SSD", "ARCHIVE"})
+  public void testCustomPolicySameTypeMovePreservesDifferentRecordedType(StorageType volumeType) throws IOException {
+    sourceVolume = spy(sourceVolume);
+    destVolume = spy(destVolume);
+    doReturn(volumeType).when(sourceVolume).getStorageType();
+    doReturn(volumeType).when(destVolume).getStorageType();
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    // Model a relabelled volume: a same-type move must preserve the replica's different recorded storage type.
+    StorageType recordedType = volumeType == StorageType.SSD ? StorageType.DISK : StorageType.SSD;
+    container.getContainerData().setStorageType(recordedType);
+    ContainerDataYaml.createContainerFile(container.getContainerData(), container.getContainerFile());
+    long destCommitted = destVolume.getCommittedBytes();
+    setCustomPolicyCandidate(container);
+
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    assertNotNull(task);
+    task.call();
+
+    Container moved = containerSet.getContainer(CONTAINER_ID);
+    assertNotEquals(container, moved);
+    assertSame(destVolume, moved.getContainerData().getVolume());
+    assertEquals(volumeType, moved.getContainerData().getVolume().getStorageType());
+    assertEquals(recordedType, moved.getContainerData().getStorageType());
+    assertEquals(recordedType, ContainerDataYaml.readContainerFile(moved.getContainerFile()).getStorageType());
+    assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(destCommitted, destVolume.getCommittedBytes());
+    assertTrue(diskBalancerService.getInProgressContainers().isEmpty());
+    assertEquals(0L, diskBalancerService.getDeltaSizes().get(sourceVolume));
+  }
+
+  @Test
+  public void testRejectedCandidateDoesNotPreventValidMoveInSameCycle() throws IOException {
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    HddsVolume invalidDestination = spy(destVolume);
+    doReturn(StorageType.SSD).when(invalidDestination).getStorageType();
+    destVolume.incCommittedBytes(42L);
+    long initialCommitted = destVolume.getCommittedBytes();
+    diskBalancerService.setParallelThread(2);
+    diskBalancerService.setStopAfterDiskEven(true);
+    // Rejection and a later successful task must preserve metrics from earlier failed tasks.
+    diskBalancerService.getMetrics().incrFailureCount(1);
+    diskBalancerService.getMetrics().getMoveFailureTime().add(10);
+    AtomicInteger selections = new AtomicInteger();
+    diskBalancerService.setVolumeContainerChoosingPolicy((ozone, volumes, deltas, inProgress, threshold, states) -> {
+      assertFalse(inProgress.contains(ContainerID.valueOf(CONTAINER_ID)));
+      int selection = selections.getAndIncrement();
+      HddsVolume destination = selection == 0 ? invalidDestination : destVolume;
+      destination.incCommittedBytes(container.getContainerData().getBytesUsed());
+      return new ContainerCandidate(container.getContainerData(), sourceVolume, destination);
+    });
+
+    BackgroundTaskQueue queue = diskBalancerService.getTasks();
+    assertEquals(2, selections.get());
+    assertEquals(1, queue.size());
+    assertEquals(initialCommitted + CONTAINER_SIZE, destVolume.getCommittedBytes());
+    assertEquals(-CONTAINER_SIZE, diskBalancerService.getDeltaSizes().get(sourceVolume));
+    assertEquals(1, diskBalancerService.getInProgressContainers().size());
+    assertTrue(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
+    assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 1L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
+    assertEquals(0, diskBalancerService.getMetrics().getIdleLoopNoAvailableVolumePairCount());
+    assertEquals(DiskBalancerRunningStatus.RUNNING, diskBalancerService.getDiskBalancerInfo().getOperationalState());
+
+    DiskBalancerService.DiskBalancerTask task = (DiskBalancerService.DiskBalancerTask) queue.poll();
+    assertNotNull(task);
+    task.call();
+    Container moved = containerSet.getContainer(CONTAINER_ID);
+    assertNotEquals(container, moved);
+    assertSame(destVolume, moved.getContainerData().getVolume());
+    assertEquals(initialCommitted, destVolume.getCommittedBytes());
+    assertEquals(0L, diskBalancerService.getDeltaSizes().get(sourceVolume));
+    assertTrue(diskBalancerService.getInProgressContainers().isEmpty());
+    assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 1L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
+    assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
+  }
+
+  @Test
+  public void testRejectionDoesNotStopWhileAnotherTaskIsInProgress() throws Exception {
+    Container scheduledContainer = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    diskBalancerService.setParallelThread(2);
+    diskBalancerService.setStopAfterDiskEven(true);
+    setCustomPolicyCandidate(scheduledContainer);
+    DiskBalancerService.DiskBalancerTask scheduledTask = getTask();
+    assertNotNull(scheduledTask);
+    long initialCommitted = destVolume.getCommittedBytes();
+    long initialDelta = diskBalancerService.getDeltaSizes().get(sourceVolume);
+
+    Container rejectedContainer = createContainer(CONTAINER_ID + 1, sourceVolume, State.CLOSED);
+    HddsVolume invalidDestination = spy(destVolume);
+    doReturn(StorageType.SSD).when(invalidDestination).getStorageType();
+    AtomicInteger selections = new AtomicInteger();
+    diskBalancerService.setVolumeContainerChoosingPolicy((ozone, volumes, deltas, inProgress, threshold, states) -> {
+      selections.incrementAndGet();
+      invalidDestination.incCommittedBytes(rejectedContainer.getContainerData().getBytesUsed());
+      return new ContainerCandidate(rejectedContainer.getContainerData(), sourceVolume, invalidDestination);
+    });
+
+    GenericTestUtils.waitFor(() -> {
+      assertTrue(diskBalancerService.getTasks().isEmpty());
+      return selections.get() == 1;
+    }, 10, 5000);
+
+    assertEquals(DiskBalancerRunningStatus.RUNNING, diskBalancerService.getDiskBalancerInfo().getOperationalState());
+    assertEquals(0, diskBalancerService.getMetrics().getIdleLoopNoAvailableVolumePairCount());
+    assertEquals(1, diskBalancerService.getInProgressContainers().size());
+    assertTrue(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
+    assertEquals(initialCommitted, destVolume.getCommittedBytes());
+    assertEquals(initialDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 0L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
+
+    scheduledTask.call();
+    assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+    assertTrue(diskBalancerService.getInProgressContainers().isEmpty());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testNoCandidateRetainsAutomaticStopBehavior(boolean stopAfterDiskEven) {
+    diskBalancerService.setStopAfterDiskEven(stopAfterDiskEven);
+    diskBalancerService.setVolumeContainerChoosingPolicy(
+        (ozone, volumes, deltas, inProgress, threshold, states) -> null);
+    long initialCommitted = destVolume.getCommittedBytes();
+
+    assertTrue(diskBalancerService.getTasks().isEmpty());
+    assertEquals(stopAfterDiskEven ? DiskBalancerRunningStatus.STOPPED : DiskBalancerRunningStatus.RUNNING,
+        diskBalancerService.getDiskBalancerInfo().getOperationalState());
+    assertEquals(1, diskBalancerService.getMetrics().getIdleLoopNoAvailableVolumePairCount());
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 0L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
+    assertEquals(initialCommitted, destVolume.getCommittedBytes());
+    assertTrue(diskBalancerService.getInProgressContainers().isEmpty());
+    assertTrue(diskBalancerService.getDeltaSizes().isEmpty());
+  }
+
+  private void setCustomPolicyCandidate(Container container) {
+    diskBalancerService.setVolumeContainerChoosingPolicy((ozone, volumes, deltas, inProgress, threshold, states) -> {
+      if (inProgress.contains(ContainerID.valueOf(CONTAINER_ID))) {
+        return null;
+      }
+      destVolume.incCommittedBytes(container.getContainerData().getBytesUsed());
+      return new ContainerCandidate(container.getContainerData(), sourceVolume, destVolume);
+    });
+  }
+
+  @ParameterizedTest
   @EnumSource(names = {"CLOSED", "QUASI_CLOSED"})
   public void moveSuccess(State containerState) throws IOException {
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
@@ -420,6 +684,7 @@ public class TestDiskBalancerTask {
     assertTrue(new File(oldContainerPath).exists());
     assertFalse(Files.exists(tempContainerDir), "Temp container directory should be cleaned up");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 1L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
@@ -484,6 +749,7 @@ public class TestDiskBalancerTask {
     assertTrue(Files.exists(destDirPath), "Dest container directory should not be cleaned up");
     assertTrue(testfile.toFile().exists(), "testfile should not be cleaned up");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertCounter("MoveFailureTimeNumOps", 1L, getMetrics(DiskBalancerServiceMetrics.SOURCE_NAME));
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));

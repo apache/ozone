@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -582,28 +583,16 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
-   * Creates a new key in this bucket and places it according to the given storage
-   * policy.
+   * Creates a new key in the bucket.
    *
-   * @param key               Name of the key to be created.
-   * @param size              Size of the data the key will hold.
-   * @param replicationConfig Replication configuration.
-   * @param keyMetadata       Custom key metadata.
-   * @param tags              Tags used for S3 object tags.
-   * @param keyStoragePolicy  Storage policy for the key, or null to inherit this
-   *                          bucket's policy.
+   * @param key     Name of the key to be created.
+   * @param options Size, replication config, metadata, tags, derived key piggybacking and storage policy of the key
    * @return OzoneOutputStream to which the data has to be written.
    * @throws IOException
    */
-  @SuppressWarnings("checkstyle:parameternumber")
-  public OzoneOutputStream createKey(String key, long size,
-      ReplicationConfig replicationConfig,
-      Map<String, String> keyMetadata,
-      Map<String, String> tags,
-      StoragePolicy keyStoragePolicy)
-      throws IOException {
-    return proxy
-        .createKey(volumeName, name, key, size, replicationConfig, keyMetadata, tags, keyStoragePolicy);
+  public OzoneOutputStream createKey(String key, CreateKeyOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
+    return proxy.createKey(volumeName, name, key, options);
   }
 
   /**
@@ -1065,7 +1054,7 @@ public class OzoneBucket extends WithMetadata {
       ReplicationConfig config, Map<String, String> metadata,
       Map<String, String> tags)
       throws IOException {
-    return initiateMultipartUpload(keyName, new MultipartUploadOptions.Builder()
+    return initiateMultipartUpload(keyName, MultipartUploadOptions.builder()
         .setReplicationConfig(config)
         .setMetadata(metadata)
         .setTags(tags)
@@ -1322,7 +1311,7 @@ public class OzoneBucket extends WithMetadata {
    * OzoneFS api to create an output stream for a file.
    *
    * @param keyName Key name
-   * @param options Size, replication config, overwrite, recursive flags and storage policy of the file
+   * @param options Size, replication config, overwrite and recursive flags of the file
    * @throws OMException if given key is a directory
    *                     if file exists and isOverwrite flag is false
    *                     if an ancestor exists as a file
