@@ -53,6 +53,7 @@ public final class MetricsLeakAssertion {
       "JvmMetrics*", // per service, via HddsServerUtil.initializeMetrics
       "UgiMetrics", // Hadoop security UGI metrics
       "ManagedRocksObjectMetrics",
+      "RDBMetrics", // shared by all RDBStores for the lifetime of the JVM
       "XceiverClientMetrics", // shared by all XceiverClientManagers for the lifetime of the JVM
       "ContainerCacheMetrics" // ContainerCache singleton, created once per JVM
   );

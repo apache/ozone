@@ -16,19 +16,11 @@
  * limitations under the License.
  */
 
-export type InputPathValidTypes = 'error' | 'success' | 'warning' | 'validating' | undefined;
-
 export type HeatmapChild = {
   label: string;
   size: number;
   accessCount: number;
   color: number;
-}
-
-export type InputPathState = {
-  inputPath: string;
-  isInputPathValid: InputPathValidTypes;
-  helpMessage: string;
 }
 
 export type HeatmapResponse =  {

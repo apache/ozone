@@ -290,7 +290,7 @@ public class XceiverClientManager extends XceiverClientCreator {
       }
       if (localAddr != null) {
         // Find a local DN and short circuit read is enabled
-        key.append('@').append(localAddr.getHostName()).append(':').append(port);
+        key.append('@').append(localAddr.getHostString()).append(':').append(port);
         shortCircuitPipeline = true;
       }
     }
@@ -400,15 +400,6 @@ public class XceiverClientManager extends XceiverClientCreator {
     }
 
     return metrics;
-  }
-
-  /**
-   * Reset xceiver client metric.
-   */
-  public static synchronized void resetXceiverClientMetrics() {
-    if (metrics != null) {
-      metrics.reset();
-    }
   }
 
   /**

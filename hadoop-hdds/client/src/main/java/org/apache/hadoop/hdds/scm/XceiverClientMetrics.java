@@ -56,10 +56,6 @@ public class XceiverClientMetrics implements MetricsSource {
   private MetricsRegistry registry;
 
   public XceiverClientMetrics() {
-    init();
-  }
-
-  public void init() {
     OzoneConfiguration conf = new OzoneConfiguration();
     int[] intervals = conf.getInts(OzoneConfigKeys.OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
 
@@ -122,11 +118,6 @@ public class XceiverClientMetrics implements MetricsSource {
   @VisibleForTesting
   public long getContainerOpCountMetrics(ContainerProtos.Type type) {
     return opsArray.get(type).value();
-  }
-
-  @VisibleForTesting
-  public void reset() {
-    init();
   }
 
   @Override

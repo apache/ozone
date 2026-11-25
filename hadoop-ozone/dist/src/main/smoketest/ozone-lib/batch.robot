@@ -91,6 +91,12 @@ Assert Later
     END
 
 
+Execute Later and Expect No Output For ozone ${subcmd}
+    [arguments]    ${command}
+    ${file} =    Execute Later ozone ${subcmd}    ${command}
+    Assert Later    File ${file} Should    Be Equal    ${EMPTY}
+
+
 Execute Batch of Commands
     IF    '${BATCH_SUBCMD}' == '${EMPTY}'    RETURN
     Run Keyword    Ozone Batch ${BATCH_SUBCMD}    @{BATCH_COMMANDS}
