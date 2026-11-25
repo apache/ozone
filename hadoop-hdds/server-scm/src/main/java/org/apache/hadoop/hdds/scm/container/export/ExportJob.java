@@ -28,8 +28,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 
 /**
  * In-memory state for a container ID export job.
@@ -149,7 +149,7 @@ public final class ExportJob {
     return scope.getLifeCycleState();
   }
 
-  ContainerHealthState getHealthState() {
+  SimplifiedContainerHealthStateForReporting getHealthState() {
     return scope.getHealthState();
   }
 

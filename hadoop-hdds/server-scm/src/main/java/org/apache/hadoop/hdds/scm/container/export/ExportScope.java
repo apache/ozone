@@ -18,11 +18,12 @@
 package org.apache.hadoop.hdds.scm.container.export;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 
 /**
  * Container listing filters for an export job.
- * An export job filters containers by {@link ContainerHealthState}, {@link LifeCycleState} or both.
+ * An export job filters containers by {@link SimplifiedContainerHealthStateForReporting}, {@link LifeCycleState}
+ * or both.
  * Example archive name:
  * {@code container-ids_health-MISSING_lifecycle-OPEN_2026-01-01-12-00-00_job{jobId}.tar.gz}
  */
@@ -30,16 +31,17 @@ public final class ExportScope {
 
   private static final String ANY = "ANY";
   private final LifeCycleState lifeCycleState;
-  private final ContainerHealthState healthState;
+  private final SimplifiedContainerHealthStateForReporting healthState;
   private final String value;
 
-  private ExportScope(LifeCycleState lifeCycleState, ContainerHealthState healthState, String value) {
+  private ExportScope(LifeCycleState lifeCycleState, SimplifiedContainerHealthStateForReporting healthState,
+      String value) {
     this.lifeCycleState = lifeCycleState;
     this.healthState = healthState;
     this.value = value;
   }
 
-  public static ExportScope of(LifeCycleState lifeCycleState, ContainerHealthState healthState) {
+  public static ExportScope of(LifeCycleState lifeCycleState, SimplifiedContainerHealthStateForReporting healthState) {
     if (lifeCycleState == null && healthState == null) {
       throw new IllegalArgumentException("At least one of healthState or lifecycleState filter is required.");
     }
@@ -54,7 +56,7 @@ public final class ExportScope {
     return lifeCycleState;
   }
 
-  public ContainerHealthState getHealthState() {
+  public SimplifiedContainerHealthStateForReporting getHealthState() {
     return healthState;
   }
 

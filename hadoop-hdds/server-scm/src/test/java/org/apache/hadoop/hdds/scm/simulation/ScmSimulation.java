@@ -67,13 +67,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
@@ -187,18 +187,25 @@ final class ScmSimulation implements AutoCloseable {
   /** How long SCM is watched after settling, when it must not move replicas any more. */
   private static final long QUIET_WINDOW_MS = 15 * 60_000;
   /** Container health states SCM must have repaired after settling. */
-  private static final List<ContainerHealthState> UNREPAIRED_STATES = Arrays.asList(
-      ContainerHealthState.UNDER_REPLICATED, ContainerHealthState.OVER_REPLICATED,
-      ContainerHealthState.MIS_REPLICATED, ContainerHealthState.MISSING, ContainerHealthState.UNHEALTHY,
-      ContainerHealthState.OPEN_UNHEALTHY, ContainerHealthState.OPEN_WITHOUT_PIPELINE,
-      ContainerHealthState.UNHEALTHY_UNDER_REPLICATED, ContainerHealthState.UNHEALTHY_OVER_REPLICATED,
-      ContainerHealthState.MISSING_UNDER_REPLICATED, ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED,
-      ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED, ContainerHealthState.QUASI_CLOSED_STUCK_MISSING);
+  private static final List<SimplifiedContainerHealthStateForReporting> UNREPAIRED_STATES = Arrays.asList(
+      SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED,
+      SimplifiedContainerHealthStateForReporting.OVER_REPLICATED,
+      SimplifiedContainerHealthStateForReporting.MIS_REPLICATED, SimplifiedContainerHealthStateForReporting.MISSING,
+      SimplifiedContainerHealthStateForReporting.UNHEALTHY, SimplifiedContainerHealthStateForReporting.OPEN_UNHEALTHY,
+      SimplifiedContainerHealthStateForReporting.OPEN_WITHOUT_PIPELINE,
+      SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED,
+      SimplifiedContainerHealthStateForReporting.UNHEALTHY_OVER_REPLICATED,
+      SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED,
+      SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_UNDER_REPLICATED,
+      SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_OVER_REPLICATED,
+      SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_MISSING);
   /** Container health states with no healthy replica left. */
-  private static final Set<ContainerHealthState> WITHOUT_HEALTHY_COPY = EnumSet.of(
-      ContainerHealthState.MISSING, ContainerHealthState.UNHEALTHY, ContainerHealthState.UNHEALTHY_UNDER_REPLICATED,
-      ContainerHealthState.UNHEALTHY_OVER_REPLICATED, ContainerHealthState.MISSING_UNDER_REPLICATED,
-      ContainerHealthState.QUASI_CLOSED_STUCK_MISSING);
+  private static final Set<SimplifiedContainerHealthStateForReporting> WITHOUT_HEALTHY_COPY = EnumSet.of(
+      SimplifiedContainerHealthStateForReporting.MISSING, SimplifiedContainerHealthStateForReporting.UNHEALTHY,
+      SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED,
+      SimplifiedContainerHealthStateForReporting.UNHEALTHY_OVER_REPLICATED,
+      SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED,
+      SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_MISSING);
   /** Handlers that repair node, topology and pipeline state after a node state change. */
   private static final List<String> NODE_LIFECYCLE_HANDLERS = Arrays.asList(
       "StaleNodeHandler", "DeadNodeHandler", "HealthyReadOnlyNodeHandler", "NewNodeHandler",
@@ -1154,13 +1161,13 @@ final class ScmSimulation implements AutoCloseable {
       count("final.ecPlacementImpossible");
     }
     boolean unhealthy = false;
-    for (ContainerHealthState state : UNREPAIRED_STATES) {
+    for (SimplifiedContainerHealthStateForReporting state : UNREPAIRED_STATES) {
       List<ContainerID> sample = report.getSample(state);
       long count = report.getStat(state);
-      if (state == ContainerHealthState.MIS_REPLICATED) {
+      if (state == SimplifiedContainerHealthStateForReporting.MIS_REPLICATED) {
         sample = sample.stream().filter(this::misReplicationFixable).collect(Collectors.toList());
         count = sample.size();
-      } else if (state == ContainerHealthState.UNDER_REPLICATED && !ecPlaceable) {
+      } else if (state == SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED && !ecPlaceable) {
         sample = sample.stream().filter(id -> !isEc(id)).collect(Collectors.toList());
         count = sample.size();
       } else if (WITHOUT_HEALTHY_COPY.contains(state)) {
@@ -1177,7 +1184,7 @@ final class ScmSimulation implements AutoCloseable {
         }
       }
     }
-    for (ContainerHealthState state : ContainerHealthState.values()) {
+    for (SimplifiedContainerHealthStateForReporting state : SimplifiedContainerHealthStateForReporting.values()) {
       if (report.getStat(state) > 0) {
         counters.put("final.health." + state, report.getStat(state));
       }

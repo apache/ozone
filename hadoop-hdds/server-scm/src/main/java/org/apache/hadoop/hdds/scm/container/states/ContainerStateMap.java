@@ -29,10 +29,10 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
@@ -125,14 +125,15 @@ public class ContainerStateMap {
           .collect(Collectors.toList());
     }
 
-    List<ContainerID> getContainerIDs(ContainerID start, int count, ContainerHealthState healthState) {
+    List<ContainerID> getContainerIDs(ContainerID start, int count,
+        SimplifiedContainerHealthStateForReporting healthState) {
       Objects.requireNonNull(start, "start == null");
       Preconditions.assertTrue(count >= 0, "count < 0");
 
       final List<ContainerID> result = new ArrayList<>(1024);
       for (ContainerEntry entry : map.tailMap(start).values()) {
         ContainerInfo info = entry.getInfo();
-        if (healthState == null || info.getHealthState() == healthState) {
+        if (healthState == null || info.getSimplifiedHealthStateForReporting() == healthState) {
           result.add(info.containerID());
           if (result.size() >= count) {
             break;
@@ -301,7 +302,7 @@ public class ContainerStateMap {
    * @return a list of sorted {@link ContainerID}s
    */
   public List<ContainerID> getContainerIDs(LifeCycleState lifeCycleState,
-      ContainerHealthState healthState, ContainerID start, int count) {
+      SimplifiedContainerHealthStateForReporting healthState, ContainerID start, int count) {
     if (count == 0) {
       return Collections.emptyList();
     }
@@ -313,7 +314,7 @@ public class ContainerStateMap {
 
     final List<ContainerID> result = new ArrayList<>(Math.min(count, 1024));
     for (ContainerInfo info : lifeCycleStateMap.tailMap(lifeCycleState, start).values()) {
-      if (healthState == null || info.getHealthState() == healthState) {
+      if (healthState == null || info.getSimplifiedHealthStateForReporting() == healthState) {
         result.add(info.containerID());
         if (result.size() >= count) {
           break;

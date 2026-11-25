@@ -354,7 +354,12 @@ public final class BlockUtils {
   public static String getBlockMapKey(ContainerProtos.ContainerCommandRequestProto request) {
     Preconditions.checkArgument(request.getCmdType() == ContainerProtos.Type.GetBlock, "Only support GetBlock command");
     ContainerProtos.GetBlockRequestProto getBlock = request.getGetBlock();
-    return request.getClientId().toStringUtf8() + ":" + request.getCallId() + ":"
-        + getBlock.getBlockID().getLocalID() + "@" + getBlock.getBlockID().getContainerID();
+    return getRequestKey(request) + ":" + getBlock.getBlockID().getLocalID() + "@"
+        + getBlock.getBlockID().getContainerID();
+  }
+
+  /** @return the client ID and call ID of the request, which identify it for any command type. */
+  public static String getRequestKey(ContainerProtos.ContainerCommandRequestProto request) {
+    return request.getClientId().toStringUtf8() + ":" + request.getCallId();
   }
 }

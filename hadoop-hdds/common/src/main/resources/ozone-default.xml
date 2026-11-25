@@ -3567,8 +3567,9 @@
     <value>4</value>
     <tag>OZONE, RECON</tag>
     <description>
-      Maximum number of export jobs (waiting + executing) that can exist at once.
-      Submissions beyond this limit are rejected with HTTP 429. Kept small because
+      Maximum number of export jobs waiting in the queue at once, not counting
+      the job that is executing. Submissions beyond this limit are rejected with HTTP 429.
+      Kept small because
       export is single-threaded and the number of distinct unhealthy-container
       states is bounded.
     </description>

@@ -651,6 +651,11 @@ public class KeyOutputStream extends OutputStream
       for (CheckedRunnable<IOException> preCommit : preCommits) {
         preCommit.run();
       }
+      // Do not commit when the thread is interrupted.
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedIOException(
+            "Commit of key " + blockOutputStreamEntryPool.getKeyName() + " aborted: thread interrupted");
+      }
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();

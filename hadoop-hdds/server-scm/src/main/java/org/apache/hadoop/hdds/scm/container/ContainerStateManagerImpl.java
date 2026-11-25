@@ -287,7 +287,7 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerHealthState healthState,
+  public List<ContainerID> getContainerIDs(LifeCycleState state, SimplifiedContainerHealthStateForReporting healthState,
       ContainerID start, int count) {
     try (AutoCloseableLock ignored = readLock()) {
       return containers.getContainerIDs(state, healthState, start, count);

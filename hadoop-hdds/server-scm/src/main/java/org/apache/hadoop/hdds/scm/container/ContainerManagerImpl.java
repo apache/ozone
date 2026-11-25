@@ -155,7 +155,7 @@ public class ContainerManagerImpl implements ContainerManager {
   public List<ContainerID> getContainerIDs(final ContainerID startID,
                                            final int count,
                                            final LifeCycleState state,
-                                           final ContainerHealthState healthState) {
+                                           final SimplifiedContainerHealthStateForReporting healthState) {
     scmContainerManagerMetrics.incNumListContainersOps();
     return containerStateManager.getContainerIDs(state, healthState, startID, count);
   }
