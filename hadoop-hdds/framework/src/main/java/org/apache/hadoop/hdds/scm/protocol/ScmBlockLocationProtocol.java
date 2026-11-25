@@ -98,9 +98,19 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
-  List<AllocatedBlock> allocateBlock(long size, int numBlocks,
+  default List<AllocatedBlock> allocateBlock(long size, int numBlocks,
       ReplicationConfig replicationConfig, String owner,
-      ExcludeList excludeList, String clientMachine) throws IOException;
+      ExcludeList excludeList, String clientMachine) throws IOException {
+    return allocateBlock(size, numBlocks, replicationConfig, owner, excludeList, clientMachine, true);
+  }
+
+  /**
+   * Same as {@link #allocateBlock(long, int, ReplicationConfig, String, ExcludeList, String)}, but SCM sorts the
+   * datanodes only if {@code sortDatanodes} is true. SCM may still use {@code clientMachine} to prefer a pipeline
+   * on the client's datanode.
+   */
+  List<AllocatedBlock> allocateBlock(long size, int numBlocks, ReplicationConfig replicationConfig, String owner,
+      ExcludeList excludeList, String clientMachine, boolean sortDatanodes) throws IOException;
 
   /**
    * Delete blocks for a set of object keys.

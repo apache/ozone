@@ -127,10 +127,6 @@ public class SCMBlockProtocolServer implements
     this.perfMetrics = scm.getPerfMetrics();
     this.omPrincipal = conf.get(OM_KERBEROS_PRINCIPAL_KEY, "");
     this.preferClientLocalPipeline = conf.getObject(ScmConfig.class).isPreferClientLocalPipeline();
-    if (preferClientLocalPipeline) {
-      LOG.info("{} is enabled on SCM; it takes effect only if OM enables it too.",
-          ScmConfig.HDDS_SCM_BLOCK_ALLOCATION_PREFER_CLIENT_LOCAL);
-    }
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
@@ -226,7 +222,7 @@ public class SCMBlockProtocolServer implements
       long size, int num,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList,
-      String clientMachine
+      String clientMachine, boolean sortDatanodes
   ) throws IOException {
     checkOmOrAdminAccess();
     long startNanos = Time.monotonicNowNanos();
@@ -243,10 +239,8 @@ public class SCMBlockProtocolServer implements
           num, size, excludeList);
     }
     try {
-      final Node client = getClientNode(clientMachine);
-      // Skip the preference when the client's datanode has no room for another container, as pipeline creation does.
-      final DatanodeDetails localDatanode = preferClientLocalPipeline && client instanceof DatanodeInfo
-          && scm.getScmNodeManager().hasAvailableSpace((DatanodeInfo) client) ? (DatanodeDetails) client : null;
+      final Node client = sortDatanodes ? getClientNode(clientMachine) : null;
+      final DatanodeDetails localDatanode = preferClientLocalPipeline ? getLocalDatanode(clientMachine) : null;
       for (int i = 0; i < num; i++) {
         AllocatedBlock block =
             scm.getScmBlockManager().allocateBlock(size, replicationConfig, owner, excludeList, localDatanode);
@@ -450,6 +444,21 @@ public class SCMBlockProtocolServer implements
         );
       }
     }
+  }
+
+  /**
+   * @return the datanode at {@code clientMachine} if it is the only one there and has room for another container
+   *     (as pipeline creation requires), otherwise null.
+   */
+  private DatanodeDetails getLocalDatanode(String clientMachine) {
+    final NodeManager nodeManager = scm.getScmNodeManager();
+    final List<DatanodeDetails> datanodes = nodeManager.getNodesByAddress(clientMachine);
+    // With several datanodes on one address (such as a mini cluster), every write would prefer the first one.
+    if (datanodes.size() != 1 || !(datanodes.get(0) instanceof DatanodeInfo)) {
+      return null;
+    }
+    final DatanodeInfo datanode = (DatanodeInfo) datanodes.get(0);
+    return nodeManager.hasAvailableSpace(datanode) ? datanode : null;
   }
 
   private Node getClientNode(String clientMachine) {

@@ -414,13 +414,15 @@ public class TestSCMBlockProtocolServer {
   }
 
   @ParameterizedTest
-  @CsvSource({"true, true, true", "true, false, false", "false, true, false"})
+  @CsvSource({"true, true, 1, true", "true, false, 1, false", "false, true, 1, false", "true, true, 2, false",
+      "true, true, 0, false"})
   void allocateBlockPassesClientDatanodeOnlyWhenPreferredAndHasSpace(boolean preferLocal, boolean hasSpace,
-      boolean expectLocal) throws Exception {
+      int datanodesAtAddress, boolean expectLocal) throws Exception {
     final String clientAddress = "1.2.3.4";
     DatanodeInfo client = mock(DatanodeInfo.class);
     NodeManager mockNodeManager = mock(NodeManager.class);
-    when(mockNodeManager.getNodesByAddress(clientAddress)).thenReturn(Collections.singletonList(client));
+    when(mockNodeManager.getNodesByAddress(clientAddress))
+        .thenReturn(Collections.nCopies(datanodesAtAddress, client));
     when(mockNodeManager.hasAvailableSpace(client)).thenReturn(hasSpace);
     BlockManager blockManager = mock(BlockManager.class);
     StorageContainerManager mockScm = mockScmForBlockServer();
@@ -432,12 +434,14 @@ public class TestSCMBlockProtocolServer {
 
     try (SCMBlockProtocolServer testServer = new SCMBlockProtocolServer(conf, mockScm)) {
       testServer.allocateBlock(128 * MB, 1, RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "o",
-          new ExcludeList(), clientAddress);
+          new ExcludeList(), clientAddress, false);
     }
 
     ArgumentCaptor<DatanodeDetails> localDatanode = ArgumentCaptor.forClass(DatanodeDetails.class);
     verify(blockManager).allocateBlock(anyLong(), any(), any(), any(), localDatanode.capture());
     assertThat(localDatanode.getValue()).isEqualTo(expectLocal ? client : null);
+    // Not asked to sort, so SCM does not resolve the client's topology location.
+    verify(mockScm, never()).resolveNodeLocation(any());
   }
 
   @Test

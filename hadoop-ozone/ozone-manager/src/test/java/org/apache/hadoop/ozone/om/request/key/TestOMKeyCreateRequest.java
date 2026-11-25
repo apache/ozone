@@ -47,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -147,7 +148,7 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE, omMetadataManager);
     OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
-        anyString(), any(ExcludeList.class), anyString()))
+        anyString(), any(ExcludeList.class), anyString(), anyBoolean()))
         .thenThrow(new SCMException("waited pipeline disappeared", SCMException.ResultCodes.PIPELINE_NOT_FOUND));
     OMRequest request = createKeyRequest(false, 0, 100, replicationConfig, null).toBuilder()
         .setVersion(ClientVersion.CURRENT.serialize()).build();
@@ -1672,12 +1673,12 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), anyBoolean());
 
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), anyBoolean());
 
     assertTrue(modifiedOmRequest.hasCreateKeyRequest());
     CreateKeyRequest responseCreateKeyRequest =
@@ -1713,7 +1714,7 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     when(scmBlockLocationProtocol.allocateBlock(
             anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString()))
+            any(ExcludeList.class), anyString(), anyBoolean()))
         .thenAnswer(invocation -> {
           int num = invocation.getArgument(1);
           List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
@@ -1749,12 +1750,12 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), anyBoolean());
 
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), anyBoolean());
 
     assertTrue(modifiedOmRequest.hasCreateKeyRequest());
     CreateKeyRequest responseCreateKeyRequest =

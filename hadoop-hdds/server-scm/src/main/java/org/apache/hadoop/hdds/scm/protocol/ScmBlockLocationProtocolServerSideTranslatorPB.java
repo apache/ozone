@@ -222,7 +222,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
                 request.getEcReplicationConfig()),
             request.getOwner(),
             ExcludeList.getFromProtoBuf(request.getExcludeList()),
-            request.getClient());
+            request.getClient(),
+            !request.hasSortDatanodes() || request.getSortDatanodes());
 
     AllocateScmBlockResponseProto.Builder builder =
         AllocateScmBlockResponseProto.newBuilder();

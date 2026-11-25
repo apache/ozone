@@ -106,15 +106,14 @@ public class ScmConfig extends ReconfigurableConfig {
 
   @Config(key = HDDS_SCM_BLOCK_ALLOCATION_PREFER_CLIENT_LOCAL,
       type = ConfigType.BOOLEAN,
-      defaultValue = "false",
+      defaultValue = "true",
       tags = { ConfigTag.SCM, ConfigTag.PIPELINE, ConfigTag.PERFORMANCE },
       description = "If true, when allocating a Ratis block for a client that runs on a datanode host, SCM prefers "
           + "an open pipeline that contains that datanode, so one replica is local to the writer (like the HDFS "
           + "first replica). Falls back to the pipeline choose policy when that datanode has no room for another "
-          + "container or no such pipeline has a usable container. "
-          + "OM reads the same key to pass the client address to SCM on every block allocation, so it must be set "
-          + "on both OM and SCM, and changing it needs a restart of both. The client is the caller of OM, so writes "
-          + "through a gateway on a datanode host, such as S3 Gateway or HttpFS, prefer that host's datanode."
+          + "container, more than one datanode has the client's address, or no such pipeline has a usable "
+          + "container. The client is the caller of OM, so writes through a gateway on a datanode host, such as "
+          + "S3 Gateway or HttpFS, prefer that host's datanode."
   )
   private boolean preferClientLocalPipeline;
 
