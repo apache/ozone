@@ -23,7 +23,7 @@ package org.apache.hadoop.hdds.tracing;
 public final class OzoneTracingAttributes {
 
   /** Status or result code of a failed request, for example SAFE_MODE_EXCEPTION. */
-  public static final String STATUS = "ozone.status";
+  public static final String STATUS = "ozone.error.status";
 
   private OzoneTracingAttributes() {
   }
