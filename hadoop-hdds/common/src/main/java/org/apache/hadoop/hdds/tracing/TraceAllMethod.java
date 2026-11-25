@@ -17,18 +17,16 @@
 
 package org.apache.hadoop.hdds.tracing;
 
-import static java.util.Collections.emptyMap;
-
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
+import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Map.Entry;
 
 /**
  * A Java proxy invocation handler to trace all the methods of the delegate
@@ -38,35 +36,43 @@ import java.util.Map.Entry;
  */
 public class TraceAllMethod<T> implements InvocationHandler {
 
-  /**
-   * Cache for all the method objects of the delegate class.
-   */
-  private final Map<String, Map<Class<?>[], DelegatedMethodInfo>> methods = new HashMap<>();
-  private final T delegate;
-  private final String name;
+  /** Interface method info per delegate class, built by its first proxy and released with the class. */
+  private static final ClassValue<Map<Method, DelegatedMethodInfo>> METHODS =
+      new ClassValue<Map<Method, DelegatedMethodInfo>>() {
+        @Override
+        protected Map<Method, DelegatedMethodInfo> computeValue(Class<?> delegateClass) {
+          Map<Method, DelegatedMethodInfo> methods = new HashMap<>();
+          for (Class<?> c = delegateClass; c != null; c = c.getSuperclass()) {
+            for (Class<?> itf : c.getInterfaces()) {
+              for (Method method : itf.getMethods()) {
+                methods.computeIfAbsent(method, m -> computeDelegatedMethodInfo(delegateClass, m));
+              }
+            }
+          }
+          return methods;
+        }
+      };
 
-  public TraceAllMethod(T delegate, String name, SpanKind spanKind) {
+  private final Map<Method, DelegatedMethodInfo> methods;
+  private final T delegate;
+  private final SpanKind spanKind;
+
+  public TraceAllMethod(T delegate, SpanKind spanKind) {
     this.delegate = delegate;
-    this.name = name;
-    for (Method method : delegate.getClass().getMethods()) {
-      if (method.getDeclaringClass().equals(Object.class)) {
-        continue;
-      }
-      boolean shouldSkip = method.isAnnotationPresent(SkipTracing.class);
-      methods.computeIfAbsent(method.getName(), any -> new HashMap<>())
-          .put(method.getParameterTypes(), new DelegatedMethodInfo(shouldSkip, findSpanKind(method, spanKind)));
-    }
+    this.spanKind = spanKind;
+    this.methods = METHODS.get(delegate.getClass());
   }
 
   @Override
   public Object invoke(Object proxy, Method method, Object[] args)
       throws Throwable {
-    DelegatedMethodInfo methodInfo = findDelegatedMethod(method);
-    if (methodInfo == null || methodInfo.shouldSkip) {
+    DelegatedMethodInfo methodInfo = methods.get(method);
+    if (methodInfo == null || methodInfo.shouldSkip || hasUnsampledParent()) {
       return invokeDelegate(method, args);
     }
 
-    Span span = TracingUtil.createSpan(name + "." + method.getName(), methodInfo.spanKind);
+    SpanKind kind = methodInfo.annotatedSpanKind != null ? methodInfo.annotatedSpanKind : spanKind;
+    Span span = TracingUtil.createSpan(methodInfo.spanName, kind);
     try (Scope ignored = span.makeCurrent()) {
       return invokeDelegate(method, args);
     } catch (Throwable ex) {
@@ -77,6 +83,11 @@ public class TraceAllMethod<T> implements InvocationHandler {
     }
   }
 
+  private static boolean hasUnsampledParent() {
+    SpanContext parent = Span.current().getSpanContext();
+    return parent.isValid() && !parent.isSampled();
+  }
+
   private Object invokeDelegate(Method method, Object[] args) throws Throwable {
     try {
       return method.invoke(delegate, args);
@@ -85,33 +96,45 @@ public class TraceAllMethod<T> implements InvocationHandler {
     }
   }
 
-  private static SpanKind findSpanKind(Method method, SpanKind defaultSpanKind) {
-    if (method.isAnnotationPresent(InternalSpanKind.class)) {
-      return SpanKind.INTERNAL;
+  private static DelegatedMethodInfo computeDelegatedMethodInfo(Class<?> delegateClass, Method method) {
+    Method delegateMethod;
+    try {
+      delegateMethod = delegateClass.getMethod(method.getName(), method.getParameterTypes());
+    } catch (NoSuchMethodException e) {
+      return null;
     }
-    return defaultSpanKind;
+    String className = delegateClass.getSimpleName();
+    // anonymous, lambda and proxy classes have no stable name
+    if (className.isEmpty() || delegateClass.isSynthetic() || Proxy.isProxyClass(delegateClass)) {
+      className = method.getDeclaringClass().getSimpleName();
+    }
+    return new DelegatedMethodInfo(computeSkip(delegateMethod), getAnnotatedSpanKind(delegateMethod),
+        className + "." + method.getName());
   }
 
-  private DelegatedMethodInfo findDelegatedMethod(Method method) {
-    for (Entry<Class<?>[], DelegatedMethodInfo> entry : methods.getOrDefault(
-        method.getName(), emptyMap()).entrySet()) {
-      if (Arrays.equals(entry.getKey(), method.getParameterTypes())) {
-        return entry.getValue();
-      }
+  private static boolean computeSkip(Method method) {
+    return method.isAnnotationPresent(SkipTracing.class);
+  }
+
+  private static SpanKind getAnnotatedSpanKind(Method method) {
+    if (method.isAnnotationPresent(InternalSpanKind.class)) {
+      return SpanKind.INTERNAL;
     }
     return null;
   }
 
   /**
-   * Whether a method should be skipped and the delegate method to invoke.
+   * Whether a method should be skipped, and the kind and name of its span.
    */
   private static final class DelegatedMethodInfo {
     private final boolean shouldSkip;
-    private final SpanKind spanKind;
+    private final SpanKind annotatedSpanKind;
+    private final String spanName;
 
-    private DelegatedMethodInfo(boolean shouldSkip, SpanKind spanKind) {
+    private DelegatedMethodInfo(boolean shouldSkip, SpanKind annotatedSpanKind, String spanName) {
       this.shouldSkip = shouldSkip;
-      this.spanKind = spanKind;
+      this.annotatedSpanKind = annotatedSpanKind;
+      this.spanName = spanName;
     }
   }
 }

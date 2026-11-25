@@ -410,21 +410,21 @@ public final class TracingUtil {
     if (!hasUsableTracer()) {
       return delegate;
     }
-    return newProxy(delegate, itf, delegate.getClass().getSimpleName(), spanKind);
+    return newProxy(delegate, itf, spanKind);
   }
 
   private static <T> T createProxy(T delegate, Class<T> itf, ConfigurationSource conf, SpanKind spanKind) {
     if (!shouldCreateTracingProxy(conf)) {
       return delegate;
     }
-    return newProxy(delegate, itf, itf.getSimpleName(), spanKind);
+    return newProxy(delegate, itf, spanKind);
   }
 
-  private static <T> T newProxy(T delegate, Class<T> itf, String name, SpanKind spanKind) {
+  private static <T> T newProxy(T delegate, Class<T> itf, SpanKind spanKind) {
     Class<?> aClass = delegate.getClass();
     return itf.cast(Proxy.newProxyInstance(aClass.getClassLoader(),
         new Class<?>[] {itf},
-        new TraceAllMethod<>(delegate, name, spanKind)));
+        new TraceAllMethod<>(delegate, spanKind)));
   }
 
   public static boolean isTracingEnabled(ConfigurationSource conf) {
