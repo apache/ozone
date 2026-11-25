@@ -925,6 +925,151 @@ public class TestRDBTableStore {
     }
   }
 
+  @Test
+  public void testPaginationWithSeekAndTrailingTombstones() throws Exception {
+    Table<byte[], byte[]> table = rdbStore.getTable(families.get(0));
+    byte[] value = "val".getBytes(StandardCharsets.UTF_8);
+
+    // Insert 5 live keys under "p1/" and 100 keys under "p2/", 5 live keys under "p3/"
+    for (int i = 1; i <= 5; i++) {
+      table.put(("p1/k" + i).getBytes(StandardCharsets.UTF_8), value);
+    }
+    for (int i = 0; i < 100; i++) {
+      table.put(String.format("p2/k%03d", i).getBytes(StandardCharsets.UTF_8), value);
+    }
+    for (int i = 1; i <= 5; i++) {
+      table.put(("p3/k" + i).getBytes(StandardCharsets.UTF_8), value);
+    }
+    // Flush and delete "p2/*" to leave tombstones immediately after "p1/"
+    rdbStore.flushDB();
+    for (int i = 0; i < 100; i++) {
+      table.delete(String.format("p2/k%03d", i).getBytes(StandardCharsets.UTF_8));
+    }
+
+    byte[][] prefixes = {"p1/".getBytes(StandardCharsets.UTF_8),
+        "p2/".getBytes(StandardCharsets.UTF_8),
+        "p3/".getBytes(StandardCharsets.UTF_8)};
+    int pageSize = 2;
+    for (byte[] prefix : prefixes) {
+      byte[] prevKey = null;
+      List<String> collected = new ArrayList<>();
+      while (true) {
+        List<String> page = new ArrayList<>();
+        try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter =
+                 table.iterator(prefix)) {
+          if (prevKey != null) {
+            iter.seek(prevKey);
+            // Skip prevKey itself (exclusive pagination marker)
+            if (iter.hasNext() && Arrays.equals(iter.next().getKey(), prevKey)) {
+              // advanced past prevKey
+              LOG.info("prevKey is skipped");
+            }
+          }
+          while (iter.hasNext() && page.size() < pageSize) {
+            byte[] key = iter.next().getKey();
+            page.add(new String(key, StandardCharsets.UTF_8));
+            prevKey = key;
+          }
+        }
+        collected.addAll(page);
+        if (page.size() < pageSize) {
+          break;
+        }
+      }
+
+      if (prefix.equals(prefixes[0])) {
+        assertEquals(5, collected.size());
+        assertEquals(Arrays.asList("p1/k1", "p1/k2", "p1/k3", "p1/k4", "p1/k5"), collected);
+      } else if (prefix.equals(prefixes[1])) {
+        assertEquals(0, collected.size());
+      } else {
+        assertEquals(5, collected.size());
+        assertEquals(Arrays.asList("p3/k1", "p3/k2", "p3/k3", "p3/k4", "p3/k5"), collected);
+      }
+    }
+  }
+
+  @Test
+  public void testSeekPastUpperBound() throws Exception {
+    Table<byte[], byte[]> table = rdbStore.getTable(families.get(0));
+    byte[] value = "val".getBytes(StandardCharsets.UTF_8);
+    table.put("a/1".getBytes(StandardCharsets.UTF_8), value);
+    table.put("a/2".getBytes(StandardCharsets.UTF_8), value);
+    table.put("b/1".getBytes(StandardCharsets.UTF_8), value);
+
+    byte[] prefix = "a/".getBytes(StandardCharsets.UTF_8);
+    byte[] outOfRangeMarker = "b/1".getBytes(StandardCharsets.UTF_8);
+
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter =
+             table.iterator(prefix)) {
+      iter.seek(outOfRangeMarker);
+      assertFalse(iter.hasNext(),
+          "Seeking at or past the prefix upper bound should yield no results");
+    }
+  }
+
+  @Test
+  public void testEmptyAndAllFFPrefix() throws Exception {
+    Table<byte[], byte[]> table = rdbStore.getTable(families.get(0));
+    byte[] value = "val".getBytes(StandardCharsets.UTF_8);
+    byte[] k1 = new byte[]{0x01, 0x02};
+    byte[] k2 = new byte[]{(byte) 0xFF, (byte) 0xFF, 0x01};
+    byte[] k3 = new byte[]{(byte) 0xFF, (byte) 0xFF, 0x02};
+    table.put(k1, value);
+    table.put(k2, value);
+    table.put(k3, value);
+
+    // 1. Empty prefix (bucket-root listing) must remain unbounded and return all keys
+    List<byte[]> rootKeys = new ArrayList<>();
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter =
+             table.iterator(new byte[0])) {
+      while (iter.hasNext()) {
+        rootKeys.add(iter.next().getKey());
+      }
+    }
+    assertEquals(3, rootKeys.size());
+
+    // 2. All-0xFF prefix has no finite upper bound; must remain unbounded and return k2, k3
+    byte[] allFFPrefix = new byte[]{(byte) 0xFF, (byte) 0xFF};
+    List<byte[]> ffKeys = new ArrayList<>();
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter =
+             table.iterator(allFFPrefix)) {
+      while (iter.hasNext()) {
+        ffKeys.add(iter.next().getKey());
+      }
+    }
+    assertEquals(2, ffKeys.size());
+    assertArrayEquals(k2, ffKeys.get(0));
+    assertArrayEquals(k3, ffKeys.get(1));
+  }
+
+  @Test
+  public void testCarryOverPrefix() throws Exception {
+    Table<byte[], byte[]> table = rdbStore.getTable(families.get(0));
+    byte[] value = "val".getBytes(StandardCharsets.UTF_8);
+    // Prefix [0x01, 0xFF] should compute upperBound = [0x02] (carry over), not [0x01, 0x00]
+    byte[] prefix = new byte[]{0x01, (byte) 0xFF};
+    byte[] match1 = new byte[]{0x01, (byte) 0xFF, 0x00};
+    byte[] match2 = new byte[]{0x01, (byte) 0xFF, 0x01};
+    byte[] afterBound = new byte[]{0x02, 0x00};
+
+    table.put(match1, value);
+    table.put(match2, value);
+    table.put(afterBound, value);
+
+    List<byte[]> results = new ArrayList<>();
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter =
+             table.iterator(prefix)) {
+      while (iter.hasNext()) {
+        results.add(iter.next().getKey());
+      }
+    }
+
+    assertEquals(2, results.size());
+    assertArrayEquals(match1, results.get(0));
+    assertArrayEquals(match2, results.get(1));
+  }
+
   private List<String> generatePrefixes(int prefixCount) {
     List<String> prefixes = new ArrayList<>();
     for (int i = 0; i < prefixCount; i++) {
