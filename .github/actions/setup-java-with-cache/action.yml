@@ -136,7 +136,6 @@ runs:
         path: |
           ~/.m2/repository/*/*/*
           !~/.m2/repository/org/apache/ozone
-          ~/.m2/wrapper
         key: maven-repo-
 
     - name: Any hit?
