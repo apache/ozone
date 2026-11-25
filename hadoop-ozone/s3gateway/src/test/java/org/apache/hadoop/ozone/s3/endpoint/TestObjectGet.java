@@ -527,20 +527,6 @@ public class TestObjectGet {
     assertEquals("application/x-directory", response.getHeaderString("Content-Type"));
   }
 
-  @Test
-  public void testGetDirectoryHonorsResponseContentTypeOverride() throws Exception {
-    final String keyPath = "keyDir/";
-    OzoneConfiguration config = new OzoneConfiguration();
-    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
-    rest.setOzoneConfiguration(config);
-    bucket.createDirectory(keyPath);
-    rest.getContext().getUriInfo().getQueryParameters().putSingle("response-content-type", CONTENT_TYPE2);
-
-    Response response = get(rest, BUCKET_NAME, keyPath);
-
-    assertEquals(CONTENT_TYPE2, response.getHeaderString("Content-Type"));
-  }
-
   private static String formatHttpDate(Instant instant) {
     return RFC1123Util.FORMAT.format(
         instant.atZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE)));

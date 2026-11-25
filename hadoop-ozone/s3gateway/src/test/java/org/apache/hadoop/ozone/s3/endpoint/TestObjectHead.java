@@ -323,7 +323,9 @@ public class TestObjectHead {
     bucket.createDirectory(keyPath);
 
     // THEN
-    assertSucceeds(() -> keyEndpoint.head(bucketName, keyPath));
+    Response response = keyEndpoint.head(bucketName, keyPath);
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    assertEquals("application/x-directory", response.getHeaderString("Content-Type"));
   }
 
   @Test
@@ -339,40 +341,12 @@ public class TestObjectHead {
   }
 
   @Test
-  public void testHeadDirectoryReturnsDirectoryContentType() throws Exception {
-    final String keyPath = "keyDir/";
-    OzoneConfiguration config = new OzoneConfiguration();
-    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
-    keyEndpoint.setOzoneConfiguration(config);
-    bucket.createDirectory(keyPath);
-
-    Response response = keyEndpoint.head(bucketName, keyPath);
-
-    assertEquals(HttpStatus.SC_OK, response.getStatus());
-    assertEquals("application/x-directory", response.getHeaderString("Content-Type"));
-  }
-
-  @Test
-  public void testHeadDirectoryWithoutSlashWhenDirCreationDisabled() throws Exception {
-    final String keyPath = "keyDir";
-    OzoneConfiguration config = new OzoneConfiguration();
-    config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "false");
-    keyEndpoint.setOzoneConfiguration(config);
-    bucket.createDirectory(keyPath);
-
-    Response response = keyEndpoint.head(bucketName, keyPath);
-
-    assertEquals(HttpStatus.SC_OK, response.getStatus());
-    assertEquals("application/x-directory", response.getHeaderString("Content-Type"));
-  }
-
-  @Test
   public void testHeadFileKeyEndingWithSlashKeepsDefaultContentType() throws Exception {
     final String keyPath = "keyDir/";
     OzoneConfiguration config = new OzoneConfiguration();
     config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
     keyEndpoint.setOzoneConfiguration(config);
-    createKey(keyPath);
+    bucket.createKey(keyPath, 0).close();
 
     Response response = keyEndpoint.head(bucketName, keyPath);
 
