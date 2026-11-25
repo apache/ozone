@@ -473,22 +473,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       responseBuilder.header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
       addEntityTagHeader(responseBuilder, keyDetails);
-
-      MultivaluedMap<String, String> queryParams =
-          getContext().getUriInfo().getQueryParameters();
-
-      // Content-Type comes from the stored object, not the request header;
-      // response-content-type still overrides it.
-      String contentType = queryParams.getFirst("response-content-type");
-      if (contentType == null) {
-        contentType = contentTypeOf(keyDetails);
-      }
-      responseBuilder.header(HttpHeaders.CONTENT_TYPE, contentType);
-
-      for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
-        addStoredObjectHeader(responseBuilder, keyDetails, queryParams, entry.getKey(),
-            entry.getValue());
-      }
+      addStoredObjectHeaders(responseBuilder, keyDetails);
 
       addLastModifiedDate(responseBuilder, keyDetails);
       addTagCountIfAny(responseBuilder, keyDetails);
@@ -579,6 +564,15 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   private void addStoredObjectHeaders(ResponseBuilder responseBuilder, OzoneKey key) {
     MultivaluedMap<String, String> queryParams =
         getContext().getUriInfo().getQueryParameters();
+
+    // Content-Type comes from the stored object, not the request header;
+    // response-content-type still overrides it.
+    String contentType = queryParams.getFirst("response-content-type");
+    if (contentType == null) {
+      contentType = contentTypeOf(key);
+    }
+    responseBuilder.header(HttpHeaders.CONTENT_TYPE, contentType);
+
     for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
       addStoredObjectHeader(responseBuilder, key, queryParams, entry.getKey(),
           entry.getValue());
@@ -720,8 +714,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           .header(HttpHeaders.CONTENT_LENGTH, endOffset - startOffset + 1)
           .header(CONTENT_RANGE_HEADER, contentRangeVal);
     }
-    response.header(HttpHeaders.CONTENT_TYPE, contentTypeOf(key))
-        .header(STORAGE_CLASS_HEADER, s3StorageType.toString())
+    response.header(STORAGE_CLASS_HEADER, s3StorageType.toString())
         .header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
     addEntityTagHeader(response, key);
     addStoredObjectHeaders(response, key);
