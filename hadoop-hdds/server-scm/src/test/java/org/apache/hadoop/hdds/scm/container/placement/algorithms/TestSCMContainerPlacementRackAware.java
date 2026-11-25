@@ -306,7 +306,7 @@ public class TestSCMContainerPlacementRackAware {
 
   @Test
   public void chooseNodeWithOverlappingUsedAndExcludedNodes() throws SCMException {
-    setup(3);
+    setup(3, StorageType.DEFAULT);
     List<DatanodeDetails> usedNodes = new ArrayList<>(datanodes.subList(0, 2));
     List<DatanodeDetails> excludedNodes = new ArrayList<>(datanodes.subList(0, 1));
 
@@ -316,7 +316,7 @@ public class TestSCMContainerPlacementRackAware {
 
   @Test
   public void rejectWhenOverlappingListsLeaveNoAvailableNodes() {
-    setup(3);
+    setup(3, StorageType.DEFAULT);
     List<DatanodeDetails> usedNodes = new ArrayList<>(datanodes.subList(0, 2));
     List<DatanodeDetails> excludedNodes = new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(2)));
 

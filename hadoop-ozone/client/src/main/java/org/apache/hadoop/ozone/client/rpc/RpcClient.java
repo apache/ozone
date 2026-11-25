@@ -1616,7 +1616,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   private void checkStoragePolicySupported() throws IOException {
-    if (!OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support storage policy");
     }
   }

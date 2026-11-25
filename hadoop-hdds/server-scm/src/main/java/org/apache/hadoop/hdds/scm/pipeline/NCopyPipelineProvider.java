@@ -25,7 +25,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
+import org.apache.hadoop.hdds.client.StorageTierUtil;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -38,6 +41,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.NodeUtils;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicyFactory;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -106,14 +110,17 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
   }
 
   @Override
-  public synchronized Pipeline create(C replicationConfig) throws IOException {
-    return create(replicationConfig, Collections.emptyList(), Collections.emptyList());
+  public synchronized Pipeline create(C replicationConfig, StorageTier storageTier) throws IOException {
+    return create(replicationConfig, Collections.emptyList(), Collections.emptyList(), storageTier);
   }
 
   @Override
-  public Pipeline create(C replicationConfig, List<DatanodeDetails> nodes) {
+  public Pipeline create(C replicationConfig, List<DatanodeDetails> nodes, StorageTier storageTier)
+      throws IOException {
+    validateSupportsStorageTier(replicationConfig, nodes, storageTier);
     return newPipelineBuilder(replicationConfig, nodes)
         .setId(PipelineID.randomId())
+        .setSupportedStorageTier(storageTier)
         .build();
   }
 
@@ -126,16 +133,29 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
         .build();
   }
 
+  /** Fail if the given datanodes cannot serve the given {@link StorageTier}. */
+  private void validateSupportsStorageTier(C replicationConfig, List<DatanodeDetails> dns,
+      StorageTier storageTier) throws SCMException {
+    final List<StorageTier> storageTiers = NodeUtils.getDatanodesStorageTypes(dns, getNodeManager());
+    if (!storageTiers.contains(storageTier)) {
+      throw new SCMException(String.format("Cannot create pipeline for StorageTier %s replicationConfig: %s",
+          storageTier, replicationConfig), SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
+  }
+
   /**
    * Build a new pipeline with the given datanodes and a suggested leader.
    * Then, send {@link CreatePipelineCommand} to each datanode.
    */
-  Pipeline createPipeline(C replicationConfig, List<DatanodeDetails> dns) throws NotLeaderException {
+  Pipeline createPipeline(C replicationConfig, List<DatanodeDetails> dns, StorageTier storageTier)
+      throws IOException {
     DatanodeDetails suggestedLeader = leaderChoosePolicy.chooseLeader(dns);
 
+    validateSupportsStorageTier(replicationConfig, dns, storageTier);
     Pipeline pipeline = newPipelineBuilder(replicationConfig, dns)
         .setId(PipelineID.randomId())
         .setSuggestedLeaderId(suggestedLeader != null ? suggestedLeader.getID() : null)
+        .setSupportedStorageTier(storageTier)
         .build();
 
     // Send command to datanodes to create pipeline
@@ -145,8 +165,8 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
     createCommand.setTerm(scmContext.getTermOfLeader());
 
     dns.forEach(node -> {
-      LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
-          pipeline.getId(), node);
+      LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{} storageTier:{}",
+          pipeline.getId(), node, storageTier);
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
           new CommandForDatanode<>(node, createCommand));
     });
@@ -161,18 +181,22 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
    * @param excludeNonStreamNodes Should it first try to exclude the datanodes without the
    *                              {@link DatanodeDetails.Port.Name#RATIS_DATASTREAM} port,
    *                              falling back to all the datanodes if there are not enough datanodes with the port?
+   * @param storageTier The datanodes must support this tier and its pipeline limit is counted per tier.
    */
   List<DatanodeDetails> chooseThreeFactorDatanodes(
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, int requiredNode,
-      boolean excludeNonStreamNodes)
+      boolean excludeNonStreamNodes, StorageTier storageTier)
       throws IOException {
+    StorageTierUtil.validateNotEmpty(storageTier);
+    final StorageType storageType = storageTier.getUniformStorageType();
     final NodeManager nodeManager = getNodeManager();
     final PipelineStateManager stateManager = getPipelineStateManager();
     final List<DatanodeDetails> healthyNodes = nodeManager.getNodes(NodeStatus.inServiceHealthy());
     excludedNodes = excludedNodes.isEmpty() ? null : excludedNodes;
     List<DatanodeDetails> additionalExcludedNodes = null;
     for (DatanodeDetails d : healthyNodes) {
-      final int count = PipelinePlacementPolicy.currentRatisThreePipelineCount(nodeManager, stateManager, d);
+      final int count = PipelinePlacementPolicy.currentRatisThreePipelineCount(
+          nodeManager, stateManager, d, storageType);
       if (count >= nodeManager.pipelineLimit(d)) {
         if (excludedNodes == null) {
           excludedNodes = new ArrayList<>();
@@ -193,7 +217,7 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
       try {
         return placementPolicy.chooseDatanodes(additionalExcludedNodes,
             favoredNodes, requiredNode, minRatisVolumeSizeBytes,
-            containerSizeBytes);
+            containerSizeBytes, storageType);
       } catch (SCMException scmException) {
         LOG.debug("Failed to allocate datanodes with strict exclusion (non-streaming nodes excluded)." +
             " Falling back.", scmException);
@@ -201,7 +225,7 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
     }
     return placementPolicy.chooseDatanodes(excludedNodes,
           favoredNodes, requiredNode, minRatisVolumeSizeBytes,
-          containerSizeBytes);
+          containerSizeBytes, storageType);
   }
 
   /**

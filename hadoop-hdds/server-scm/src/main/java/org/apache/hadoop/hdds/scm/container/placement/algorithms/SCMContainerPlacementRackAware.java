@@ -112,7 +112,6 @@ public final class SCMContainerPlacementRackAware
     Map<String, Long> mapSizeRequired = new HashMap<>();
     mapSizeRequired.put(META_DATA_SIZE_REQUIRED, metadataSizeRequired);
     mapSizeRequired.put(DATA_SIZE_REQUIRED, dataSizeRequired);
-
     if (!usedNodesPassed(usedNodes)) {
       // If interface is called without used nodes
       // In this case consider only exclude nodes to determine racks

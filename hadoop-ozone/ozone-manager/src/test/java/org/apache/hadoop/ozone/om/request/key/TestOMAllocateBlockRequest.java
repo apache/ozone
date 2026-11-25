@@ -114,12 +114,12 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
   private IOException allocateBlockWithScmFailure(SCMException cause) throws Exception {
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), anyString())).thenThrow(cause);
+        anyString(), any(ExcludeList.class), anyString(), any(StoragePolicy.class), anyBoolean())).thenThrow(cause);
 
     OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
     return assertThrows(IOException.class,
         () -> request.allocateBlock(replicationConfig, new ExcludeList(), scmBlockSize, false,
-            UserInfo.newBuilder().build(), ozoneManager));
+            UserInfo.newBuilder().build(), ozoneManager, OzoneStoragePolicy.getDefaultPolicy(), true));
   }
 
   @Test
@@ -443,7 +443,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), clientMachine.capture()))
+        anyString(), any(ExcludeList.class), clientMachine.capture(), any(StoragePolicy.class), anyBoolean()))
         .thenReturn(Collections.singletonList(block));
 
     KeyManager mockKeyManager = mock(KeyManager.class);
@@ -455,7 +455,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
     List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
         new ExcludeList(), scmBlockSize, true,
-        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager,
+        OzoneStoragePolicy.getDefaultPolicy(), true);
 
     assertEquals("1.2.3.4", clientMachine.getValue());
     verify(mockKeyManager, times(1)).resolveClientForWrite(eq("1.2.3.4"), any());
@@ -497,7 +498,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         .setContainerBlockID(new ContainerBlockID(CONTAINER_ID + 1, LOCAL_ID + 1)).build();
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), clientMachine.capture()))
+        anyString(), any(ExcludeList.class), clientMachine.capture(), any(StoragePolicy.class), anyBoolean()))
         .thenReturn(Arrays.asList(block1, block2));
 
     Node client = mock(Node.class);
@@ -512,7 +513,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
     List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
         new ExcludeList(), 2 * scmBlockSize, true,
-        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager,
+        OzoneStoragePolicy.getDefaultPolicy(), true);
 
     assertEquals(2, locations.size());
     // OM sorts, so SCM is told not to.

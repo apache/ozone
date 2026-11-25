@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StoragePolicy;
@@ -192,7 +193,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     when(scm.checkLeader()).thenReturn(true);
     when(scm.getVersionManager()).thenReturn(mock(ScmVersionManager.class));
     when(impl.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
-        anyString(), any(), anyString()))
+        anyString(), any(), anyString(), any(StoragePolicy.class), anyBoolean()))
         .thenThrow(new SCMException("waited pipeline disappeared", SCMException.ResultCodes.PIPELINE_NOT_FOUND));
 
     AllocateScmBlockRequestProto allocation = AllocateScmBlockRequestProto.newBuilder()
@@ -220,7 +221,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
     SCMException error = assertThrows(SCMException.class,
         () -> client.allocateBlock(1024, 1, RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
-            "owner", new ExcludeList(), ""));
+            "owner", new ExcludeList(), "", OzoneStoragePolicy.getDefaultPolicy(), false));
     assertEquals(SCMException.ResultCodes.PIPELINE_NOT_FOUND, error.getResult());
     assertEquals("waited pipeline disappeared", error.getMessage());
   }

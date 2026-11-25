@@ -1294,7 +1294,7 @@ public class TestContainerReportHandler {
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.CLOSED, datanodeFour.getUuidString(),
-        200L, 10L, sequenceId + 1, 0);
+        200L, 10L, sequenceId + 1, 0, null);
     reportHandler.onMessage(new ContainerReportFromDatanode(datanodeFour, containerReport), publisher);
 
     assertEquals(sequenceId, containerManager.getContainer(containerOne.containerID()).getSequenceId());
@@ -1324,7 +1324,7 @@ public class TestContainerReportHandler {
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.QUASI_CLOSED, datanodeOne.getUuidString(),
-        200L, 10L, sequenceId + 1, 0);
+        200L, 10L, sequenceId + 1, 0, null);
     reportHandler.onMessage(new ContainerReportFromDatanode(datanodeOne, containerReport), publisher);
 
     assertEquals(sequenceId + 1, containerManager.getContainer(containerOne.containerID()).getSequenceId());
@@ -1348,7 +1348,7 @@ public class TestContainerReportHandler {
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.CLOSED, datanodeOne.getUuidString(),
-        200L, 10L, sequenceId + 1, 0);
+        200L, 10L, sequenceId + 1, 0, null);
     reportHandler.onMessage(new ContainerReportFromDatanode(datanodeOne, containerReport), publisher);
 
     final ContainerInfo container = containerManager.getContainer(containerOne.containerID());

@@ -1476,7 +1476,7 @@ public class TestHddsDispatcher {
 
     // EC writes (replica index > 0) over gRPC: WriteChunk and PutBlock
     assertEquals(ContainerProtos.Result.CONTAINER_MISSING, dispatcher.dispatch(
-        withReplicaIndex(getWriteChunkRequest(dd.getUuidString(), ecContainer, 1L), 2), null).getResult());
+        withReplicaIndex(getWriteChunkRequest(dd.getUuidString(), ecContainer, 1L, null), 2), null).getResult());
     assertEquals(ContainerProtos.Result.CONTAINER_MISSING, dispatcher.dispatch(
         withReplicaIndex(getEmptyPutBlockRequest(dd.getUuidString(), ecContainer, 1L), 2), null).getResult());
 
@@ -1490,9 +1490,9 @@ public class TestHddsDispatcher {
 
     // a non-EC write over gRPC, and an EC write through Ratis: no action
     assertEquals(ContainerProtos.Result.CONTAINER_MISSING, dispatcher.dispatch(
-        getWriteChunkRequest(dd.getUuidString(), otherContainer, 1L), null).getResult());
+        getWriteChunkRequest(dd.getUuidString(), otherContainer, 1L, null), null).getResult());
     assertEquals(ContainerProtos.Result.CONTAINER_MISSING, dispatcher.dispatch(
-        withReplicaIndex(getWriteChunkRequest(dd.getUuidString(), otherContainer, 2L), 2),
+        withReplicaIndex(getWriteChunkRequest(dd.getUuidString(), otherContainer, 2L, null), 2),
         newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA)).getResult());
     verify(context, times(2)).addContainerActionIfAbsent(any(ContainerAction.class));
   }

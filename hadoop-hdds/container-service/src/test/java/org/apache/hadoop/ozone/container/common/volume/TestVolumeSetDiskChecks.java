@@ -404,7 +404,7 @@ public class TestVolumeSetDiskChecks {
     data.setReplicaIndex(replicaIndex);
     data.setSchemaVersion(OzoneConsts.SCHEMA_V3);
     KeyValueContainer container = new KeyValueContainer(data, conf);
-    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString(), StorageType.DISK);
     conSet.addContainer(container);
     return containerID;
   }

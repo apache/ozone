@@ -263,9 +263,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
           throw new OMException(ex.getMessage(), OMException.ResultCodes.SCM_IN_SAFE_MODE);
         }
-      }
-      if (ex.getResult() == SCMException.ResultCodes.PIPELINE_NOT_FOUND) {
-        throw new OMException(ex.getMessage(), ex, OMException.ResultCodes.KEY_ALLOCATION_ERROR);
+        if (((SCMException)ex).getResult() == SCMException.ResultCodes.PIPELINE_NOT_FOUND) {
+          throw new OMException(ex.getMessage(), ex, OMException.ResultCodes.KEY_ALLOCATION_ERROR);
+        }
       }
       throw ex;
     }

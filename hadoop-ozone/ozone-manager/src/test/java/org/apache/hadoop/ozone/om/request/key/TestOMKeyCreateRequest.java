@@ -150,7 +150,7 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     OMRequestTestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE, omMetadataManager);
     OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
-        anyString(), any(ExcludeList.class), anyString()))
+        anyString(), any(ExcludeList.class), anyString(), any(StoragePolicy.class), anyBoolean()))
         .thenThrow(new SCMException("waited pipeline disappeared", SCMException.ResultCodes.PIPELINE_NOT_FOUND));
     OMRequest request = createKeyRequest(false, 0, 100, replicationConfig, null).toBuilder()
         .setVersion(ClientVersion.CURRENT.serialize()).build();

@@ -131,13 +131,15 @@ class TestWritableRatisContainerProvider {
   void reportsMissingAllocatedPipelineIfNoReplacementIsAvailable() throws Exception {
     Pipeline allocated = MockPipeline.createPipeline(3);
     throwWhenCreatePipeline();
-    when(pipelineManager.getPipelines(REPLICATION_CONFIG, ALLOCATED, emptySet(), emptySet()))
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, ALLOCATED, emptySet(), emptySet(),
+        StorageTier.getDefaultTier()))
         .thenReturn(singletonList(allocated));
     when(pipelineManager.waitOnePipelineReady(singletonList(allocated.getId()), 0))
         .thenThrow(new PipelineNotFoundException("The input pipeline IDs " + allocated.getId() + " cannot be found"));
 
     SCMException error = assertThrows(SCMException.class,
-        () -> createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION));
+        () -> createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION,
+            StorageTier.getDefaultTier()));
 
     assertEquals(SCMException.ResultCodes.PIPELINE_NOT_FOUND, error.getResult());
     assertEquals(PipelineNotFoundException.class, error.getCause().getClass());
@@ -150,15 +152,17 @@ class TestWritableRatisContainerProvider {
     Pipeline replacementPipeline = MockPipeline.createPipeline(3);
     ContainerInfo replacement = pipelineHasContainer(replacementPipeline);
     throwWhenCreatePipeline();
-    when(pipelineManager.getPipelines(REPLICATION_CONFIG, ALLOCATED, emptySet(), emptySet()))
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, ALLOCATED, emptySet(), emptySet(),
+        StorageTier.getDefaultTier()))
         .thenReturn(singletonList(allocated));
     when(pipelineManager.waitOnePipelineReady(singletonList(allocated.getId()), 0))
         .thenThrow(new PipelineNotFoundException("missing"));
-    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet(), StorageTier.getDefaultTier()))
         .thenReturn(emptyList(), singletonList(replacementPipeline));
 
     assertSame(replacement,
-        createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION));
+        createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION,
+            StorageTier.getDefaultTier()));
   }
 
   private void existingPipelines(Pipeline... pipelines) {
