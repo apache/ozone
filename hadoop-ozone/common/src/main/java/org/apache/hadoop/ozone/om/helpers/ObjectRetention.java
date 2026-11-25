@@ -22,14 +22,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyRete
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 
 /**
- * Immutable retention state applied to a key, with an optional expiration time in epoch milliseconds.
+ * Immutable retention state applied to a key, with an expiration time in epoch milliseconds, or zero if unset.
  */
 public final class ObjectRetention {
   private final RetentionMode retentionMode;
-  private final Long retentionDate;
+  private final long retentionDate;
   private final EventHold eventHold;
 
-  public ObjectRetention(RetentionMode retentionMode, Long retentionDate, EventHold eventHold) {
+  public ObjectRetention(RetentionMode retentionMode, long retentionDate, EventHold eventHold) {
     this.retentionMode = Objects.requireNonNull(retentionMode, "retention mode is null");
     this.retentionDate = retentionDate;
     this.eventHold = eventHold;
@@ -39,7 +39,7 @@ public final class ObjectRetention {
     return retentionMode;
   }
 
-  public Long getRetentionDate() {
+  public long getRetentionDate() {
     return retentionDate;
   }
 
@@ -50,13 +50,13 @@ public final class ObjectRetention {
   public static ObjectRetention fromProto(KeyRetention proto) {
     Objects.requireNonNull(proto, "retention is null");
     return new ObjectRetention(proto.getRetentionMode(),
-        proto.hasRetentionDate() ? proto.getRetentionDate() : null,
+        proto.getRetentionDate(),
         proto.hasEventHold() ? EventHold.fromProto(proto.getEventHold()) : null);
   }
 
   public KeyRetention toProto() {
     KeyRetention.Builder builder = KeyRetention.newBuilder().setRetentionMode(retentionMode);
-    if (retentionDate != null) {
+    if (retentionDate > 0) {
       builder.setRetentionDate(retentionDate);
     }
     if (eventHold != null) {
@@ -74,7 +74,7 @@ public final class ObjectRetention {
       return false;
     }
     ObjectRetention that = (ObjectRetention) obj;
-    return retentionMode == that.retentionMode && Objects.equals(retentionDate, that.retentionDate) &&
+    return retentionMode == that.retentionMode && retentionDate == that.retentionDate &&
         Objects.equals(eventHold, that.eventHold);
   }
 

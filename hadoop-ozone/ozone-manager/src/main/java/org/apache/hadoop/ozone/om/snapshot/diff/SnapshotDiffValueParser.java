@@ -116,9 +116,17 @@ public final class SnapshotDiffValueParser {
       case KeyInfo.RETENTION_FIELD_NUMBER:
         ByteString retentionBytes = input.readBytes();
         KeyRetention retention = KeyRetention.parseFrom(retentionBytes);
-        if (retention.getEventHold().hasEnabled() && retention.getEventHold().getEnabled()) {
-          retentionBytes = retention.toBuilder().setEventHold(retention.getEventHold().toBuilder().clearEnabled())
-              .build().toByteString();
+        boolean clearDate = retention.hasRetentionDate() && retention.getRetentionDate() == 0;
+        boolean clearEnabled = retention.getEventHold().hasEnabled() && retention.getEventHold().getEnabled();
+        if (clearDate || clearEnabled) {
+          KeyRetention.Builder builder = retention.toBuilder();
+          if (clearDate) {
+            builder.clearRetentionDate();
+          }
+          if (clearEnabled) {
+            builder.getEventHoldBuilder().clearEnabled();
+          }
+          retentionBytes = builder.build().toByteString();
         }
         updateDigestWithBytes(digest, fieldNumber, retentionBytes);
         break;

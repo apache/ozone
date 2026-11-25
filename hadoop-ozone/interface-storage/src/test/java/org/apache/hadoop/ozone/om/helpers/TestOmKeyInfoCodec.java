@@ -140,7 +140,7 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
   public void testObjectLockFields(boolean hasDate) throws IOException {
     RetentionDuration rule = new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.YEARS, 1);
     ObjectRetention retention = new ObjectRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
-        hasDate ? 1_800_000_000_000L : null,
+        hasDate ? 1_800_000_000_000L : 0,
         new EventHold(true, rule));
     OmKeyInfo key = getKeyInfo(1).toBuilder()
         .setRetention(retention).setLegalHold(true).build();

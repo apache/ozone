@@ -148,11 +148,11 @@ class TestSnapshotDiffValueParser {
     OmKeyInfo key = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
         Collections.singletonList(createKeyLocationGroup(1L))).toBuilder()
-        .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null,
+        .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, 0,
             new EventHold(true, new RetentionDuration(RetentionTimeUnit.DAYS, 1)))).build();
     byte[] raw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(key);
     KeyInfo.Builder explicit = KeyInfo.parseFrom(raw).toBuilder().setLegalHold(false);
-    explicit.getRetentionBuilder().getEventHoldBuilder().setEnabled(true);
+    explicit.getRetentionBuilder().setRetentionDate(0).getEventHoldBuilder().setEnabled(true);
     assertArrayEquals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(raw),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(explicit.build().toByteArray()));
   }
@@ -166,7 +166,7 @@ class TestSnapshotDiffValueParser {
     OmKeyInfo retained = keyInfo.toBuilder().setRetention(retention).setLegalHold(true).build();
     EventHold eventHold = new EventHold(true, rule);
     OmKeyInfo held = keyInfo.toBuilder()
-        .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null, eventHold)).build();
+        .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, 0, eventHold)).build();
     return Stream.of(
         Arguments.of("unchanged absent fields", keyInfo, keyInfo.copyObject(), true),
         Arguments.of("unchanged Object Lock fields", retained, retained.copyObject(), true),
@@ -179,10 +179,10 @@ class TestSnapshotDiffValueParser {
             .build(), false),
         Arguments.of("event hold without date", keyInfo, held, false),
         Arguments.of("event hold disabled", held, held.toBuilder()
-            .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null,
+            .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, 0,
                 new EventHold(false, rule))).build(), false),
         Arguments.of("event hold rule changed", held, held.toBuilder()
-            .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null,
+            .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, 0,
                 new EventHold(true, new RetentionDuration(rule.getTimeUnit(), 2)))).build(), false),
         Arguments.of("legal hold enabled", keyInfo, keyInfo.toBuilder().setLegalHold(true).build(), false),
         Arguments.of("legal hold disabled", retained, retained.toBuilder().setLegalHold(false).build(), false),

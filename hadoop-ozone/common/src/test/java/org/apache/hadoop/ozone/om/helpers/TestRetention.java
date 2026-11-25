@@ -88,12 +88,12 @@ class TestRetention {
     OzoneManagerProtocolProtos.EventHold decoded = OzoneManagerProtocolProtos.EventHold.parseFrom(hold.toByteArray());
     assertFalse(decoded.hasEnabled());
     assertTrue(decoded.getEnabled());
-    ObjectRetention retention = new ObjectRetention(RetentionMode.GOVERNANCE, null, EventHold.fromProto(decoded));
+    ObjectRetention retention = new ObjectRetention(RetentionMode.GOVERNANCE, 0, EventHold.fromProto(decoded));
     assertTrue(ObjectRetention.fromProto(retention.toProto()).getEventHold().getEnabled());
     assertEquals(decoded, retention.toProto().getEventHold());
     assertFalse(retention.toProto().getEventHold().hasEnabled());
     EventHold released = new EventHold(false, rule(RetentionTimeUnit.DAYS, 30));
-    assertFalse(ObjectRetention.fromProto(new ObjectRetention(RetentionMode.GOVERNANCE, null, released).toProto())
+    assertFalse(ObjectRetention.fromProto(new ObjectRetention(RetentionMode.GOVERNANCE, 0, released).toProto())
         .getEventHold().getEnabled());
     assertTrue(OzoneManagerProtocolProtos.EventHold.getDescriptor().findFieldByName("enabled").isOptional());
     assertEquals("RetentionDuration", OzoneManagerProtocolProtos.BucketRetention.getDescriptor()
@@ -127,14 +127,17 @@ class TestRetention {
     EventHold hold = new EventHold(true, rule(RetentionTimeUnit.YEARS, 1));
     for (ObjectRetention retention : new ObjectRetention[]{
         new ObjectRetention(RetentionMode.GOVERNANCE, date, null),
-        new ObjectRetention(RetentionMode.COMPLIANCE, null, hold),
+        new ObjectRetention(RetentionMode.COMPLIANCE, 0, hold),
         new ObjectRetention(RetentionMode.COMPLIANCE, date, hold)}) {
       assertEquals(retention, ObjectRetention.fromProto(retention.toProto()));
       assertEquals(retention.hashCode(), ObjectRetention.fromProto(retention.toProto()).hashCode());
-      assertEquals(retention.getRetentionDate() != null, retention.toProto().hasRetentionDate());
+      assertEquals(retention.getRetentionDate() > 0, retention.toProto().hasRetentionDate());
     }
     ObjectRetention retention = new ObjectRetention(RetentionMode.GOVERNANCE, date, null);
     assertEquals(date, retention.toProto().getRetentionDate());
+    ObjectRetention unset = ObjectRetention.fromProto(retention.toProto().toBuilder().setRetentionDate(0).build());
+    assertEquals(0, unset.getRetentionDate());
+    assertFalse(unset.toProto().hasRetentionDate());
     assertThrows(NullPointerException.class, () -> new ObjectRetention(null, date, null));
     assertThrows(NullPointerException.class, () -> new BucketRetention(null, null, null));
   }
@@ -164,7 +167,7 @@ class TestRetention {
       EventHold hold = new EventHold(true, invalid);
       BucketRetention retention = new BucketRetention(RetentionMode.GOVERNANCE, null, invalid);
       assertEquals(retention, BucketRetention.fromProto(retention.toProto()));
-      ObjectRetention objectRetention = new ObjectRetention(RetentionMode.GOVERNANCE, null, hold);
+      ObjectRetention objectRetention = new ObjectRetention(RetentionMode.GOVERNANCE, 0, hold);
       assertEquals(objectRetention, ObjectRetention.fromProto(objectRetention.toProto()));
       RetentionUtil.validateRule(invalid);
       new BucketRetention(RetentionMode.GOVERNANCE, invalid, null);
