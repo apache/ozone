@@ -21,6 +21,7 @@ import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.AWS4_SIGNING_ALGORITHM;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -94,7 +95,7 @@ public class AuthorizationV4QueryParser implements SignatureParser {
         .setAlgorithm(queryParameters.get("X-Amz-Algorithm"))
         .setService(credential.getAwsService())
         .setSignPayload(false)
-        .setPayloadHash("UNSIGNED-PAYLOAD")
+        .setPayloadHash(UNSIGNED_PAYLOAD)
         .build();
   }
 

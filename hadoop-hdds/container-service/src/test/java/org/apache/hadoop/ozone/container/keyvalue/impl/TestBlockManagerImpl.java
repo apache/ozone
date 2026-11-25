@@ -497,4 +497,32 @@ public class TestBlockManagerImpl {
       assertEquals(2, persisted.getBlockCommitSequenceId());
     }
   }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPutBlockForClosedContainerWithLastChunkInfo(ContainerTestVersionInfo versionInfo) throws Exception {
+    initTest(versionInfo);
+    Assumptions.assumeFalse(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));
+    // simulates writing a full chunk + 1024 bytes, hsync, and the client stopping before the end of the block
+    long containerID = 1;
+    long blockNo = 2;
+    long chunkLimit = 4 * 1024 * 1024;
+    blockData1 = createBlockDataWithOneFullChunk(containerID, blockNo, 2, chunkLimit, 1024, 1);
+    blockManager.putBlock(keyValueContainer, blockData1, false);
+    keyValueContainer.close();
+
+    BlockID blockID = new BlockID(containerID, blockNo);
+    BlockData fullBlock = blockManager.getBlock(keyValueContainer, blockID);
+    assertEquals(chunkLimit + 1024, fullBlock.getSize());
+    KeyValueContainerData containerData = keyValueContainer.getContainerData();
+    String blockKey = containerData.getBlockKey(blockNo);
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      // Reconciliation in older versions wrote the full chunk list but kept the last chunk info row.
+      db.getStore().getBlockDataTable().put(blockKey, fullBlock);
+      assertEquals(chunkLimit + 1024, blockManager.getBlock(keyValueContainer, blockID).getSize());
+
+      blockManager.putBlockForClosedContainer(keyValueContainer, fullBlock, false);
+      assertNull(db.getStore().getLastChunkInfoTable().get(blockKey));
+      assertEquals(chunkLimit + 1024, blockManager.getBlock(keyValueContainer, blockID).getSize());
+    }
+  }
 }

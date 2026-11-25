@@ -150,6 +150,7 @@
                                 }
                                 return {
                                     hostname: key,
+                                    urlhost: key.includes(":") ? "[" + key + "]" : key,
                                     opstate: value && value.find((element) => element.key === "OPSTATE").value,
                                     usedspacepercent: value && value.find((element) => element.key === "USEDSPACEPERCENT").value,
                                     capacity: value && value.find((element) => element.key === "CAPACITY").value,

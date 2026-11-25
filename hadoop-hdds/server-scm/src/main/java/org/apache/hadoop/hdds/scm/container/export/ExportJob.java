@@ -40,8 +40,7 @@ public final class ExportJob {
   private final ExportScope scope;
   private final String jobStartTime = ExportFileManager.formatJobStartTime(Instant.now());
   private final ContainerID startContainerId;
-  private final int batchSize;
-  private final int partSize;
+  private final ExportSizing sizing;
   /** The .tar.gz output path, fixed at job creation; used by the worker to write the archive. */
   private final String fileName;
 
@@ -134,13 +133,12 @@ public final class ExportJob {
     }
   }
 
-  ExportJob(ExportScope scope, ContainerID startContainerId, int batchSize, int partSize) {
+  ExportJob(ExportScope scope, ContainerID startContainerId, ExportSizing sizing) {
     this.id = Id.newId();
     this.scope = scope;
     this.startContainerId = startContainerId != null ? startContainerId : ContainerID.valueOf(0);
     this.fileName = ExportFileManager.archiveFileName(scope, jobStartTime, id);
-    this.batchSize = batchSize;
-    this.partSize = partSize;
+    this.sizing = sizing;
   }
 
   Id getId() {
@@ -163,12 +161,16 @@ public final class ExportJob {
     return startContainerId;
   }
 
+  long getMaxRows() {
+    return sizing.getMaxRows();
+  }
+
   int getBatchSize() {
-    return batchSize;
+    return sizing.getBatchSize();
   }
 
   int getPartSize() {
-    return partSize;
+    return sizing.getPartSize();
   }
 
   CompletableFuture<Long> getFuture() {

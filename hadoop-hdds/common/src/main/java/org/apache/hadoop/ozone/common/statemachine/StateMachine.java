@@ -17,9 +17,8 @@
 
 package org.apache.hadoop.ozone.common.statemachine;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Map;
@@ -35,8 +34,7 @@ public class StateMachine<STATE extends Enum<?>, EVENT extends Enum<?>> {
   private final ImmutableSet<STATE> finalStates;
 
   private final LoadingCache<EVENT, Map<STATE, STATE>> transitions =
-      CacheBuilder.newBuilder().build(
-          CacheLoader.from(() -> new HashMap<>()));
+      Caffeine.newBuilder().build(e -> new HashMap<>());
 
   public StateMachine(STATE initState, Set<STATE> finalStates) {
     this.initialState = initState;
@@ -53,7 +51,7 @@ public class StateMachine<STATE extends Enum<?>, EVENT extends Enum<?>> {
 
   public STATE getNextState(STATE from, EVENT e)
       throws InvalidStateTransitionException {
-    STATE target = transitions.getUnchecked(e).get(from);
+    STATE target = transitions.get(e).get(from);
     if (target == null) {
       throw new InvalidStateTransitionException(from, e);
     }
@@ -61,6 +59,6 @@ public class StateMachine<STATE extends Enum<?>, EVENT extends Enum<?>> {
   }
 
   public void addTransition(STATE from, STATE to, EVENT e) {
-    transitions.getUnchecked(e).put(from, to);
+    transitions.get(e).put(from, to);
   }
 }

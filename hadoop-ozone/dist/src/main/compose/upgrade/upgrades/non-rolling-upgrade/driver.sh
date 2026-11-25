@@ -51,6 +51,7 @@ prepare_for_image "$OZONE_UPGRADE_FROM"
 
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
 start_docker_env
+wait_for_all_oms
 callback with_old_version
 
 execute_robot_test "$SCM" -N "${OUTPUT_NAME}-prepare" upgrade/non-rolling/prepare.robot
@@ -61,6 +62,7 @@ export OM_HA_ARGS='--upgrade'
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO PRE-FINALIZED ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-pre-finalized"
 OZONE_KEEP_RESULTS=true start_docker_env
+wait_for_all_oms
 callback with_this_version_pre_finalized
 execute_robot_test "$SCM" -N "${OUTPUT_NAME}-prepare" upgrade/non-rolling/prepare.robot
 stop_docker_env
@@ -70,6 +72,7 @@ set_downgrade_om_args
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM AFTER DOWNGRADE ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-3-downgraded"
 OZONE_KEEP_RESULTS=true start_docker_env
+wait_for_all_oms
 callback with_old_version_downgraded
 
 execute_robot_test "$SCM" -N "${OUTPUT_NAME}-prepare" upgrade/non-rolling/prepare.robot
@@ -80,6 +83,7 @@ export OM_HA_ARGS='--upgrade'
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-4-finalized"
 OZONE_KEEP_RESULTS=true start_docker_env
+wait_for_all_oms
 
 # Sends commands to finalize OM and SCM.
 execute_robot_test "$SCM" -N "${OUTPUT_NAME}-finalize" upgrade/non-rolling/finalize.robot

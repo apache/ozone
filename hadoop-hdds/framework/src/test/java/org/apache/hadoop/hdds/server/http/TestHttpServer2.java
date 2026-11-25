@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -45,12 +46,14 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.eclipse.jetty.http.UriCompliance;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.util.component.LifeCycle;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -58,6 +61,40 @@ import org.junit.jupiter.api.io.TempDir;
  * Testing HttpServer2.
  */
 public class TestHttpServer2 {
+
+  @Test
+  void testMetricsUnregisteredWhenContextStopFails() throws Exception {
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    LifeCycle.Listener listener = new LifeCycle.Listener() {
+      @Override
+      public void lifeCycleStopping(LifeCycle event) {
+        throw new IllegalStateException("Context stop failed");
+      }
+    };
+    try {
+      HttpServer2 server = new HttpServer2.Builder()
+          .setConf(new OzoneConfiguration())
+          .setName("test")
+          .setMetricsSourceId("context-stop-failure")
+          .addEndpoint(URI.create("http://localhost:0"))
+          .build();
+      String sourceName = HttpServer2Metrics.NAME + "-context-stop-failure";
+      try {
+        server.start();
+        assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName));
+        server.getWebAppContext().addEventListener(listener);
+        assertThrows(Exception.class, server::stop);
+        assertNull(DefaultMetricsSystem.instance().getSource(sourceName));
+      } finally {
+        server.getWebAppContext().removeEventListener(listener);
+        server.stop();
+        DefaultMetricsSystem.instance().unregisterSource(sourceName);
+      }
+    } finally {
+      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+    }
+  }
 
   /**
    * Test hadoop.http.idle_timeout.ms correctly loaded, and not being default

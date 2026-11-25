@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -221,15 +223,40 @@ public class TestListInfoSubcommand {
         "Expected UUID " + nodes.get(0).getNodeID().getUuid() + " but got: " + uuid);
   }
 
+  @Test
+  public void testDataNodeByIpv6AddressTextForm() throws Exception {
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    HddsProtos.Node original = nodes.get(0);
+    HddsProtos.DatanodeDetailsProto nodeId = original.getNodeID().toBuilder()
+        .setIpAddress("2001:db8:0:0:0:0:0:1")
+        .build();
+    nodes.set(0, HddsProtos.Node.newBuilder(original).setNodeID(nodeId).build());
+
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.queryNode(any(), any(), any(), any())).thenReturn(nodes);
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--ip", "2001:db8::1", "--json");
+    cmd.execute(scmClient);
+
+    JsonNode root = mapper.readTree(outContent.toString(DEFAULT_ENCODING));
+    assertEquals(1, root.size());
+    assertEquals(nodes.get(0).getNodeID().getUuid(), root.get(0).get("id").asText());
+  }
+
   @ParameterizedTest
   @CsvSource({
-      "true, --most-used, descending",
-      "false, --least-used, ascending"
+      "true, --most-used, descending, 100",
+      "false, --least-used, ascending, 100",
+      "true, --most-used, descending, 1",
+      "false, --least-used, ascending, 1"
   })
   public void testUsedOrderingAndOutput(
       boolean mostUsed,
       String cliFlag,
-      String orderDirection) throws Exception {
+      String orderDirection,
+      int length) throws Exception {
 
     ScmClient scmClient = mock(ScmClient.class);
     List<HddsProtos.DatanodeUsageInfoProto> usageList = new ArrayList<>();
@@ -256,14 +283,16 @@ public class TestListInfoSubcommand {
 
     // ----- JSON output test -----
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs(cliFlag, "--json");
+    c.parseArgs(cliFlag, "--json", "--length", String.valueOf(length));
     cmd.execute(scmClient);
 
     String jsonOutput = outContent.toString(DEFAULT_ENCODING);
     JsonNode root = new ObjectMapper().readTree(jsonOutput);
 
     assertTrue(root.isArray(), "JSON output should be an array");
-    assertEquals(4, root.size(), "Expected 4 nodes in JSON output");
+    int expectedCount = Math.min(length, nodeList.size());
+    assertEquals(expectedCount, root.size());
+    verify(scmClient, times(expectedCount)).queryNode(any(UUID.class));
 
     for (JsonNode node : root) {
       assertTrue(node.has("used"), "Missing 'used'");
@@ -277,11 +306,35 @@ public class TestListInfoSubcommand {
 
     // ----- Text output test -----
     c = new CommandLine(cmd);
-    c.parseArgs(cliFlag);
+    c.parseArgs(cliFlag, "--length", String.valueOf(length));
     cmd.execute(scmClient);
 
     String textOutput = outContent.toString(DEFAULT_ENCODING);
     validateOrderingFromTextOutput(textOutput, orderDirection);
+    verify(scmClient, times(2 * expectedCount)).queryNode(any(UUID.class));
+  }
+
+  @Test
+  public void testLengthWithFilteringAndFailedNode() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    List<HddsProtos.DatanodeUsageInfoProto> usageList = new ArrayList<>();
+    for (HddsProtos.Node node : nodes) {
+      usageList.add(HddsProtos.DatanodeUsageInfoProto.newBuilder().setNode(node.getNodeID()).build());
+      when(scmClient.queryNode(UUID.fromString(node.getNodeID().getUuid()))).thenReturn(node);
+    }
+    when(scmClient.queryNode(UUID.fromString(nodes.get(0).getNodeID().getUuid())))
+        .thenThrow(new IOException("Node query failed"));
+    when(scmClient.getDatanodeUsageInfo(false, Integer.MAX_VALUE)).thenReturn(usageList);
+    when(scmClient.listPipelines()).thenReturn(Collections.emptyList());
+
+    new CommandLine(cmd).parseArgs("--least-used", "--node-state", "HEALTHY", "--length", "1", "--json");
+    cmd.execute(scmClient);
+
+    JsonNode result = mapper.readTree(outContent.toString(DEFAULT_ENCODING));
+    assertEquals(1, result.size());
+    assertEquals(nodes.get(2).getNodeID().getUuid(), result.get(0).get("id").asText());
+    verify(scmClient, times(3)).queryNode(any(UUID.class));
   }
 
   @ParameterizedTest(name = "{0} and {1} should be mutually exclusive")

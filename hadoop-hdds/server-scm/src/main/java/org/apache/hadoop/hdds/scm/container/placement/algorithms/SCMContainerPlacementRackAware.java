@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
@@ -120,11 +122,11 @@ public final class SCMContainerPlacementRackAware
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     int usedNodesCount = usedNodes == null ? 0 : usedNodes.size();
-    if (datanodeCount < nodesRequired + excludedNodesCount + usedNodesCount) {
-      throw new SCMException("No enough datanodes to choose. " +
-          "TotalNode = " + datanodeCount + " RequiredNode = " + nodesRequired +
-          " ExcludedNode = " + excludedNodesCount +
-          " UsedNode = " + usedNodesCount, null);
+    int unavailableNodesCount = countUnavailableNodes(usedNodes, excludedNodes);
+    if (datanodeCount < nodesRequired + unavailableNodesCount) {
+      throw new SCMException("Not enough datanodes to choose. TotalNode = " + datanodeCount +
+          " RequiredNode = " + nodesRequired + " UnavailableNode = " + unavailableNodesCount +
+          " (UsedNode = " + usedNodesCount + ", ExcludedNode = " + excludedNodesCount + ")", null);
     }
     List<DatanodeDetails> mutableFavoredNodes = favoredNodes;
     // sanity check of favoredNodes
@@ -255,6 +257,16 @@ public final class SCMContainerPlacementRackAware
         mutableUsedNodes, favorIndex, nodesRequired, mapSizeRequired);
   }
 
+  private static int countUnavailableNodes(List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes) {
+    if (excludedNodes.isEmpty()) {
+      return usedNodes.size();
+    }
+    Set<DatanodeDetails> unavailableNodes = new HashSet<>(usedNodes.size() + excludedNodes.size(), 1);
+    unavailableNodes.addAll(usedNodes);
+    unavailableNodes.addAll(excludedNodes);
+    return unavailableNodes.size();
+  }
+
   /**
    * Called by SCM to choose datanodes.
    * There are two scenarios, one is choosing all nodes for a new pipeline.
@@ -280,7 +292,7 @@ public final class SCMContainerPlacementRackAware
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     if (datanodeCount < nodesRequired + excludedNodesCount) {
-      throw new SCMException("No enough datanodes to choose. " +
+      throw new SCMException("Not enough datanodes to choose. " +
           "TotalNode = " + datanodeCount +
           " RequiredNode = " + nodesRequired +
           " ExcludedNode = " + excludedNodesCount, null);
@@ -465,6 +477,7 @@ public final class SCMContainerPlacementRackAware
       steps.add(new Step(null, 0, true));
     }
 
+    boolean outOfRetries = false;
     for (Step step : steps) {
       int retries = MAX_RETRY;
       while (retries > 0) {
@@ -490,15 +503,16 @@ public final class SCMContainerPlacementRackAware
         }
         retries--;
       }
-      // Decommissioned and maintenance nodes stay in the topology, so a rack can use up all its tries on them.
-      // If that happens on an affinity node's rack, move on to the next place. Anywhere else, give up.
-      if (retries == 0 && step.affinityNode == null) {
-        String errMsg = "No writable datanode with enough space was found. "
-            + "metadata size required: " + metadataSizeRequired +
-            " data size required: " + dataSizeRequired;
-        LOG.info(errMsg);
-        throw new SCMException(errMsg, null);
-      }
+      // Decommissioned and maintenance nodes stay in the topology, so a place can use up all its tries on them,
+      // e.g. the only other rack while a whole rack is being decommissioned. Then move on to the next place.
+      outOfRetries |= retries == 0;
+    }
+    if (outOfRetries) {
+      String errMsg = "No writable datanode with enough space was found. "
+          + "metadata size required: " + metadataSizeRequired +
+          " data size required: " + dataSizeRequired;
+      LOG.info(errMsg);
+      throw new SCMException(errMsg, null);
     }
     throw new SCMException("No satisfied datanode to meet the excludedNodes and affinityNode constrains.", null);
   }

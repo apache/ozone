@@ -85,6 +85,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistingContainersInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
@@ -138,7 +139,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io_.retry.RetryProxy;
@@ -155,12 +156,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This class is the client-side translator to translate the requests made on
- * the {@link StorageContainerLocationProtocol} interface to the RPC server
+ * the {@link StorageContainerLocationInternalInterface} interface to the RPC server
  * implementing {@link StorageContainerLocationProtocolPB}.
  */
 @InterfaceAudience.Private
 public final class StorageContainerLocationProtocolClientSideTranslatorPB
-    implements StorageContainerLocationProtocol, ProtocolTranslator, Closeable {
+    implements StorageContainerLocationInternalInterface, ProtocolTranslator, Closeable {
 
   /**
    * RpcController is not used and hence is set to null.
@@ -388,6 +389,23 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     }
 
     return cps;
+  }
+
+  @Override
+  public List<ContainerInfo> getExistingContainersInBatch(List<Long> containerIDs) throws IOException {
+    for (Long containerID : containerIDs) {
+      Preconditions.checkState(containerID >= 0, "Container ID cannot be negative");
+    }
+    GetExistingContainersInBatchRequestProto request = GetExistingContainersInBatchRequestProto.newBuilder()
+        .addAllContainerIDs(containerIDs).build();
+    ScmContainerLocationResponse response = submitRequest(Type.GetExistingContainersInBatch,
+        builder -> builder.setGetExistingContainersInBatchRequest(request));
+    List<ContainerInfo> containers = new ArrayList<>();
+    for (HddsProtos.ContainerInfoProto container :
+        response.getGetExistingContainersInBatchResponse().getContainersList()) {
+      containers.add(ContainerInfo.fromProtobuf(container));
+    }
+    return containers;
   }
 
   /**

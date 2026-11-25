@@ -239,7 +239,7 @@ public final class SCMContainerPlacementRackScatter
       availableNodes.removeAll(usedNodes);
     }
     if (availableNodes.size() < nodesRequired) {
-      throw new SCMException("No enough datanodes to choose. " +
+      throw new SCMException("Not enough datanodes to choose. " +
           "TotalNodes = " + totalNodesCount +
           " AvailableNodes = " + availableNodes.size() +
           " RequiredNodes = " + nodesRequired +
@@ -333,9 +333,12 @@ public final class SCMContainerPlacementRackScatter
     }
 
     if (chosenNodes.size() < nodesRequired) {
-      racks.addAll(usedRacksCntMap.keySet());
+      // usedRacksCntMap iterates in the same order for the same racks, so shuffle to spread extra replicas
+      List<Node> usedRacks = new ArrayList<>(usedRacksCntMap.keySet());
+      Collections.shuffle(usedRacks);
+      racks.addAll(usedRacks);
       racks = sortRackWithExcludedNodes(racks, excludedNodes, usedRacksCntMap);
-      racks.addAll(usedRacksCntMap.keySet());
+      racks.addAll(usedRacks);
       LOG.debug("Available racks considering racks with used and exclude " +
               "nodes: {}.", racks);
       chosenNodes.addAll(chooseNodesFromRacks(racks, unavailableNodes,

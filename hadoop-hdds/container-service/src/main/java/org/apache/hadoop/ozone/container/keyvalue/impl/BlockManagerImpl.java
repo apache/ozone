@@ -132,6 +132,10 @@ public class BlockManagerImpl implements BlockManager {
         }
 
         db.getStore().getBlockDataTable().putWithBatch(batch, containerData.getBlockKey(localID), data);
+        // data has the full chunk list. Delete the last chunk info row so that reads do not add the last chunk again.
+        if (db.getStore().getLastChunkInfoTable() != null) {
+          db.getStore().getLastChunkInfoTable().deleteWithBatch(batch, containerData.getBlockKey(localID));
+        }
         if (overwriteBcsId && blockBcsID > containerBcsID) {
           db.getStore().getMetadataTable().putWithBatch(batch, containerData.getBcsIdKey(), blockBcsID);
         }

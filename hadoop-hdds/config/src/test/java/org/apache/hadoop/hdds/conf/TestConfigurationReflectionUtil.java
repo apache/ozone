@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import static org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil.assertNoDuplicatedKeys;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import com.google.common.collect.ImmutableSet;
@@ -61,17 +63,34 @@ class TestConfigurationReflectionUtil {
       Optional<ConfigType> expectedType,
       Optional<String> expectedKey,
       Optional<String> expectedDefault) {
-    Optional<ConfigType> type = ConfigurationReflectionUtil.getType(
-        testClass, fieldName);
+    final Optional<Config> config = getConfigAnnotationByName(testClass, fieldName);
+    final Optional<ConfigType> type = config.map(Config::type);
     assertEquals(expectedType, type);
 
-    Optional<String> key = ConfigurationReflectionUtil.getKey(
-        testClass, fieldName);
+    final Optional<String> key = config.map(Config::key);
     assertEquals(expectedKey, key);
 
-    Optional<String> defaultValue = ConfigurationReflectionUtil.getDefaultValue(
-        testClass, fieldName);
+    final Optional<String> defaultValue = config.map(Config::defaultValue);
     assertEquals(expectedDefault, defaultValue);
+  }
+
+  static Optional<Config> getConfigAnnotationByName(Class<?> configClass, String fieldName) {
+    for (Class<?> clazz = configClass; clazz != null;) {
+      Optional<Config> config = Stream.of(clazz.getDeclaredFields())
+          .filter(f -> f.getName().equals(fieldName))
+          .findFirst()
+          .map(f -> f.getAnnotation(Config.class));
+
+      if (config.isPresent()) {
+        return config;
+      }
+
+      clazz = clazz.getSuperclass();
+      if (Object.class.equals(clazz)) {
+        clazz = null;
+      }
+    }
+    return Optional.empty();
   }
 
   @Test
@@ -84,5 +103,26 @@ class TestConfigurationReflectionUtil {
     assertEquals(ImmutableSet.of(
         prefix + ".dynamic"
     ), props);
+  }
+
+  @Test
+  void testDuplicatedConfig() {
+    assertThrows(IllegalStateException.class, () -> assertNoDuplicatedKeys(DuplicatedConfig.class));
+  }
+
+  static class DuplicatedConfig {
+    @Config(key = "key",
+        defaultValue = "1",
+        tags = ConfigTag.HDDS,
+        description = "key1"
+    )
+    private String key1;
+
+    @Config(key = "key",
+        defaultValue = "2",
+        tags = ConfigTag.HDDS,
+        description = "key2"
+    )
+    private String key2;
   }
 }

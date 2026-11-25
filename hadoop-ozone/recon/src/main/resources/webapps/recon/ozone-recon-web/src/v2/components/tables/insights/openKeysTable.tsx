@@ -145,9 +145,9 @@ const OpenKeysTable: React.FC<OpenKeysTableProps> = ({
     render: (replicationInfo: ReplicationInfo) => (
       <div>
         {
-          (replicationInfo.replicationType === "RATIS")
-          ? replicationInfo.replicationFactor
-          : `${replicationInfo.codec}-${replicationInfo.data}-${replicationInfo.parity}`
+          (replicationInfo.replicationType === "EC")
+          ? `${replicationInfo.codec}-${replicationInfo.data}-${replicationInfo.parity}`
+          : replicationInfo.replicationFactor
         }
       </div>
     )

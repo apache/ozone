@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createContainerForTesting;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -54,10 +55,10 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -111,7 +112,6 @@ public class TestContainerStateMachineFailureOnRead {
     ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
     conf.setFromObject(ratisClientConfig);
 
-    conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -161,7 +161,7 @@ public class TestContainerStateMachineFailureOnRead {
     try (XceiverClientRatis xceiverClientRatis =
         XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf)) {
       xceiverClientRatis.connect();
-      TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
+      createContainerForTesting(xceiverClientRatis, 100L);
     }
 
     OmKeyLocationInfo omKeyLocationInfo;
@@ -204,15 +204,14 @@ public class TestContainerStateMachineFailureOnRead {
     // stale interval timeout for the test
     cluster.restartHddsDatanode(dnToStop.get().getDatanodeDetails(), false);
     cluster.waitForClusterToBeReady();
-    Thread.sleep(10000);
-
-    try {
-      Pipeline pipeline = cluster.getStorageContainerManager()
-          .getPipelineManager().getPipeline(pipelines.get(0).getId());
-      assertEquals(Pipeline.PipelineState.CLOSED, pipeline.getPipelineState(),
-          "Pipeline " + pipeline.getId() + "should be in CLOSED state");
-    } catch (PipelineNotFoundException e) {
-      // Do nothing.
-    }
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return cluster.getStorageContainerManager().getPipelineManager()
+            .getPipeline(pipelines.get(0).getId()).getPipelineState()
+            == Pipeline.PipelineState.CLOSED;
+      } catch (PipelineNotFoundException e) {
+        return true;
+      }
+    }, 100, 10000);
   }
 }

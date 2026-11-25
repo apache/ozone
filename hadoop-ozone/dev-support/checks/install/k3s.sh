@@ -21,7 +21,7 @@
 : ${KUBECONFIG:=/etc/rancher/k3s/k3s.yaml}
 
 _install_k3s() {
-  curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${K3S_VERSION}" sh -
+  curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="${K3S_VERSION}" K3S_KUBECONFIG_MODE=644 sh -
   sudo chmod a+r $KUBECONFIG
 }
 

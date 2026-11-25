@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -88,6 +89,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
     Objects.requireNonNull(createFileRequest, "createFileRequest == null");
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
+    if (keyArgs.getIsMultipartKey()) {
+      OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
+    }
 
     OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
     if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {

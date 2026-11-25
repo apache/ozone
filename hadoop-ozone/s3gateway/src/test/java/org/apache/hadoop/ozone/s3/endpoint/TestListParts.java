@@ -56,6 +56,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This class test list parts request.
@@ -73,7 +74,7 @@ public class TestListParts {
 
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("UNSIGNED-PAYLOAD");
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
@@ -89,12 +90,14 @@ public class TestListParts {
     }
   }
 
-  @Test
-  public void testListParts() throws Exception {
-    ListPartsResponse listPartsResponse = listParts(3, 0);
+  @ParameterizedTest
+  @ValueSource(ints = {1, 3, 1000})
+  public void testListParts(int maxParts) throws Exception {
+    ListPartsResponse listPartsResponse = listParts(maxParts, 0);
 
-    assertFalse(listPartsResponse.getTruncated());
-    assertEquals(3, listPartsResponse.getPartList().size());
+    assertEquals(maxParts < 3, listPartsResponse.getTruncated());
+    assertEquals(Math.min(maxParts, 3), listPartsResponse.getPartList().size());
+    assertEquals(maxParts, listPartsResponse.getMaxParts());
   }
 
   @Test
@@ -118,8 +121,26 @@ public class TestListParts {
   }
 
   @ParameterizedTest
+  @ValueSource(ints = {0, -1, Integer.MIN_VALUE})
+  public void testListPartsRejectsNonPositiveMaxParts(int maxParts) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    ObjectEndpoint endpoint = newEndpoint(proxy, mock(HttpHeaders.class));
+    when(proxy.listParts(null, "bucket1", "key1", "upload1", 0, maxParts))
+        .thenThrow(new IllegalArgumentException("Max Parts Should be greater than zero"));
+    long failures = endpoint.getMetrics().getListPartsFailure();
+
+    OS3Exception error = assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT,
+        () -> EndpointTestUtils.listParts(endpoint, "bucket1", "key1", "upload1", maxParts, 0));
+
+    assertThat(error.getResource()).isEqualTo("max-parts");
+    assertThat(endpoint.getMetrics().getListPartsFailure()).isEqualTo(failures + 1);
+    verify(proxy, never()).listParts(null, "bucket1", "key1", "upload1", 0, maxParts);
+  }
+
+  @ParameterizedTest
   @CsvSource({", 0", "'', 0", "owner, 1"})
   public void testListPartsOnlyLooksUpBucketForOwner(String expectedOwner, int bucketLookups) throws Exception {
+    String volumeName = bucketLookups == 0 ? null : "volume1";
     ClientProtocol proxy = mock(ClientProtocol.class);
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
@@ -127,7 +148,7 @@ public class TestListParts {
     OzoneMultipartUploadPartListParts parts = new OzoneMultipartUploadPartListParts(
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), 4, true);
     parts.addPart(new OzoneMultipartUploadPartListParts.PartInfo(4, "part4", 0, 10, "etag4"));
-    when(proxy.listParts("volume1", "bucket1", "key1", "upload1", 3, 2)).thenReturn(parts);
+    when(proxy.listParts(volumeName, "bucket1", "key1", "upload1", 3, 2)).thenReturn(parts);
 
     try (Response response = EndpointTestUtils.listParts(endpoint, "bucket1", "key1", "upload1", 2, 3)) {
       assertThat(response.getStatus()).isEqualTo(200);
@@ -140,8 +161,9 @@ public class TestListParts {
       assertThat(result.getPartList()).hasSize(1);
       assertThat(result.getPartList().get(0).getETag()).isEqualTo("etag4");
     }
-    verify(proxy, times(bucketLookups)).getBucketDetails("volume1", "bucket1");
-    verify(proxy).listParts("volume1", "bucket1", "key1", "upload1", 3, 2);
+    verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
+    verify(proxy, times(bucketLookups)).getBucketDetails(null, "bucket1");
+    verify(proxy).listParts(volumeName, "bucket1", "key1", "upload1", 3, 2);
   }
 
   @Test
@@ -167,28 +189,30 @@ public class TestListParts {
   public void testListPartsProtocolErrors(ResultCodes resultCode, S3ErrorTable expectedError) throws Exception {
     ClientProtocol proxy = mock(ClientProtocol.class);
     ObjectEndpoint endpoint = newEndpoint(proxy, mock(HttpHeaders.class));
-    when(proxy.listParts("volume1", "bucket1", "key1", "upload1", 3, 2))
+    when(proxy.listParts(null, "bucket1", "key1", "upload1", 3, 2))
         .thenThrow(new OMException("List parts failed", resultCode));
 
     assertErrorResponse(expectedError,
         () -> EndpointTestUtils.listParts(endpoint, "bucket1", "key1", "upload1", 2, 3));
 
-    verify(proxy).listParts("volume1", "bucket1", "key1", "upload1", 3, 2);
+    verify(proxy).listParts(null, "bucket1", "key1", "upload1", 3, 2);
   }
 
   @ParameterizedTest
   @CsvSource({"PERMISSION_DENIED, ACCESS_DENIED", "TOKEN_EXPIRED, EXPIRED_TOKEN"})
-  public void testListPartsVolumeLookupErrors(ResultCodes resultCode, S3ErrorTable expectedError) throws Exception {
+  public void testOwnerBucketLookupErrors(ResultCodes resultCode, S3ErrorTable expectedError) throws Exception {
     ClientProtocol proxy = mock(ClientProtocol.class);
-    ObjectEndpoint endpoint = newEndpoint(proxy, mock(HttpHeaders.class));
-    when(endpoint.getClient().getObjectStore().getS3Volume())
-        .thenThrow(new OMException("Volume lookup failed", resultCode));
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner");
+    ObjectEndpoint endpoint = newEndpoint(proxy, headers);
+    when(proxy.getBucketDetails(null, "bucket1"))
+        .thenThrow(new OMException("Bucket lookup failed", resultCode));
 
     OS3Exception error = assertErrorResponse(expectedError,
         () -> EndpointTestUtils.listParts(endpoint, "bucket1", "key1", "upload1", 2, 3));
 
     assertThat(error.getResource()).isEqualTo("key1");
-    verify(proxy, never()).listParts("volume1", "bucket1", "key1", "upload1", 3, 2);
+    verify(proxy, never()).listParts(null, "bucket1", "key1", "upload1", 3, 2);
   }
 
   private ObjectEndpoint newEndpoint(ClientProtocol proxy, HttpHeaders headers) throws Exception {
@@ -197,7 +221,7 @@ public class TestListParts {
         .setName("volume1").setAcls(Collections.emptyList()).build();
     OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
         .setVolumeName("volume1").setName("bucket1").setOwner("owner").build();
-    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    when(proxy.getBucketDetails(null, "bucket1")).thenReturn(bucket);
     ObjectStore objectStore = mock(ObjectStore.class);
     when(objectStore.getS3Volume()).thenReturn(volume);
     when(objectStore.getClientProxy()).thenReturn(proxy);

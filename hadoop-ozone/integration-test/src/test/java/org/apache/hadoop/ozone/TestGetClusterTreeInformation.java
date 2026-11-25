@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.ozone.test.HATests;
+import org.apache.ozone.test.HACluster;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * information from SCM.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestGetClusterTreeInformation implements HATests.TestCase {
+public abstract class TestGetClusterTreeInformation implements HACluster.TestCase {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGetClusterTreeInformation.class);

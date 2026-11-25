@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -424,7 +425,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     try {
       incrementCounter(Statistic.OBJECTS_QUERY, 1);
       OzoneFileStatus status = bucket.getFileStatus(key, headOp);
-      return toFileStatusAdapter(status, userName, uri, qualifiedPath);
+      // An OM without HDDS-15678 still returns the block locations of a head op, without pipelines: ignore them.
+      return toFileStatusAdapter(status, userName, uri, qualifiedPath, !headOp);
 
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -445,23 +447,22 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries, URI uri,
       Path workingDir, String username, boolean lite) throws IOException {
+    return listStatusPage(keyName, recursive, startKey, numEntries, uri, workingDir, username, lite)
+        .getStatuses();
+  }
+
+  @Override
+  public ListStatusResult<FileStatusAdapter> listStatusPage(String keyName, boolean recursive,
+      String startKey, long numEntries, URI uri,
+      Path workingDir, String username, boolean lite) throws IOException {
     try {
       incrementCounter(Statistic.OBJECTS_LIST, 1);
-      List<FileStatusAdapter> result = new ArrayList<>();
       if (lite) {
-        List<OzoneFileStatusLight> statuses = bucket
-            .listStatusLight(keyName, recursive, startKey, numEntries);
-        for (OzoneFileStatusLight status : statuses) {
-          result.add(toFileStatusAdapter(status, username, uri, workingDir));
-        }
-      } else {
-        List<OzoneFileStatus> statuses = bucket
-            .listStatus(keyName, recursive, startKey, numEntries);
-        for (OzoneFileStatus status : statuses) {
-          result.add(toFileStatusAdapter(status, username, uri, workingDir));
-        }
+        return bucket.listStatusLightPage(keyName, recursive, startKey, numEntries)
+            .map(status -> toFileStatusAdapter(status, username, uri, workingDir));
       }
-      return result;
+      return bucket.listStatusPage(keyName, recursive, startKey, numEntries)
+          .map(status -> toFileStatusAdapter(status, username, uri, workingDir, true));
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
         throw new FileNotFoundException(e.getMessage());
@@ -540,7 +541,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
-      String owner, URI defaultUri, Path workingDir) {
+      String owner, URI defaultUri, Path workingDir, boolean withBlockLocations) {
     OmKeyInfo keyInfo = status.getKeyInfo();
     short replication = (short) keyInfo.getReplicationConfig()
         .getRequiredNodes();
@@ -565,7 +566,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         StringUtils.defaultIfEmpty(keyInfo.getOwnerName(), owner),
         owner,
         null,
-        getBlockLocations(status),
+        getBlockLocations(withBlockLocations ? status : null),
         OzoneClientUtils.isKeyEncrypted(keyInfo),
         isEc,
         ecPolicy
@@ -629,13 +630,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
     OmKeyLocationInfoGroup omKeyLocationInfoGroup =
         keyInfo.getLatestVersionLocations();
-    BlockLocation[] blockLocations = new BlockLocation[
-        omKeyLocationInfoGroup.getBlocksLatestVersionOnly().size()];
+    List<OmKeyLocationInfo> blocks =
+        omKeyLocationInfoGroup.getBlocksLatestVersionOnly();
+    BlockLocation[] blockLocations = new BlockLocation[blocks.size()];
 
     int i = 0;
     long offsetOfBlockInFile = 0L;
-    for (OmKeyLocationInfo omKeyLocationInfo :
-        omKeyLocationInfoGroup.getBlocksLatestVersionOnly()) {
+    for (OmKeyLocationInfo omKeyLocationInfo : blocks) {
       List<String> hostList = new ArrayList<>();
       List<String> nameList = new ArrayList<>();
       omKeyLocationInfo.getPipeline().getNodes()

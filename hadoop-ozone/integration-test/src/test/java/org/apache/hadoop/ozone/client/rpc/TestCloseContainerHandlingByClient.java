@@ -47,7 +47,7 @@ import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -57,7 +57,7 @@ import org.junit.jupiter.api.TestInstance;
  * Tests Close Container Exception handling by Ozone Client.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestCloseContainerHandlingByClient implements NonHATests.TestCase {
+public abstract class TestCloseContainerHandlingByClient implements ClusterForTests.TestCase {
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;

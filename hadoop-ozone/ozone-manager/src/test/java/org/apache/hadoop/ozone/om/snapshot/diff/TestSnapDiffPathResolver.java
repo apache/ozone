@@ -166,7 +166,7 @@ class TestSnapDiffPathResolver {
 
   @Test
   void testBatchResolveSurvivesLruEvictionWithinBatch() throws Exception {
-    try (SnapDiffJobStore store = newStoreWithPathCacheCapacity(2L)) {
+    try (SnapDiffJobStore store = newStoreWithPathCacheCapacity(2)) {
       putFromEdge(store, BUCKET_OBJECT_ID, 10L, "dir");
       putFromEdge(store, 10L, 11L, "a");
       putFromEdge(store, 10L, 12L, "b");
@@ -213,7 +213,7 @@ class TestSnapDiffPathResolver {
     return newStoreWithPathCacheCapacity(null);
   }
 
-  private static SnapDiffJobStore newStoreWithPathCacheCapacity(Long maxInMemoryEntries)
+  private static SnapDiffJobStore newStoreWithPathCacheCapacity(Integer maxInMemoryEntries)
       throws IOException {
     return SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
         "path-resolver-" + JOB_ID.incrementAndGet(), true, snapDiffReportCfh, null,

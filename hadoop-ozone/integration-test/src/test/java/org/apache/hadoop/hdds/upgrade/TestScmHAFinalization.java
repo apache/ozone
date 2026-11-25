@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -56,7 +56,7 @@ public class TestScmHAFinalization {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestScmHAFinalization.class);
 
-  private StorageContainerLocationProtocol scmClient;
+  private StorageContainerLocationInternalInterface scmClient;
   private ScmBlockLocationProtocol scmBlockClient;
   private MiniOzoneHAClusterImpl cluster;
   private static final int NUM_DATANODES = 3;
@@ -201,8 +201,8 @@ public class TestScmHAFinalization {
     HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
         inactiveScm, 0);
 
-    // Use log to verify a snapshot was installed.
-    assertThat(logCapture.getOutput()).contains("New snapshot received with higher apparent version " +
-        HDDSVersion.SOFTWARE_VERSION + ". Attempting to finalize to that version.");
+    // Use log to verify a snapshot was installed and triggered finalization.
+    assertThat(logCapture.getOutput()).contains("Version file has lower apparent version (INITIAL_VERSION (0)) than " +
+        "DB (" + HDDSVersion.SOFTWARE_VERSION + "). Finalizing to the DB version.");
   }
 }

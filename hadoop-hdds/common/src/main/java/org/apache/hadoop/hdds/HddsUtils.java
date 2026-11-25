@@ -59,6 +59,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import javax.management.ObjectName;
 import org.apache.hadoop.conf.ConfigRedactor;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -76,6 +77,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ipc_.RpcException;
@@ -109,6 +111,33 @@ public final class HddsUtils {
   private static final int ONE_MB = SizeInBytes.valueOf("1m").getSizeInt();
 
   private static final int NO_PORT = -1;
+
+  /**
+   * Returns whether two IP literals denote the same address without resolving hostnames.
+   *
+   * @param first the first IP literal
+   * @param second the second IP literal
+   * @return whether both values are IP literals with identical address bytes
+   */
+  public static boolean isSameIpAddress(String first, String second) {
+    return first != null && second != null
+        && first.indexOf('%') < 0 && second.indexOf('%') < 0
+        && InetAddresses.isInetAddress(first) && InetAddresses.isInetAddress(second)
+        && InetAddresses.forString(first).equals(InetAddresses.forString(second));
+  }
+
+  /**
+   * Normalizes an IP literal for use as an internal address-map key without resolving hostnames.
+   *
+   * @param address an IP literal or hostname
+   * @return the canonical IP literal, or the original hostname or scoped literal
+   */
+  public static String normalizeIpAddress(String address) {
+    if (address == null || address.indexOf('%') >= 0 || !InetAddresses.isInetAddress(address)) {
+      return address;
+    }
+    return InetAddresses.toAddrString(InetAddresses.forString(address));
+  }
 
   private HddsUtils() {
   }
@@ -354,7 +383,7 @@ public final class HddsUtils {
    * @param value host or host:port
    * @throws ConfigurationException if the host is an unbracketed IPv6 literal
    */
-  private static void validateHostPortAuthority(String key, String value) {
+  public static void validateHostPortAuthority(String key, String value) {
     if (value == null || value.isEmpty() || value.startsWith("[")) {
       return;
     }
@@ -632,6 +661,8 @@ public final class HddsUtils {
     case ReadChunk:
     case ReadBlock:
     case WriteChunk:
+    case StreamInit:
+    case StreamInitWithPutBlock:
     case FinalizeBlock:
       return true;
     default:
@@ -648,6 +679,7 @@ public final class HddsUtils {
     case UpdateContainer:
     case GetContainerChecksumInfo:
     case ListBlock:
+    case Echo:
       return true;
     default:
       return false;
@@ -713,6 +745,8 @@ public final class HddsUtils {
       }
       break;
     case WriteChunk:
+    case StreamInit:
+    case StreamInitWithPutBlock:
       if (msg.hasWriteChunk()) {
         blockID = msg.getWriteChunk().getBlockID();
       }
@@ -867,6 +901,25 @@ public final class HddsUtils {
       }
     }
     return exception instanceof InvalidProtocolBufferException;
+  }
+
+  /**
+   * Returns the Hadoop configuration to create an RPC proxy to one of the servers of a failover proxy provider.
+   * Unless set explicitly, {@code ipc.client.connect.max.retries.on.timeouts} is 0 in the returned copy, so that
+   * a connect timeout fails over to the next server instead of being retried on the same server
+   * (Hadoop default 45 retries with {@code ipc.client.connect.timeout} 20s, about 15 minutes per attempt).
+   */
+  public static Configuration getFailoverProxyConfiguration(ConfigurationSource conf) {
+    final String key = CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY;
+    final Configuration hadoopConf = LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+    if (conf.isExplicitlySet(key)) {
+      return hadoopConf;
+    }
+    // Copy to avoid changing the configuration shared with other clients.
+    final Configuration copy = hadoopConf instanceof OzoneConfiguration
+        ? new OzoneConfiguration(hadoopConf) : new Configuration(hadoopConf);
+    copy.setInt(key, 0);
+    return copy;
   }
 
   /**

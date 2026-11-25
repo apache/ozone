@@ -20,15 +20,14 @@ package org.apache.hadoop.ozone.s3.signature;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.SIGNATURE_DOES_NOT_MATCH;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 
-import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
-import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.security.HmacSha256;
 
 /**
  * Verifies the per-chunk and trailing-header signatures of a SigV4 chunked upload
@@ -59,20 +58,11 @@ public class ChunksValidator {
       "AWS4-HMAC-SHA256-PAYLOAD";
   private static final String TRAILER_STRING_TO_SIGN_ALGORITHM =
       "AWS4-HMAC-SHA256-TRAILER";
-  private static final String HMAC_SHA256 = "HmacSHA256";
   private static final String NEWLINE = "\n";
 
   /** SHA-256 hex of the empty string (the hashed empty headers slot). */
   private static final String EMPTY_STRING_SHA256 =
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-
-  private static final ThreadLocal<Mac> HMAC = ThreadLocal.withInitial(() -> {
-    try {
-      return Mac.getInstance(HMAC_SHA256);
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException(HMAC_SHA256 + " not available", e);
-    }
-  });
 
   /** The signing key is fixed for the request, so the key spec is built once instead of per chunk. */
   private final SecretKeySpec signingKey;
@@ -83,7 +73,7 @@ public class ChunksValidator {
 
   public ChunksValidator(byte[] signingKey, String dateTime,
       String credentialScope, String seedSignature, String resource) {
-    this.signingKey = new SecretKeySpec(signingKey, HMAC_SHA256);
+    this.signingKey = new SecretKeySpec(signingKey, HmacSha256.ALGORITHM);
     this.dateTime = dateTime;
     this.credentialScope = credentialScope;
     this.previousSignature = seedSignature;
@@ -141,11 +131,11 @@ public class ChunksValidator {
 
   private byte[] hmacSha256(String msg) {
     try {
-      Mac mac = HMAC.get();
-      mac.init(signingKey);
-      return mac.doFinal(msg.getBytes(StandardCharsets.UTF_8));
+      return HmacSha256.sign(signingKey, msg);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(HmacSha256.ALGORITHM + " not available", e);
     } catch (InvalidKeyException e) {
-      throw new IllegalStateException("Failed to compute " + HMAC_SHA256, e);
+      throw new IllegalStateException("Failed to compute " + HmacSha256.ALGORITHM, e);
     }
   }
 }

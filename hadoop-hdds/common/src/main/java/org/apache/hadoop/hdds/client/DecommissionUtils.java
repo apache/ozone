@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -67,7 +68,8 @@ public final class DecommissionUtils {
           .equals(uuid)).collect(Collectors.toList());
     } else if (!Strings.isNullOrEmpty(ipAddress)) {
       decommissioningNodes = allNodes.filter(p -> p.getNodeID().getIpAddress()
-          .compareToIgnoreCase(ipAddress) == 0).collect(Collectors.toList());
+          .compareToIgnoreCase(ipAddress) == 0 || HddsUtils.isSameIpAddress(
+              p.getNodeID().getIpAddress(), ipAddress)).collect(Collectors.toList());
     } else {
       decommissioningNodes = allNodes.collect(Collectors.toList());
     }

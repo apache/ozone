@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -603,6 +604,12 @@ public final class OMRequestTestUtils {
       String keyName, ReplicationConfig replicationConfig) {
     return createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig,
         new OmKeyLocationInfoGroup(0L, new ArrayList<>(), false));
+  }
+
+  // Returns for each block of the first version of the key info whether it has the given property.
+  public static List<Boolean> blocksWith(KeyInfo keyInfo, Predicate<KeyLocation> property) {
+    return keyInfo.getKeyLocationList(0).getKeyLocationsList().stream()
+        .map(property::test).collect(Collectors.toList());
   }
 
   /**
@@ -1747,4 +1754,11 @@ public final class OMRequestTestUtils {
         .build();
   }
 
+  /**
+   * @return an EC replication config with an unknown codec
+   */
+  public static HddsProtos.ECReplicationConfig invalidEcReplicationConfig() {
+    return HddsProtos.ECReplicationConfig.newBuilder().setData(3).setParity(2).setCodec("NO_SUCH_CODEC")
+        .setEcChunkSize(1024 * 1024).build();
+  }
 }

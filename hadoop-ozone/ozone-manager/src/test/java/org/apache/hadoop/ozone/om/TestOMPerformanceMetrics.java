@@ -52,6 +52,7 @@ public class TestOMPerformanceMetrics {
       "GetKeyInfoAclCheckLatencyNs",
       "GetKeyInfoSortDatanodesLatencyNs",
       "AllocateBlockSortDatanodesLatencyNs",
+      "AllocateBlockResolveClientLatencyNs",
       "GetKeyInfoResolveBucketLatencyNs",
       "S3VolumeContextLatencyNs",
       "ForceContainerCacheRefresh",
@@ -92,7 +93,7 @@ public class TestOMPerformanceMetrics {
 
   /**
    * Registers the source and asserts that every latency counter publishes the
-   * expected {@code NumOps}/{@code AvgTime} metric names, guarding the 44
+   * expected {@code NumOps}/{@code AvgTime} metric names, guarding the 45
    * hand-typed name literals against a typo silently renaming a metric.
    */
   @Test

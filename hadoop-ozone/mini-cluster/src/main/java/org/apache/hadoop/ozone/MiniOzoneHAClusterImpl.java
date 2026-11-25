@@ -502,6 +502,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
           scmConfigurator, omService, scmService, hddsDatanodes, path, getServices());
+      cluster.setMetricsLeakAssertEnabled(metricsLeakAssertEnabled);
       try {
         cluster.startServices();
       } catch (Exception e) {
@@ -990,18 +991,17 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * @return the new leader OM after transfer
    */
   public OzoneManager transferOMLeadershipToAnotherNode(OzoneManager currentLeader) throws Exception {
-    // Get list of all OMs
     List<OzoneManager> omList = getOzoneManagersList();
-
-    // Remove current leader from list
-    omList.remove(currentLeader);
-
-    // Select the first alternative OM as target
-    OzoneManager targetOM = omList.get(0);
+    OzoneManager targetOM = omList.stream()
+        .filter(om -> om != currentLeader && om.isRunning())
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("No running OM available for leadership transfer"));
     String targetNodeId = targetOM.getOMNodeId();
 
-    // Transfer leadership
-    currentLeader.transferLeadership(targetNodeId);
+    // Transfer leadership over RPC, so the admin check sees the caller
+    try (OzoneClient client = createClient()) {
+      client.getProxy().getOzoneManagerClient().transferLeadership(targetNodeId);
+    }
 
     // Wait for leadership transfer to complete
     GenericTestUtils.waitFor(() -> {
@@ -1129,11 +1129,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           throw e;
         }
       }
+    }
 
-      waitForBootstrappedNodeToBeReady(scm, leaderSnapshotIndex);
-      if (updateConfigs) {
-        waitForConfigUpdateOnActiveSCMs(scmNodeId);
-      }
+    waitForBootstrappedNodeToBeReady(scm, leaderSnapshotIndex);
+    if (updateConfigs) {
+      waitForConfigUpdateOnActiveSCMs(scmNodeId);
     }
   }
 
@@ -1179,10 +1179,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       // Also, the new SCM should contain each existing active SCM in it's SCM
       // peer list and RatisServer peerList.
       for (StorageContainerManager scm : scmhaService.getActiveServices()) {
-        if (!scm.doesPeerExist(scm.getScmId())) {
+        if (!scm.doesPeerExist(newSCMNode.getScmId())) {
           return false;
         }
-        if (!newSCMNode.doesPeerExist(scm.getSCMNodeId())) {
+        if (!newSCMNode.doesPeerExist(scm.getScmId())) {
           return false;
         }
       }
@@ -1240,7 +1240,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     public List<Type> getServices() {
-      return services;
+      return new ArrayList<>(services);
     }
 
     public List<Type> getActiveServices() {
@@ -1324,7 +1324,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   @Override
   public List<StorageContainerManager> getStorageContainerManagers() {
-    return new ArrayList<>(this.scmhaService.getServices());
+    return this.scmhaService.getServices();
   }
 
   @Override

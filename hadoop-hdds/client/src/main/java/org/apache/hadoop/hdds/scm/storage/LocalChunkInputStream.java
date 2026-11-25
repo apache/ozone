@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.EOFException;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -62,12 +61,12 @@ public class LocalChunkInputStream extends ChunkInputStream
   @SuppressWarnings("checkstyle:parameternumber")
   LocalChunkInputStream(ChunkInfo chunkInfo, BlockID blockId, XceiverClientFactory xceiverClientFactory,
       Supplier<Pipeline> pipelineSupplier, boolean verifyChecksum, Supplier<Token<?>> tokenSupplier,
-      XceiverClientShortCircuit xceiverClientShortCircuit, FileInputStream blockInputStream) {
+      XceiverClientShortCircuit xceiverClientShortCircuit, FileChannel dataIn) {
     // Pass null for xceiverClientFactory such readPositioned() is taken, both routing reads
     // and checksum verification are done locally.
     super(chunkInfo, blockId, null, pipelineSupplier, verifyChecksum, tokenSupplier);
     this.chunkInfo = chunkInfo;
-    this.dataIn = blockInputStream.getChannel();
+    this.dataIn = dataIn;
     this.validator = this::validateChunk;
     this.verifyChecksum = verifyChecksum;
     if (LOG.isDebugEnabled()) {

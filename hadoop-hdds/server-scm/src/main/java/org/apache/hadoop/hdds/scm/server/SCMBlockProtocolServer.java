@@ -66,7 +66,7 @@ import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -519,7 +519,7 @@ public class SCMBlockProtocolServer implements
       String peerId = peer.getNodeId();
       ScmNodeTarget target = new ScmNodeTarget();
       target.setNodeId(peerId);
-      StorageContainerLocationProtocol peerClient = null;
+      StorageContainerLocationInternalInterface peerClient = null;
       try {
         // Contact the peer SCM as this SCM's service (Kerberos keytab) identity, not the remote client's identity.
         // This runs inside the finalize RPC handler's doAs context, whose UGI has no credentials to open a fresh

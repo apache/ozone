@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -50,6 +51,9 @@ class TestDatanodeIdYaml {
     DatanodeDetails read = DatanodeIdYaml.readDatanodeIdFile(file);
 
     assertEquals(original, read);
+    // currentVersion is not persisted in datanode.id
+    assertEquals(HDDSVersion.DEFAULT_VERSION, read.getCurrentVersion());
+    read.setCurrentVersion(original.getCurrentVersion());
     assertEquals(original.toDebugString(), read.toDebugString());
   }
 

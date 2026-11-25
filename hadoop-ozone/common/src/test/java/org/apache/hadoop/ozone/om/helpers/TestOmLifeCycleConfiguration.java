@@ -35,10 +35,12 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmLCFilter.Tag;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Test lifecycle configuration related entities.
@@ -157,7 +159,7 @@ public class TestOmLifeCycleConfiguration {
     rules.add(new OmLCRule.Builder()
         .setId("rule2")
         .setEnabled(true)
-        .setFilter(getOmLCFilterBuilder(null, Pair.of("temporary", "true"), null).build())
+        .setFilter(getOmLCFilterBuilder(null, new Tag("temporary", "true"), null).build())
         .setAction(new OmLCExpiration.Builder()
             .setDate(getFutureDateString(100))
             .build())
@@ -263,4 +265,46 @@ public class TestOmLifeCycleConfiguration {
     assertDoesNotThrow(configFromProto::valid);
   }
 
+  @ParameterizedTest
+  @CsvSource({"false, , value", "false, key,", "false, ,", "true, , value", "true, key,"})
+  public void testTagPresenceValidation(boolean useAnd, String key, String value) {
+    OmLCFilter filter;
+    String expectedMessage;
+    if (useAnd) {
+      OmLifecycleRuleAndOperator and = new OmLifecycleRuleAndOperator.Builder()
+          .setPrefix("prefix")
+          .addTag(key, value)
+          .build();
+      filter = new OmLCFilter.Builder().setAndOperator(and).build();
+      expectedMessage = key == null ? "A Tag's Key must be a length between 1 and" : "A Tag must have a Value.";
+    } else {
+      filter = new OmLCFilter.Builder().setTag(key, value).build();
+      expectedMessage = "A Tag must have a Key and a Value.";
+    }
+    assertOMException(() -> configurationWithFilter(filter).build(), INVALID_REQUEST, expectedMessage);
+  }
+
+  @Test
+  public void testValidTagPresence() {
+    OmLCFilter emptyFilter = new OmLCFilter.Builder().build();
+    OmLCFilter emptyValue = new OmLCFilter.Builder()
+        .setTag("key", "")
+        .build();
+    OmLifecycleRuleAndOperator and = new OmLifecycleRuleAndOperator.Builder()
+        .setPrefix("prefix")
+        .addTag("key", "")
+        .build();
+    assertDoesNotThrow(() -> configurationWithFilter(emptyFilter).build());
+    assertDoesNotThrow(() -> configurationWithFilter(emptyValue).build());
+    assertDoesNotThrow(() -> configurationWithFilter(new OmLCFilter.Builder().setAndOperator(and).build()).build());
+  }
+
+  private OmLifecycleConfiguration.Builder configurationWithFilter(OmLCFilter filter) {
+    OmLCRule rule = new OmLCRule.Builder()
+        .setId("rule")
+        .setFilter(filter)
+        .setAction(new OmLCExpiration.Builder().setDays(1).build())
+        .build();
+    return getOmLifecycleConfiguration("volume", "bucket", Collections.singletonList(rule));
+  }
 }

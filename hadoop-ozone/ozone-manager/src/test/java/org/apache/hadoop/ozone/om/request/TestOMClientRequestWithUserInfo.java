@@ -28,9 +28,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import io.grpc.Context;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -182,6 +183,19 @@ public class TestOMClientRequestWithUserInfo {
         new OMKeyCommitRequest(request, mock(BucketLayout.class));
 
     assertEquals("AccessId", omClientRequest.getUserInfo().getUserName());
+  }
+
+  @Test
+  public void testUserInfoWithoutRemoteAddress() throws Exception {
+    when(ozoneManager.getOmRpcServerAddr()).thenReturn(new InetSocketAddress(inetAddress, 9862));
+
+    OMRequest request = createRequestWithS3Credentials("AccessId", "Signature", "StringToSign");
+    OMClientRequest omClientRequest = new OMKeyCommitRequest(request, mock(BucketLayout.class));
+
+    OzoneManagerProtocolProtos.UserInfo userInfo = omClientRequest.getUserIfNotExists(ozoneManager);
+
+    assertEquals("AccessId", userInfo.getUserName());
+    assertEquals(inetAddress.getHostAddress(), userInfo.getRemoteAddress());
   }
 
   @Test

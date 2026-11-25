@@ -24,10 +24,10 @@ import java.net.InetSocketAddress;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.net.unix.DomainSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -157,7 +157,7 @@ public final class DomainSocketFactory {
       } else {
         pathInfo = PathInfo.VALID;
         isEnabled = true;
-        timer = new Timer(DomainSocketFactory.class.getSimpleName() + "-Timer");
+        timer = new Timer(DomainSocketFactory.class.getSimpleName() + "-Timer", true);
         LOG.info(FEATURE + " is enabled within {} ns.", System.nanoTime() - startTime);
       }
     }

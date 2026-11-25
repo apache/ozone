@@ -34,6 +34,8 @@ class DatanodeDeletedBlockTransactions {
   // A list of TXs mapped to a certain datanode ID.
   private final Map<DatanodeID, List<DeletedBlocksTransaction>> transactions =
       new HashMap<>();
+  private final Map<DatanodeID, Integer> blocksDeletedByDatanode =
+      new HashMap<>();
   // counts blocks deleted across datanodes. Blocks deleted will be counted
   // for all the replicas and may not be unique.
   private int blocksDeleted = 0;
@@ -43,7 +45,9 @@ class DatanodeDeletedBlockTransactions {
 
   void addTransactionToDN(DatanodeID dnID, DeletedBlocksTransaction tx) {
     transactions.computeIfAbsent(dnID, k -> new LinkedList<>()).add(tx);
-    blocksDeleted += tx.getLocalIDCount();
+    int blockCount = tx.getLocalIDCount();
+    blocksDeleted += blockCount;
+    blocksDeletedByDatanode.merge(dnID, blockCount, Integer::sum);
     if (SCMBlockDeletingService.LOG.isDebugEnabled()) {
       SCMBlockDeletingService.LOG
           .debug("Transaction added: {} <- TX({}), DN {} <- blocksDeleted Add {}.",
@@ -69,11 +73,7 @@ class DatanodeDeletedBlockTransactions {
   }
 
   public int getNumberOfBlocksForDatanode(DatanodeID dnId) {
-    return Optional.ofNullable(transactions.get(dnId))
-        .orElse(new LinkedList<>())
-        .stream()
-        .mapToInt(DeletedBlocksTransaction::getLocalIDCount)
-        .sum();
+    return blocksDeletedByDatanode.getOrDefault(dnId, 0);
   }
 
   boolean isEmpty() {

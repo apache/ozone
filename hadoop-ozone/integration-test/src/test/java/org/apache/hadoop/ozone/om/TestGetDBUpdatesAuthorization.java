@@ -64,7 +64,7 @@ public class TestGetDBUpdatesAuthorization {
   private static final String BUCKET = "bucket1";
   private static final String KEY = "key1";
   private static final String READONLY_ADMIN = "roadmin";
-  private static final String RECON_PRINCIPAL = "reconsvc";
+  static final String RECON_PRINCIPAL = "reconsvc";
 
   @BeforeAll
   static void init() throws Exception {
@@ -95,7 +95,7 @@ public class TestGetDBUpdatesAuthorization {
     }
   }
 
-  private static OzoneConfiguration authTestConfiguration() {
+  static OzoneConfiguration authTestConfiguration() {
     OzoneConfiguration testConf = new OzoneConfiguration();
     testConf.setBoolean(OZONE_ACL_ENABLED, true);
     testConf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
@@ -108,7 +108,7 @@ public class TestGetDBUpdatesAuthorization {
     return testConf;
   }
 
-  private static DBUpdates getDBUpdates(OzoneConfiguration ozoneConf, UserGroupInformation user)
+  static DBUpdates getDBUpdates(OzoneConfiguration ozoneConf, UserGroupInformation user)
       throws Exception {
     return user.doAs((PrivilegedExceptionAction<DBUpdates>) () -> {
       OzoneManagerProtocolClientSideTranslatorPB omClient =
@@ -156,21 +156,4 @@ public class TestGetDBUpdatesAuthorization {
     assertDbUpdatesNonEmpty(getDBUpdates(conf, recon));
   }
 
-  @Test
-  void accessDeniedWhenReconPrincipalNotConfigured() throws Exception {
-    OzoneConfiguration noReconConf = authTestConfiguration();
-    noReconConf.unset(OZONE_RECON_KERBEROS_PRINCIPAL_KEY);
-    MiniOzoneCluster denyCluster =
-        MiniOzoneCluster.newBuilder(noReconConf).setNumDatanodes(1).build();
-    try {
-      denyCluster.waitForClusterToBeReady();
-      UserGroupInformation reconLikeUser =
-          UserGroupInformation.createUserForTesting(RECON_PRINCIPAL, new String[] {"recon"});
-      OMException ex = assertThrows(OMException.class,
-          () -> getDBUpdates(noReconConf, reconLikeUser));
-      assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
-    } finally {
-      denyCluster.shutdown();
-    }
-  }
 }

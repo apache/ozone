@@ -24,6 +24,16 @@ import java.io.IOException;
  * same server, without failover.
  */
 public class RetriableWithNoFailoverException extends IOException {
+
+  /**
+   * Constructs a {@code RetriableWithNoFailoverException} with the given detailed message. <p>
+   * Required for Unwrapping {@code RemoteException}. Used by
+   * {@link org.apache.hadoop.ipc_.RemoteException#unwrapRemoteException()}
+   */
+  public RetriableWithNoFailoverException(String message) {
+    super(message);
+  }
+
   public RetriableWithNoFailoverException(IOException exception) {
     super(exception);
   }

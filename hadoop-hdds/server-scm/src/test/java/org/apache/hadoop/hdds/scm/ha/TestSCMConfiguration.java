@@ -38,7 +38,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -214,6 +216,14 @@ class TestSCMConfiguration {
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
     assertEquals(TimeDuration.ZERO, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
+
+    assertFalse(scmRatisConfig.isAppendEntriesComposeEnabled(), "isAppendEntriesComposeEnabled");
+    assertFalse(RaftServerConfigKeys.Log.appendEntriesComposeEnabled(p),
+        RaftServerConfigKeys.Log.APPEND_ENTRIES_COMPOSE_ENABLED_KEY);
+    scmRatisConfig.setAppendEntriesComposeEnabled(true);
+    conf.setFromObject(scmRatisConfig);
+    assertTrue(RaftServerConfigKeys.Log.appendEntriesComposeEnabled(RatisUtil.newRaftProperties(conf)),
+        RaftServerConfigKeys.Log.APPEND_ENTRIES_COMPOSE_ENABLED_KEY);
   }
 
   @ParameterizedTest
@@ -238,6 +248,27 @@ class TestSCMConfiguration {
         () -> SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig));
 
     assertThat(e.getMessage()).contains(addressKey).contains(address);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"2001:db8::2", "[2001:db8::2]"})
+  void testSCMConfigWithIpv6PeerAddress(String address) throws Exception {
+    String scmServiceId = "scmserviceId";
+    conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
+    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY + "." + scmServiceId, "scm1,scm2");
+    conf.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, "scm1");
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, "scm1"), "localhost");
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, "scm2"), address);
+    conf.setInt(OZONE_SCM_RATIS_PORT_KEY, 10000);
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getState()).thenReturn(Storage.StorageState.NOT_INITIALIZED);
+
+    SCMHANodeDetails details = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
+
+    assertThat(details.getPeerNodeDetails())
+        .singleElement()
+        .extracting(SCMNodeDetails::getRpcAddress)
+        .isEqualTo(new InetSocketAddress("2001:db8::2", 10000));
   }
 
   @Test

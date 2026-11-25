@@ -92,7 +92,7 @@ public class InterSCMGrpcProtocolService {
         CertificateClient certClient = scm.getScmCertificateClient();
         SslContextBuilder sslServerContextBuilder =
             forServer(certClient.getKeyManager())
-                .trustManager(certClient.getTrustManager());
+                .trustManager(new HASecurityUtils.ScmPeerTrustManager(certClient.getTrustManager()));
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslServerContextBuilder, securityConfig.getGrpcSslProvider());
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);

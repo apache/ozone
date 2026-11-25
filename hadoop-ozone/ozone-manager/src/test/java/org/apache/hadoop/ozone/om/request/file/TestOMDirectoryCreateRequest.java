@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -492,6 +493,24 @@ public class TestOMDirectoryCreateRequest {
     // Verify sub dirs inherit parent DEFAULT acls.
     verifyDirectoriesInheritAcls(volumeName, bucketName, keyName, bucketAcls);
 
+  }
+
+  @Test
+  public void testRejectInvalidReplicationConfig() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
+
+    OMRequest.Builder request = createDirectoryRequest(volumeName, bucketName, genRandomKeyName()).toBuilder();
+    request.getCreateDirectoryRequestBuilder().getKeyArgsBuilder().setType(EC)
+        .setEcReplicationConfig(OMRequestTestUtils.invalidEcReplicationConfig());
+    OMRequest modifiedRequest =
+        new OMDirectoryCreateRequest(request.build(), getBucketLayout()).preExecute(ozoneManager);
+    OMDirectoryCreateRequest omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(modifiedRequest, getBucketLayout());
+    omDirectoryCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
+    OMClientResponse response = omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST, response.getOMResponse().getStatus());
   }
 
   @ParameterizedTest
