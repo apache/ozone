@@ -164,7 +164,6 @@ jobs:
           path: |
             ~/.m2/repository/*/*/*
             !~/.m2/repository/org/apache/ozone
-            ~/.m2/wrapper
           key: ${{ steps.restore-cache.outputs.cache-key }}
   npm:
     needs:
