@@ -39,11 +39,11 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
@@ -143,7 +143,7 @@ public class TestQuasiClosedContainerHandler {
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
     assertEquals(1, request.getReport().getStat(
-        ContainerHealthState.QUASI_CLOSED_STUCK));
+        SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK));
   }
 
   /**
@@ -285,7 +285,7 @@ public class TestQuasiClosedContainerHandler {
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
     assertEquals(1, request.getReport().getStat(
-        ContainerHealthState.QUASI_CLOSED_STUCK));
+        SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK));
   }
 
   /**
@@ -314,7 +314,7 @@ public class TestQuasiClosedContainerHandler {
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
     assertEquals(1, request.getReport().getStat(
-        ContainerHealthState.QUASI_CLOSED_STUCK));
+        SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK));
   }
 
   /**
