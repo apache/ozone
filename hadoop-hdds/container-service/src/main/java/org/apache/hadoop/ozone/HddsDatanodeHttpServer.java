@@ -31,7 +31,12 @@ public class HddsDatanodeHttpServer extends BaseHttpServer {
 
   public HddsDatanodeHttpServer(MutableConfigurationSource conf)
       throws IOException {
-    super(conf, "hddsDatanode");
+    this(conf, null);
+  }
+
+  public HddsDatanodeHttpServer(MutableConfigurationSource conf,
+      String datanodeId) throws IOException {
+    super(conf, "hddsDatanode", datanodeId);
   }
 
   @Override

@@ -21,9 +21,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QU
 
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
@@ -73,8 +73,8 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
 
     if (request.getContainerReplicas().isEmpty()) {
       // If there are no replicas, mark as QUASI_CLOSED_STUCK + MISSING combination
-      request.getReport().incrementAndSample(ContainerHealthState.QUASI_CLOSED_STUCK_MISSING, 
-          request.getContainerInfo());
+      request.setSimplifiedHealthStateForReporting(
+          SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_MISSING);
       return true;
     }
 
@@ -101,8 +101,8 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
     if (replicaCount.isUnderReplicated()) {
       LOG.debug("Container {} is quasi-closed-stuck under-replicated", request.getContainerInfo());
       // Container is both QUASI_CLOSED_STUCK and UNDER_REPLICATED
-      request.getReport().incrementAndSample(ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED, 
-          request.getContainerInfo());
+      request.setSimplifiedHealthStateForReporting(
+          SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_UNDER_REPLICATED);
       if (pendingAdd == 0) {
         // Only queue if there are no pending adds, as that could correct the under replication.
         LOG.debug("Queueing under-replicated health result for container {}", request.getContainerInfo());
@@ -117,8 +117,8 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
     if (replicaCount.isOverReplicated()) {
       LOG.debug("Container {} is quasi-closed-stuck over-replicated", request.getContainerInfo());
       // Container is both QUASI_CLOSED_STUCK and OVER_REPLICATED
-      request.getReport().incrementAndSample(ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED, 
-          request.getContainerInfo());
+      request.setSimplifiedHealthStateForReporting(
+          SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_OVER_REPLICATED);
       if (pendingDelete == 0) {
         // Only queue if there are no pending deletes which could correct the over replication
         LOG.debug("Queueing over-replicated health result for container {}", request.getContainerInfo());

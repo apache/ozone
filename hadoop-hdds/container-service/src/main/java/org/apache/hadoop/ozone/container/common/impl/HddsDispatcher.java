@@ -33,6 +33,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -56,7 +57,6 @@ import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.audit.DNAction;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.helpers.ReadBlockContext;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -78,8 +79,11 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,6 +120,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
   private long slowOpThresholdNs;
+  // missing EC containers whose close was requested from SCM with an immediate heartbeat
+  private final Set<Long> missingEcCloseRequested = ConcurrentHashMap.newKeySet();
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -174,6 +180,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case CLOSED_CONTAINER_IO:
     case DELETE_ON_OPEN_CONTAINER:
     case UNSUPPORTED_REQUEST:// Blame client for sending unsupported request.
+    case MALFORMED_REQUEST:// Blame client for sending malformed request.
     case CONTAINER_MISSING:
     case CONTAINER_ALREADY_EXISTS:
       return true;
@@ -224,7 +231,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
             == DispatcherContext.WriteChunkStage.WRITE_DATA)
-            || (cmdType == Type.StreamInit);
+            || (cmdType == Type.StreamInit)
+            || (cmdType == Type.StreamInitWithPutBlock);
     boolean isWriteCommitStage =
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
@@ -282,6 +290,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
               + " has been lost and cannot be recreated on this DataNode",
           ContainerProtos.Result.CONTAINER_MISSING);
       audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
+      // EC writes arrive directly over gRPC without a Ratis dispatch context and carry a positive replica index.
+      // Ask SCM to close the affected container so it stops allocating writes and can repair the missing replica.
+      if (dispatcherContext == null && getReplicaIndex(msg) > 0) {
+        sendCloseActionForMissingEcContainer(containerID);
+      }
       return ContainerUtils.logAndReturnError(LOG, sce, msg);
     }
 
@@ -297,6 +310,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       if (container == null && ((isWriteStage || isCombinedStage)
           || cmdType == Type.PutSmallFile
           || cmdType == Type.PutBlock)) {
+
+        if (!ContainerUtils.isContainerCreatable(msg)) {
+          StorageContainerException sce = new StorageContainerException(
+              "ContainerID " + containerID + " does not exist",
+              ContainerProtos.Result.CONTAINER_NOT_FOUND);
+          audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
+          return ContainerUtils.logAndReturnError(LOG, sce, msg);
+        }
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
         responseProto = createContainer(msg);
@@ -630,6 +651,37 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
+  /**
+   * A write to an EC container this datanode has lost fails with CONTAINER_MISSING. Unlike Ratis, where the failed
+   * write closes the pipeline, nothing else would close the container, so SCM would keep allocating it: ask SCM to
+   * close it. The action is re-added for later failed writes; the immediate heartbeat is triggered once.
+   */
+  private void sendCloseActionForMissingEcContainer(long containerID) {
+    if (context == null) {
+      return;
+    }
+    context.addContainerActionIfAbsent(ContainerAction.newBuilder()
+        .setContainerID(containerID)
+        .setAction(ContainerAction.Action.CLOSE)
+        .setReason(ContainerAction.Reason.CONTAINER_UNHEALTHY)
+        .build());
+    if (missingEcCloseRequested.add(containerID)) {
+      LOG.warn("Asked SCM to close EC container {}, which is missing on this datanode", containerID);
+      context.getParent().triggerHeartbeat();
+    }
+  }
+
+  /** The EC replica index of a WriteChunk or PutBlock request, 0 for anything else. */
+  private static int getReplicaIndex(ContainerCommandRequestProto msg) {
+    if (msg.hasWriteChunk()) {
+      return msg.getWriteChunk().getBlockID().getReplicaIndex();
+    }
+    if (msg.hasPutBlock()) {
+      return msg.getPutBlock().getBlockData().getBlockID().getReplicaIndex();
+    }
+    return 0;
+  }
+
   private boolean isContainerFull(Container container) {
     boolean isOpen = Optional.ofNullable(container)
         .map(cont -> cont.getContainerState() == ContainerDataProto.State.OPEN)
@@ -806,13 +858,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-          ContainerCommandRequestProto msg)
-          throws StorageContainerException {
+      ContainerCommandRequestProto msg,
+      CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock)
+      throws StorageContainerException {
     long containerID = msg.getContainerID();
     Container container = getContainer(containerID);
     if (container != null) {
       Handler handler = getHandler(getContainerType(container));
-      return handler.getStreamDataChannel(container, msg);
+      return handler.getStreamDataChannel(container, msg, putBlock);
     } else {
       throw new StorageContainerException(
               "ContainerID " + containerID + " does not exist",
@@ -823,7 +876,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void streamDataReadOnly(ContainerCommandRequestProto msg,
       StreamObserver<ContainerCommandResponseProto> streamObserver,
-      RandomAccessFileChannel blockFile, DispatcherContext dispatcherContext) {
+      ReadBlockContext readBlockContext, DispatcherContext dispatcherContext) {
     Objects.requireNonNull(msg, "msg == null");
     Type cmdType = msg.getCmdType();
     String traceID = msg.getTraceID();
@@ -865,7 +918,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
       }
       perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
-      responseProto = handler.readBlock(msg, container, blockFile, streamObserver);
+      responseProto = handler.readBlock(msg, container, readBlockContext, streamObserver);
       long oPLatencyMS = Time.monotonicNow() - startTime;
       metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
       if (responseProto == null) {
@@ -879,6 +932,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       perf.appendOpLatencyMs(oPLatencyMS);
       performanceAudit(action, msg, dispatcherContext, perf, oPLatencyMS);
 
+    } catch (StatusRuntimeException sre) {
+      // The client cancelled the call or its connection dropped: not a container failure.
+      if (sre.getStatus().getCode() != Status.Code.CANCELLED) {
+        throw sre;
+      }
+      LOG.debug("Streaming {} for container {} ended early: {}", cmdType, msg.getContainerID(), sre.getStatus());
     } catch (StorageContainerException sce) {
       audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
       streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));
@@ -914,6 +973,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case CloseContainer   : return DNAction.CLOSE_CONTAINER;
     case GetCommittedBlockLength : return DNAction.GET_COMMITTED_BLOCK_LENGTH;
     case StreamInit       : return DNAction.STREAM_INIT;
+    case StreamInitWithPutBlock: return DNAction.STREAM_INIT_WITH_PUT_BLOCK;
     case FinalizeBlock    : return DNAction.FINALIZE_BLOCK;
     case Echo             : return DNAction.ECHO;
     case GetContainerChecksumInfo: return DNAction.GET_CONTAINER_CHECKSUM_INFO;

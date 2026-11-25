@@ -26,6 +26,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -259,9 +260,13 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
       return null;
     }
 
-    return Executors.newScheduledThreadPool(1,
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("DiskUsage-" + params.getPath() + "-%n")
-            .build());
+    return Executors.newScheduledThreadPool(1, threadFactoryFor(params));
+  }
+
+  static ThreadFactory threadFactoryFor(SpaceUsageCheckParams params) {
+    return new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat("DiskUsage-" + params.getPath() + "-%d")
+        .build();
   }
 }

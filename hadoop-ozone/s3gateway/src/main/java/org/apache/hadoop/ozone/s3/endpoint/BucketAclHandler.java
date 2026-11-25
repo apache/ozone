@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -71,6 +70,11 @@ public class BucketAclHandler extends BucketOperationHandler {
     return queryParams().get(QueryParams.ACL) != null;
   }
 
+  @Override
+  S3GAction getAction() {
+    return shouldHandle() ? S3GAction.NOT_IMPLEMENTED : null;
+  }
+
   /**
    * Implement acl get.
    * <p>
@@ -87,7 +91,7 @@ public class BucketAclHandler extends BucketOperationHandler {
     context.setAction(S3GAction.GET_ACL);
 
     try {
-      OzoneBucket bucket = context.getVolume().getBucket(bucketName);
+      OzoneBucket bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       S3Owner owner = S3Owner.of(bucket.getOwner());
 
@@ -139,7 +143,7 @@ public class BucketAclHandler extends BucketOperationHandler {
 
     try {
       OzoneVolume volume = context.getVolume();
-      OzoneBucket bucket = volume.getBucket(bucketName);
+      OzoneBucket bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
 
       List<OzoneAcl> ozoneAclListOnBucket = new ArrayList<>();
@@ -181,8 +185,10 @@ public class BucketAclHandler extends BucketOperationHandler {
       if (!currentAclsOnVolume.isEmpty()) {
         for (OzoneAcl acl : acls) {
           if (acl.getAclScope() == ACCESS) {
-            aclsToRemoveOnVolume.addAll(OzoneAclUtil.filterAclList(
-                acl.getName(), acl.getType(), currentAclsOnVolume));
+            currentAclsOnVolume.stream()
+                .filter(a -> a.getType() == acl.getType())
+                .filter(a -> a.getName().equals(acl.getName()))
+                .forEach(aclsToRemoveOnVolume::add);
           }
         }
         for (OzoneAcl acl : aclsToRemoveOnVolume) {

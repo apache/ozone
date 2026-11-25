@@ -139,7 +139,7 @@ public class TestSnapshotDiffManagerMXBean {
         org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED,
         "vol", "bucket", "snap1", "snap2",
         false, false, 0,
-        org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO,
+        org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_FSO_DIR,
         0, null);
     snapDiffJobTable.put("job-1", job);
 
@@ -151,6 +151,6 @@ public class TestSnapshotDiffManagerMXBean {
     assertEquals("job-1", jobs[0].get("jobId"));
     assertEquals("snap1", jobs[0].get("fromSnapshot"));
     assertEquals("snap2", jobs[0].get("toSnapshot"));
-    assertEquals("OBJECT_ID_MAP_GEN_FSO", jobs[0].get("subStatus"));
+    assertEquals("OBJECT_ID_MAP_GEN_FSO_DIR", jobs[0].get("subStatus"));
   }
 }

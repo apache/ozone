@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,6 +57,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test for {@link SendContainerRequestHandler}.
@@ -105,6 +107,30 @@ public class TestSendContainerRequestHandler {
   }
 
   @Test
+  void testNoSpaceOnTargetVolume() throws Exception {
+    long containerId = 1;
+
+    // Simulate the target datanode having no volume with enough space to
+    // import the incoming container by having the volume chooser throw.
+    DiskOutOfSpaceException noSpace =
+        new DiskOutOfSpaceException("No volumes have enough space for a new container");
+    doThrow(noSpace).when(importer).chooseNextVolume(anyLong());
+
+    doAnswer(invocation -> {
+      Object arg = invocation.getArgument(0);
+      assertEquals(noSpace, arg);
+      return null;
+    }).when(responseObserver).onError(any());
+
+    sendContainerRequestHandler.onNext(createRequest(containerId,
+        ByteString.copyFromUtf8("test"), 0, null));
+
+    // No volume was reserved, so no committed bytes should change on any volume.
+    HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
+    assertEquals(0, volume.getCommittedBytes());
+  }
+
+  @Test
   void testReceiveDataForExistingContainer() throws Exception {
     long containerId = 1;
     // create containerImporter
@@ -132,9 +158,7 @@ public class TestSendContainerRequestHandler {
     long containerId = 1;
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     long initialCommittedBytes = volume.getCommittedBytes();
-    long expectedReservedSpace = size != null ?
-        importer.getRequiredReplicationSpace(size) :
-        importer.getDefaultReplicationSpace();
+    long expectedReservedSpace = importer.getSpaceToReserve(size);
 
     // Create and execute the first request to reserve space
     sendContainerRequestHandler.onNext(
@@ -156,9 +180,7 @@ public class TestSendContainerRequestHandler {
     long containerId = 1;
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     long initialCommittedBytes = volume.getCommittedBytes();
-    long expectedReservedSpace = size != null ?
-        importer.getRequiredReplicationSpace(size) :
-        importer.getDefaultReplicationSpace();
+    long expectedReservedSpace = importer.getSpaceToReserve(size);
 
     ByteString data = ByteString.copyFromUtf8("test");
     // Execute first request to reserve space
@@ -184,9 +206,7 @@ public class TestSendContainerRequestHandler {
     long containerId = 1;
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     long initialCommittedBytes = volume.getCommittedBytes();
-    long expectedReservedSpace = size != null ?
-        importer.getRequiredReplicationSpace(size) :
-        importer.getDefaultReplicationSpace();
+    long expectedReservedSpace = importer.getSpaceToReserve(size);
 
     // Execute request
     sendContainerRequestHandler.onNext(createRequest(containerId,
@@ -234,6 +254,23 @@ public class TestSendContainerRequestHandler {
     // Verify specific calculations
     assertEquals(2 * overallocatedSize, overallocatedReservation);
     assertEquals(2 * containerMaxSize, defaultReservation);
+  }
+
+  /**
+   * A negative size (for example a source whose bytes used counter has drifted below zero), or one whose
+   * required space overflows, must reserve the default space, and release it when the request completes.
+   */
+  @ParameterizedTest
+  @ValueSource(longs = {-1_234_567_890L, Long.MAX_VALUE})
+  public void testInvalidSizeReservesDefaultSpace(long size) {
+    HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
+    long initialCommittedBytes = volume.getCommittedBytes();
+
+    sendContainerRequestHandler.onNext(createRequest(1, ByteString.EMPTY, 0, size));
+    assertEquals(initialCommittedBytes + importer.getDefaultReplicationSpace(), volume.getCommittedBytes());
+
+    sendContainerRequestHandler.onCompleted();
+    assertEquals(initialCommittedBytes, volume.getCommittedBytes());
   }
 
   private ContainerProtos.SendContainerRequest createRequest(

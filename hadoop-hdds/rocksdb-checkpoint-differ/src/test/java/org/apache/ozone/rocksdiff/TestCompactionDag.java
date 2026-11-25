@@ -68,11 +68,13 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -436,6 +438,23 @@ public class TestCompactionDag {
         compactionDag.pruneForwardDag(originalDag, levelToBeRemoved);
     assertEquals(expectedDag, originalDag);
     assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
+  }
+
+  @Test
+  public void testPruneNodesRemovesNodesFromCompactionMap() {
+    CompactionDag compactionDag = new CompactionDag();
+    CompactionFileInfo inputFile =
+        new CompactionFileInfo("input", "a", "b", "keyTable");
+    CompactionFileInfo outputFile =
+        new CompactionFileInfo("output", "a", "b", "keyTable");
+    compactionDag.populateCompactionDAG(
+        Collections.singletonList(inputFile), Collections.singletonList(outputFile), 1L);
+
+    compactionDag.pruneNodesFromDag(
+        Collections.singleton(compactionDag.getCompactionNode("input")));
+
+    assertFalse(compactionDag.getCompactionMap().containsKey("input"));
+    assertTrue(compactionDag.getCompactionMap().containsKey("output"));
   }
 
   @SuppressWarnings("methodlength")

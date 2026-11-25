@@ -21,17 +21,18 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Node;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
-import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -53,7 +54,6 @@ public class PipelineSyncTask extends ReconScmTask {
 
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final long interval;
-  private final ReconTaskStatusUpdater taskStatusUpdater;
 
   public PipelineSyncTask(ReconPipelineManager pipelineManager,
       ReconNodeManager nodeManager,
@@ -65,7 +65,6 @@ public class PipelineSyncTask extends ReconScmTask {
     this.reconPipelineManager = pipelineManager;
     this.nodeManager = nodeManager;
     this.interval = reconTaskConfig.getPipelineSyncTaskInterval().toMillis();
-    this.taskStatusUpdater = getTaskStatusUpdater();
   }
 
   @Override
@@ -75,13 +74,9 @@ public class PipelineSyncTask extends ReconScmTask {
         initializeAndRunTask();
         Thread.sleep(interval);
       }
-    } catch (Throwable t) {
-      LOG.error("Exception in Pipeline sync Thread.", t);
-      if (t instanceof InterruptedException) {
-        Thread.currentThread().interrupt();
-      }
-      taskStatusUpdater.setLastTaskRunStatus(-1);
-      taskStatusUpdater.recordRunCompletion();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.info("Pipeline sync Thread interrupted", e);
     }
   }
 
@@ -95,7 +90,6 @@ public class PipelineSyncTask extends ReconScmTask {
       syncOperationalStateOnDeadNodes();
       LOG.debug("Pipeline sync Thread took {} milliseconds.",
           Time.monotonicNow() - start);
-      taskStatusUpdater.setLastTaskRunStatus(0);
     } finally {
       lock.writeLock().unlock();
     }
@@ -109,13 +103,14 @@ public class PipelineSyncTask extends ReconScmTask {
    */
   private void syncOperationalStateOnDeadNodes()
       throws IOException, NodeNotFoundException {
-    List<DatanodeDetails> deadNodesOnRecon = nodeManager.getNodes(null, DEAD);
+    final Set<DatanodeID> deadNodesOnRecon = nodeManager.getNodes(null, DEAD).stream()
+        .map(info -> info.getID())
+        .collect(Collectors.toSet());
 
     if (!deadNodesOnRecon.isEmpty()) {
       List<Node> scmNodes = scmClient.getNodes();
       List<Node> filteredScmNodes = scmNodes.stream()
-              .filter(n -> deadNodesOnRecon.contains(
-                  DatanodeDetails.getFromProtoBuf(n.getNodeID())))
+              .filter(n -> deadNodesOnRecon.contains(DatanodeDetails.getFromProtoBuf(n.getNodeID()).getID()))
               .collect(Collectors.toList());
 
       for (Node deadNode : filteredScmNodes) {

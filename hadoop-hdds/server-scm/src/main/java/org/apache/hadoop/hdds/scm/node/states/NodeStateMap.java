@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
  */
 public class NodeStateMap {
   /** Map: {@link DatanodeID} -> ({@link DatanodeInfo}, {@link ContainerID}s). */
-  private final Map<DatanodeID, DatanodeEntry> nodeMap = new HashMap<>();
+  private final Map<DatanodeID, DatanodeEntry> nodeMap = new TreeMap<>();
 
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -81,7 +81,7 @@ public class NodeStateMap {
   }
 
   /**
-   * Update the given datanode.
+   * Update the given datanode. The datanode keeps its containers.
    *
    * @return the existing {@link DatanodeInfo}.
    */
@@ -90,11 +90,9 @@ public class NodeStateMap {
     final DatanodeInfo oldInfo;
     lock.writeLock().lock();
     try {
-      oldInfo = getNodeInfo(id);
-      if (oldInfo == null) {
-        throw new NodeNotFoundException(id);
-      }
-      nodeMap.put(id, new DatanodeEntry(datanode));
+      final DatanodeEntry oldEntry = getExisting(id);
+      oldInfo = oldEntry.getInfo();
+      nodeMap.put(id, new DatanodeEntry(datanode, oldEntry));
     } finally {
       lock.writeLock().unlock();
     }
@@ -166,11 +164,7 @@ public class NodeStateMap {
     }
   }
 
-  /**
-   * Returns the list of all the nodes as DatanodeInfo objects.
-   *
-   * @return list of all the node ids
-   */
+  /** @return a shadow copied list of all datanodes, sorted by {@link DatanodeID}. */
   public List<DatanodeInfo> getAllDatanodeInfos() {
     lock.readLock().lock();
     try {
@@ -326,13 +320,11 @@ public class NodeStateMap {
    */
   @Override
   public String toString() {
-    // TODO - fix this method to include the commented out values
     StringBuilder builder = new StringBuilder();
     builder.append("Total number of nodes: ").append(getTotalNodeCount());
-   // for (NodeState state : NodeState.values()) {
-   //   builder.append("Number of nodes in ").append(state).append(" state: ")
-   //       .append(getNodeCount(state));
-   // }
+    for (NodeState state : NodeState.values()) {
+      builder.append(", ").append(state).append(": ").append(getNodeCount(null, state));
+    }
     return builder.toString();
   }
 

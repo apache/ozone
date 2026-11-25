@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -52,7 +51,11 @@ import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import picocli.CommandLine;
@@ -81,7 +84,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       description = "Comma separated Container IDs")
   private String containers;
 
-  @CommandLine.Option(names = {"--onlyFileNames"},
+  @CommandLine.Option(names = {"--only-file-names"},
       defaultValue = "false",
       description = "Only display file names without full path")
   private boolean onlyFileNames;
@@ -100,6 +103,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   private Table<String, OmKeyInfo> openFileTable;
   private Table<String, OmKeyInfo> openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
+  private Table<OmMultipartPartKey, OmMultipartPartInfo> multipartPartsTable;
   private DBStore dirTreeDbStore;
   private Table<Long, String> dirTreeTable;
   // Cache volume IDs to avoid repeated lookups
@@ -124,7 +128,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     conf = new OzoneConfiguration();
     File dbFile = new File(dbPath);
 
-    try (PrintWriter writer = out()) {
+    try {
       omDbStore = DBStoreBuilder.newBuilder(conf, OMDBDefinition.get(), dbFile.getName(),
           dbFile.getParentFile().toPath())
           .setOpenReadOnly(true)
@@ -138,8 +142,9 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       openFileTable = OMDBDefinition.OPEN_FILE_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
       openKeyTable = OMDBDefinition.OPEN_KEY_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
       multipartInfoTable = OMDBDefinition.MULTIPART_INFO_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
+      multipartPartsTable = OMDBDefinition.MULTIPART_PARTS_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
 
-      retrieve(dbPath, writer, containerIDs);
+      retrieve(dbPath, containerIDs);
     } catch (Exception e) {
       err().println("Failed to open RocksDB: " + e);
       throw e;
@@ -178,7 +183,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
   }
 
-  private void retrieve(String dbPath, PrintWriter writer, Set<Long> containerIds) {
+  private void retrieve(String dbPath, Set<Long> containerIds) {
     Map<Long, Pair<Long, String>> bucketVolMap = new HashMap<>();
     // Build dir tree for FSO keys only if we need full paths
     if (!onlyFileNames) {
@@ -215,13 +220,12 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     processFSOKeys(containerIds, containerToKeysMap, unreferencedCountMap, bucketVolMap);
     // Process OBS keys (keyTable)
     processOBSKeys(containerIds, containerToKeysMap);
-    jsonOutput(writer, containerToKeysMap, containerToOpenKeysMap, unreferencedCountMap);
+    jsonOutput(containerToKeysMap, containerToOpenKeysMap, unreferencedCountMap);
   }
 
   private void processFSOKeys(Set<Long> containerIds, Map<Long, List<String>> containerToKeysMap,
       Map<Long, Long> unreferencedCountMap, Map<Long, Pair<Long, String>> bucketVolMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator =
-        fileTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> fileIterator = fileTable.iterator()) {
       
       while (fileIterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = fileIterator.next();
@@ -248,8 +252,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private void processOBSKeys(Set<Long> containerIds, Map<Long, List<String>> containerToKeysMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIterator =
-         keyTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> keyIterator = keyTable.iterator()) {
 
       while (keyIterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = keyIterator.next();
@@ -273,8 +276,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private void processOpenFiles(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator =
-             openFileTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> fileIterator = openFileTable.iterator()) {
       while (fileIterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = fileIterator.next();
         addOpenKeyToContainerMap(entry.getKey(), entry.getValue(), containerIds, containerToOpenKeysMap);
@@ -285,8 +287,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private void processOpenKeys(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIterator =
-             openKeyTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> keyIterator = openKeyTable.iterator()) {
       while (keyIterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = keyIterator.next();
         addOpenKeyToContainerMap(entry.getKey(), entry.getValue(), containerIds, containerToOpenKeysMap);
@@ -309,7 +310,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private void processMultipartUpload(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
+    try (TableIterator<String, Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
              multipartInfoTable.iterator()) {
 
       while (mpuIterator.hasNext()) {
@@ -317,11 +318,18 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         String dbKey = entry.getKey();
         OmMultipartKeyInfo mpuInfo = entry.getValue();
 
-        // Collect all target containers that have parts of this MPU
+        // Collect all target containers that have parts of this MPU. Legacy
+        // (schemaVersion 0) MPUs embed their parts in the multipartInfoTable
+        // value, whereas split (schemaVersion 1) MPUs store each part as a
+        // separate row in the multipartPartsTable.
         Set<Long> matchedContainers = new HashSet<>();
-        for (PartKeyInfo partKeyInfo : mpuInfo.getPartKeyInfoMap()) {
-          OmKeyInfo partKey = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-          matchedContainers.addAll(getKeyContainers(partKey, containerIds));
+        if (mpuInfo.getSchemaVersion() == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+          matchedContainers.addAll(getSplitPartContainers(dbKey, containerIds));
+        } else {
+          for (PartKeyInfo partKeyInfo : mpuInfo.getPartKeyInfoMap()) {
+            OmKeyInfo partKey = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+            matchedContainers.addAll(getKeyContainers(partKey, containerIds));
+          }
         }
 
         if (!matchedContainers.isEmpty()) {
@@ -336,22 +344,62 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private Set<Long> getKeyContainers(OmKeyInfo keyInfo, Set<Long> targetContainerIds) {
+    return getContainers(keyInfo.getKeyLocationVersions(), targetContainerIds);
+  }
+
+  /**
+   * Scans the split multipartPartsTable for all parts belonging to the given
+   * multipart upload (its uploadId is the last path component of the
+   * multipartInfoTable db key) and returns the target containers referenced by
+   * those parts' block locations.
+   */
+  private Set<Long> getSplitPartContainers(String multipartInfoDbKey, Set<Long> targetContainerIds) {
+    Set<Long> matchedContainers = new HashSet<>();
+    String uploadId;
+    try {
+      uploadId = OmMultipartUpload.from(multipartInfoDbKey).getUploadId();
+    } catch (IllegalArgumentException e) {
+      err().println("Invalid multipartInfoTable key " + multipartInfoDbKey + ", " + e);
+      return matchedContainers;
+    }
+    OmMultipartPartKey prefix = OmMultipartPartKey.prefix(uploadId);
+    try (TableIterator<OmMultipartPartKey, Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo>>
+             partIterator = multipartPartsTable.iterator(prefix)) {
+      while (partIterator.hasNext()) {
+        Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo> partEntry = partIterator.next();
+        OmMultipartPartKey partKey = partEntry.getKey();
+        // Prefix iteration can overshoot into the next upload's rows; stop then.
+        if (!uploadId.equals(partKey.getUploadId())) {
+          break;
+        }
+        if (partKey.hasPartNumber()) {
+          matchedContainers.addAll(
+              getContainers(partEntry.getValue().getKeyLocationInfos(), targetContainerIds));
+        }
+      }
+    } catch (Exception e) {
+      err().println("Exception occurred reading multipartPartsTable for upload " + uploadId + ", " + e);
+    }
+    return matchedContainers;
+  }
+
+  private Set<Long> getContainers(List<OmKeyLocationInfoGroup> locationVersions, Set<Long> targetContainerIds) {
     Set<Long> keyContainers = new HashSet<>();
-    keyInfo.getKeyLocationVersions().forEach(
-        e -> e.getLocationList().forEach(
-            blk -> {
-              long cid = blk.getBlockID().getContainerID();
-              if (targetContainerIds.contains(cid)) {
-                keyContainers.add(cid);
-              }
-            }));
+    locationVersions.forEach(
+        e -> e.getLocationLists().forEach(
+            locationList -> locationList.forEach(
+                blk -> {
+                  long cid = blk.getBlockID().getContainerID();
+                  if (targetContainerIds.contains(cid)) {
+                    keyContainers.add(cid);
+                  }
+                })));
     return keyContainers;
   }
 
   private void prepareDirIdTree(Map<Long, Pair<Long, String>> bucketVolMap) throws Exception {
     // Add bucket volume tree
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> bucketIterator = 
-        bucketTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmBucketInfo>> bucketIterator = bucketTable.iterator()) {
       
       while (bucketIterator.hasNext()) {
         Table.KeyValue<String, OmBucketInfo> entry = bucketIterator.next();
@@ -370,7 +418,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
 
     // Add dir tree
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> directoryIterator = 
+    try (TableIterator<String, Table.KeyValue<String, OmDirectoryInfo>> directoryIterator =
         directoryTable.iterator()) {
       
       while (directoryIterator.hasNext()) {
@@ -455,7 +503,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
   }
 
-  private void jsonOutput(PrintWriter writer, Map<Long, List<String>> containerToKeysMap,
+  private void jsonOutput(Map<Long, List<String>> containerToKeysMap,
       Map<Long, List<String>> containerToOpenKeysMap, Map<Long, Long> unreferencedCountMap) {
     try {
       ObjectMapper mapper = new ObjectMapper();
@@ -501,8 +549,8 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       }
 
       root.set("containers", containersNode);
-      writer.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root));
-      writer.flush();
+      out().println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root));
+      out().flush();
     } catch (Exception e) {
       err().println("Error writing JSON output: " + e.getMessage());
     }

@@ -126,8 +126,7 @@ public class PrometheusServiceProviderImpl
     HttpURLConnection urlConnection =
         getMetricsResponse(api, queryString);
     List<Metric> metrics = null;
-    if (Response.Status.fromStatusCode(urlConnection.getResponseCode())
-        .getFamily() == Response.Status.Family.SUCCESSFUL) {
+    if (Response.Status.Family.familyOf(urlConnection.getResponseCode()) == Response.Status.Family.SUCCESSFUL) {
       InputStream inputStream = urlConnection.getInputStream();
       ObjectMapper mapper = new ObjectMapper();
       Map<String, Object> jsonMap = mapper.readValue(inputStream, Map.class);

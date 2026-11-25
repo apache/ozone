@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -87,20 +88,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest request = super.preExecute(ozoneManager);
+    final OMRequest request = super.preExecute(ozoneManager);
     CommitKeyRequest commitKeyRequest = request.getCommitKeyRequest();
     Objects.requireNonNull(commitKeyRequest, "commitKeyRequest == null");
 
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
 
-    if (keyArgs.hasExpectedDataGeneration()) {
-      if (keyArgs.getExpectedDataGeneration()
-          == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
-        ozoneManager.checkFeatureEnabled(
-            OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
-      } else {
-        ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
-      }
+    if (keyArgs.hasExpectedDataGeneration()
+        && keyArgs.getExpectedDataGeneration() != OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     }
 
     if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
@@ -194,7 +190,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       bucketLockAcquired = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       // Check for directory exists with same name, if it exists throw error.
       if (LOG.isDebugEnabled()) {
@@ -303,9 +299,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
 
       validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
-      // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
-      // not persisted in the key table.
-      // Combination
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
           .setExpectedDataGeneration(null)
@@ -322,8 +315,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       long correctedSpace = omKeyInfo.getReplicatedSize();
-      // if keyToDelete isn't null, usedNamespace needn't check and
-      // increase.
+      // Same-client hsync re-commit does not consume namespace.
       if (keyToDelete != null && (isSameHsyncKey)) {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
@@ -370,12 +362,13 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         // Subtract the used namespace of empty overwritten keys.
         omBucketInfo.decrUsedNamespace(filteredUsedBlockCnt.getRight(), false);
         omBucketInfo.decrUsedBytes(totalSize, true);
+        omBucketInfo.incrUsedNamespace(1L);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
+        omBucketInfo.incrUsedNamespace(1L);
       }
-      omBucketInfo.incrUsedNamespace(1L);
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
       final OmKeyInfo pseudoKeyInfo = isHSync ? null
@@ -408,6 +401,13 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           dbOzoneKey, omKeyInfo, trxnLogIndex);
 
       omBucketInfo.incrUsedBytes(correctedSpace);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
+      omResponse.setCommitKeyResponse(CommitKeyResponse.newBuilder()
+          .setModificationTime(commitKeyArgs.getModificationTime())
+          .build());
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
           omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
@@ -625,7 +625,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       Long expectedGen = toCommit.getExpectedDataGeneration();
       auditMap.put(OzoneConsts.REWRITE_GENERATION, String.valueOf(expectedGen));
 
-      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS) {
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
         if (existing != null) {
           throw new OMException("Atomic create-if-not-exists conflicted with an existing key",
               OMException.ResultCodes.ATOMIC_WRITE_CONFLICT);

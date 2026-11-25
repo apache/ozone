@@ -24,15 +24,16 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.RemoteException;
@@ -88,6 +89,14 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
   private final UserGroupInformation ugi;
 
+  /**
+   * When true, on each connection-class failure the provider re-resolves
+   * the cached OM hostname for the current proxy and discards the cached
+   * proxy if the IP has changed (Kubernetes pod-IP-change recovery).
+   * Off by default. Mirrors the design intent of HADOOP-17068.
+   */
+  private final boolean resolveOnFailureEnabled;
+
   public OMFailoverProxyProviderBase(ConfigurationSource configuration,
                                      UserGroupInformation ugi,
                                      String omServiceId,
@@ -104,6 +113,9 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     this.omProxies = new OMProxyInfo.OrderedMap<>(initOmProxiesFromConfigs(conf, omServiceId));
     nextProxyIndex = 0;
     currentProxyIndex = 0;
+    this.resolveOnFailureEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT);
   }
 
   /**
@@ -123,8 +135,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    * @throws IOException if any error occurs while trying to get the proxy
    */
   protected T createOMProxy(InetSocketAddress omAddress) throws IOException {
-    Configuration hadoopConf =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
+    Configuration hadoopConf = HddsUtils.getFailoverProxyConfiguration(getConf());
 
     RPC.setProtocolEngine(hadoopConf, getInterface(), ProtobufRpcEngine.class);
 
@@ -166,6 +177,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         OMException omEx = (OMException) cause;
         // Do not failover if the operation was blocked because the OM was
         // prepared.
+        // Current OMs do not support prepare for upgrade, but the client may encounter an old OM server.
         return omEx.getResult() !=
            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED;
       }
@@ -188,12 +200,20 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     // Client will attempt up to maxFailovers number of failovers between
     // available OMs before throwing exception.
     RetryPolicy retryPolicy = new RetryPolicy() {
+      // Stores the failed OMs per request, to debounce repeatedly failed OM-suggested leaders.
+      private final ThreadLocal<Set<String>> failedOMs = ThreadLocal.withInitial(HashSet::new);
+
       @Override
       public RetryAction shouldRetry(Exception exception, int retries,
           int failovers, boolean isIdempotentOrAtMostOnce)
           throws Exception {
 
         String omNodeId = getCurrentProxyOMNodeId();
+        final Set<String> failedOMsOfRequest = failedOMs.get();
+        if (failovers == 0) {
+          failedOMsOfRequest.clear();
+        }
+        failedOMsOfRequest.add(omNodeId);
 
         if (LOG.isDebugEnabled()) {
           if (exception.getCause() != null) {
@@ -212,13 +232,10 @@ public abstract class OMFailoverProxyProviderBase<T> implements
           if (notLeaderException != null) {
             // Prepare the next OM to be tried. This will help with calculation
             // of the wait times needed get creating the retryAction.
-            String suggestedLeaderAddress =
-                notLeaderException.getSuggestedLeaderAddress();
             String suggestedNodeId =
                 notLeaderException.getSuggestedLeaderNodeId();
-            if (suggestedLeaderAddress != null &&
-                suggestedNodeId != null &&
-                omProxies.contains(suggestedNodeId, suggestedLeaderAddress)) {
+            if (suggestedNodeId != null && omProxies.get(suggestedNodeId) != null
+                && !failedOMsOfRequest.contains(suggestedNodeId)) {
               setNextOmProxy(suggestedNodeId);
               return getRetryAction(RetryDecision.FAILOVER_AND_RETRY,
                   failovers);
@@ -241,6 +258,26 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
         if (!shouldFailover(exception)) {
           return RetryAction.FAIL; // do not retry
+        }
+
+        // Before advancing failover index, give the cached OM address a
+        // chance to be re-resolved -- the same nodeId may have been
+        // rescheduled to a new IP (Kubernetes pod-IP-change recovery).
+        // Restricted to connection-class exceptions so we don't add DNS
+        // load on application-level errors.
+        if (resolveOnFailureEnabled
+            && ConnectionFailureUtils.isConnectionFailure(exception)
+            && maybeRefreshCurrentOmAddress()) {
+          // Pin nextProxyIndex back to the current nodeId so that the
+          // RetryInvocationHandler's subsequent performFailover() call
+          // does NOT advance to a different peer. Without this,
+          // performFailover() would read whatever nextProxyIndex was
+          // last set to (often already advanced from prior retries) and
+          // bypass the freshly-fixed peer for up to N-1 attempts in an
+          // N-OM HA cluster -- defeating the purpose of the refresh.
+          // Mirrors the OMLeaderNotReady "retry same OM" pattern above.
+          setNextOmProxy(omNodeId);
+          return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
         }
 
         // Prepare the next OM to be tried. This will help with calculation
@@ -356,13 +393,24 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
   /**
    * Get the wait time based on
-   * 1. Is the same OM being retried based on response from OM.
-   * 2. Is this a new OM that is being used.
-   * 3. Were all the OMs visited once and retries need to be resumed after a
+   * 1. Were all the OMs visited once and retries need to be resumed after a
    * delay.
+   * 2. Is the same OM being retried based on response from OM.
+   * 3. Is this a new OM that is being used.
    * @return delay in milliseconds
    */
   public synchronized long getWaitTime() {
+    // OMs are being contacted in Round Robin way. If all the OMs have been
+    // contacted once in this attempt, clear the list. The OMs will be retried
+    // in a Round Robin fashion again after a fixed delay. This is checked first
+    // because with a single OM, Round Robin selects the same OM again, which is
+    // not a retry on the same OM based on response from OM.
+    if (attemptedOMs.containsAll(omProxies.getNodeIds())) {
+      attemptedOMs.clear();
+      numAttemptsOnSameOM = 0;
+      return waitBetweenRetries;
+    }
+
     if (omProxies.getNodeId(nextProxyIndex).equals(lastAttemptedOM)) {
       // Clear attemptedOMs list as the same OM has been selected again.
       attemptedOMs.clear();
@@ -373,19 +421,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     }
     // Reset numAttemptsOnSameOM as we failed over to a different OM.
     numAttemptsOnSameOM = 0;
-
-    // OMs are being contacted in Round Robin way. Check if all the OMs have
-    // been contacted in this attempt.
-    for (String omNodeID : omProxies.getNodeIds()) {
-      if (!attemptedOMs.contains(omNodeID)) {
-        return 0;
-      }
-    }
-    // This implies all the OMs have been contacted once. Return true and
-    // clear the list. The OMs will be retried in a Round Robin fashion again
-    // after a delay.
-    attemptedOMs.clear();
-    return waitBetweenRetries;
+    return 0;
   }
 
   public List<OMProxyInfo<T>> getOMProxies() {
@@ -405,15 +441,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    */
   public static OMLeaderNotReadyException getLeaderNotReadyException(
       Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMLeaderNotReadyException) {
-        return (OMLeaderNotReadyException) ioException;
-      }
-    }
-    return null;
+    return getCause(exception, OMLeaderNotReadyException.class);
   }
 
   /**
@@ -425,15 +453,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    */
   public static OMNotLeaderException getNotLeaderException(
       Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMNotLeaderException) {
-        return (OMNotLeaderException) ioException;
-      }
-    }
-    return null;
+    return getCause(exception, OMNotLeaderException.class);
   }
 
   /**
@@ -444,15 +464,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    *         exception is not ReadIndexException.
    */
   public static ReadIndexException getReadIndexException(Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof ReadIndexException) {
-        return (ReadIndexException) ioException;
-      }
-    }
-    return null;
+    return getCause(exception, ReadIndexException.class);
   }
 
   /**
@@ -463,18 +475,76 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    *         exception is not ReadException.
    */
   public static ReadException getReadException(Exception exception) {
+    return getCause(exception, ReadException.class);
+  }
+
+  /**
+   * @return the cause of the given exception if it has the given type, otherwise null.
+   *         A cause in a {@link RemoteException} is unwrapped first.
+   */
+  private static <T extends IOException> T getCause(Exception exception, Class<T> type) {
     Throwable cause = exception.getCause();
     if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof ReadException) {
-        return (ReadException) ioException;
-      }
+      cause = ((RemoteException) cause).unwrapRemoteException();
     }
-    return null;
+    return type.isInstance(cause) ? type.cast(cause) : null;
   }
 
   protected ConfigurationSource getConf() {
     return conf;
+  }
+
+  /**
+   * Asks the current proxy's {@link OMProxyInfo} to re-resolve its
+   * configured hostname. If DNS now returns a different IP, the
+   * OMProxyInfo replaces its cached address and discards the cached
+   * proxy so the next dial happens against the new IP.
+   * <p>
+   * Calls {@link #onAddressRefreshed(String)} when a swap occurs so
+   * subclasses (specifically {@code HadoopRpcOMFailoverProxyProvider})
+   * can refresh derived state such as the aggregated delegation-token
+   * service identifier.
+   * <p>
+   * The DNS lookup performed inside {@link OMProxyInfo#refreshAddressIfChanged}
+   * is run OUTSIDE this provider's monitor. {@link OMProxyInfo} maintains
+   * its own monitor for the swap commit; if we held the provider monitor
+   * across the resolve, a slow / dead resolver would freeze every
+   * concurrent caller of synchronized provider methods (e.g.
+   * {@link #performFailover}, {@link #selectNextOmProxy}). The provider
+   * monitor is only re-acquired briefly to invoke the refresh hook.
+   *
+   * @return true if a swap actually happened.
+   */
+  @VisibleForTesting
+  boolean maybeRefreshCurrentOmAddress() {
+    // getCurrentProxyOMNodeId() is synchronized and omProxies is an
+    // unmodifiable map populated once at construction, so neither read
+    // needs the provider monitor; both values are always present.
+    final String nodeId = Objects.requireNonNull(getCurrentProxyOMNodeId(),
+        "Current proxy node id is null");
+    final OMProxyInfo<T> info = Objects.requireNonNull(omProxies.get(nodeId),
+        "Current proxy info is null");
+    // refreshAddressIfChanged handles its own locking and performs the
+    // DNS lookup outside its entry monitor.
+    boolean swapped = info.refreshAddressIfChanged();
+    if (swapped) {
+      synchronized (this) {
+        onAddressRefreshed(nodeId);
+      }
+    }
+    return swapped;
+  }
+
+  /**
+   * Hook called immediately after a successful per-node DNS refresh.
+   * Default implementation is a no-op. Subclasses override to refresh
+   * any state derived from the cached set of OM addresses (e.g. the
+   * aggregated delegation-token service in
+   * {@code HadoopRpcOMFailoverProxyProvider}).
+   *
+   * @param nodeId the OM nodeId whose address was just refreshed.
+   */
+  protected void onAddressRefreshed(String nodeId) {
+    // no-op by default
   }
 }

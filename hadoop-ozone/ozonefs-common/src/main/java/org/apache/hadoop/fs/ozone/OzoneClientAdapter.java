@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -73,6 +74,17 @@ public interface OzoneClientAdapter {
       String startKey, long numEntries, URI uri,
       Path workingDir, String username, boolean lite) throws IOException;
 
+  /**
+   * Like {@link #listStatus}, but also returns whether OM reported that no entries follow this page.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  default ListStatusResult<FileStatusAdapter> listStatusPage(String keyName, boolean recursive,
+      String startKey, long numEntries, URI uri,
+      Path workingDir, String username, boolean lite) throws IOException {
+    return ListStatusResult.unknown(listStatus(keyName, recursive, startKey, numEntries, uri, workingDir,
+        username, lite));
+  }
+
   Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
       throws IOException;
   
@@ -88,6 +100,17 @@ public interface OzoneClientAdapter {
 
   FileStatusAdapter getFileStatus(String key, URI uri,
       Path qualifiedPath, String userName) throws IOException;
+
+  /**
+   * @param headOp when true, request a metadata-only (type) check so the OM
+   *               skips the pipeline refresh (SCM round-trip) and datanode
+   *               sorting. Implementations that cannot honor it fall back to a
+   *               full status.
+   */
+  default FileStatusAdapter getFileStatus(String key, URI uri,
+      Path qualifiedPath, String userName, boolean headOp) throws IOException {
+    return getFileStatus(key, uri, qualifiedPath, userName);
+  }
 
   boolean isFSOptimizedBucket();
 
@@ -110,6 +133,8 @@ public interface OzoneClientAdapter {
   long finalizeBlock(OmKeyLocationInfo block) throws IOException;
 
   void setTimes(String key, long mtime, long atime) throws IOException;
+
+  void setVerifyChecksum(boolean verifyChecksum);
 
   boolean isFileClosed(String pathStr) throws IOException;
 

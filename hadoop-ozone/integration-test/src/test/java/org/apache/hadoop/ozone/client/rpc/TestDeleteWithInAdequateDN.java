@@ -147,13 +147,11 @@ public class TestDeleteWithInAdequateDN {
     ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
     conf.setFromObject(ratisClientConfig);
 
-    conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numOfDatanodes)
         .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(THREE, 60000);
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
@@ -256,7 +254,7 @@ public class TestDeleteWithInAdequateDN {
         .setKeyName(keyName).build();
     OmKeyInfo info = cluster.getOzoneManager().lookupKey(keyArgs);
     BlockID blockID = info.getKeyLocationVersions().get(0)
-        .getLocationList().get(0).getBlockID();
+        .createLocationList().get(0).getBlockID();
     OzoneContainer ozoneContainer;
     final DatanodeStateMachine dnStateMachine =
         leader.getDatanodeStateMachine();

@@ -25,6 +25,9 @@ x-new-config:
     - ../..:/opt/hadoop
     - ../_keytabs:/etc/security/keytabs
     - ./krb5.conf:/etc/krb5.conf
+  depends_on:
+    kdc:
+      condition: service_healthy
 
 services:
   kdc:
@@ -36,7 +39,7 @@ services:
       - ../_keytabs:/etc/security/keytabs
     command: ["/opt/hadoop/compose/common/init-kdc.sh"]
   kms:
-    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_IMAGE_VERSION}
     hostname: kms
     dns_search: .
     ports:
@@ -63,7 +66,10 @@ services:
     hostname: om
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
-      OZONE_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
+      OZONE_OM_OPTS: -Dcom.sun.net.ssl.checkRevocation=false
+      OZONE-SITE.XML_ozone.om.snapshot.diff.optimized.enabled: "true"
+      OZONE-SITE.XML_ozone.om.snapshot.force.full.diff: "true"
+      OZONE_OPTS:
     ports:
       - 9874:9874
       - 9862:9862

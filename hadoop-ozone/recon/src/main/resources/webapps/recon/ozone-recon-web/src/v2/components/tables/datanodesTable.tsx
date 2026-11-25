@@ -40,6 +40,7 @@ import { getTimeDiffFromTimestamp } from '@/v2/utils/momentUtils';
 
 import {
   Datanode,
+  DatanodeDiskInfo,
   DatanodeOpState,
   DatanodeOpStateList,
   DatanodeState,
@@ -294,6 +295,41 @@ const DatanodesTable: React.FC<DatanodeTableProps> = ({
     decommissioningUuids = decommissionUuids;
   }, [decommissionUuids])
 
+  function expandedDiskRowRender(record: Datanode) {
+    const diskColumns: ColumnsType<DatanodeDiskInfo> = [
+      { title: 'Disk Location', dataIndex: 'storageLocation', key: 'storageLocation' },
+      {
+        title: 'Open Containers',
+        dataIndex: 'openContainerCount',
+        key: 'openContainerCount',
+        sorter: (a: DatanodeDiskInfo, b: DatanodeDiskInfo) =>
+          (a.openContainerCount ?? Number.MAX_SAFE_INTEGER) -
+          (b.openContainerCount ?? Number.MAX_SAFE_INTEGER),
+        render: (openContainerCount: number | null) => openContainerCount ?? 'N/A'
+      },
+      {
+        title: 'Capacity',
+        key: 'capacity',
+        render: (_: unknown, disk: DatanodeDiskInfo) => (
+          <StorageBar
+            capacity={disk.capacity}
+            used={disk.used}
+            remaining={disk.remaining}
+            committed={disk.committed} />
+        )
+      }
+    ];
+    return (
+      <Table
+        rowKey={(disk: DatanodeDiskInfo) => disk.storageUuid}
+        dataSource={record.disks ?? []}
+        columns={diskColumns}
+        pagination={false}
+        size='small'
+        data-testid={`dn-disks-${record.uuid}`} />
+    );
+  }
+
   return (
     <div>
       <Table
@@ -305,6 +341,11 @@ const DatanodesTable: React.FC<DatanodeTableProps> = ({
         pagination={paginationConfig}
         scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
         locale={{ filterTitle: '' }}
+        expandable={{
+          expandRowByClick: false,
+          rowExpandable: (record: Datanode) => (record.disks?.length ?? 0) > 0,
+          expandedRowRender: expandedDiskRowRender
+        }}
         onRow={(record: Datanode) => ({
           'data-testid': `dntable-${record.uuid}`
         } as HTMLAttributes<HTMLElement>)}

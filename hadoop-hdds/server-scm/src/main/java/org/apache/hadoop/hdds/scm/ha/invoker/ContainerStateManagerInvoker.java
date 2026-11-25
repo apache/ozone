@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.ha.invoker;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -31,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -49,6 +49,10 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
         null,
         new Class<?>[] {HddsProtos.ContainerID.class}
     }),
+    transitionDeletingOrDeletedToClosedState(new Class<?>[][] {
+        null,
+        new Class<?>[] {HddsProtos.ContainerID.class}
+    }),
     transitionDeletingOrDeletedToTargetState(new Class<?>[][] {
         null,
         null,
@@ -57,6 +61,11 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
     updateContainerInfo(new Class<?>[][] {
         null,
         new Class<?>[] {ContainerInfoProto.class}
+    }),
+    updateContainerState(new Class<?>[][] {
+        null,
+        null,
+        new Class<?>[] {HddsProtos.ContainerID.class, LifeCycleEvent.class}
     }),
     updateContainerStateWithSequenceId(new Class<?>[][] {
         null,
@@ -111,17 +120,18 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       }
 
       @Override
-      public List<ContainerID> getContainerIDs(LifeCycleState arg0, ContainerID arg1, int arg2) {
-        return invoker.getImpl().getContainerIDs(arg0, arg1, arg2);
-      }
-
-      @Override
-      public List<ContainerInfo> getContainerInfos(ReplicationType arg0) {
-        return invoker.getImpl().getContainerInfos(arg0);
+      public List<ContainerID> getContainerIDs(LifeCycleState arg0, SimplifiedContainerHealthStateForReporting arg1,
+          ContainerID arg2, int arg3) {
+        return invoker.getImpl().getContainerIDs(arg0, arg1, arg2, arg3);
       }
 
       @Override
       public List<ContainerInfo> getContainerInfos(LifeCycleState arg0) {
+        return invoker.getImpl().getContainerInfos(arg0);
+      }
+
+      @Override
+      public List<ContainerInfo> getContainerInfos(ReplicationType arg0) {
         return invoker.getImpl().getContainerInfos(arg0);
       }
 
@@ -162,6 +172,12 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       }
 
       @Override
+      public void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID arg0) throws IOException {
+        final Object[] args = {arg0};
+        invoker.invokeReplicateDirect(ReplicateMethod.transitionDeletingOrDeletedToClosedState, args);
+      }
+
+      @Override
       public void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID arg0, LifeCycleState arg1) throws
           IOException {
         final Object[] args = {arg0, arg1};
@@ -180,15 +196,17 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       }
 
       @Override
-      public void updateContainerStateWithSequenceId(HddsProtos.ContainerID arg0, LifeCycleEvent arg1, Long arg2) throws
-          IOException, InvalidStateTransitionException {
-        final Object[] args = {arg0, arg1, arg2};
-        invoker.invokeReplicateDirect(ReplicateMethod.updateContainerStateWithSequenceId, args);
+      public void updateContainerState(HddsProtos.ContainerID arg0, LifeCycleEvent arg1) throws IOException,
+          InvalidStateTransitionException {
+        final Object[] args = {arg0, arg1};
+        invoker.invokeReplicateDirect(ReplicateMethod.updateContainerState, args);
       }
 
       @Override
-      public void updateDeleteTransactionId(Map arg0) throws IOException {
-        invoker.getImpl().updateDeleteTransactionId(arg0);
+      public void updateContainerStateWithSequenceId(HddsProtos.ContainerID arg0, LifeCycleEvent arg1, Long arg2) throws
+          IOException {
+        final Object[] args = {arg0, arg1, arg2};
+        invoker.invokeReplicateDirect(ReplicateMethod.updateContainerStateWithSequenceId, args);
       }
     };
   }
@@ -224,99 +242,107 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
 
     case "getContainerIDs":
       final LifeCycleState arg4 = p.length > 0 ? (LifeCycleState) p[0] : null;
-      final ContainerID arg5 = p.length > 1 ? (ContainerID) p[1] : null;
-      final int arg6 = p.length > 2 ? (int) p[2] : 0;
+      final SimplifiedContainerHealthStateForReporting arg5 = p.length > 1 ?
+          (SimplifiedContainerHealthStateForReporting) p[1] : null;
+      final ContainerID arg6 = p.length > 2 ? (ContainerID) p[2] : null;
+      final int arg7 = p.length > 3 ? (int) p[3] : 0;
       returnType = List.class;
-      returnValue = getImpl().getContainerIDs(arg4, arg5, arg6);
+      returnValue = getImpl().getContainerIDs(arg4, arg5, arg6, arg7);
       break;
 
     case "getContainerInfos":
-      if (p.length == 1 && (p[0] == null || ReplicationType.class.isInstance(p[0]))) {
-        final ReplicationType arg7 = (ReplicationType) p[0];
-        returnType = List.class;
-        returnValue = getImpl().getContainerInfos(arg7);
-        break;
-      }
       if (p.length == 1 && (p[0] == null || LifeCycleState.class.isInstance(p[0]))) {
         final LifeCycleState arg8 = (LifeCycleState) p[0];
         returnType = List.class;
         returnValue = getImpl().getContainerInfos(arg8);
         break;
       }
-      if (p.length == 2 && (p[0] == null || ContainerID.class.isInstance(p[0])) && p[1] instanceof Integer) {
-        final ContainerID arg9 = (ContainerID) p[0];
-        final int arg10 = (int) p[1];
+      if (p.length == 1 && (p[0] == null || ReplicationType.class.isInstance(p[0]))) {
+        final ReplicationType arg9 = (ReplicationType) p[0];
         returnType = List.class;
-        returnValue = getImpl().getContainerInfos(arg9, arg10);
+        returnValue = getImpl().getContainerInfos(arg9);
+        break;
+      }
+      if (p.length == 2 && (p[0] == null || ContainerID.class.isInstance(p[0])) && p[1] instanceof Integer) {
+        final ContainerID arg10 = (ContainerID) p[0];
+        final int arg11 = (int) p[1];
+        returnType = List.class;
+        returnValue = getImpl().getContainerInfos(arg10, arg11);
         break;
       }
       if (p.length == 3 && (p[0] == null || LifeCycleState.class.isInstance(p[0])) && (p[1] == null ||
           ContainerID.class.isInstance(p[1])) && p[2] instanceof Integer) {
-        final LifeCycleState arg11 = (LifeCycleState) p[0];
-        final ContainerID arg12 = (ContainerID) p[1];
-        final int arg13 = (int) p[2];
+        final LifeCycleState arg12 = (LifeCycleState) p[0];
+        final ContainerID arg13 = (ContainerID) p[1];
+        final int arg14 = (int) p[2];
         returnType = List.class;
-        returnValue = getImpl().getContainerInfos(arg11, arg12, arg13);
+        returnValue = getImpl().getContainerInfos(arg12, arg13, arg14);
         break;
       }
       throw new IllegalArgumentException("Method not found: " + methodName + " in ContainerStateManager");
 
     case "getContainerReplicas":
-      final ContainerID arg14 = p.length > 0 ? (ContainerID) p[0] : null;
+      final ContainerID arg15 = p.length > 0 ? (ContainerID) p[0] : null;
       returnType = Set.class;
-      returnValue = getImpl().getContainerReplicas(arg14);
+      returnValue = getImpl().getContainerReplicas(arg15);
       break;
 
     case "getMatchingContainer":
-      final long arg15 = p.length > 0 ? (long) p[0] : 0L;
-      final String arg16 = p.length > 1 ? (String) p[1] : null;
-      final PipelineID arg17 = p.length > 2 ? (PipelineID) p[2] : null;
-      final NavigableSet arg18 = p.length > 3 ? (NavigableSet) p[3] : null;
+      final long arg16 = p.length > 0 ? (long) p[0] : 0L;
+      final String arg17 = p.length > 1 ? (String) p[1] : null;
+      final PipelineID arg18 = p.length > 2 ? (PipelineID) p[2] : null;
+      final NavigableSet arg19 = p.length > 3 ? (NavigableSet) p[3] : null;
       returnType = ContainerInfo.class;
-      returnValue = getImpl().getMatchingContainer(arg15, arg16, arg17, arg18);
+      returnValue = getImpl().getMatchingContainer(arg16, arg17, arg18, arg19);
       break;
 
     case "reinitialize":
-      final Table arg19 = p.length > 0 ? (Table) p[0] : null;
-      getImpl().reinitialize(arg19);
+      final Table arg20 = p.length > 0 ? (Table) p[0] : null;
+      getImpl().reinitialize(arg20);
       return Message.EMPTY;
 
     case "removeContainer":
-      final HddsProtos.ContainerID arg20 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
-      getImpl().removeContainer(arg20);
+      final HddsProtos.ContainerID arg21 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
+      getImpl().removeContainer(arg21);
       return Message.EMPTY;
 
     case "removeContainerReplica":
-      final ContainerReplica arg21 = p.length > 0 ? (ContainerReplica) p[0] : null;
-      getImpl().removeContainerReplica(arg21);
+      final ContainerReplica arg22 = p.length > 0 ? (ContainerReplica) p[0] : null;
+      getImpl().removeContainerReplica(arg22);
+      return Message.EMPTY;
+
+    case "transitionDeletingOrDeletedToClosedState":
+      final HddsProtos.ContainerID arg23 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
+      getImpl().transitionDeletingOrDeletedToClosedState(arg23);
       return Message.EMPTY;
 
     case "transitionDeletingOrDeletedToTargetState":
-      final HddsProtos.ContainerID arg22 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
-      final LifeCycleState arg23 = p.length > 1 ? (LifeCycleState) p[1] : null;
-      getImpl().transitionDeletingOrDeletedToTargetState(arg22, arg23);
+      final HddsProtos.ContainerID arg24 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
+      final LifeCycleState arg25 = p.length > 1 ? (LifeCycleState) p[1] : null;
+      getImpl().transitionDeletingOrDeletedToTargetState(arg24, arg25);
       return Message.EMPTY;
 
     case "updateContainerInfo":
-      final ContainerInfoProto arg24 = p.length > 0 ? (ContainerInfoProto) p[0] : null;
-      getImpl().updateContainerInfo(arg24);
+      final ContainerInfoProto arg26 = p.length > 0 ? (ContainerInfoProto) p[0] : null;
+      getImpl().updateContainerInfo(arg26);
       return Message.EMPTY;
 
     case "updateContainerReplica":
-      final ContainerReplica arg25 = p.length > 0 ? (ContainerReplica) p[0] : null;
-      getImpl().updateContainerReplica(arg25);
+      final ContainerReplica arg27 = p.length > 0 ? (ContainerReplica) p[0] : null;
+      getImpl().updateContainerReplica(arg27);
+      return Message.EMPTY;
+
+    case "updateContainerState":
+      final HddsProtos.ContainerID arg28 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
+      final LifeCycleEvent arg29 = p.length > 1 ? (LifeCycleEvent) p[1] : null;
+      getImpl().updateContainerState(arg28, arg29);
       return Message.EMPTY;
 
     case "updateContainerStateWithSequenceId":
-      final HddsProtos.ContainerID arg26 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
-      final LifeCycleEvent arg27 = p.length > 1 ? (LifeCycleEvent) p[1] : null;
-      final Long arg28 = p.length > 2 ? (Long) p[2] : null;
-      getImpl().updateContainerStateWithSequenceId(arg26, arg27, arg28);
-      return Message.EMPTY;
-
-    case "updateDeleteTransactionId":
-      final Map arg29 = p.length > 0 ? (Map) p[0] : null;
-      getImpl().updateDeleteTransactionId(arg29);
+      final HddsProtos.ContainerID arg30 = p.length > 0 ? (HddsProtos.ContainerID) p[0] : null;
+      final LifeCycleEvent arg31 = p.length > 1 ? (LifeCycleEvent) p[1] : null;
+      final Long arg32 = p.length > 2 ? (Long) p[2] : null;
+      getImpl().updateContainerStateWithSequenceId(arg30, arg31, arg32);
       return Message.EMPTY;
 
     default:

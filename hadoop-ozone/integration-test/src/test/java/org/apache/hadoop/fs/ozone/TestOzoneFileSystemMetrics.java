@@ -28,14 +28,14 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -45,7 +45,7 @@ import org.junit.jupiter.api.TestInstance;
  * Test OM Metrics for OzoneFileSystem operations.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneFileSystemMetrics implements NonHATests.TestCase {
+public abstract class TestOzoneFileSystemMetrics implements ClusterForTests.TestCase {
 
   private OzoneClient client;
   private FileSystem fs;
@@ -70,7 +70,7 @@ public abstract class TestOzoneFileSystemMetrics implements NonHATests.TestCase 
     omConfig.setFileSystemPathEnabled(true);
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.LEGACY);
+    bucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.LEGACY);
 
     // Set the fs.defaultFS and start the filesystem
     String uri = String.format("%s://%s.%s/",

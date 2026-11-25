@@ -54,17 +54,19 @@ on:
         required: false
       java-version:
         description: Java version to use
-        default: '21'
+        default: '25'
         required: true
 env:
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  # JAVA_VERSION, MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
+  JAVA_VERSION: 25
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
+  MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   TEST_CLASS: ${{ github.event.inputs.test-class}}
   TEST_METHOD: ${{ github.event.inputs.test-name }}
   ITERATIONS: ${{ github.event.inputs.iterations }}
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
   RATIS_REPO: ${{ github.event.inputs.ratis-repo }}
   RATIS_VERSION: ${{ github.event.inputs.ratis-ref }}
-  JAVA_VERSION: ${{ github.event.inputs.java-version }}
   SPLITS: ${{ github.event.inputs.splits }}
   SUBMODULE: ${{ github.event.inputs.submodule }}
   # Surefire 3.0.0-M4 is used because newer versions do not reliably kill the fork on timeout
@@ -78,7 +80,7 @@ jobs:
     outputs:
       matrix: ${{steps.generate.outputs.matrix}}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           ref: ${{ github.event.inputs.ref }}
@@ -93,7 +95,7 @@ jobs:
           split_matrix="[${x%,}]"
           echo "matrix=$split_matrix" >> $GITHUB_OUTPUT
   ratis:
-    uses: ./.github/workflows/build-ratis.yml
+    uses: $/.github/workflows/build-ratis.yml
     if: ${{ github.event.inputs.ratis-ref != '' }}
     with:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
@@ -107,53 +109,32 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout project
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
           ref: ${{ github.event.inputs.ref }}
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - name: Setup java
+        uses: $/.github/actions/setup-java-with-cache
         with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Download Ratis repo
         if: ${{ github.event.inputs.ratis-ref != '' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@v8
         with:
           name: ratis-jars
           path: |
             ~/.m2/repository/org/apache/ratis
-      - name: Setup java
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
-        with:
-          distribution: 'temurin'
-          java-version: ${{ github.event.inputs.java-version }}
       - name: Build (most) of Ozone
         run: |
           args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true -Drocks_tools_native"
-          if [[ "$RATIS_VERSION" != "" ]]; then
-            args="$args -Dratis.version=$ratis_version"
-            args="$args -Dratis.thirdparty.version=$ratis_thirdparty_version"
-            args="$args -Dratis-thirdparty.grpc.version=$grpc_version"
-            args="$args -Dratis-thirdparty.netty.version=$netty_version"
-            args="$args -Dratis-thirdparty.protobuf.version=$protobuf_version"
-          fi
-
+          args="$args $ratis_args"
           args="$args -am -pl :$SUBMODULE"
 
           hadoop-ozone/dev-support/checks/build.sh $args
         env:
-          ratis_version: ${{ needs.ratis.outputs.ratis-version }}
-          ratis_thirdparty_version: ${{ needs.ratis.outputs.thirdparty-version }}
-          grpc_version: ${{ needs.ratis.outputs.grpc-version }}
-          netty_version: ${{ needs.ratis.outputs.netty-version }}
-          protobuf_version: ${{ needs.ratis.outputs.protobuf-version }}
+          ratis_args: ${{ needs.ratis.outputs.build-args }}
       - name: Store Maven repo for tests
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: ozone-repo
           path: |
@@ -172,39 +153,28 @@ jobs:
         split: ${{fromJson(needs.prepare-job.outputs.matrix)}}  # Define  splits
       fail-fast: ${{ fromJson(github.event.inputs.fail-fast) }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           ref: ${{ github.event.inputs.ref }}
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - name: Setup java
+        uses: $/.github/actions/setup-java-with-cache
         with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Download Ratis repo
         if: ${{ github.event.inputs.ratis-ref != '' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@v8
         with:
           name: ratis-jars
           path: |
             ~/.m2/repository/org/apache/ratis
       - name: Download Ozone repo
         id: download-ozone-repo
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@v8
         with:
           name: ozone-repo
           path: |
             ~/.m2/repository/org/apache/ozone
-        continue-on-error: true
-      - name: Setup java
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
-        with:
-          distribution: 'temurin'
-          java-version: ${{ github.event.inputs.java-version }}
       - name: Execute tests
         run: |
           if [[ -e "$repo_path" ]]; then
@@ -212,14 +182,7 @@ jobs:
           fi
 
           args="-DexcludedGroups=slow|unhealthy -DskipShade -Drocks_tools_native"
-          if [[ "$RATIS_VERSION" != "" ]]; then
-            args="$args -Dratis.version=$ratis_version"
-            args="$args -Dratis.thirdparty.version=$ratis_thirdparty_version"
-            args="$args -Dratis-thirdparty.grpc.version=$grpc_version"
-            args="$args -Dratis-thirdparty.netty.version=$netty_version"
-            args="$args -Dratis-thirdparty.protobuf.version=$protobuf_version"
-          fi
-
+          args="$args $ratis_args"
           args="$args -pl :$SUBMODULE"
 
           if [ "$TEST_METHOD" = "ALL" ]; then
@@ -231,31 +194,27 @@ jobs:
             set -x
             hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS#$TEST_METHOD,Abstract*Test*\$*"
           fi
-        continue-on-error: true
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          CHECK: flaky
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
           repo_path: ${{ steps.download-ozone-repo.outputs.download-path }}
-          ratis_version: ${{ needs.ratis.outputs.ratis-version }}
-          ratis_thirdparty_version: ${{ needs.ratis.outputs.thirdparty-version }}
-          grpc_version: ${{ needs.ratis.outputs.grpc-version }}
-          netty_version: ${{ needs.ratis.outputs.netty-version }}
-          protobuf_version: ${{ needs.ratis.outputs.protobuf-version }}
+          ratis_args: ${{ needs.ratis.outputs.build-args }}
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
-        if: ${{ !cancelled() }}
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/flaky/summary.txt
+        if: ${{ failure() }}
       - name: Archive build results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7
         if: ${{ failure() }}
         with:
           name: result-${{ github.run_number }}-${{ github.run_id }}-split-${{ matrix.split }}
-          path: target/unit
+          path: target/flaky
   count-failures:
     if: ${{ failure() }}
     needs: run-test
     runs-on: ubuntu-slim
     steps:
       - name: Download build results
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@v8
       - name: Count failures
         run: |
           failures=$(find . -name 'summary.txt' | grep --text -v 'iteration' | xargs grep --text -v 'exit code: 0' | wc -l)

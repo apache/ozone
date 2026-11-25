@@ -18,21 +18,33 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests S3 Multipart Upload Complete request.
@@ -87,6 +99,104 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
     OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, omKeyInfoFSO.getObjectID(),
             omMetadataManager);
+  }
+
+  @Override
+  protected void addKeyToTable(String volumeName, String bucketName,
+      String keyName, long clientID, List<OmKeyLocationInfo> locationList)
+      throws Exception {
+    long parentID = getParentID(volumeName, bucketName, keyName);
+    long txnId = 2;
+    long objectId = parentID + 1;
+
+    OmKeyInfo omKeyInfoFSO =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+                RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
+            .setObjectID(objectId)
+            .setParentObjectID(parentID)
+            .setUpdateID(txnId)
+            .build();
+    omKeyInfoFSO.appendNewBlocks(locationList, false);
+
+    // add key to openFileTable
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    omKeyInfoFSO.setKeyName(fileName);
+    OMRequestTestUtils.addFileToKeyTable(true, false,
+            fileName, omKeyInfoFSO, clientID, omKeyInfoFSO.getObjectID(),
+            omMetadataManager);
+  }
+
+  @Override
+  protected void addCommittedKeyToTable(String volumeName, String bucketName,
+      String keyName, List<OmKeyLocationInfo> locationList) throws Exception {
+    long parentID = getParentID(volumeName, bucketName, keyName);
+
+    OmKeyInfo omKeyInfoFSO =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+                RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), false))
+            .setObjectID(parentID + 2)
+            .setParentObjectID(parentID)
+            .setUpdateID(0L)
+            .build();
+    omKeyInfoFSO.appendNewBlocks(locationList, false);
+
+    // add key to fileTable
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    omKeyInfoFSO.setKeyName(fileName);
+    OMRequestTestUtils.addFileToKeyTable(false, false,
+            fileName, omKeyInfoFSO, 0L, 100L, omMetadataManager);
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheFileExistsInParentPath() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    addVolumeAndBucket(volumeName, bucketName);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    OMRequest initiateRequest = doPreExecuteInitiateMPU(volumeName, bucketName, "a/b");
+    String uploadId = getS3InitiateMultipartUploadReq(initiateRequest).validateAndUpdateCache(ozoneManager, 1L)
+        .getOMResponse().getInitiateMultiPartUploadResponse().getMultipartUploadID();
+    String dirKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "a");
+    omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(dirKey), CacheValue.get(2L));
+    OmKeyInfo fileInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "a",
+        RatisReplicationConfig.getInstance(ONE)).setParentObjectID(bucketId).build();
+    OMRequestTestUtils.addFileToKeyTable(false, true, "a", fileInfo, 0L, 2L, omMetadataManager);
+
+    OMRequest request = doPreExecuteCompleteMPU(volumeName, bucketName, "a/b", uploadId, new ArrayList<>());
+    OMClientResponse response = getS3MultipartUploadCompleteReq(request).validateAndUpdateCache(ozoneManager, 3L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.NOT_A_FILE, response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(omMetadataManager.getMultipartKey(volumeId, bucketId, bucketId, "b", uploadId)));
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheParentDirectoryDeleted() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    addVolumeAndBucket(volumeName, bucketName);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    OMRequest initiateRequest = doPreExecuteInitiateMPU(volumeName, bucketName, "a/b");
+    String uploadId = getS3InitiateMultipartUploadReq(initiateRequest).validateAndUpdateCache(ozoneManager, 1L)
+        .getOMResponse().getInitiateMultiPartUploadResponse().getMultipartUploadID();
+    long clientID = Time.now();
+    S3MultipartUploadCommitPartRequest commitRequest = getS3MultipartUploadCommitReq(
+        doPreExecuteCommitMPU(volumeName, bucketName, "a/b", clientID, uploadId, 1));
+    addKeyToTable(volumeName, bucketName, "a/b", clientID);
+    commitRequest.validateAndUpdateCache(ozoneManager, 2L);
+    String eTag = commitRequest.getOmRequest().getCommitMultiPartUploadRequest().getKeyArgs().getMetadataList()
+        .stream().filter(keyValue -> keyValue.getKey().equals(OzoneConsts.ETAG)).findFirst().get().getValue();
+    String dirKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "a");
+    omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(dirKey), CacheValue.get(3L));
+
+    List<Part> parts = Collections.singletonList(Part.newBuilder().setETag(eTag).setPartName(eTag).setPartNumber(1)
+        .build());
+    OMRequest request = doPreExecuteCompleteMPU(volumeName, bucketName, "a/b", uploadId, parts);
+    OMClientResponse response = getS3MultipartUploadCompleteReq(request).validateAndUpdateCache(ozoneManager, 4L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
   }
 
   private long getParentID(String volumeName, String bucketName,

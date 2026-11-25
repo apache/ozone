@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -61,33 +61,27 @@ public class SimplePipelineProvider
     }
 
     Collections.shuffle(dns);
-    return Pipeline.newBuilder()
+    return newPipelineBuilder(replicationConfig, dns.subList(0, replicationConfig.getReplicationFactor().getNumber()))
         .setId(PipelineID.randomId())
-        .setState(PipelineState.OPEN)
-        .setReplicationConfig(replicationConfig)
-        .setNodes(dns.subList(0,
-            replicationConfig.getReplicationFactor().getNumber()))
         .build();
   }
 
   @Override
   public Pipeline create(StandaloneReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes) {
-    return Pipeline.newBuilder()
+    return newPipelineBuilder(replicationConfig, nodes)
         .setId(PipelineID.randomId())
-        .setState(PipelineState.OPEN)
-        .setReplicationConfig(replicationConfig)
-        .setNodes(nodes)
         .build();
   }
 
   @Override
   public Pipeline createForRead(StandaloneReplicationConfig replicationConfig,
       Set<ContainerReplica> replicas) {
-    return create(replicationConfig, replicas
-        .stream()
-        .map(ContainerReplica::getDatanodeDetails)
-        .collect(Collectors.toList()));
+    // Use insecureRandomId for throwaway read pipeline IDs to avoid
+    // contention on the shared SecureRandom instance.
+    return newPipelineBuilder(replicationConfig, ContainerReplica.toDatanodeDetailsList(replicas))
+        .setId(PipelineID.insecureRandomId())
+        .build();
   }
 
   @Override
@@ -95,4 +89,9 @@ public class SimplePipelineProvider
 
   }
 
+  @Override
+  protected Pipeline.Builder newPipelineBuilder(ReplicationConfig replicationConfig, List<DatanodeDetails> nodes) {
+    return super.newPipelineBuilder(replicationConfig, nodes)
+        .setState(PipelineState.OPEN);
+  }
 }

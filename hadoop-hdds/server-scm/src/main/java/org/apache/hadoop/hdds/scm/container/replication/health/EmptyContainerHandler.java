@@ -21,9 +21,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -57,7 +57,7 @@ public class EmptyContainerHandler extends AbstractCheck {
     Set<ContainerReplica> replicas = request.getContainerReplicas();
 
     if (isContainerEmptyAndClosed(containerInfo, replicas)) {
-      request.getReport().incrementAndSample(ContainerHealthState.EMPTY, containerInfo);
+      request.setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting.EMPTY);
       if (!request.isReadOnly()) {
         LOG.debug("Container {} is empty and closed, marking as DELETING",
             containerInfo);
@@ -77,7 +77,7 @@ public class EmptyContainerHandler extends AbstractCheck {
       }
       return true;
     } else if (isContainerEmptyAndQuasiClosed(containerInfo, replicas)) {
-      request.getReport().incrementAndSample(ContainerHealthState.EMPTY, containerInfo);
+      request.setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting.EMPTY);
       if (!request.isReadOnly()) {
         String originIds = replicas.stream()
             .map(r -> r.getOriginDatanodeId().toString())
@@ -115,7 +115,7 @@ public class EmptyContainerHandler extends AbstractCheck {
       // information to delete the container, so we just log it as EMPTY,
       // leaving it as CLOSED and return true, otherwise, it will end up marked
       // as missing in the replication check handlers.
-      request.getReport().incrementAndSample(ContainerHealthState.EMPTY, containerInfo);
+      request.setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting.EMPTY);
       LOG.debug("Container {} appears empty and is closed, but cannot be " +
               "deleted because it has no replicas. Marking as EMPTY.",
           containerInfo);

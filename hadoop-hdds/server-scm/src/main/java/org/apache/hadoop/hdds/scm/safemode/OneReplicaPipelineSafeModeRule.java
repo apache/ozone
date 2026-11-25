@@ -58,6 +58,8 @@ public class OneReplicaPipelineSafeModeRule extends
   private int currentReportedPipelineCount = 0;
   private PipelineManager pipelineManager;
   private final double pipelinePercent;
+  private final RatisReplicationConfig targetReplicationConfig =
+      RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
 
   public OneReplicaPipelineSafeModeRule(EventQueue eventQueue, PipelineManager pipelineManager,
       SCMSafeModeManager safeModeManager, ConfigurationSource configuration) {
@@ -108,8 +110,7 @@ public class OneReplicaPipelineSafeModeRule extends
         continue;
       }
 
-      if (RatisReplicationConfig
-          .hasFactor(pipeline.getReplicationConfig(), ReplicationFactor.THREE)
+      if (targetReplicationConfig.equals(pipeline.getReplicationConfig())
           && pipeline.isOpen() &&
           !reportedPipelineIDSet.contains(pipeline.getId())) {
         if (oldPipelineIDSet.contains(pipeline.getId())) {
@@ -152,8 +153,10 @@ public class OneReplicaPipelineSafeModeRule extends
   @Override
   public String getStatusText() {
     String status = String.format(
-        "reported Ratis/THREE pipelines with at least one datanode (=%d) "
-            + ">= threshold (=%d)", getCurrentReportedPipelineCount(),
+        "reported %s pipelines with at least one datanode (=%d) "
+            + ">= threshold (=%d)",
+        targetReplicationConfig.configFormat(),
+        getCurrentReportedPipelineCount(),
         getThresholdCount());
     status = updateStatusTextWithSamplePipelines(status);
     return status;
@@ -184,11 +187,11 @@ public class OneReplicaPipelineSafeModeRule extends
   }
 
   private void updateReportedPipelineSet() {
-    List<Pipeline> openRatisPipelines =
-        pipelineManager.getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+    List<Pipeline> openTargetPipelines =
+        pipelineManager.getPipelines(targetReplicationConfig,
             Pipeline.PipelineState.OPEN);
 
-    for (Pipeline pipeline : openRatisPipelines) {
+    for (Pipeline pipeline : openTargetPipelines) {
       PipelineID pipelineID = pipeline.getId();
       if (!pipeline.getNodeSet().isEmpty()
           && oldPipelineIDSet.contains(pipelineID)
@@ -202,7 +205,7 @@ public class OneReplicaPipelineSafeModeRule extends
   private void initializeRule(boolean refresh) {
 
     oldPipelineIDSet = pipelineManager.getPipelines(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+        targetReplicationConfig,
         Pipeline.PipelineState.OPEN)
         .stream().map(p -> p.getId()).collect(Collectors.toSet());
 

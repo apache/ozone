@@ -39,15 +39,14 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -63,7 +62,7 @@ public class TestEmptyContainerHandler {
 
   @BeforeEach
   public void setup()
-      throws IOException, InvalidStateTransitionException, TimeoutException {
+      throws IOException, TimeoutException {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
@@ -335,7 +334,7 @@ public class TestEmptyContainerHandler {
     assertEquals(assertion, emptyContainerHandler.handle(request));
     verify(replicationManager, times(times)).sendDeleteCommand(any(ContainerInfo.class), anyInt(),
         any(DatanodeDetails.class), eq(false));
-    assertEquals(numEmptyExpected, request.getReport().getStat(ContainerHealthState.EMPTY));
+    assertEquals(numEmptyExpected, request.getReport().getStat(SimplifiedContainerHealthStateForReporting.EMPTY));
 
     if (times > 0) {
       verify(replicationManager, times(1)).updateContainerState(any(ContainerID.class),

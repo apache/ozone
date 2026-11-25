@@ -83,6 +83,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    */
   private final BufferPool bufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
+  private long modificationTime;
   private final long openID;
   private final ExcludeList excludeList;
   private final ContainerClientMetrics clientMetrics;
@@ -181,38 +182,23 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    * where the blocks of the key have been written.
    * @return the location info list of written blocks.
    */
-  @VisibleForTesting
-  public List<OmKeyLocationInfo> getLocationInfoList() {
-    List<OmKeyLocationInfo> locationInfoList;
-    List<OmKeyLocationInfo> currBlocksLocationInfoList =
-        getOmKeyLocationInfos(streamEntries);
-    locationInfoList = currBlocksLocationInfoList;
-    return locationInfoList;
-  }
-
-  private List<OmKeyLocationInfo> getOmKeyLocationInfos(
-      List<BlockOutputStreamEntry> streams) {
+  List<OmKeyLocationInfo> getLocationInfoList() {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-    for (BlockOutputStreamEntry streamEntry : streams) {
+    for (BlockOutputStreamEntry streamEntry : streamEntries) {
       long length = streamEntry.getCurrentPosition();
       // Commit only those blocks to OzoneManager which are not empty
-      if (length != 0) {
+      if (length > 0) {
         OmKeyLocationInfo info =
             new OmKeyLocationInfo.Builder()
                 .setBlockID(streamEntry.getBlockID())
-                .setLength(streamEntry.getCurrentPosition())
-                .setOffset(0)
+                .setLength(length)
                 .setToken(streamEntry.getToken())
                 .setPipeline(streamEntry.getPipeline())
                 .build();
         locationInfoList.add(info);
       }
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(
-            "block written " + streamEntry.getBlockID() + ", length " + length
-                + " bcsID " + streamEntry.getBlockID()
-                .getBlockCommitSequenceId());
-      }
+      LOG.debug("Block written: {} length: {}; bcsID: {}",
+          streamEntry.getBlockID(), length, streamEntry.getBlockID().getBlockCommitSequenceId());
     }
     return locationInfoList;
   }
@@ -329,8 +315,9 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       if (keyArgs.getIsMultipartKey()) {
         commitUploadPartInfo =
             omClient.commitMultipartUploadPart(buildKeyArgs(), openID);
+        modificationTime = commitUploadPartInfo.getModificationTime();
       } else {
-        omClient.commitKey(buildKeyArgs(), openID);
+        modificationTime = omClient.commitKey(buildKeyArgs(), openID);
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");
@@ -366,7 +353,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     }
   }
 
-  BlockOutputStreamEntry getCurrentStreamEntry() {
+  synchronized BlockOutputStreamEntry getCurrentStreamEntry() {
     if (streamEntries.isEmpty() || streamEntries.size() <= currentStreamIndex) {
       return null;
     } else {
@@ -405,7 +392,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return bufferPool.computeBufferData();
   }
 
-  void cleanup() {
+  synchronized void cleanup() {
     if (excludeList != null) {
       excludeList.clear();
     }
@@ -422,11 +409,15 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return commitUploadPartInfo;
   }
 
+  public long getModificationTime() {
+    return modificationTime;
+  }
+
   public ExcludeList getExcludeList() {
     return excludeList;
   }
 
-  boolean isEmpty() {
+  synchronized boolean isEmpty() {
     return streamEntries.isEmpty();
   }
 

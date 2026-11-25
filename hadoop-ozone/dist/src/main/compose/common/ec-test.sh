@@ -17,8 +17,11 @@
 
 start_docker_env 5
 
-## Exclude virtual-host tests. This is tested separately as it requires additional config.
-execute_robot_test scm -v BUCKET:erasure --exclude virtual-host s3
+# some S3 tests are independent of the bucket type, only need to be run once, in ozonesecure-ha/test-haproxy-s3g.sh
+exclude="--exclude no-bucket-type"
+bucket=erasure
+layout=FILE_SYSTEM_OPTIMIZED
+execute_robot_test scm -v BUCKET:${bucket} -v BUCKET_LAYOUT:${layout} -N s3-${layout}-${bucket} ${exclude} s3
 
 execute_robot_test scm ec/rewrite.robot
 
@@ -31,4 +34,5 @@ execute_robot_test scm -v PREFIX:${prefix} -N read-3-datanodes ec/read.robot
 docker-compose up -d --no-recreate --scale datanode=5
 execute_robot_test scm -v container:1 -v count:5 -N EC-recovery replication/wait.robot
 docker-compose up -d --no-recreate --scale datanode=9
+execute_robot_test scm -v PREFIX:${prefix} -N debug-ec6-3 debug/ozone-debug-tests-ec6-3.robot
 execute_robot_test scm -N S3-EC-Storage ec/awss3ecstorage.robot

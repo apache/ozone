@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
  */
 @Path("/heatmap")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 @InternalOnly(feature = "Heatmap", description = "Heatmap feature has " +
     "dependency on heatmap provider service component implementation.")
 public class AccessHeatMapEndpoint {

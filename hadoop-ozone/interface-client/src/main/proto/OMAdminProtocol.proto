@@ -72,6 +72,10 @@ message DecommissionOMResponse {
 
 message CompactRequest {
     required string columnFamily = 1;
+  // BottommostLevelCompaction option:
+  // 0=kSkip, 1=kIfHaveCompactionFilter, 2=kForce, 3=kForceOptimized.
+  // Defaults to kSkip (0) if not set.
+  optional int32 bottommostLevelCompaction = 2 [default = 0];
 }
 
 message CompactResponse {
@@ -87,6 +91,16 @@ message TriggerSnapshotDefragResponse {
     required bool success = 1;
     optional string errorMsg = 2;
     optional bool result = 3;
+}
+
+// Request from an OM leader to a peer OM to read its local upgrade status.
+// Intentionally OM-local: no SCM round-trip is performed by the server.
+message GetPeerUpgradeStatusRequest {
+}
+
+message GetPeerUpgradeStatusResponse {
+    // Serialized OzoneManagerVersion.SOFTWARE_VERSION of the responding OM binary.
+    optional int32 omSoftwareVersion = 1;
 }
 
 /**
@@ -109,4 +123,8 @@ service OzoneManagerAdminService {
     // RPC request from admin to trigger snapshot defragmentation
     rpc triggerSnapshotDefrag(TriggerSnapshotDefragRequest)
     returns(TriggerSnapshotDefragResponse);
+
+    // RPC request from the OM leader to a peer OM to read its local upgrade status.
+    rpc getPeerUpgradeStatus(GetPeerUpgradeStatusRequest)
+    returns(GetPeerUpgradeStatusResponse);
 }

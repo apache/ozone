@@ -333,44 +333,23 @@ public final class ChunkUtils {
   }
 
   /**
-   * Validates chunk data and returns a file object to Chunk File that we are
-   * expected to write data to.
-   *
-   * @param chunkFile - chunkFile to write data into.
-   * @param info - chunk info.
-   * @return true if the chunkFile exists and chunkOffset &lt; chunkFile length,
-   *         false otherwise.
-   */
-  public static boolean validateChunkForOverwrite(File chunkFile,
-      ChunkInfo info) {
-
-    if (isOverWriteRequested(chunkFile, info)) {
-      if (!isOverWritePermitted(info)) {
-        LOG.warn("Duplicate write chunk request. Chunk overwrite " +
-            "without explicit request. {}", info);
-      }
-      return true;
-    }
-
-    // TODO: when overwriting a chunk, we should ensure that the new chunk
-    //  size is same as the old chunk size
-
-    return false;
-  }
-
-  /**
    * Validates chunk data and returns a boolean value that indicates if the
    * chunk data should be overwritten.
    *
-   * @param chunkFile - FileChannel of the chunkFile to write data into.
+   * @param fileLen - current length of the chunk or block file.
    * @param info - chunk info.
    * @return true if the chunkOffset is less than the chunkFile length,
    *         false otherwise.
    */
-  public static boolean validateChunkForOverwrite(FileChannel chunkFile,
-                                                  ChunkInfo info) {
+  public static boolean validateChunkForOverwrite(long fileLen, ChunkInfo info) {
+    return validateChunkForOverwrite(fileLen, info, info.getOffset());
+  }
 
-    if (isOverWriteRequested(chunkFile, info)) {
+  /**
+   * Checks for an overwrite using the write offset within the file.
+   */
+  public static boolean validateChunkForOverwrite(long fileLen, ChunkInfo info, long fileOffset) {
+    if (fileOffset < fileLen) {
       if (!isOverWritePermitted(info)) {
         LOG.warn("Duplicate write chunk request. Chunk overwrite " +
             "without explicit request. {}", info);
@@ -382,49 +361,6 @@ public final class ChunkUtils {
     //  size is same as the old chunk size
 
     return false;
-  }
-
-  /**
-   * Checks if we are getting a request to overwrite an existing range of
-   * chunk.
-   *
-   * @param chunkFile - File
-   * @param chunkInfo - Buffer to write
-   * @return bool
-   */
-  public static boolean isOverWriteRequested(File chunkFile, ChunkInfo
-      chunkInfo) {
-
-    if (!chunkFile.exists()) {
-      return false;
-    }
-
-    long offset = chunkInfo.getOffset();
-    return offset < chunkFile.length();
-  }
-
-  /**
-   * Checks if a request to overwrite an existing range of a chunk has been
-   * received.
-   *
-   * @param channel - FileChannel of the file to check
-   * @param chunkInfo - Chunk information containing the offset
-   * @return true if the offset is less than the file length, indicating
-   *         a request to overwrite an existing range; false otherwise
-   */
-  public static boolean isOverWriteRequested(FileChannel channel, ChunkInfo
-      chunkInfo) {
-    long fileLen;
-    try {
-      fileLen = channel.size();
-    } catch (IOException e) {
-      String msg = "IO error encountered while getting the file size";
-      LOG.error(msg, e.getMessage());
-      throw new UncheckedIOException("IO error encountered while " +
-          "getting the file size for ", e);
-    }
-    long offset = chunkInfo.getOffset();
-    return offset < fileLen;
   }
 
   /**
@@ -528,18 +464,9 @@ public final class ChunkUtils {
    * Checks if the block file length is equal to the chunk offset.
    *
    */
-  public static void validateChunkSize(FileChannel fileChannel,
-      ChunkInfo chunkInfo, String fileName)
+  public static void validateChunkSize(long fileLen, ChunkInfo chunkInfo, String fileName)
       throws StorageContainerException {
     long offset = chunkInfo.getOffset();
-    long fileLen;
-    try {
-      fileLen = fileChannel.size();
-    } catch (IOException e) {
-      throw new StorageContainerException("IO error encountered while " +
-          "getting the file size for " + fileName + " at offset " + offset,
-          CHUNK_FILE_INCONSISTENCY);
-    }
     if (fileLen != offset) {
       throw new StorageContainerException("Chunk offset " + offset +
           " does not match length " + fileLen + " of blockFile " + fileName,

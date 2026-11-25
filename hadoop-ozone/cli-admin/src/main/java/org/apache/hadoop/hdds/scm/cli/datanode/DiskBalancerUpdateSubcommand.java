@@ -133,7 +133,7 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
                 .map(this::formatDatanodeDisplayName)
                 .collect(toList())));
       } else {
-        System.out.println("Updated DiskBalancer configuration on all IN_SERVICE nodes.");
+        System.out.println("Updated DiskBalancer configuration on all IN_SERVICE and HEALTHY nodes.");
       }
     } else {
       // Detailed message for specific nodes

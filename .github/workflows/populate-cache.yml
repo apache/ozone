@@ -21,63 +21,133 @@ on:
   push:
     branches:
       - master
-      - ozone-1.4
     paths:
-      - 'pom.xml'
+      - '**/pnpm-lock.yaml'
       - '**/pom.xml'
+      - 'dev-support/ci/populate-cache.sh'
+      - '.github/actions/setup-java-with-cache/action.yml'
       - '.github/workflows/populate-cache.yml'
+      - '.mvn/extensions.xml'
+      - '.mvn/wrapper/maven-wrapper.properties'
   workflow_call:
   workflow_dispatch:
 
 permissions: { }
+
+concurrency:
+  group: cache-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  # variables are duplicated from ci.yml, please keep in sync
+  BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
+  JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
+  MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
+  MVNW_VERBOSE: true
+  SKIP_APACHE_VERIFY_DOWNLOAD: false
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout project
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - name: Restore cache for Maven dependencies
-        id: restore-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-
       - name: Setup Java
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        id: restore-cache
+        uses: $/.github/actions/setup-java-with-cache
         with:
-          distribution: 'temurin'
-          java-version: 8
-
-      - name: Get NodeJS version
-        id: nodejs-version
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: echo "nodejs-version=$(mvn help:evaluate -Dexpression=nodejs.version -q -DforceStdout -Dscan=false)" >> $GITHUB_OUTPUT
-
-      - name: Restore NodeJS tarballs
-        id: restore-nodejs
-        if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ~/.m2/repository/com/github/eirslett/node
-          key: nodejs-${{ steps.nodejs-version.outputs.nodejs-version }}
-
-      - name: Download NodeJS
-        if: steps.restore-cache.outputs.cache-hit != 'true' && steps.restore-nodejs.outputs.cache-hit != 'true'
-        run: dev-support/ci/download-nodejs.sh
-        env:
-          NODEJS_VERSION: ${{ steps.nodejs-version.outputs.nodejs-version }}
+          only-exact-hit: true
 
       - name: Fetch dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: mvn --batch-mode --no-transfer-progress --show-version -Pgo-offline -Pdist -Drocks_tools_native clean verify
+        run: |
+          dev-support/ci/populate-cache.sh
+
+      - name: Get versions
+        id: versions
+        run: |
+          source hadoop-ozone/dev-support/checks/_lib.sh
+          HADOOP_VERSION=$(get_version hadoop)
+          echo "HADOOP_VERSION=$HADOOP_VERSION" >> $GITHUB_ENV
+          RANGER_VERSION=$(get_version ranger)
+          echo "RANGER_VERSION=$RANGER_VERSION" >> $GITHUB_ENV
+
+      - name: Restore Hadoop
+        id: restore-hadoop
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
+        with:
+          clean: true
+          path: ~/.cache/ozone
+          key: hadoop-${{ env.HADOOP_VERSION }}
+
+      - name: Get Hadoop
+        if: steps.restore-hadoop.outputs.stash-hit != 'true'
+        run: |
+          rm -fr ~/.cache/ozone
+          source hadoop-ozone/dist/src/main/compose/testlib.sh
+          import_keys https://downloads.apache.org/hadoop/common/KEYS
+          download_hadoop
+
+      - name: Stash Hadoop
+        if: steps.restore-hadoop.outputs.stash-hit != 'true'
+        uses: apache/infrastructure-actions/stash/save@save/v1
+        with:
+          path: ~/.cache/ozone
+          key: hadoop-${{ env.HADOOP_VERSION }}
+          retention-days: 90
+
+      - name: Restore Hadoop AWS dependencies
+        id: restore-hadoop-deps
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
+        with:
+          path: ~/.cache/ozone/maven-repo
+          key: hadoop-${{ env.HADOOP_VERSION }}-deps
+
+      - name: Fetch Hadoop AWS dependencies
+        if: steps.restore-hadoop-deps.outputs.stash-hit != 'true'
+        run: |
+          # create custom local repo dir for Hadoop AWS dependencies
+          mkdir -p ~/.cache/ozone/maven-repo
+          bash hadoop-ozone/dist/src/main/compose/ozone/test-s3a.sh
+        env:
+          BUILD_ONLY: true
+
+      - name: Stash Hadoop AWS dependencies
+        if: steps.restore-hadoop-deps.outputs.stash-hit != 'true'
+        uses: apache/infrastructure-actions/stash/save@save/v1
+        with:
+          path: ~/.cache/ozone/maven-repo
+          key: hadoop-${{ env.HADOOP_VERSION }}-deps
+          retention-days: 90
+
+      - name: Restore Ranger
+        id: restore-ranger
+        uses: apache/infrastructure-actions/stash/restore@restore/v1
+        with:
+          clean: true
+          path: ~/.cache/ozone
+          key: ranger-${{ env.RANGER_VERSION }}
+
+      - name: Get Ranger
+        if: steps.restore-ranger.outputs.stash-hit != 'true'
+        run: |
+          rm -fr ~/.cache/ozone
+          source hadoop-ozone/dist/src/main/compose/testlib.sh
+          import_keys https://downloads.apache.org/ranger/KEYS
+          download_ranger
+          download_ranger_ozone_plugin
+
+      - name: Stash Ranger
+        if: steps.restore-ranger.outputs.stash-hit != 'true'
+        uses: apache/infrastructure-actions/stash/save@save/v1
+        with:
+          path: ~/.cache/ozone
+          key: ranger-${{ env.RANGER_VERSION }}
+          retention-days: 90
 
       - name: Delete Ozone jars from repo
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -85,13 +155,62 @@ jobs:
 
       - name: List repo contents
         if: always()
-        run: find ~/.m2/repository -type f | sort | xargs ls -lh
+        run: find ~/.m2 -type f | sort | xargs ls -lh
 
       - name: Save cache for Maven dependencies
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/save@v6
         with:
           path: |
             ~/.m2/repository/*/*/*
             !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+            ~/.m2/wrapper
+          key: ${{ steps.restore-cache.outputs.cache-key }}
+  npm:
+    needs:
+      - build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Java
+        id: restore-cache
+        uses: $/.github/actions/setup-java-with-cache
+        with:
+          only-exact-hit: true
+
+      - name: Calculate cache key
+        id: cache-key
+        run: |
+          echo "value=${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore NPM dependencies
+        id: restore-pnpm
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.pnpm-store
+          key: ${{ steps.cache-key.outputs.value }}
+          lookup-only: true
+
+      - name: Fetch NPM dependencies
+        if: steps.restore-pnpm.outputs.cache-hit != 'true'
+        run: |
+          export MAVEN_ARGS="$MAVEN_ARGS --offline"
+          ./mvnw -pl :ozone-recon com.github.eirslett:frontend-maven-plugin:install-node-and-pnpm
+          run_pnpm() {
+            ./mvnw -pl :ozone-recon com.github.eirslett:frontend-maven-plugin:pnpm -Dfrontend.pnpm.arguments="$1"
+          }
+          run_pnpm "config set store-dir ~/.pnpm-store"
+          run_pnpm fetch
+
+      - name: Save NPM dependencies
+        if: steps.restore-pnpm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/.pnpm-store
+          key: ${{ steps.cache-key.outputs.value }}

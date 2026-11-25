@@ -44,12 +44,12 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions() {
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(double deletionRatio) {
       // Write Buffer Size -- set to 128 MB
       final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
 
       ManagedColumnFamilyOptions managedColumnFamilyOptions =
-          new ManagedColumnFamilyOptions();
+          ManagedColumnFamilyOptions.withDeletionRatio(deletionRatio);
 
       managedColumnFamilyOptions.setLevelCompactionDynamicLevelBytes(true)
           .setWriteBufferSize(writeBufferSize)
@@ -87,6 +87,7 @@ public enum DBProfile {
       ManagedBlockBasedTableConfig config = new ManagedBlockBasedTableConfig();
       config.setBlockCache(new ManagedLRUCache(blockCacheSize))
           .setBlockSize(blockSize)
+          .setFormatVersion(ManagedBlockBasedTableConfig.FORMAT_VERSION)
           .setPinL0FilterAndIndexBlocksInCache(true)
           .setFilterPolicy(new ManagedBloomFilter());
       return config;
@@ -108,8 +109,8 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions() {
-      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions();
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(double deletionRatio) {
+      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions(deletionRatio);
       cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
       return cfOptions;
     }
@@ -132,8 +133,8 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions() {
-      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions();
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(double deletionRatio) {
+      ManagedColumnFamilyOptions cfOptions = SSD.getColumnFamilyOptions(deletionRatio);
       cfOptions.setCompactionStyle(CompactionStyle.LEVEL);
       cfOptions.setDisableAutoCompactions(true);
       return cfOptions;
@@ -152,7 +153,11 @@ public enum DBProfile {
 
   public abstract ManagedDBOptions getDBOptions();
 
-  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions();
+  public ManagedColumnFamilyOptions getColumnFamilyOptions() {
+    return getColumnFamilyOptions(0);
+  }
+
+  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions(double deletionRatio);
 
   public abstract ManagedBlockBasedTableConfig getBlockBasedTableConfig();
 }

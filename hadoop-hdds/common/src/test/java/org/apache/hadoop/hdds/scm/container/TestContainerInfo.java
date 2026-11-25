@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -110,7 +110,7 @@ public class TestContainerInfo {
 
   @Test
   void restoreState() {
-    TestClock clock = TestClock.newInstance();
+    MockClock clock = MockClock.newInstance();
     ContainerInfo subject = newBuilderForTest()
         .setClock(clock)
         .build();

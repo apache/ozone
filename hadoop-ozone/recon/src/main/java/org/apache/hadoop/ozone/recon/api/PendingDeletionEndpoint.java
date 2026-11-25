@@ -25,8 +25,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,18 +38,17 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/pendingDeletion")
 @Produces("application/json")
-@AdminOnly
 public class PendingDeletionEndpoint {
   private static final Logger LOG = LoggerFactory.getLogger(PendingDeletionEndpoint.class);
   private final ReconGlobalMetricsService reconGlobalMetricsService;
   private final DataNodeMetricsService dataNodeMetricsService;
-  private final StorageContainerLocationProtocol scmClient;
+  private final StorageContainerLocationInternalInterface scmClient;
 
   @Inject
   public PendingDeletionEndpoint(
       ReconGlobalMetricsService reconGlobalMetricsService,
       DataNodeMetricsService dataNodeMetricsService,
-      StorageContainerLocationProtocol scmClient) {
+      StorageContainerLocationInternalInterface scmClient) {
     this.reconGlobalMetricsService = reconGlobalMetricsService;
     this.dataNodeMetricsService = dataNodeMetricsService;
     this.scmClient = scmClient;
@@ -87,12 +86,12 @@ public class PendingDeletionEndpoint {
           .entity("Limit query parameter must be at-least 1").build();
     }
 
-    DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics(limit);
-    if (response.getStatus() == DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
-      return Response.ok(response).build();
-    } else {
-      return Response.accepted(response).build();
+    Object response = dataNodeMetricsService.getCollectedMetrics(limit);
+    if (response instanceof DataNodeMetricsCompleteResponse) {
+      DataNodeMetricsCompleteResponse completeResponse = (DataNodeMetricsCompleteResponse) response;
+      return Response.ok(completeResponse).build();
     }
+    return Response.accepted(response).build();
   }
 
   private Response handleScmPendingDeletion() {

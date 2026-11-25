@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.client.rpc;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.container.TestHelper.createKey;
-import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.createKey;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.waitForContainerClose;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -44,7 +44,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -54,7 +54,7 @@ import org.junit.jupiter.api.TestInstance;
  * Tests that unused block pre-allocated for write is discarded when container is closed.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestDiscardPreallocatedBlocks implements NonHATests.TestCase {
+public abstract class TestDiscardPreallocatedBlocks implements ClusterForTests.TestCase {
   private MiniOzoneCluster cluster;
   private OzoneClient client;
   private ObjectStore objectStore;

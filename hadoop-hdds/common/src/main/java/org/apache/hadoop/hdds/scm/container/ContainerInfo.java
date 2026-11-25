@@ -77,17 +77,16 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // field and hence maintain the original output.
   @JsonIgnore
   private final ContainerID containerID;
-  // Delete Transaction Id is updated when new transaction for a container
-  // is stored in SCM delete Table.
-  // TODO: Replication Manager should consider deleteTransactionId so that
-  // replica with higher deleteTransactionId is preferred over replica with
-  // lower deleteTransactionId.
+  // Deprecated SCM-side delete transaction ID retained for old persisted data, SCM no longer updates this field.
+  @Deprecated
   private long deleteTransactionId;
   // The sequenceId of a close container cannot change, and all the
   // container replica should have the same sequenceId.
   private long sequenceId;
-  // Health state of the container (determined by ReplicationManager)
-  private ContainerHealthState healthState;
+  // Summary label from the last ReplicationManager check; not a lifecycle state and not persisted.
+  // The JSON name is kept as "healthState" so the container list and info CLI output does not change.
+  @JsonProperty("healthState")
+  private SimplifiedContainerHealthStateForReporting simplifiedHealthStateForReporting;
   private boolean suppressed;
 
   private ContainerInfo(Builder b) {
@@ -103,7 +102,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     sequenceId = b.sequenceId;
     replicationConfig = b.replicationConfig;
     clock = b.clock;
-    healthState = b.healthState != null ? b.healthState : ContainerHealthState.HEALTHY;
+    simplifiedHealthStateForReporting = b.simplifiedHealthStateForReporting != null
+        ? b.simplifiedHealthStateForReporting : SimplifiedContainerHealthStateForReporting.HEALTHY;
     suppressed = b.suppressed;
   }
 
@@ -218,16 +218,19 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     numberOfKeys = value;
   }
 
+  /**
+   * Legacy SCM-side delete transaction ID. SCM no longer updates this field.
+   *
+   * @deprecated SCM no longer updates this field. Use DN-side container data
+   *             for delete transaction tracking.
+   */
+  @Deprecated
   public long getDeleteTransactionId() {
     return deleteTransactionId;
   }
 
   public long getSequenceId() {
     return sequenceId;
-  }
-
-  public void updateDeleteTransactionId(long transactionId) {
-    deleteTransactionId = max(transactionId, deleteTransactionId);
   }
 
   public void updateSequenceId(long sequenceID) {
@@ -253,21 +256,22 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   }
 
   /**
-   * Get the health state of the container.
+   * Get the label set by the last ReplicationManager check of this container. This is not the
+   * container lifecycle state; see {@link #getState()}. It is kept only in SCM memory.
    *
-   * @return ContainerHealthState
+   * @return SimplifiedContainerHealthStateForReporting
    */
-  public ContainerHealthState getHealthState() {
-    return healthState;
+  public SimplifiedContainerHealthStateForReporting getSimplifiedHealthStateForReporting() {
+    return simplifiedHealthStateForReporting;
   }
 
   /**
-   * Set the health state of the container.
+   * Set the label from a ReplicationManager check of this container.
    *
    * @param newHealthState The new health state
    */
-  public void setHealthState(ContainerHealthState newHealthState) {
-    this.healthState = newHealthState;
+  public void setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting newHealthState) {
+    this.simplifiedHealthStateForReporting = newHealthState;
   }
 
   /**
@@ -420,7 +424,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     private long sequenceId;
     private PipelineID pipelineID;
     private ReplicationConfig replicationConfig;
-    private ContainerHealthState healthState;
+    private SimplifiedContainerHealthStateForReporting simplifiedHealthStateForReporting;
     private boolean suppressed;
 
     public Builder setPipelineID(PipelineID pipelineId) {
@@ -464,6 +468,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       return this;
     }
 
+    @Deprecated
     public Builder setDeleteTransactionId(long deleteTransactionID) {
       this.deleteTransactionId = deleteTransactionID;
       return this;
@@ -474,8 +479,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       return this;
     }
 
-    public Builder setHealthState(ContainerHealthState healthState) {
-      this.healthState = healthState;
+    public Builder setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting healthState) {
+      this.simplifiedHealthStateForReporting = healthState;
       return this;
     }
 

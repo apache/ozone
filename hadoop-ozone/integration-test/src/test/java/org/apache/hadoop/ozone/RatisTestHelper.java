@@ -21,10 +21,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.ratis.client.RaftClient;
@@ -50,6 +52,20 @@ public interface RatisTestHelper {
             rpc.name());
   }
 
+  /**
+   * Returns a copy of {@code conf} with a short Ratis client write request timeout, for clients in tests
+   * where retrying the write cannot succeed. The timeout stays above the Ratis client RPC request timeout,
+   * so the first attempt can complete.
+   */
+  static OzoneConfiguration withShortWriteRequestTimeout(OzoneConfiguration conf) {
+    OzoneConfiguration copy = new OzoneConfiguration(conf);
+    Duration rpcTimeout = copy.getObject(RatisClientConfig.RaftConfig.class).getRpcRequestTimeout();
+    RatisClientConfig ratisClientConfig = copy.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeout(rpcTimeout.plusSeconds(1));
+    copy.setFromObject(ratisClientConfig);
+    return copy;
+  }
+
   static void initXceiverServerRatis(
       RpcType rpc, DatanodeDetails dd, Pipeline pipeline) throws IOException {
     final RaftPeer p = RatisHelper.toRaftPeer(dd);
@@ -65,7 +81,7 @@ public interface RatisTestHelper {
       HddsDatanodeService dn, Pipeline pipeline) throws Exception {
     if (!pipeline.getNodes().contains(dn.getDatanodeDetails())) {
       throw new IllegalArgumentException("Pipeline:" + pipeline.getId() +
-          " not exist in datanode:" + dn.getDatanodeDetails().getUuid());
+          " not exist in datanode:" + dn.getDatanodeDetails().getID());
     }
 
     XceiverServerRatis server =

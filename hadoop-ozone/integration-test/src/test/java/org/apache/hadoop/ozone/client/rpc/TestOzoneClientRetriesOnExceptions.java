@@ -47,7 +47,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -92,11 +92,8 @@ public class TestOzoneClientRetriesOnExceptions {
     conf.setFromObject(clientConfig);
 
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 3);
-    conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
+    OzoneTestUtils.setFastPipelineScrub(conf);
     conf.set("hdds.scm.pipeline.choose.policy.impl", RoundRobinPipelineChoosePolicy.class.getName());
-    conf.setQuietMode(false);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
@@ -109,7 +106,6 @@ public class TestOzoneClientRetriesOnExceptions {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
@@ -163,7 +159,7 @@ public class TestOzoneClientRetriesOnExceptions {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
-    TestHelper.waitForPipelineClose(key, cluster, false);
+    OzoneTestHelper.waitForPipelineClose(key, cluster, false);
     key.flush();
     assertInstanceOf(GroupMismatchException.class,
         HddsClientUtils.checkForException(blockOutputStream.getIoException()));
@@ -202,7 +198,7 @@ public class TestOzoneClientRetriesOnExceptions {
                 .getPipeline(container.getPipelineID());
         XceiverClientSpi xceiverClient =
             xceiverClientManager.acquireClient(pipeline);
-        assertThat(containerList.contains(containerID));
+        Assumptions.assumeFalse(containerList.contains(containerID));
         containerList.add(containerID);
         xceiverClient.sendCommand(ContainerTestHelper
             .getCreateContainerRequest(containerID, pipeline));
@@ -211,7 +207,7 @@ public class TestOzoneClientRetriesOnExceptions {
       key.write(data1);
       OutputStream stream = entries.get(0).getOutputStream();
       BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
-      TestHelper.waitForContainerClose(key, cluster);
+      OzoneTestHelper.waitForContainerClose(key, cluster);
       // Ensure that blocks for the key have been allocated to at least N+1
       // containers so that write request will be tried on N+1 different blocks
       // of N+1 different containers and it will finally fail as it will hit
@@ -237,13 +233,13 @@ public class TestOzoneClientRetriesOnExceptions {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
                                       long size) throws Exception {
-    return TestHelper
+    return OzoneTestHelper
         .createKey(keyName, type, ReplicationFactor.ONE,
             size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    TestHelper
+    OzoneTestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -34,6 +35,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeFailureCountProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import picocli.CommandLine;
@@ -56,54 +59,107 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    if (verboseWithHistory && !isVerbose()) {
+      System.err.println("Warning: -H/--history has no effect without -v/--verbose.");
+    }
     ContainerBalancerStatusInfoResponseProto response = scmClient.getContainerBalancerStatusInfo();
     boolean isRunning = response.getIsRunning();
     ContainerBalancerStatusInfoProto balancerStatusInfo = response.getContainerBalancerStatusInfo();
     if (isRunning) {
-      Instant startedAtInstant = Instant.ofEpochSecond(balancerStatusInfo.getStartedAt());
-      LocalDateTime dateTime =
-          LocalDateTime.ofInstant(startedAtInstant, ZoneId.systemDefault());
       System.out.println("ContainerBalancer is Running.");
-
-      if (isVerbose()) {
-        System.out.printf("Started at: %s %s%n",
-            dateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
-            dateTime.toLocalTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
-        Duration balancingDuration = Duration.between(startedAtInstant, OffsetDateTime.now());
-        System.out.printf("Balancing duration: %s%n%n", getPrettyDuration(balancingDuration));
-        System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
-        List<ContainerBalancerTaskIterationStatusInfoProto> iterationsStatusInfoList
-            = balancerStatusInfo.getIterationsStatusInfoList();
-
-        System.out.println("Current iteration info:");
-        ContainerBalancerTaskIterationStatusInfoProto currentIterationStatistic = iterationsStatusInfoList.stream()
-            .filter(it -> it.getIterationResult().isEmpty())
-            .findFirst()
-            .orElse(null);
-        if (currentIterationStatistic == null) {
-          System.out.println("-");
-          System.out.println();
-        } else {
-          System.out.println(
-              getPrettyIterationStatusInfo(currentIterationStatistic)
-          );
-        }
-
-
-        if (verboseWithHistory) {
-          System.out.println("Iteration history list:");
-          System.out.println(
-              iterationsStatusInfoList
-                  .stream()
-                  .filter(it -> !it.getIterationResult().isEmpty())
-                  .map(this::getPrettyIterationStatusInfo)
-                  .collect(Collectors.joining(System.lineSeparator()))
-          );
-        }
-      }
-
+    } else if (response.hasContainerBalancerStatusInfo()) {
+      System.out.println("ContainerBalancer is Not Running.");
+      printStopReasonAndMessage(balancerStatusInfo);
     } else {
       System.out.println("ContainerBalancer is Not Running.");
+    }
+
+    if (isVerbose() && response.hasContainerBalancerStatusInfo()) {
+      printVerboseStatusInfo(balancerStatusInfo, isRunning);
+    }
+  }
+
+  private void printVerboseStatusInfo(ContainerBalancerStatusInfoProto balancerStatusInfo, boolean isRunning) {
+    Instant startedAtInstant = Instant.ofEpochSecond(balancerStatusInfo.getStartedAt());
+    LocalDateTime startedAtDateTime =
+        LocalDateTime.ofInstant(startedAtInstant, ZoneId.systemDefault());
+    System.out.printf("Started at: %s %s%n",
+        startedAtDateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
+        startedAtDateTime.toLocalTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
+
+    Instant endInstant = balancerStatusInfo.hasStoppedAt()
+        ? Instant.ofEpochSecond(balancerStatusInfo.getStoppedAt())
+        : OffsetDateTime.now().toInstant();
+    if (balancerStatusInfo.hasStoppedAt()) {
+      LocalDateTime stoppedAtDateTime =
+          LocalDateTime.ofInstant(endInstant, ZoneId.systemDefault());
+      System.out.printf("Stopped at: %s %s%n",
+          stoppedAtDateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
+          stoppedAtDateTime.toLocalTime().format(DateTimeFormatter.ISO_LOCAL_TIME));
+    }
+    Duration balancingDuration = Duration.between(startedAtInstant, endInstant);
+    System.out.printf("Balancing duration: %s%n%n", getPrettyDuration(balancingDuration));
+    System.out.println(getConfigurationPrettyString(balancerStatusInfo.getConfiguration()));
+    List<ContainerBalancerTaskIterationStatusInfoProto> iterationsStatusInfoList = 
+        balancerStatusInfo.getIterationsStatusInfoList();
+
+    ContainerBalancerTaskIterationStatusInfoProto lastIterationStatistic = null;
+    if (isRunning) {
+      System.out.println("Current iteration info:");
+      ContainerBalancerTaskIterationStatusInfoProto currentIterationStatistic = iterationsStatusInfoList.stream()
+          .filter(it -> it.getIterationResult().isEmpty())
+          .findFirst()
+          .orElse(null);
+      if (currentIterationStatistic == null) {
+        System.out.println("-");
+        System.out.println();
+      } else {
+        System.out.println(
+            getPrettyIterationStatusInfo(currentIterationStatistic)
+        );
+      }
+    } else {
+      System.out.println("Last iteration info:");
+      lastIterationStatistic = iterationsStatusInfoList.stream()
+          .filter(it -> !it.getIterationResult().isEmpty())
+          .reduce((first, second) -> second)
+          .orElse(null);
+      if (lastIterationStatistic == null) {
+        System.out.println("-");
+        System.out.println();
+      } else {
+        System.out.println(
+            getPrettyIterationStatusInfo(lastIterationStatistic)
+        );
+      }
+    }
+
+    if (verboseWithHistory) {
+      System.out.println("Completed iteration history:");
+      final int lastCompletedIterationNumber = lastIterationStatistic == null
+          ? -1
+          : lastIterationStatistic.getIterationNumber();
+      String history = iterationsStatusInfoList
+          .stream()
+          .filter(it -> !it.getIterationResult().isEmpty())
+          .filter(it -> isRunning || it.getIterationNumber() != lastCompletedIterationNumber)
+          .map(this::getPrettyIterationStatusInfo)
+          .collect(Collectors.joining(System.lineSeparator()));
+      if (history.isEmpty()) {
+        System.out.println("-");
+      } else {
+        System.out.println(history);
+      }
+      System.out.println();
+    }
+  }
+
+  private void printStopReasonAndMessage(ContainerBalancerStatusInfoProto balancerStatusInfo) {
+    if (balancerStatusInfo.hasStopReason()) {
+      System.out.printf("Stop reason: %s%n", balancerStatusInfo.getStopReason());
+    }
+    if (balancerStatusInfo.hasStopMessage()) {
+      System.out.printf("Message: %s%n", balancerStatusInfo.getStopMessage());
     }
   }
 
@@ -179,6 +235,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     if (leavingDataNodeList.isEmpty()) {
       leavingDataNodeList = " -" + System.lineSeparator();
     }
+    String failures = formatFailures(containerMovesFailed, iterationStatusInfo.getContainerMoveFailuresList());
     return String.format(
             "%-50s %s%n" +
                     "%-50s %s%n" +
@@ -190,6 +247,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
+                    "%s" +
                     "%-50s %n%s" +
                     "%-50s %n%s",
             "Key", "Value",
@@ -203,8 +261,46 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             "Already moved containers", containerMovesCompleted,
             "Failed to move containers", containerMovesFailed,
             "Failed to move containers by timeout", containerMovesTimeout,
+            failures,
             "Entered data to nodes", enteringDataNodeList,
             "Exited data from nodes", leavingDataNodeList);
+  }
+
+  private String formatFailures(long containerMovesFailed, List<ContainerMoveFailureDetailProto> failures) {
+    if (containerMovesFailed > 0 && failures.isEmpty()) {
+      return String.format("%-50s %s%n", "Failed container moves", "(no breakdown available)");
+    }
+    if (failures.isEmpty()) {
+      return "";
+    }
+    List<ContainerMoveFailureDetailProto> sorted = failures.stream()
+        .sorted(Comparator.comparingLong(ContainerMoveFailureDetailProto::getCount).reversed()
+            .thenComparing(ContainerMoveFailureDetailProto::getReason))
+        .collect(Collectors.toList());
+    StringBuilder builder = new StringBuilder();
+    builder.append(String.format("%-50s %n", "Failed container moves"));
+    for (ContainerMoveFailureDetailProto failure : sorted) {
+      builder.append(String.format("  %-48s %d%n", failure.getReason(), failure.getCount()));
+      if (!failure.getSourceFailureCountsList().isEmpty()) {
+        builder.append(String.format("    %-46s %n", "Source datanodes"));
+        for (NodeFailureCountProto src : failure.getSourceFailureCountsList()) {
+          builder.append(String.format("      %-44s %d%n", formatDatanodeLabel(src), src.getCount()));
+        }
+      }
+      if (!failure.getTargetFailureCountsList().isEmpty()) {
+        builder.append(String.format("    %-46s %n", "Target datanodes"));
+        for (NodeFailureCountProto tgt : failure.getTargetFailureCountsList()) {
+          builder.append(String.format("      %-44s %d%n", formatDatanodeLabel(tgt), tgt.getCount()));
+        }
+      }
+    }
+    return builder.toString();
+  }
+
+  private static String formatDatanodeLabel(NodeFailureCountProto node) {
+    return node.hasHostname()
+        ? node.getHostname() + " (" + node.getDatanodeUuid() + ")"
+        : node.getDatanodeUuid();
   }
 
 }

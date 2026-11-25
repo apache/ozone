@@ -178,7 +178,9 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
       }
 
       omClientResponse = new OMSnapshotSetPropertyResponse(omResponse.build(), snapshotInfoMap.values());
-      LOG.info("Successfully executed snapshotSetPropertyRequest: {{}}.", setSnapshotPropertyRequests);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Successfully executed snapshotSetPropertyRequest: {{}}.", setSnapshotPropertyRequests);
+      }
     } catch (UncheckedIOException | IOException ex) {
       omClientResponse = new OMSnapshotSetPropertyResponse(
           createErrorOMResponse(omResponse, ex));

@@ -14,12 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apiVersion: 1
+
 datasources:
-- name: 'Prometheus'
-  type: 'prometheus'
-  access: 'proxy'
-  org_id: 1
-  url: 'http://prometheus:9090'
-  is_default: true
-  version: 1
-  editable: true
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    orgId: 1
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true

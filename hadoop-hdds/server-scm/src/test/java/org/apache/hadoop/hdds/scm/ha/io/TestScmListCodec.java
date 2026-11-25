@@ -17,10 +17,14 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -48,5 +52,70 @@ public class TestScmListCodec {
         () -> codec.deserialize(listArg.toByteString()));
 
     assertTrue(ex.getMessage().contains("Missing ListArgument.type"));
+  }
+
+  /**
+   * An empty list serialized with the Object.class sentinel must round-trip
+   * cleanly without triggering "Failed to resolve java.lang.Object".
+   */
+  @Test
+  public void testEmptyListRoundTrip() throws Exception {
+    ScmListCodec codec = new ScmListCodec(
+        new ScmCodecFactory.ClassResolver(Collections.emptyList()));
+
+    List<?> result = (List<?>) codec.deserialize(codec.serialize(new ArrayList<>()));
+
+    assertEquals(0, result.size());
+  }
+
+  /**
+   * The EMPTY_LIST sentinel (type=java.lang.Object, no values) stored in an
+   * existing Ratis log must deserialize successfully.
+   */
+  @Test
+  public void testEmptyListSentinelDeserialization() throws Exception {
+    SCMRatisProtocol.ListArgument sentinel =
+        SCMRatisProtocol.ListArgument.newBuilder()
+            .setType(Object.class.getName())
+            // no values
+            .build();
+
+    ScmListCodec codec = new ScmListCodec(
+        new ScmCodecFactory.ClassResolver(Collections.emptyList()));
+
+    List<?> result = (List<?>) codec.deserialize(sentinel.toByteString());
+
+    assertEquals(0, result.size());
+  }
+
+  /**
+   * Deserialized empty lists must be concrete {@link ArrayList} instances.
+   * Generated invokers (e.g. DeletedBlockLogStateManagerInvoker) cast the
+   * decoded argument directly to {@code ArrayList}; returning an unmodifiable
+   * or fixed-size list would cause a ClassCastException during Ratis log
+   * replay even though the list is logically empty.
+   */
+  @Test
+  public void testEmptyListDeserializedAsArrayList() throws Exception {
+    ScmListCodec codec = new ScmListCodec(
+        new ScmCodecFactory.ClassResolver(Collections.emptyList()));
+
+    // Round-trip path: serialize an empty list then deserialize it.
+    Object roundTrip = codec.deserialize(codec.serialize(new ArrayList<>()));
+    assertInstanceOf(ArrayList.class, roundTrip,
+        "round-trip empty list must be an ArrayList, not " + roundTrip.getClass());
+
+    // Sentinel path: the exact bytes that older logs contain.
+    SCMRatisProtocol.ListArgument sentinel =
+        SCMRatisProtocol.ListArgument.newBuilder()
+            .setType(Object.class.getName())
+            .build();
+    Object fromSentinel = codec.deserialize(sentinel.toByteString());
+    assertInstanceOf(ArrayList.class, fromSentinel,
+        "sentinel empty list must be an ArrayList, not " + fromSentinel.getClass());
+
+    // Verify the cast that invokers actually perform does not throw.
+    ArrayList<?> cast = (ArrayList<?>) roundTrip;
+    assertEquals(0, cast.size());
   }
 }

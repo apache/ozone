@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, { HTMLAttributes } from 'react';
 import filesize from 'filesize';
 
 import { Button, Popover, Select, Space, Table } from 'antd';
@@ -192,14 +192,23 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
   hasPrevPage,
   pageSize,
   onPageSizeChange,
+  sinceColumnTitle = 'Unhealthy Since',
 }) => {
 
 
   function filterSelectedColumns() {
     const columnKeys = selectedColumns.map((column) => column.value);
-    return COLUMNS.filter(
+    const filteredColumns = COLUMNS.filter(
       (column) => columnKeys.indexOf(column.key as string) >= 0
     );
+    
+    // Override the title for the unhealthySince column if needed
+    return filteredColumns.map(col => {
+      if (col.key === 'unhealthySince') {
+        return { ...col, title: sinceColumnTitle };
+      }
+      return col;
+    });
   }
 
   async function loadRowData(containerID: number) {
@@ -276,6 +285,9 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
         pagination={false}
         scroll={{ x: 'max-content', scrollToFirstRowOnChange: true }}
         locale={{ filterTitle: '' }}
+        onRow={(record: Container) => ({
+          'data-testid': `containerstable-${record.containerID}`,
+        } as HTMLAttributes<HTMLElement>)}
         expandable={{
           expandRowByClick: true,
           expandedRowRender: expandedRowRender,

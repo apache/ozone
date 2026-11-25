@@ -44,6 +44,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -61,6 +62,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.recon.ReconResponseUtils;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
@@ -91,12 +93,14 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/keys")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class OMDBInsightEndpoint {
 
   private final ReconOMMetadataManager omMetadataManager;
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDBInsightEndpoint.class);
+  /** Excludes multipart open keys, which are reported by {@code /keys/open/mpu/summary} instead. */
+  private static final Predicate<OmKeyInfo> NOT_MULTIPART_OPEN_KEY =
+      keyInfo -> !OMMultipartUploadUtils.isMultipartKeySet(keyInfo);
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
@@ -202,7 +206,7 @@ public class OMDBInsightEndpoint {
       if (includeNonFso) {
         // Search for non-FSO keys in KeyTable
         Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BucketLayout.LEGACY);
-        obsKeys = ReconUtils.extractKeysFromTable(openKeyTable, startPrefix, limit, prevKey);
+        obsKeys = ReconUtils.extractKeysFromTable(openKeyTable, startPrefix, limit, prevKey, NOT_MULTIPART_OPEN_KEY);
         for (Map.Entry<String, OmKeyInfo> entry : obsKeys.entrySet()) {
           keysFound = true;
           skipPrevKeyDone = true; // Don't use the prevKey for the file table
@@ -287,7 +291,8 @@ public class OMDBInsightEndpoint {
       // Iterate over the subpaths and retrieve the open files
       for (String subPath : subPaths) {
         matchedKeys.putAll(
-            ReconUtils.extractKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey));
+            ReconUtils.extractKeysFromTable(openFileTable, subPath, limit - matchedKeys.size(), prevKey,
+                NOT_MULTIPART_OPEN_KEY));
         if (matchedKeys.size() >= limit) {
           break;
         }
@@ -297,7 +302,7 @@ public class OMDBInsightEndpoint {
 
     // If the search level is at the volume, bucket or key level, directly search the openFileTable
     matchedKeys.putAll(
-        ReconUtils.extractKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey));
+        ReconUtils.extractKeysFromTable(openFileTable, startPrefixObjectPath, limit, prevKey, NOT_MULTIPART_OPEN_KEY));
     return matchedKeys;
   }
 
@@ -598,6 +603,38 @@ public class OMDBInsightEndpoint {
     // Create a keys summary for deleted directories
     createSummaryForDeletedDirectories(dirSummary);
     return Response.ok(dirSummary).build();
+  }
+
+  /**
+   * Retrieves data pending deletion grouped by bucket, largest first.
+   * Keys are taken from the deletedTable and directories from the deletedDirTable; directory sizes come from
+   * NSSummary. All sizes are replicated bytes.
+   *
+   * Example response:
+   *   [
+   *     {
+   *       "volumeName": "vol1",
+   *       "bucketName": "bucket1",
+   *       "pendingDeletionKeys": 10,
+   *       "pendingDeletionKeyBytes": 31457280,
+   *       "pendingDeletionDirs": 2,
+   *       "pendingDeletionDirBytes": 3145728,
+   *       "totalPendingDeletionBytes": 34603008
+   *     }
+   *   ]
+   *
+   * @param limit maximum number of buckets to return.
+   */
+  @GET
+  @Path("/deletePending/buckets")
+  public Response getBucketPendingDeletion(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit) {
+    try {
+      return Response.ok(reconGlobalMetricsService.getBucketPendingDeletion(limit)).build();
+    } catch (IOException e) {
+      LOG.error("Error while aggregating pending deletion data per bucket", e);
+      return createInternalServerErrorResponse("Error aggregating pending deletion per bucket: " + e.getMessage());
+    }
   }
 
   /**
@@ -1053,8 +1090,7 @@ public class OMDBInsightEndpoint {
       throws IOException {
     boolean skipPrevKey = false;
     String seekKey = paramInfo.getPrevKey();
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, ReconBasicOmKeyInfo>> keyIter = table.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, ReconBasicOmKeyInfo>> keyIter = table.iterator()) {
 
       if (!paramInfo.isSkipPrevKeyDone() && isNotBlank(seekKey)) {
         skipPrevKey = true;

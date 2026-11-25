@@ -269,6 +269,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_STALENODE_INTERVAL_DEFAULT =
       "5m";
 
+  public static final String OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL =
+      "ozone.scm.pending.container.roll.interval";
+  public static final String OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL_DEFAULT =
+      "5m";
+
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT =
       "ozone.scm.heartbeat.rpc-timeout";
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT =
@@ -371,6 +376,9 @@ public final class ScmConfigKeys {
       "ozone.scm.pipeline.placement.impl";
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY =
       "ozone.scm.container.placement.ec.impl";
+  public static final String OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED =
+      "ozone.scm.container.placement.rack.scatter.capacity.aware.enabled";
+  public static final boolean OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED_DEFAULT = false;
 
   public static final String OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT =
       "ozone.scm.pipeline.owner.container.count";
@@ -453,6 +461,18 @@ public final class ScmConfigKeys {
 
   public static final boolean
       OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT = true;
+
+  /**
+   * If true, BackgroundPipelineCreator will create RATIS/THREE pipelines even
+   * when the default replication is EC. This keeps RATIS write paths warm for
+   * mixed-workload clusters. If false, RATIS/THREE pipeline creation is
+   * skipped for EC-default clusters.
+   */
+  public static final String OZONE_SCM_PIPELINE_CREATE_RATIS_THREE =
+      "ozone.scm.pipeline.creation.ratis.three";
+
+  public static final boolean
+      OZONE_SCM_PIPELINE_CREATE_RATIS_THREE_DEFAULT = true;
 
   public static final String OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR =
       "ozone.scm.block.deletion.per.dn.distribution.factor";
@@ -543,6 +563,36 @@ public final class ScmConfigKeys {
   public static final long
           OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL_DEFAULT = 30 * 60 * 1000L;
 
+  public static final String OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIME =
+          "ozone.scm.ha.grpc.client.keepalive.time";
+  public static final long
+          OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIME_DEFAULT = 5 * 60 * 1000L;
+
+  public static final String OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIMEOUT =
+          "ozone.scm.ha.grpc.client.keepalive.timeout";
+  public static final long
+          OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIMEOUT_DEFAULT = 30 * 1000L;
+
+  public static final String OZONE_SCM_HA_GRPC_SERVER_MAX_CONNECTION_IDLE =
+          "ozone.scm.ha.grpc.server.max.connection.idle";
+  public static final long
+          OZONE_SCM_HA_GRPC_SERVER_MAX_CONNECTION_IDLE_DEFAULT = 15 * 60 * 1000L;
+
+  public static final String OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIME =
+          "ozone.scm.ha.grpc.server.keepalive.time";
+  public static final long
+          OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIME_DEFAULT = 5 * 60 * 1000L;
+
+  public static final String OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIMEOUT =
+          "ozone.scm.ha.grpc.server.keepalive.timeout";
+  public static final long
+          OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIMEOUT_DEFAULT = 30 * 1000L;
+
+  public static final String OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME =
+          "ozone.scm.ha.grpc.server.permit.keepalive.time";
+  public static final long
+          OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME_DEFAULT = 5 * 60 * 1000L;
+
   public static final String OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT =
           "ozone.scm.ha.ratis.server.failure.timeout.duration";
   public static final long
@@ -584,15 +634,6 @@ public final class ScmConfigKeys {
   public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
           1000L;
 
-  /**
-   * the config will transfer value to ratis config
-   * raft.server.snapshot.creation.gap, used by ratis to take snapshot
-   * when manual trigger using api.
-   */
-  public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_GAP
-      = "ozone.scm.ha.ratis.server.snapshot.creation.gap";
-  public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_GAP_DEFAULT =
-      1024L;
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_DIR =
           "ozone.scm.ha.ratis.snapshot.dir";
 
@@ -618,6 +659,10 @@ public final class ScmConfigKeys {
       "ozone.scm.ha.dbtransactionbuffer.flush.interval";
   public static final long
       OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 60 * 1000L;
+
+  public static final String OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT =
+      "ozone.scm.ha.dbtransactionbuffer.flush.pending.limit";
+  public static final long OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT_DEFAULT = 10000L;
 
   public static final String NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY =
       "net.topology.node.switch.mapping.impl";

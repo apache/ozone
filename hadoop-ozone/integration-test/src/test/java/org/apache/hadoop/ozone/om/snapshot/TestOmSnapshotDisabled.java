@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
@@ -76,9 +76,9 @@ public class TestOmSnapshotDisabled {
 
   @Test
   public void testExceptionThrown() throws Exception {
-    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck-" + RandomStringUtils.secure().nextNumeric(5);
-    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol-");
+    String bucketName = uniqueObjectName("buck-");
+    String snapshotName = uniqueObjectName("snap-");
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);

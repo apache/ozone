@@ -23,12 +23,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import io.grpc.Context;
-import io.grpc.Contexts;
-import io.grpc.Metadata;
-import io.grpc.ServerCall;
-import io.grpc.ServerCallHandler;
-import io.grpc.ServerInterceptor;
+import org.apache.ratis.thirdparty.io.grpc.Context;
+import org.apache.ratis.thirdparty.io.grpc.Contexts;
+import org.apache.ratis.thirdparty.io.grpc.Metadata;
+import org.apache.ratis.thirdparty.io.grpc.ServerCall;
+import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
+import org.apache.ratis.thirdparty.io.grpc.ServerInterceptor;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
@@ -66,11 +66,15 @@ public class TestClientAddressServerInterceptor {
           }
       );
       Context context = contextArgumentCaptor.getValue();
-      context.attach();
-      assertEquals("host.example.com",
-          GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get());
-      assertEquals("173.56.23.4",
-          GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get());
+      Context previous = context.attach();
+      try {
+        assertEquals("host.example.com",
+            GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get());
+        assertEquals("173.56.23.4",
+            GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get());
+      } finally {
+        context.detach(previous);
+      }
     }
   }
 

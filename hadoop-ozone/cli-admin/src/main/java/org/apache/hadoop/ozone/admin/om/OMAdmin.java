@@ -50,6 +50,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
+        BucketDeletedBytesSubCommand.class,
         FinalizeUpgradeSubCommand.class,
         ListOpenFilesSubCommand.class,
         GetServiceRolesSubcommand.class,
@@ -61,7 +62,8 @@ import picocli.CommandLine;
         TransferOmLeaderSubCommand.class,
         FetchKeySubCommand.class,
         LeaseSubCommand.class,
-        SnapshotSubCommand.class
+        SnapshotSubCommand.class,
+        LifecycleSubCommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
 public class OMAdmin implements AdminSubcommand {

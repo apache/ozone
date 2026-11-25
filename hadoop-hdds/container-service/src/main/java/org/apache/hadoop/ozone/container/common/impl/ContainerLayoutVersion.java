@@ -32,18 +32,8 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 public enum ContainerLayoutVersion {
 
   @Deprecated /* Use FILE_PER_BLOCK instead */
-  FILE_PER_CHUNK(1, "One file per chunk") {
-    @Override
-    public File getChunkFile(File chunkDir, BlockID blockID, String chunkName) {
-      return new File(chunkDir, chunkName);
-    }
-  },
-  FILE_PER_BLOCK(2, "One file per block") {
-    @Override
-    public File getChunkFile(File chunkDir, BlockID blockID, String chunkName) {
-      return new File(chunkDir, blockID.getLocalID() + ".block");
-    }
-  };
+  FILE_PER_CHUNK(1, "One file per chunk"),
+  FILE_PER_BLOCK(2, "One file per block");
 
   public static final ContainerLayoutVersion
       DEFAULT_LAYOUT = ContainerLayoutVersion.FILE_PER_BLOCK;
@@ -71,6 +61,13 @@ public enum ContainerLayoutVersion {
       }
     }
     return null;
+  }
+
+  /**
+   * @return list of supported versions.
+   */
+  public static List<ContainerLayoutVersion> getSupportedVersions() {
+    return ImmutableList.of(FILE_PER_BLOCK);
   }
 
   /**
@@ -107,8 +104,12 @@ public enum ContainerLayoutVersion {
     return description;
   }
 
-  public abstract File getChunkFile(File chunkDir,
-      BlockID blockID, String chunkName);
+  public File getChunkFile(File chunkDir, BlockID blockID, String chunkName) {
+    return switch (this) {
+    case FILE_PER_CHUNK -> new File(chunkDir, chunkName);
+    case FILE_PER_BLOCK -> new File(chunkDir, blockID.getLocalID() + ".block");
+    };
+  }
 
   public File getChunkFile(ContainerData containerData, BlockID blockID,
       String chunkName) throws StorageContainerException {

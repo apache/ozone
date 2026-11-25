@@ -18,48 +18,35 @@
 package org.apache.hadoop.ozone.om.request.validation;
 
 import java.lang.annotation.Annotation;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
 /**
  * Class to extract version out of OM request.
  */
 public enum VersionExtractor {
   /**
-   * Extracts current metadata layout version.
+   * Extracts current apparent component version (legacy layout or {@link org.apache.hadoop.ozone.OzoneManagerVersion}).
    */
-  LAYOUT_VERSION_EXTRACTOR {
-    @Override
-    public Versioned extractVersion(OMRequest req, ValidationContext ctx) {
-      LayoutVersionManager layoutVersionManager = ctx.versionManager();
-      return ctx.versionManager().getFeature(layoutVersionManager.getMetadataLayoutVersion());
-    }
-
-    @Override
-    public Class<? extends Annotation> getValidatorClass() {
-      return OMLayoutVersionValidator.class;
-    }
-  },
+  LAYOUT_VERSION_EXTRACTOR,
 
   /**
    * Extracts client version from the OMRequests.
    */
-  CLIENT_VERSION_EXTRACTOR {
-    @Override
-    public Versioned extractVersion(OMRequest req, ValidationContext ctx) {
-      return req.getVersion() > ClientVersion.CURRENT_VERSION ?
-          ClientVersion.FUTURE_VERSION : ClientVersion.fromProtoValue(req.getVersion());
-    }
+  CLIENT_VERSION_EXTRACTOR;
 
-    @Override
-    public Class<? extends Annotation> getValidatorClass() {
-      return OMClientVersionValidator.class;
-    }
-  };
+  public ComponentVersion extractVersion(OMRequest req, ValidationContext ctx) {
+    return switch (this) {
+    case LAYOUT_VERSION_EXTRACTOR -> ctx.versionManager().getApparentVersion();
+    case CLIENT_VERSION_EXTRACTOR -> ClientVersion.deserialize(req.getVersion());
+    };
+  }
 
-  public abstract Versioned extractVersion(OMRequest req, ValidationContext ctx);
-
-  public abstract Class<? extends Annotation> getValidatorClass();
+  public Class<? extends Annotation> getValidatorClass() {
+    return switch (this) {
+    case LAYOUT_VERSION_EXTRACTOR -> OMLayoutVersionValidator.class;
+    case CLIENT_VERSION_EXTRACTOR -> OMClientVersionValidator.class;
+    };
+  }
 }

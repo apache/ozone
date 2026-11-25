@@ -18,13 +18,14 @@
 package org.apache.hadoop.hdds.cli;
 
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.PrintStream;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystemException;
 import java.nio.file.NoSuchFileException;
 import java.util.Map;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
@@ -55,7 +56,8 @@ public abstract class GenericCli implements GenericParentCommand {
     configOverrides.forEach(config::set);
   }
 
-  @Option(names = {"-conf"})
+  @Option(names = {"--conf"},
+      description = "Path to custom configuration file.")
   public void setConfigurationPath(String configPath) {
     config.addResource(new Path(configPath));
   }
@@ -66,12 +68,16 @@ public abstract class GenericCli implements GenericParentCommand {
 
   public GenericCli(CommandLine.IFactory factory) {
     cmd = new CommandLine(this, factory);
+    ExtensibleParentCommand.addSubcommands(cmd);
+    cmd.getCommandSpec().preprocessor((args, commandSpec, argSpec, info) -> {
+      args.replaceAll(arg -> DeprecatedCliOption.toNonDeprecated(arg, err()));
+      return false;
+    });
+
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
       printError(ex);
       return EXECUTION_ERROR_EXIT_CODE;
     });
-
-    ExtensibleParentCommand.addSubcommands(cmd);
   }
 
   public void run(String[] argv) {
@@ -92,15 +98,20 @@ public abstract class GenericCli implements GenericParentCommand {
     //print out the stack trace.
     final String rawMessage = error.getMessage();
     if (verbose || rawMessage == null || rawMessage.isEmpty()) {
-      error.printStackTrace(cmd.getErr());
-    } else {
-      if (error instanceof FileSystemException) {
-        String errorMessage = handleFileSystemException((FileSystemException) error);
-        cmd.getErr().println(errorMessage);
-      } else {
-        cmd.getErr().println(rawMessage.split("\n")[0]);
-      }
+      error.printStackTrace(err());
+      return;
     }
+    String aclLine = HddsUtils.formatAccessControlExceptionLine(error);
+    if (aclLine != null) {
+      err().println(aclLine);
+      ExitUtils.terminate(EXECUTION_ERROR_EXIT_CODE, aclLine, null);
+    }
+    if (error instanceof FileSystemException) {
+      String errorMessage = handleFileSystemException((FileSystemException) error);
+      err().println(errorMessage);
+      return;
+    }
+    err().println(rawMessage.split("\n")[0]);
   }
 
   @Override
@@ -125,31 +136,36 @@ public abstract class GenericCli implements GenericParentCommand {
     return verbose;
   }
 
-  protected PrintWriter out() {
-    return cmd.getOut();
+  protected PrintStream out() {
+    return System.out;
+    // until https://github.com/remkop/picocli/issues/2546 is fixed
+    // return cmd.getOut();
   }
 
-  protected PrintWriter err() {
-    return cmd.getErr();
+  protected PrintStream err() {
+    return System.err;
+    // until https://github.com/remkop/picocli/issues/2546 is fixed
+    // return cmd.getErr();
   }
 
   private static String handleFileSystemException(FileSystemException e) {
-    String errorMessage = e.getMessage();
+    StringBuilder sb = new StringBuilder();
+    sb.append("Error: ");
 
     // If reason is set, return the exception's message as it is.
     // Otherwise, construct a custom message based on the type of exception
     if (e.getReason() == null) {
       if (e instanceof NoSuchFileException) {
-        errorMessage = "File not found: " + errorMessage;
+        sb.append("File not found: ");
       } else if (e instanceof AccessDeniedException) {
-        errorMessage = "Access denied: " + errorMessage;
+        sb.append("Access denied: ");
       } else if (e instanceof FileAlreadyExistsException) {
-        errorMessage = "File already exists: " + errorMessage;
+        sb.append("File already exists: ");
       } else {
-        errorMessage = e.getClass().getSimpleName() + ": " + errorMessage;
+        sb.append(e.getClass().getSimpleName()).append(": ");
       }
     }
 
-    return "Error: " + errorMessage;
+    return sb.append(e.getMessage()).toString();
   }
 }

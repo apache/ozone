@@ -38,12 +38,12 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -86,13 +86,10 @@ public class TestContainerStateMachineFlushDelay {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
-    conf.setQuietMode(false);
     OzoneManager.setTestSecureOmFlag(true);
     conf.setLong(OzoneConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     //  conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
-    conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
+    OzoneTestUtils.setFastPipelineScrub(conf);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
@@ -108,7 +105,6 @@ public class TestContainerStateMachineFlushDelay {
             .build();
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";
@@ -127,39 +123,39 @@ public class TestContainerStateMachineFlushDelay {
 
   @Test
   public void testContainerStateMachineFailures() throws Exception {
-    OzoneOutputStream key =
+    OmKeyLocationInfo omKeyLocationInfo;
+    try (OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey("ratis", 1024,
                 ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                    ReplicationFactor.ONE), new HashMap<>());
-    // Now ozone.client.stream.buffer.flush.delay is currently enabled
-    // by default. Here we  written data(length 110) greater than chunk
-    // Size(length 100), make sure flush will sync data.
-    byte[] data =
-        ContainerTestHelper.getFixedLengthString(keyString, 110)
-            .getBytes(UTF_8);
-    // First write and flush creates a container in the datanode
-    key.write(data);
-    key.flush();
-    key.write("ratis".getBytes(UTF_8));
+                    ReplicationFactor.ONE), new HashMap<>())) {
+      // Now ozone.client.stream.buffer.flush.delay is currently enabled
+      // by default. Here we write data (length 110) greater than chunk
+      // size (length 100), making sure flush will sync data.
+      byte[] data =
+          ContainerTestHelper.getFixedLengthString(keyString, 110)
+              .getBytes(UTF_8);
+      // First write and flush creates a container in the datanode.
+      key.write(data);
+      key.flush();
+      key.write("ratis".getBytes(UTF_8));
 
-    //get the name of a valid container
-    KeyOutputStream groupOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+      // Get the name of a valid container.
+      KeyOutputStream groupOutputStream =
+          (KeyOutputStream) key.getOutputStream();
 
-    List<OmKeyLocationInfo> locationInfoList =
-        groupOutputStream.getLocationInfoList();
-    assertEquals(1, locationInfoList.size());
-    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+      List<OmKeyLocationInfo> locationInfoList =
+          groupOutputStream.getLocationInfoList();
+      assertEquals(1, locationInfoList.size());
+      omKeyLocationInfo = locationInfoList.get(0);
 
-    // delete the container dir
-    FileUtil.fullyDelete(new File(
-        cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-            .getContainer().getContainerSet()
-            .getContainer(omKeyLocationInfo.getContainerID()).getContainerData()
-            .getContainerPath()));
-
-    key.close();
+      // Delete the container directory.
+      FileUtil.fullyDelete(new File(
+          cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+              .getContainer().getContainerSet()
+              .getContainer(omKeyLocationInfo.getContainerID()).getContainerData()
+              .getContainerPath()));
+    }
     // Make sure the container is marked unhealthy
     assertSame(
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()

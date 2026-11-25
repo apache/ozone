@@ -28,7 +28,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -44,6 +43,8 @@ import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.VolumeBucket;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,11 +61,9 @@ public final class OzoneClientUtils {
 
   public static BucketLayout resolveLinkBucketLayout(OzoneBucket bucket,
                                                      ObjectStore objectStore,
-                                                     Set<Pair<String,
-                                                         String>> visited)
-      throws IOException {
+                                                     Set<VolumeBucket> visited) throws IOException {
     if (bucket.isLink()) {
-      if (!visited.add(Pair.of(bucket.getVolumeName(),
+      if (!visited.add(new VolumeBucket(bucket.getVolumeName(),
           bucket.getName()))) {
         throw new OMException("Detected loop in bucket links. Bucket name: " +
             bucket.getName() + ", Volume name: " + bucket.getVolumeName(),
@@ -220,23 +219,31 @@ public final class OzoneClientUtils {
         .parse(clientReplicationType, clientReplication, clientSideConfig);
   }
 
-  public static FileChecksum getFileChecksumWithCombineMode(OzoneVolume volume,
-      OzoneBucket bucket, String keyName, long length,
+  /**
+   * Computes the checksum of a key.
+   *
+   * @param useLookupFile when true the key is read with {@code lookupFile}, which rejects OBJECT_STORE buckets
+   *     server-side; when false {@code lookupKey} is used, which accepts any bucket layout
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public static FileChecksum getFileChecksumWithCombineMode(String volumeName,
+      String bucketName, String keyName, long length,
       OzoneClientConfig.ChecksumCombineMode combineMode,
-      ClientProtocol rpcClient) throws IOException {
+      ClientProtocol rpcClient, boolean useLookupFile) throws IOException {
     Preconditions.checkArgument(length >= 0);
 
     if (keyName.isEmpty()) {
       return null;
     }
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volume.getName())
-        .setBucketName(bucket.getName()).setKeyName(keyName)
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+        .setBucketName(bucketName).setKeyName(keyName)
         .setSortDatanodesInPipeline(true)
         .setLatestVersionLocation(true).build();
-    OmKeyInfo keyInfo = rpcClient.getOzoneManagerClient().lookupKey(keyArgs);
+    OzoneManagerProtocol omClient = rpcClient.getOzoneManagerClient();
+    OmKeyInfo keyInfo = useLookupFile ? omClient.lookupFile(keyArgs) : omClient.lookupKey(keyArgs);
     BaseFileChecksumHelper helper = ChecksumHelperFactory
         .getChecksumHelper(keyInfo.getReplicationConfig().getReplicationType(),
-            volume, bucket, keyName, length, combineMode, rpcClient, keyInfo);
+            volumeName, bucketName, keyName, length, combineMode, rpcClient, keyInfo);
     helper.compute();
     return helper.getFileChecksum();
   }

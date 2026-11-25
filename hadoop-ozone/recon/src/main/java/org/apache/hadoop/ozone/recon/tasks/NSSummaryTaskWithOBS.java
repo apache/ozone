@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
@@ -26,8 +27,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -98,9 +97,12 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
                                             NSSummaryAsyncFlusher asyncFlusher) {
     Table<String, OmKeyInfo> keyTable =
         omMetadataManager.getKeyTable(BUCKET_LAYOUT);
+    Table<String, OmBucketInfo> bucketTable = omMetadataManager.getBucketTable();
 
     // Per-worker maps for lockless updates
     Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+    // Cache only the last bucket, since keys within each iterator batch are sorted by volume and bucket.
+    ThreadLocal<OmBucketInfo> lastBucket = new ThreadLocal<>();
 
     // Divide threshold by worker count
     final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
@@ -118,21 +120,20 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         // continue to the next iteration.
         String volumeName = keyInfo.getVolumeName();
         String bucketName = keyInfo.getBucketName();
-        String bucketDBKey = omMetadataManager
-            .getBucketKey(volumeName, bucketName);
-        // Get bucket info from bucket table
-        OmBucketInfo omBucketInfo = omMetadataManager
-            .getBucketTable().getSkipCache(bucketDBKey);
+        OmBucketInfo omBucketInfo = lastBucket.get();
+        if (omBucketInfo == null || !volumeName.equals(omBucketInfo.getVolumeName())
+            || !bucketName.equals(omBucketInfo.getBucketName())) {
+          String bucketDBKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+          omBucketInfo = bucketTable.getSkipCache(bucketDBKey);
+          lastBucket.set(omBucketInfo);
+        }
 
         if (omBucketInfo != null && omBucketInfo.getBucketLayout() == BUCKET_LAYOUT) {
           // Check if async flusher has failed - stop immediately if so
           asyncFlusher.checkForFailures();
-          
-          // Look up parent ID for OBS keys (not populated in keyInfo from DB)
-          long parentObjectId = getKeyParentID(keyInfo);
-          
+
           // Use reprocess-specific method (no DB reads)
-          handlePutKeyEventReprocess(keyInfo, workerMap, parentObjectId);
+          handlePutKeyEventReprocess(keyInfo, workerMap, omBucketInfo.getObjectID());
 
           // Submit to async queue when threshold reached
           if (workerMap.size() >= perWorkerThreshold) {
@@ -160,6 +161,11 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     } catch (Exception ex) {
       LOG.error("Unable to process keyTable in parallel", ex);
       return false;
+    } finally {
+      // The small-table fallback in ParallelTableIteratorOperation runs the
+      // per-key operation on this (reused Recon pool) thread, so clear the
+      // bucket cache here.
+      lastBucket.remove();
     }
     
     long keyEndTime = System.currentTimeMillis();
@@ -183,8 +189,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     return true;
   }
 
-  public Pair<Integer, Boolean> processWithOBS(OMUpdateEventBatch events,
-                                               int seekPos) {
+  public ProcessResult processWithOBS(OMUpdateEventBatch events, int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
@@ -201,10 +206,21 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
       eventCounter++;
 
-      // We only process updates on OM's KeyTable
       String table = omdbUpdateEvent.getTable();
-      boolean updateOnKeyTable = table.equals(KEY_TABLE);
-      if (!updateOnKeyTable) {
+      // A bucket can be deleted and recreated under the same name with a new
+      // objectID. A recreate is always preceded by a delete, so dropping the
+      // cached OmBucketInfo on the delete event is enough for a later key event
+      // to re-read the recreated bucket. Bucket property updates don't change
+      // objectID or layout, so they need not invalidate the cache.
+      if (table.equals(BUCKET_TABLE)) {
+        if (action == OMDBUpdateEvent.OMDBUpdateAction.DELETE) {
+          invalidateBucketCache(omdbUpdateEvent.getKey());
+        }
+        continue;
+      }
+
+      // We only process updates on OM's KeyTable
+      if (!table.equals(KEY_TABLE)) {
         continue;
       }
 
@@ -234,15 +250,13 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         String bucketName = updatedKeyInfo.getBucketName();
         String bucketDBKey =
             getReconOMMetadataManager().getBucketKey(volumeName, bucketName);
-        // Get bucket info from bucket table
-        OmBucketInfo omBucketInfo = getReconOMMetadataManager().getBucketTable()
-            .getSkipCache(bucketDBKey);
+        OmBucketInfo omBucketInfo = lookupBucketCached(bucketDBKey);
 
         if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
           continue;
         }
 
-        long parentObjectID = getKeyParentID(updatedKeyInfo);
+        long parentObjectID = omBucketInfo.getObjectID();
 
         switch (action) {
         case PUT:
@@ -253,12 +267,12 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           break;
         case UPDATE:
           if (oldKeyInfo != null) {
-            // delete first, then put
-            long oldKeyParentObjectID = getKeyParentID(oldKeyInfo);
-            handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, oldKeyParentObjectID);
+            // For OBS, parent is always the bucket, so same parentObjectID
+            // applies to old and new (a key cannot move between buckets via
+            // an UPDATE event — that would be a delete+put).
+            handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, parentObjectID);
           } else {
-            LOG.warn("Update event does not have the old keyInfo for {}.",
-                updatedKey);
+            LOG.warn("Update event does not have the old keyInfo for {}.", updatedKey);
           }
           handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, parentObjectID);
           break;
@@ -267,52 +281,24 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         }
         if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
           if (!flushAndCommitNSToDB(nsSummaryMap)) {
-            return new ImmutablePair<>(seekPos, false);
+            return new ProcessResult(seekPos, false);
           }
-          seekPos = eventCounter + 1;
+          seekPos = itrPos + eventCounter;
         }
-      } catch (IOException ioEx) {
-        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-            ioEx);
+      } catch (IOException | RuntimeException ex) {
+        LOG.error("Unable to process Namespace Summary data in Recon DB. ", ex);
         nsSummaryMap.clear();
-        return new ImmutablePair<>(seekPos, false);
+        return new ProcessResult(seekPos, false);
       }
     }
 
     // Flush and commit left-out entries at the end
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
-      return new ImmutablePair<>(seekPos, false);
+      return new ProcessResult(seekPos, false);
     }
 
     LOG.debug("Completed a process run of NSSummaryTaskWithOBS");
-    return new ImmutablePair<>(seekPos, true);
-  }
-
-  /**
-   * KeyTable entries don't have the parentId set.
-   * In order to reuse the existing methods that rely on
-   * the parentId, we have to set it explicitly.
-   * Note: For an OBS key, the parentId will always correspond to the ID of the
-   * OBS bucket in which it is located.
-   *
-   * @param keyInfo
-   * @throws IOException
-   */
-  private long getKeyParentID(OmKeyInfo keyInfo)
-      throws IOException {
-    String bucketKey = getReconOMMetadataManager()
-        .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
-    OmBucketInfo parentBucketInfo =
-        getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
-
-    if (parentBucketInfo != null) {
-      return parentBucketInfo.getObjectID();
-    } else {
-      LOG.warn("ParentBucketInfo is null for key: %s in volume: %s, bucket: %s",
-          keyInfo.getKeyName(), keyInfo.getVolumeName(), keyInfo.getBucketName());
-      throw new IOException("ParentKeyInfo for " +
-          "NSSummaryTaskWithOBS is null");
-    }
+    return new ProcessResult(itrPos + eventCounter, true);
   }
 
 }

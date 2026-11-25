@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentity
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -94,7 +95,7 @@ import org.junit.jupiter.api.Test;
  * Ozone Manager HA tests where all OMs are running throughout all tests.
  * @see TestOzoneManagerHAWithStoppedNodes
  */
-class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
+class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
 
   @Test
   void testFileOperationsWithRecursive() throws Exception {
@@ -235,7 +236,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   public void testAllVolumeOperations() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
 
     createAndCheckVolume(volumeName);
 
@@ -251,8 +252,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   public void testAllBucketOperations() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
 
     OzoneVolume retVolume = createAndCheckVolume(volumeName);
 
@@ -340,7 +341,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneManagerProtocolProtos.OMRequest readRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.ListVolume)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(randomUUID().toString())
             .build();
 
@@ -354,7 +355,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   public void testReadRequest() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
     ObjectStore objectStore = getObjectStore();
     objectStore.createVolume(volumeName);
 
@@ -1034,8 +1035,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
   void testOMRatisSnapshot() throws Exception {
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -1133,7 +1134,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
       HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
           OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
       assertNotNull(followerReadFailoverProxyProvider);
-      assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
+      assertTrue(followerReadFailoverProxyProvider.isOmServiceSupportsFollowerRead());
 
 
       // Trigger write so that the leader failover proxy provider points to the leader
@@ -1157,7 +1158,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
       // Client follower read is disabled since it detected that the cluster does not
       // support follower read
-      assertFalse(followerReadFailoverProxyProvider.isUseFollowerRead());
+      assertFalse(followerReadFailoverProxyProvider.isOmServiceSupportsFollowerRead());
       OMProxyInfo<OzoneManagerProtocolPB> lastProxy =
           (OMProxyInfo<OzoneManagerProtocolPB>) followerReadFailoverProxyProvider.getLastProxy();
       // The last read will be done on the leader

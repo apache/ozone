@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -98,7 +99,8 @@ public class TestS3MultipartUploadAbortResponseWithFSO
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     return new S3MultipartUploadAbortResponseWithFSO(omResponse, multipartKey,
         multipartOpenKey, omMultipartKeyInfo, omBucketInfo,
-        getBucketLayout());
+        getBucketLayout(), Collections.emptyList(),
+        Collections.emptyList());
   }
 
   @Override

@@ -49,8 +49,8 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -60,7 +60,7 @@ import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -74,7 +74,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Class tests create with object store and getFileStatus.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.TestCase {
+public abstract class TestOzoneFSWithObjectStoreCreate implements ClusterForTests.TestCase {
 
   private OzoneClient client;
   private OzoneFileSystem o3fs;
@@ -104,7 +104,7 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
+    DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
 
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME, bucketName,
         volumeName);
@@ -402,7 +402,7 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     ArrayList<String> expectedKeys = new ArrayList<>();
     expectedKeys.add(dirPath);
     expectedKeys.add(normalizedKey);
-    TestDataUtil.createKey(ozoneBucket, slashyKey, data);
+    DataTestUtil.createKey(ozoneBucket, slashyKey, data);
 
     try {
       ozoneBucket.readKey(slashyKey).close();
@@ -430,7 +430,7 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
   private void createAndAssertKey(OzoneBucket ozoneBucket, String key, int length)
       throws Exception {
     
-    byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, length);
+    byte[] input = DataTestUtil.createStringKey(ozoneBucket, key, length);
     // Read the key with given key name.
     readKey(ozoneBucket, key, length, input);
 

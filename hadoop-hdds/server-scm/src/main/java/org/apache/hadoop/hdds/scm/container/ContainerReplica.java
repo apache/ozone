@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.builder.CompareToBuilder;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -163,6 +166,12 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         .append(this.containerID, that.containerID)
         .append(this.datanodeDetails, that.datanodeDetails)
         .build();
+  }
+
+  public static List<DatanodeDetails> toDatanodeDetailsList(Set<ContainerReplica> replicas) {
+    return replicas.stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
   }
 
   /**

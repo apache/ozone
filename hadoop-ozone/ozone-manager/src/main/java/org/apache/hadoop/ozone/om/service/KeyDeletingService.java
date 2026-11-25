@@ -39,7 +39,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -135,11 +134,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return deletedKeyCount;
   }
 
-  Pair<Pair<Integer, Long>, Boolean> processKeyDeletes(Map<String, PurgedKey> keyBlocksList,
+  KeyPurgeResult processKeyDeletes(Map<String, PurgedKey> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
     long startTime = Time.monotonicNow();
-    Pair<Pair<Integer, Long>, Boolean> purgeResult = Pair.of(Pair.of(0, 0L), false);
+    KeyPurgeResult purgeResult = new KeyPurgeResult(0, 0L, false);
     
     // Filter out empty files (files with no blocks) before sending to SCM
     Map<String, PurgedKey> nonEmptyKeyBlocksList = keyBlocksList.entrySet().stream()
@@ -195,7 +194,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       int limit = getOzoneManager().getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
-          purgeResult.getKey().getKey(), blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
+          purgeResult.deletedCount(), blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
     getPerfMetrics().setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
     return purgeResult;
@@ -262,7 +261,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
   @SuppressWarnings("checkstyle:MethodLength")
-  private Pair<Pair<Integer, Long>, Boolean> submitPurgeKeysRequest(
+  private KeyPurgeResult submitPurgeKeysRequest(
       List<DeleteBlockGroupResult> results,
       Map<String, PurgedKey> purgedKeys,
       Map<String, RepeatedOmKeyInfo> keysToModify,
@@ -333,7 +332,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         keyToUpdate.setKey(keyToModify.getKey());
         List<OzoneManagerProtocolProtos.KeyInfo> keyInfos =
             keyToModify.getValue().getOmKeyInfoList().stream()
-                .map(k -> k.getProtobuf(ClientVersion.CURRENT_VERSION))
+                .map(k -> k.getProtobuf(ClientVersion.CURRENT))
                 .collect(Collectors.toList());
         keyToUpdate.addAllKeyInfos(keyInfos);
         keyToUpdate.setBucketId(keyToModify.getValue().getBucketId());
@@ -343,7 +342,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     if (purgedKeyList.isEmpty() && keysToUpdateList.isEmpty() &&
         (renameEntriesToBeDeleted == null || renameEntriesToBeDeleted.isEmpty())) {
-      return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
+      return new KeyPurgeResult(deletedCount, deletedReplSize, purgeSuccess);
     }
 
     int purgeKeyIndex = 0, updateIndex = 0, renameIndex = 0;
@@ -424,7 +423,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
     }
 
-    return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
+    return new KeyPurgeResult(deletedCount, deletedReplSize, purgeSuccess);
   }
 
   private boolean hasPendingItems(PurgeKeysRequest.Builder builder) {
@@ -560,7 +559,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
      * @param keyManager KeyManager of the underlying store.
      */
     private void processDeletedKeysForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
-        int remainNum) throws IOException, InterruptedException {
+        UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot, int remainNum)
+        throws IOException, InterruptedException {
       String volume = null, bucket = null, snapshotTableKey = null;
       if (currentSnapshotInfo != null) {
         volume = currentSnapshotInfo.getVolumeName();
@@ -603,26 +603,36 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               ? keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum)
               : keyManager.getPendingDeletionKeys(volume, bucket, null, reclaimableKeyFilter, remainNum);
           Map<String, PurgedKey> purgedKeys = pendingKeysDeletion.getPurgedKeys();
+
+          // Keep the snapshot GC locks until the OM requests below complete, but release all snapshot DB read locks
+          // first. Otherwise the synchronous Ratis submission can wait for the double buffer while the double buffer
+          // waits for a colliding snapshot DB write lock.
+          reclaimableKeyFilter.closeSnapshotDbHandles();
+          renameEntryFilter.closeSnapshotDbHandles();
+          if (currentSnapshot != null) {
+            currentSnapshot.close();
+          }
+
           //submit purge requests if there are renamed entries to be purged or keys to be purged.
           if (!renamedTableEntries.isEmpty() || purgedKeys != null && !purgedKeys.isEmpty()) {
             // Validating if the previous snapshot is still the same before purging the blocks.
             SnapshotUtils.validatePreviousSnapshotId(currentSnapshotInfo, snapshotChainManager,
                 expectedPreviousSnapshotId);
-            Pair<Pair<Integer, Long>, Boolean> purgeResult = processKeyDeletes(purgedKeys,
+            KeyPurgeResult purgeResult = processKeyDeletes(purgedKeys,
                 pendingKeysDeletion.getKeysToModify(), renamedTableEntries, snapshotTableKey,
                 expectedPreviousSnapshotId);
-            remainNum -= purgeResult.getKey().getKey();
-            successStatus = purgeResult.getValue();
+            remainNum -= purgeResult.deletedCount();
+            successStatus = purgeResult.purgeSuccess();
             getMetrics().incrNumKeysProcessed(purgedKeys.size());
-            getMetrics().incrNumKeysSentForPurge(purgeResult.getKey().getKey());
+            getMetrics().incrNumKeysSentForPurge(purgeResult.deletedCount());
 
             DeletionStats statsToUpdate = currentSnapshotInfo == null ? aosDeletionStats : snapshotDeletionStats;
-            statsToUpdate.updateDeletionStats(purgeResult.getKey().getKey(), purgeResult.getKey().getValue(),
+            statsToUpdate.updateDeletionStats(purgeResult.deletedCount(), purgeResult.deletedReplSize(),
                 purgedKeys.size() + pendingKeysDeletion.getNotReclaimableKeyCount(),
                 pendingKeysDeletion.getNotReclaimableKeyCount()
             );
             if (successStatus) {
-              deletedKeyCount.addAndGet(purgeResult.getKey().getKey());
+              deletedKeyCount.addAndGet(purgeResult.deletedCount());
             }
           }
 
@@ -702,7 +712,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   snapInfo.getName())) {
             KeyManager keyManager = snapInfo == null ? getOzoneManager().getKeyManager()
                 : omSnapshot.get().getKeyManager();
-            processDeletedKeysForStore(snapInfo, keyManager, remainNum);
+            processDeletedKeysForStore(snapInfo, keyManager, omSnapshot, remainNum);
           }
         } catch (IOException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
@@ -737,5 +747,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       iteratedKeyCount.set(0L);
       notReclaimableKeyCount.set(0L);
     }
+  }
+
+  /**
+   * The number and replicated size of the purged keys paired with the purge success flag,
+   * used as the result of a key purge request submission by the key deleting service.
+   */
+  record KeyPurgeResult(int deletedCount, long deletedReplSize, boolean purgeSuccess) {
   }
 }

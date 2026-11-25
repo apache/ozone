@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.tagging;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -28,10 +29,12 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -44,13 +47,30 @@ import org.junit.jupiter.api.Test;
 /**
  * Test put object tagging request.
  */
-public class TestS3PutObjectTaggingRequest extends TestOMKeyRequest {
+public class TestS3PutObjectTaggingRequest extends OMKeyRequestTests {
 
   @Test
   public void testPreExecute() throws Exception {
     Map<String, String> tags = new HashMap<>();
     getTags(2);
     doPreExecute(volumeName, bucketName, keyName, tags);
+  }
+
+  @Test
+  public void testPreExecutePermissionDeniedIsAudited() throws Exception {
+    OMRequest originalRequest = createPutObjectTaggingRequest(volumeName, bucketName, keyName, getTags(2));
+    assertPreExecuteAclDenialIsAudited(getPutObjectTaggingRequest(originalRequest), OMAction.PUT_OBJECT_TAGGING);
+  }
+
+  @Test
+  public void testPreExecutePermissionDeniedOnLinkAuditsSourceBucket() throws Exception {
+    resolveRequestedBucketAsLinkTo("source-volume", "source-bucket");
+    OMRequest originalRequest = createPutObjectTaggingRequest(volumeName, bucketName, keyName, getTags(2));
+    AuditMessage message = assertPreExecuteAclDenialIsAudited(getPutObjectTaggingRequest(originalRequest),
+        OMAction.PUT_OBJECT_TAGGING);
+    assertThat(message.getFormattedMessage())
+        .contains("\"volume\":\"source-volume\"", "\"bucket\":\"source-bucket\"")
+        .doesNotContain(bucketName);
   }
 
   @Test

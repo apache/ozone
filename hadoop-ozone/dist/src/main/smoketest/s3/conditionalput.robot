@@ -79,11 +79,11 @@ Conditional Put If-Match With Wrong ETag Fails
                        Should Be Equal    ${head_etag}    ${etag}
 
 Conditional Put If-Match On Non-Existent Key Fails
-    [Documentation]    If-Match on a key that does not exist should fail with 412
+    [Documentation]    If-Match on a key that does not exist should fail with 404
     ${key} =           Set Variable    condput-ifmatch-nonexistent
                        Execute         echo "test-content" > /tmp/${key}
     ${result} =        Execute AWSS3APICli and ignore error    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key} --if-match some-etag
-                       Should contain    ${result}    PreconditionFailed
+                       Should contain    ${result}    NoSuchKey
     ${head_result} =   Execute AWSS3APICli and ignore error    head-object --bucket ${BUCKET} --key ${key}
                        Should contain    ${head_result}    404
                        Should contain    ${head_result}    Not Found

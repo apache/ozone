@@ -1,0 +1,153 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.hdds.tracing;
+
+import static org.apache.hadoop.hdds.tracing.TracingUtil.createClientProxy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.SpanKind;
+import java.io.IOException;
+import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.Service;
+import org.apache.hadoop.hdds.tracing.TestTraceAllMethod.ServiceImpl;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Test for Tracing related annotations.
+ * {@link SkipTracing} , {@link InternalSpanKind}.
+ */
+public class TestTracingAnnotations {
+
+  @BeforeEach
+  public void resetGlobalState() {
+    TracingUtil.shutdownTracing();
+    GlobalOpenTelemetry.resetForTest();
+  }
+
+  /**
+   * Tear down tracing state after each test.
+   */
+  @AfterEach
+  public void cleanup() {
+    TracingUtil.shutdownTracing();
+    GlobalOpenTelemetry.resetForTest();
+  }
+
+  private static MutableConfigurationSource tracingEnabled() {
+    MutableConfigurationSource config = new InMemoryConfigurationForTesting();
+    config.setBoolean("ozone.tracing.enabled", true);
+    return config;
+  }
+
+  @Test
+  public void testSkipTracingNoSpan() {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      ServiceImpl impl = new ServiceImpl();
+      Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
+
+      serviceProxy.skippedMethod();
+      assertFalse(impl.wasSpanActive(), "Span should NOT be created for @SkipTracing methods.");
+      assertTrue(spans.getSpans().isEmpty(), "No span should be collected for @SkipTracing methods.");
+    }
+  }
+
+  @Test
+  public void testSkipTracingExceptionUnwrapped() {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      ServiceImpl impl = new ServiceImpl();
+      Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
+
+      IOException ex = assertThrows(IOException.class, () -> serviceProxy.throwingMethod());
+      assertEquals("Original Exception", ex.getMessage());
+      assertFalse(impl.wasSpanActive(), "Span should NOT have been created for a @SkipTracing throwing method.");
+      assertTrue(spans.getSpans().isEmpty(), "No span should be collected for a @SkipTracing throwing method.");
+    }
+  }
+
+  @Test
+  public void testProxyNormalVsSkipped() {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      ServiceImpl impl = new ServiceImpl();
+      Service serviceProxy = TracingUtil.createInternalProxy(impl, Service.class, tracingEnabled());
+
+      serviceProxy.normalMethod();
+      assertTrue(impl.wasSpanActive(), "Normal method should have an active span.");
+      assertEquals(1, spans.named("Service.normalMethod").size(), "Normal method should create exactly one span.");
+
+      serviceProxy.skippedMethod();
+      assertFalse(impl.wasSpanActive(), "@SkipTracing method should NOT have an active span.");
+      assertTrue(spans.named("Service.skippedMethod").isEmpty(), "@SkipTracing method should not create a span.");
+    }
+  }
+
+  @Test
+  public void testInternalSpanKind() {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      ServiceImpl impl = new ServiceImpl();
+      Service serviceProxy = createClientProxy(impl, Service.class, tracingEnabled());
+      serviceProxy.localMethod();
+      assertTrue(impl.wasSpanActive(), "Local method should have an active span.");
+      assertEquals(SpanKind.INTERNAL, impl.lastSpanKind(), "@InternalSpanKind method should use INTERNAL.");
+      spans.assertKind("Service.localMethod", SpanKind.INTERNAL);
+    }
+  }
+
+  @Test
+  public void testInterfaceMethodAnnotationIsIgnored() {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      Service serviceProxy = createClientProxy(new ServiceImpl(), Service.class, tracingEnabled());
+      serviceProxy.annotatedOnlyOnInterface();
+      spans.assertKind("Service.annotatedOnlyOnInterface", SpanKind.CLIENT);
+    }
+  }
+
+  @Test
+  public void testLambdaDelegateUsesDefaultKind() {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      LocalService serviceProxy = createClientProxy(() -> "local", LocalService.class, tracingEnabled());
+      assertEquals("local", serviceProxy.call());
+      spans.assertKind("LocalService.call", SpanKind.CLIENT);
+    }
+  }
+
+  @Test
+  public void testCreateProxyKinds() {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      TracingUtil.createInternalProxy(new ServiceImpl(), Service.class, tracingEnabled()).normalMethod();
+      spans.assertKind("Service.normalMethod", SpanKind.INTERNAL);
+    }
+    try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
+      createClientProxy(new ServiceImpl(), Service.class, tracingEnabled()).normalMethod();
+      spans.assertKind("Service.normalMethod", SpanKind.CLIENT);
+    }
+  }
+
+  /**
+   * Interface with no tracing annotations.
+   */
+  public interface LocalService {
+    String call();
+  }
+}

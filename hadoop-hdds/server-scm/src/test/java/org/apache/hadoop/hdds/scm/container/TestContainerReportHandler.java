@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainerReports;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
@@ -27,8 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -58,6 +59,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -72,7 +74,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.junit.jupiter.api.AfterEach;
@@ -99,9 +100,9 @@ public class TestContainerReportHandler {
   private PipelineManager pipelineManager;
 
   @BeforeEach
-  void setup() throws IOException, InvalidStateTransitionException {
+  void setup() throws IOException {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
-    nodeManager = new MockNodeManager(true, 10);
+    nodeManager = new MockNodeManager(true, 20);
     containerManager = mock(ContainerManager.class);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
@@ -209,10 +210,6 @@ public class TestContainerReportHandler {
               replicaState.equals(ContainerReplicaProto.State.QUASI_CLOSED)) &&
               (containerState.equals(HddsProtos.LifeCycleState.DELETED) ||
               containerState.equals(HddsProtos.LifeCycleState.DELETING))) {
-            continue;
-          }
-          if (replicationType == HddsProtos.ReplicationType.EC &&
-              containerState.equals(HddsProtos.LifeCycleState.DELETED)) {
             continue;
           }
           for (ContainerReplicaProto.State invalidState : invalidReplicaStates) {
@@ -514,13 +511,13 @@ public class TestContainerReportHandler {
   }
 
   /**
-   * Tests that a DELETING or DELETED RATIS/EC container transitions to CLOSED if a non-empty replica in OPEN, CLOSING,
-   * CLOSED, QUASI_CLOSED or UNHEALTHY state is reported.
+   * Tests that a DELETING or DELETED RATIS container transitions to CLOSED or QUASI_CLOSED depending on
+   * non-empty replica state. EC does not resurrect and non-empty replica gets a force-delete command.
    * It should not transition if the replica is in INVALID or DELETED states.
    */
   @ParameterizedTest
   @MethodSource("containerAndReplicaStates")
-  public void containerShouldTransitionFromDeletingOrDeletedToClosedWhenNonEmptyReplica(
+  public void containerTransitionFromDeletingOrDeletedWhenNonEmptyReplica(
       HddsProtos.ReplicationType replicationType,
       LifeCycleState containerState,
       ContainerReplicaProto.State replicaState,
@@ -565,22 +562,23 @@ public class TestContainerReportHandler {
      * replicationType        EC
      */
 
-    // should transition on processing the valid replica's report
+    clearInvocations(publisher);
+
     ContainerReportsProto closedContainerReport = getContainerReports(validReplica);
     containerReportHandler
         .onMessage(new ContainerReportFromDatanode(dnWithValidReplica, closedContainerReport), publisher);
-    // Determine expected state based on replica state
-    LifeCycleState expectedState;
-    if (replicaState == ContainerReplicaProto.State.CLOSED) {
-      expectedState = LifeCycleState.CLOSED;
-    } else {
-      expectedState = LifeCycleState.QUASI_CLOSED;
-    }
-    assertEquals(expectedState, containerStateManager.getContainer(container.containerID()).getState());
 
-    // verify that no delete command is issued for non-empty replica, regardless of container state
-    verify(publisher, times(0))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
+    if (replicationType == HddsProtos.ReplicationType.EC) {
+      assertEquals(containerState, containerStateManager.getContainer(container.containerID()).getState());
+      verify(publisher, times(1))
+          .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
+    } else {
+      LifeCycleState expectedState = replicaState == ContainerReplicaProto.State.CLOSED
+          ? LifeCycleState.CLOSED : LifeCycleState.QUASI_CLOSED;
+      assertEquals(expectedState, containerStateManager.getContainer(container.containerID()).getState());
+      verify(publisher, times(0))
+          .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
+    }
   }
 
   @ParameterizedTest
@@ -637,12 +635,11 @@ public class TestContainerReportHandler {
         container.getReplicationType());
     final int numDatanodes =
         container.getReplicationConfig().getRequiredNodes();
-    // Register required number of datanodes with NodeManager
-    List<DatanodeDetails> dns = new ArrayList<>(numDatanodes);
-    for (int i = 0; i < numDatanodes; i++) {
-      dns.add(randomDatanodeDetails());
-      nodeManager.register(dns.get(i), null, null);
-    }
+    // Get the required number of pre-registered, healthy datanodes from NodeManager
+    List<DatanodeDetails> dns = nodeManager.getNodes(NodeStatus.inServiceHealthy())
+        .stream()
+        .limit(numDatanodes)
+        .collect(Collectors.toList());
 
     // Add this container to ContainerStateManager
     containerStateManager.addContainer(container.getProtobuf());
@@ -1270,6 +1267,93 @@ public class TestContainerReportHandler {
     assertEquals(1, containerManager.getContainerReplicas(containerOne.containerID()).size());
   }
 
+  /**
+   * A CLOSED container's sequenceId must not be raised by a healthy replica reporting a higher BCSID,
+   * otherwise the QUASI_CLOSED replicas matching the original sequenceId would be seen as unhealthy.
+   */
+  @Test
+  public void testClosedContainerSequenceIdNotUpdatedByHigherBcsid() throws Exception {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(NodeStatus.inServiceHealthy()).iterator();
+    final DatanodeDetails datanodeOne = nodeIterator.next();
+    final DatanodeDetails datanodeTwo = nodeIterator.next();
+    final DatanodeDetails datanodeThree = nodeIterator.next();
+    final DatanodeDetails datanodeFour = nodeIterator.next();
+    final ContainerInfo containerOne = getContainer(LifeCycleState.CLOSED);
+    final long sequenceId = containerOne.getSequenceId();
+
+    nodeManager.setContainers(datanodeFour, Stream.of(containerOne.containerID()).collect(Collectors.toSet()));
+    containerStateManager.addContainer(containerOne.getProtobuf());
+    getReplicas(containerOne.containerID(), ContainerReplicaProto.State.QUASI_CLOSED, sequenceId,
+        datanodeOne, datanodeTwo, datanodeThree).forEach(containerStateManager::updateContainerReplica);
+    assertEquals(3, getHealthyReplicaCount(containerOne));
+
+    final ContainerReportsProto containerReport = getContainerReportsProto(
+        containerOne.containerID(), ContainerReplicaProto.State.CLOSED, datanodeFour.getUuidString(),
+        200L, 10L, sequenceId + 1, 0);
+    reportHandler.onMessage(new ContainerReportFromDatanode(datanodeFour, containerReport), publisher);
+
+    assertEquals(sequenceId, containerManager.getContainer(containerOne.containerID()).getSequenceId());
+    // The three QUASI_CLOSED replicas stay healthy and the CLOSED replica on datanodeFour is a fourth healthy copy.
+    // If the sequenceId were bumped, the QUASI_CLOSED replicas would be unhealthy and the count would drop to 1.
+    assertEquals(4, getHealthyReplicaCount(containerOne));
+  }
+
+  private int getHealthyReplicaCount(ContainerInfo container) throws ContainerNotFoundException {
+    final ContainerInfo current = containerStateManager.getContainer(container.containerID());
+    return new RatisContainerReplicaCount(current, containerStateManager.getContainerReplicas(container.containerID()),
+        0, 0, current.getReplicationFactor().getNumber(), 1).getHealthyReplicaCount();
+  }
+
+  /**
+   * A QUASI_CLOSED container can still advance its sequenceId to the BCSID of a healthy replica.
+   */
+  @Test
+  public void testQuasiClosedContainerSequenceIdUpdatedByHigherBcsid() throws Exception {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    final DatanodeDetails datanodeOne = nodeManager.getNodes(NodeStatus.inServiceHealthy()).iterator().next();
+    final ContainerInfo containerOne = getContainer(LifeCycleState.QUASI_CLOSED);
+    final long sequenceId = containerOne.getSequenceId();
+
+    nodeManager.setContainers(datanodeOne, Stream.of(containerOne.containerID()).collect(Collectors.toSet()));
+    containerStateManager.addContainer(containerOne.getProtobuf());
+
+    final ContainerReportsProto containerReport = getContainerReportsProto(
+        containerOne.containerID(), ContainerReplicaProto.State.QUASI_CLOSED, datanodeOne.getUuidString(),
+        200L, 10L, sequenceId + 1, 0);
+    reportHandler.onMessage(new ContainerReportFromDatanode(datanodeOne, containerReport), publisher);
+
+    assertEquals(sequenceId + 1, containerManager.getContainer(containerOne.containerID()).getSequenceId());
+  }
+
+  /**
+   * A DELETING or DELETED container with a non-empty CLOSED replica whose BCSID is higher than the container's
+   * is resurrected to CLOSED, keeping its sequenceId, and the replica is not deleted.
+   */
+  @ParameterizedTest
+  @EnumSource(value = LifeCycleState.class, names = {"DELETING", "DELETED"})
+  public void testDeletingOrDeletedContainerWithHigherBcsidReplicaResurrects(LifeCycleState state)
+      throws Exception {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    final DatanodeDetails datanodeOne = nodeManager.getNodes(NodeStatus.inServiceHealthy()).iterator().next();
+    final ContainerInfo containerOne = getContainer(state);
+    final long sequenceId = containerOne.getSequenceId();
+
+    nodeManager.setContainers(datanodeOne, Stream.of(containerOne.containerID()).collect(Collectors.toSet()));
+    containerStateManager.addContainer(containerOne.getProtobuf());
+
+    final ContainerReportsProto containerReport = getContainerReportsProto(
+        containerOne.containerID(), ContainerReplicaProto.State.CLOSED, datanodeOne.getUuidString(),
+        200L, 10L, sequenceId + 1, 0);
+    reportHandler.onMessage(new ContainerReportFromDatanode(datanodeOne, containerReport), publisher);
+
+    final ContainerInfo container = containerManager.getContainer(containerOne.containerID());
+    assertEquals(LifeCycleState.CLOSED, container.getState());
+    assertEquals(sequenceId, container.getSequenceId());
+    assertEquals(1, containerManager.getContainerReplicas(containerOne.containerID()).size());
+    verify(publisher, never()).fireEvent(any(), any(CommandForDatanode.class));
+  }
+
   @Test
   public void testWithNoContainerDataChecksum() throws Exception {
     final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
@@ -1486,7 +1570,7 @@ public class TestContainerReportHandler {
         ContainerReportsProto.newBuilder();
     final ContainerReplicaProto replicaProto =
         ContainerReplicaProto.newBuilder()
-            .setContainerID(containerId.getId())
+            .setContainerID(containerId.getIdForTesting())
             .setState(state)
             .setOriginNodeId(originNodeId)
             .setSize(5368709120L)

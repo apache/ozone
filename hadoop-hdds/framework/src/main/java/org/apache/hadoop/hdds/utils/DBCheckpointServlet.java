@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -181,10 +180,10 @@ public class DBCheckpointServlet extends HttpServlet
             UserGroupInformation.createRemoteUser(userPrincipalName);
         if (!hasPermission(ugi)) {
           LOG.error("Permission denied: User principal '{}' does not have"
-                  + " access to /dbCheckpoint.\nThis can happen when Ozone"
-                  + " Manager is started with a different user.\n"
-                  + " Please append '{}' to OM 'ozone.administrators'"
-                  + " config and restart OM to grant current"
+                  + " access to /dbCheckpoint.\nThis can happen when the"
+                  + " service is started with a different user.\n"
+                  + " Please append '{}' to 'ozone.administrators'"
+                  + " config and restart the service to grant current"
                   + " user access to this endpoint.",
               userPrincipalName, userPrincipalName);
           response.setStatus(HttpServletResponse.SC_FORBIDDEN);
@@ -238,8 +237,7 @@ public class DBCheckpointServlet extends HttpServlet
                file + ".tar\"");
 
       Instant start = Instant.now();
-      writeDbDataToStream(checkpoint, request, response.getOutputStream(),
-          receivedSstFiles, tmpdir);
+      writeDbDataToStream(checkpoint, request, response, receivedSstFiles, tmpdir);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
@@ -368,18 +366,18 @@ public class DBCheckpointServlet extends HttpServlet
    * @param checkpoint The checkpoint to be written.
    * @param ignoredRequest The httpRequest which generated this checkpoint.
    *        (Parameter is ignored in this class but used in child classes).
-   * @param destination The stream to write to.
+   * @param response The HTTP response; the body is written to {@link HttpServletResponse#getOutputStream()}.
    * @param toExcludeList the files to be excluded
    *
    */
   public void writeDbDataToStream(DBCheckpoint checkpoint,
       HttpServletRequest ignoredRequest,
-      OutputStream destination,
+      HttpServletResponse response,
       Set<String> toExcludeList,
       Path tmpdir)
       throws IOException, InterruptedException {
     Objects.requireNonNull(toExcludeList);
-    writeDBCheckpointToStream(checkpoint, destination, toExcludeList);
+    writeDBCheckpointToStream(checkpoint, response.getOutputStream(), toExcludeList);
   }
 
   public DBStore getDbStore() {

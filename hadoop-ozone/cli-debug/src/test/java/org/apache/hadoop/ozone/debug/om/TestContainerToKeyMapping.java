@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.debug.om;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,6 +29,9 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -41,9 +42,13 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.ozone.test.GenericTestUtils.PrintStreamCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,7 +66,7 @@ public class TestContainerToKeyMapping {
   private OMMetadataManager omMetadataManager;
   private String dbPath;
   private CommandLine cmd;
-  private StringWriter outWriter;
+  private PrintStreamCapturer outWriter;
 
   private static final String VOLUME_NAME = "vol1";
   private static final String FSO_BUCKET_NAME = "fso-bucket";
@@ -76,6 +81,7 @@ public class TestContainerToKeyMapping {
   private static final long CONTAINER_ID_2 = 2L;
   private static final long CONTAINER_ID_3 = 3L;
   private static final long CONTAINER_ID_4 = 4L;
+  private static final long CONTAINER_ID_5 = 5L;
   private static final long UNREFERENCED_FILE_ID = 500L;
   private static final long MISSING_DIR_ID = 999L;  // Non-existent parent
   private static final long OPEN_FILE_ID = 600L;
@@ -90,11 +96,8 @@ public class TestContainerToKeyMapping {
     dbPath = dbFile.toString();
     
     cmd = new OzoneDebug().getCmd();
-    outWriter = new StringWriter();
-    StringWriter errWriter = new StringWriter();
-    cmd.setOut(new PrintWriter(outWriter));
-    cmd.setErr(new PrintWriter(errWriter));
-    
+    outWriter = new SystemOutCapturer();
+
     OzoneConfiguration conf = new OzoneConfiguration();
     omMetadataManager = new OmMetadataManagerImpl(conf,
         tempDir.toFile(), "om.db", false);
@@ -106,6 +109,7 @@ public class TestContainerToKeyMapping {
 
   @AfterEach
   public void tearDown() throws Exception {
+    IOUtils.closeQuietly(outWriter);
     if (omMetadataManager != null && !omMetadataManager.getStore().isClosed()) {
       omMetadataManager.getStore().close();
     }
@@ -187,6 +191,18 @@ public class TestContainerToKeyMapping {
     assertThat(output).contains("\"" + CONTAINER_ID_4 + "\"");
     assertThat(output).contains("\"openKeys\"");
     assertThat(output).contains("/vol1/obs-bucket/mpuKey/test-upload-id");
+  }
+
+  @Test
+  public void testContainerToKeyMappingWithSplitSchemaMPU() {
+    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID_5), "--in-progress");
+    assertEquals(0, exitCode);
+
+    String output = outWriter.toString();
+
+    assertThat(output).contains("\"" + CONTAINER_ID_5 + "\"");
+    assertThat(output).contains("\"openKeys\"");
+    assertThat(output).contains("/vol1/obs-bucket/splitMpuKey/split-upload-id");
   }
 
   @Test
@@ -292,6 +308,7 @@ public class TestContainerToKeyMapping {
 
     // Create MPU (multipart upload) for OBS bucket with parts in container 5
     createMultipartUpload();
+    createSplitSchemaMultipartUpload();
   }
 
   /**
@@ -304,7 +321,7 @@ public class TestContainerToKeyMapping {
     // Create part 1 with a block in container 4
     OmKeyInfo part1Info = createOBSKeyInfo(
         mpuKeyName + "/" + uploadId + "/part-1", MPU_PART1_ID, CONTAINER_ID_4);
-    KeyInfo part1Proto = part1Info.getProtobuf(true, 0);
+    KeyInfo part1Proto = part1Info.getProtobuf(true, ClientVersion.DEFAULT_VERSION);
     PartKeyInfo partKeyInfo1 = PartKeyInfo.newBuilder()
         .setPartName(mpuKeyName + "/" + uploadId + "/part-1")
         .setPartNumber(1)
@@ -314,7 +331,7 @@ public class TestContainerToKeyMapping {
     // Create part 2 with a block in container 4
     OmKeyInfo part2Info = createOBSKeyInfo(
         mpuKeyName + "/" + uploadId + "/part-2", MPU_PART2_ID, CONTAINER_ID_4);
-    KeyInfo part2Proto = part2Info.getProtobuf(true, 0);
+    KeyInfo part2Proto = part2Info.getProtobuf(true, ClientVersion.DEFAULT_VERSION);
     PartKeyInfo partKeyInfo2 = PartKeyInfo.newBuilder()
         .setPartName(mpuKeyName + "/" + uploadId + "/part-2")
         .setPartNumber(2)
@@ -334,6 +351,46 @@ public class TestContainerToKeyMapping {
         .build();
 
     // Put into multipartInfoTable
+    String mpuKey = omMetadataManager.getMultipartKey(
+        VOLUME_NAME, OBS_BUCKET_NAME, mpuKeyName, uploadId);
+    omMetadataManager.getMultipartInfoTable().put(mpuKey, mpuInfo);
+  }
+
+  /**
+   * Helper method to create a split-schema multipart upload with parts in
+   * multipartPartsTable.
+   */
+  private void createSplitSchemaMultipartUpload() throws Exception {
+    String mpuKeyName = "splitMpuKey";
+    String uploadId = "split-upload-id";
+
+    OmKeyInfo part1Info = new OmKeyInfo.Builder(createOBSKeyInfo(
+        mpuKeyName + "/" + uploadId + "/part-1", MPU_PART1_ID + 10, CONTAINER_ID_5))
+        .addMetadata(OzoneConsts.ETAG, "etag-1")
+        .build();
+    OmMultipartPartInfo partInfo1 = OmMultipartPartInfo.from(
+        mpuKeyName + "/" + uploadId + "/part-1", 1, part1Info);
+
+    OmKeyInfo part2Info = new OmKeyInfo.Builder(createOBSKeyInfo(
+        mpuKeyName + "/" + uploadId + "/part-2", MPU_PART2_ID + 10, CONTAINER_ID_5))
+        .addMetadata(OzoneConsts.ETAG, "etag-2")
+        .build();
+    OmMultipartPartInfo partInfo2 = OmMultipartPartInfo.from(
+        mpuKeyName + "/" + uploadId + "/part-2", 2, part2Info);
+
+    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(uploadId, 1), partInfo1);
+    omMetadataManager.getMultipartPartsTable().put(OmMultipartPartKey.of(uploadId, 2), partInfo2);
+
+    OmMultipartKeyInfo mpuInfo = new OmMultipartKeyInfo.Builder()
+        .setUploadID(uploadId)
+        .setCreationTime(System.currentTimeMillis())
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .setObjectID(MPU_KEY_ID + 10)
+        .setParentID(0)
+        .setUpdateID(1)
+        .build();
+
     String mpuKey = omMetadataManager.getMultipartKey(
         VOLUME_NAME, OBS_BUCKET_NAME, mpuKeyName, uploadId);
     omMetadataManager.getMultipartInfoTable().put(mpuKey, mpuInfo);
@@ -386,6 +443,8 @@ public class TestContainerToKeyMapping {
         .setDataSize(1024)
         .setObjectID(objectId)
         .setUpdateID(1)
+        .setCreationTime(System.currentTimeMillis())
+        .setModificationTime(System.currentTimeMillis())
         .addOmKeyLocationInfoGroup(locationGroup)
         .build();
   }

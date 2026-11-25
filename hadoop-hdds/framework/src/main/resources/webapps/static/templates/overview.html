@@ -21,6 +21,10 @@
         <th>Namespace:</th>
         <td>{{$ctrl.jmx.Namespace}}</td>
     </tr>
+    <tr ng-if="$ctrl.jmx.DatanodeUuid">
+        <th>Datanode UUID:</th>
+        <td>{{$ctrl.jmx.DatanodeUuid}}</td>
+    </tr>
     <tr>
         <th>Started:</th>
         <td>{{$ctrl.jmx.StartedTimeInMillis | date : 'medium'}}</td>

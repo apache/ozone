@@ -18,14 +18,16 @@
 import React from 'react';
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import {rest} from "msw";
 import {vi} from 'vitest';
+import axios from 'axios';
+import { AUTO_RELOAD_INTERVAL_DEFAULT } from '@/constants/autoReload.constants';
 
 import Datanodes from '@/v2/pages/datanodes/datanodes';
 import * as commonUtils from '@/utils/common';
 import {datanodeServer} from '@tests/mocks/datanodeMocks/datanodeServer';
 import {datanodeLocators, searchInputLocator} from '@tests//locators/locators';
 import {waitForDNTable} from '@tests/utils/datanodes.utils';
+import { http, HttpResponse } from 'msw';
 
 // Mock utility functions
 vi.spyOn(commonUtils, 'showDataFetchError');
@@ -41,6 +43,19 @@ vi.mock('@/v2/components/select/multiSelect.tsx', () => ({
     </select>
   ),
 }));
+
+vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/v2/hooks/useAPIData.hook')>();
+  return {
+    ...actual,
+    useApiData: <T,>(url: string, defaultValue: T, options = {}) =>
+      actual.useApiData(url, defaultValue, {
+        ...options,
+        retryAttempts: 0,
+        retryDelay: 0,
+      }),
+  };
+});
 
 describe('Datanodes Component', () => {
   // Start and stop MSW server before and after all tests
@@ -65,6 +80,29 @@ describe('Datanodes Component', () => {
     expect(rows).toHaveLength(5); // Based on the mocked DatanodeResponse
   });
 
+  test('loads each endpoint once and does not poll when auto refresh is disabled', async () => {
+    sessionStorage.setItem('autoReloadEnabled', 'false');
+    const requests: string[] = [];
+    const interceptor = axios.interceptors.request.use(config => {
+      requests.push(config.url || '');
+      return config;
+    });
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
+    const { unmount } = render(<Datanodes />);
+    try {
+      await waitForDNTable();
+      for (const endpoint of ['/api/v1/datanodes', '/api/v1/datanodes/decommission/info']) {
+        expect(requests.filter(url => url === endpoint)).toHaveLength(1);
+      }
+      expect(setTimeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), AUTO_RELOAD_INTERVAL_DEFAULT);
+    } finally {
+      unmount();
+      setTimeoutSpy.mockRestore();
+      axios.interceptors.request.eject(interceptor);
+      sessionStorage.removeItem('autoReloadEnabled');
+    }
+  });
+
   test('Loads data on mount', async () => {
     render(<Datanodes />);
     // Wait for the data to be loaded into the table
@@ -77,8 +115,8 @@ describe('Datanodes Component', () => {
 
   test('Displays no data message if the datanodes API returns an empty array', async () => {
     datanodeServer.use(
-      rest.get('api/v1/datanodes', (req, res, ctx) => {
-        return res(ctx.status(200), ctx.json({ totalCount: 0, datanodes: [] }));
+      http.get('/api/v1/datanodes', () => {
+        return HttpResponse.json({ totalCount: 0, datanodes: [] });
       })
     );
 
@@ -171,8 +209,8 @@ describe('Datanodes Component', () => {
   test('Handles API errors gracefully by showing error message', async () => {
     // Set up MSW to return an error for the datanode API
     datanodeServer.use(
-      rest.get('api/v1/datanodes', (req, res, ctx) => {
-        return res(ctx.status(500), ctx.json({ error: 'Internal Server Error' }));
+      http.get('/api/v1/datanodes', () => {
+        return HttpResponse.json({ error: 'Internal Server Error' }, { status: 500 });
       })
     );
 
@@ -180,7 +218,9 @@ describe('Datanodes Component', () => {
 
     // Wait for the error to be handled
     await waitFor(() =>
-      expect(commonUtils.showDataFetchError).toHaveBeenCalledWith('AxiosError: Request failed with status code 500')
+      expect(commonUtils.showDataFetchError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Request failed with status code 500' })
+      )
     );
   });
 });

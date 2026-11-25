@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.security_;
 
+import static org.apache.hadoop.security_.SaslMechanismFactory.HADOOP_SECURITY_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY;
+
 import java.io.ByteArrayInputStream;
-import java.io.DataInput;
 import java.io.DataInputStream;
-import java.io.DataOutput;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedExceptionAction;
@@ -46,10 +46,8 @@ import javax.security.sasl.SaslServerFactory;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.ipc_.RetriableException;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ipc_.Server.Connection;
-import org.apache.hadoop.ipc_.StandbyException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SaslPlainServer;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
@@ -91,7 +89,7 @@ public class SaslRpcServer {
   
   public SaslRpcServer(AuthMethod authMethod) throws IOException {
     this.authMethod = authMethod;
-    mechanism = authMethod.getMechanismName();    
+    mechanism = SaslMechanismFactory.getMechanismName(authMethod);
     switch (authMethod) {
       case SIMPLE: {
         return; // no sasl for simple
@@ -214,30 +212,46 @@ public class SaslRpcServer {
     return fullName.split("[/@]");
   }
 
-  /** CallbackHandler for SASL DIGEST-MD5 mechanism */
+  /** CallbackHandler for SASL mechanism */
   public static class SaslDigestCallbackHandler implements CallbackHandler {
+    private final CustomizedCallbackHandler customizedCallbackHandler;
     private SecretManager<TokenIdentifier> secretManager;
     private Server.Connection connection; 
     
     public SaslDigestCallbackHandler(
         SecretManager<TokenIdentifier> secretManager,
         Server.Connection connection) {
-      this.secretManager = secretManager;
-      this.connection = connection;
+      this(secretManager, connection, connection.getConf());
     }
 
-    private char[] getPassword(TokenIdentifier tokenid) throws InvalidToken,
-        StandbyException, RetriableException, IOException {
+    public SaslDigestCallbackHandler(
+        SecretManager<TokenIdentifier> secretManager,
+        Server.Connection connection,
+        Configuration conf) {
+      this.secretManager = secretManager;
+      this.connection = connection;
+      this.customizedCallbackHandler = CustomizedCallbackHandler.get(
+          HADOOP_SECURITY_SASL_CUSTOMIZEDCALLBACKHANDLER_CLASS_KEY, conf);
+    }
+
+    private char[] getPassword(TokenIdentifier tokenid) throws IOException {
       return encodePassword(secretManager.retriableRetrievePassword(tokenid));
     }
 
+    private char[] getPassword(String name) throws IOException {
+      final TokenIdentifier tokenIdentifier = getIdentifier(name, secretManager);
+      final UserGroupInformation user = tokenIdentifier.getUser();
+      connection.attemptingUser = user;
+      LOG.debug("SASL server callback: setting password for client: {}", user);
+      return getPassword(tokenIdentifier);
+    }
+
     @Override
-    public void handle(Callback[] callbacks) throws InvalidToken,
-        UnsupportedCallbackException, StandbyException, RetriableException,
-        IOException {
+    public void handle(Callback[] callbacks) throws UnsupportedCallbackException, IOException {
       NameCallback nc = null;
       PasswordCallback pc = null;
       AuthorizeCallback ac = null;
+      List<Callback> unknownCallbacks = null;
       for (Callback callback : callbacks) {
         if (callback instanceof AuthorizeCallback) {
           ac = (AuthorizeCallback) callback;
@@ -248,23 +262,14 @@ public class SaslRpcServer {
         } else if (callback instanceof RealmCallback) {
           continue; // realm is ignored
         } else {
-          throw new UnsupportedCallbackException(callback,
-              "Unrecognized SASL DIGEST-MD5 Callback");
+          if (unknownCallbacks == null) {
+            unknownCallbacks = new ArrayList<>();
+          }
+          unknownCallbacks.add(callback);
         }
       }
       if (pc != null) {
-        TokenIdentifier tokenIdentifier = getIdentifier(nc.getDefaultName(),
-            secretManager);
-        char[] password = getPassword(tokenIdentifier);
-        UserGroupInformation user = null;
-        user = tokenIdentifier.getUser(); // may throw exception
-        connection.attemptingUser = user;
-        
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("SASL server DIGEST-MD5 callback: setting password "
-              + "for client: " + tokenIdentifier.getUser());
-        }
-        pc.setPassword(password);
+        pc.setPassword(getPassword(nc.getDefaultName()));
       }
       if (ac != null) {
         String authid = ac.getAuthenticationID();
@@ -279,11 +284,15 @@ public class SaslRpcServer {
             UserGroupInformation logUser =
               getIdentifier(authzid, secretManager).getUser();
             String username = logUser == null ? null : logUser.getUserName();
-            LOG.debug("SASL server DIGEST-MD5 callback: setting "
-                + "canonicalized client ID: " + username);
+            LOG.debug("SASL server callback: setting authorizedID: {}", username);
           }
           ac.setAuthorizedID(authzid);
         }
+      }
+      if (unknownCallbacks != null) {
+        final String name = nc != null ? nc.getDefaultName() : null;
+        final char[] password = name != null ? getPassword(name) : null;
+        customizedCallbackHandler.handleCallbacks(unknownCallbacks, name, password);
       }
     }
   }

@@ -54,7 +54,6 @@ public class ReplicationManagerReport {
 
   private final Map<String, LongAdder> stats;
   private final Map<String, List<ContainerID>> containerSample = new ConcurrentHashMap<>();
-  private ContainerHealthState containerHealthState = ContainerHealthState.HEALTHY;
 
   public static ReplicationManagerReport fromProtobuf(
       HddsProtos.ReplicationManagerReportProto proto) {
@@ -81,13 +80,12 @@ public class ReplicationManagerReport {
     return sampleLimit;
   }
 
-  public void increment(ContainerHealthState stat) {
+  public void increment(SimplifiedContainerHealthStateForReporting stat) {
     increment(stat.name());
   }
 
-  public void incrementAndSample(ContainerHealthState stat, ContainerInfo containerInfo) {
+  public void incrementAndSample(SimplifiedContainerHealthStateForReporting stat, ContainerInfo containerInfo) {
     incrementAndSample(stat.name(), containerInfo.containerID());
-    containerHealthState = stat;
   }
 
   public void increment(HddsProtos.LifeCycleState stat) {
@@ -104,14 +102,6 @@ public class ReplicationManagerReport {
    */
   public long getReportTimeStamp() {
     return reportTimeStamp;
-  }
-
-  public ContainerHealthState getContainerHealthState() {
-    return containerHealthState;
-  }
-
-  public void resetContainerHealthState() {
-    this.containerHealthState = ContainerHealthState.HEALTHY;
   }
 
   /**
@@ -151,16 +141,16 @@ public class ReplicationManagerReport {
   }
 
   /**
-   * Get the stat for the given ContainerHealthState. If there is no stat available
+   * Get the stat for the given SimplifiedContainerHealthStateForReporting. If there is no stat available
    * for that stat -1 is returned.
    * @param stat The requested stat.
    * @return The stat value or -1 if it is not present
    */
-  public long getStat(ContainerHealthState stat) {
+  public long getStat(SimplifiedContainerHealthStateForReporting stat) {
     return getStat(stat.name());
   }
 
-  public List<ContainerID> getSample(ContainerHealthState stat) {
+  public List<ContainerID> getSample(SimplifiedContainerHealthStateForReporting stat) {
     return getSample(stat.name());
   }
 
@@ -246,7 +236,7 @@ public class ReplicationManagerReport {
     for (HddsProtos.LifeCycleState s : HddsProtos.LifeCycleState.values()) {
       map.put(s.toString(), new LongAdder());
     }
-    for (ContainerHealthState s : ContainerHealthState.values()) {
+    for (SimplifiedContainerHealthStateForReporting s : SimplifiedContainerHealthStateForReporting.values()) {
       map.put(s.name(), new LongAdder());
     }
     return map;

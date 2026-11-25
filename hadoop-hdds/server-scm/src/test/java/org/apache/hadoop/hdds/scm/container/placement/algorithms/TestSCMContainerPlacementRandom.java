@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -61,7 +62,7 @@ public class TestSCMContainerPlacementRandom {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto(),
+          UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
@@ -89,6 +90,10 @@ public class TestSCMContainerPlacementRandom {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
+    when(mockNodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
+      DatanodeInfo di = invocation.getArgument(0);
+      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() >= 15L);
+    });
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
@@ -168,7 +173,7 @@ public class TestSCMContainerPlacementRandom {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto(),
+          UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
@@ -209,6 +214,10 @@ public class TestSCMContainerPlacementRandom {
         .thenReturn(datanodes.get(1));
     when(mockNodeManager.getNode(datanodes.get(2).getID()))
         .thenReturn(datanodes.get(2));
+    when(mockNodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
+      DatanodeInfo di = invocation.getArgument(0);
+      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() >= 15L);
+    });
 
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,

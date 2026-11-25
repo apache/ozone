@@ -29,6 +29,7 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -219,6 +220,9 @@ public class StorageVolumeChecker {
   public Set<? extends StorageVolume> checkAllVolumes(
       Collection<? extends StorageVolume> volumes)
       throws InterruptedException {
+    if (volumes.isEmpty()) {
+      return Collections.emptySet();
+    }
     final Set<StorageVolume> healthyVolumes = ConcurrentHashMap.newKeySet();
     final Set<StorageVolume> failedVolumes = ConcurrentHashMap.newKeySet();
     final Set<StorageVolume> allVolumes = new HashSet<>();

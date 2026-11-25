@@ -22,10 +22,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
 import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
@@ -49,7 +48,6 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       // This handler is only for EC containers.
       return false;
     }
-    ReplicationManagerReport report = request.getReport();
     ContainerInfo container = request.getContainerInfo();
     ContainerHealthResult health = checkHealth(request);
     LOG.debug("Checking container {} in ECReplicationCheckHandler", container);
@@ -62,7 +60,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         == ContainerHealthResult.HealthState.UNDER_REPLICATED) {
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
-      ContainerHealthState healthState;
+      SimplifiedContainerHealthStateForReporting healthState;
       if (underHealth.isUnrecoverable()) {
         // An EC container can be both unrecoverable and have offline replicas. In this case, we need
         // to report both states as the decommission monitor needs to wait for an extra copy to be
@@ -70,30 +68,29 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         if (underHealth.hasUnreplicatedOfflineIndexes()) {
           // Container has BOTH unrecoverable state AND unreplicated offline indexes
           if (underHealth.isMissing()) {
-            healthState = ContainerHealthState.MISSING_UNDER_REPLICATED;
+            healthState = SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED;
           } else {
             // A container which is unrecoverable but not missing must have too
             // many unhealthy replicas. Therefore it is UNHEALTHY + UNDER_REPLICATED
-            healthState = ContainerHealthState.UNHEALTHY_UNDER_REPLICATED;
+            healthState = SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED;
           }
         } else {
           // Only unrecoverable, no offline indexes
           if (underHealth.isMissing()) {
-            healthState = ContainerHealthState.MISSING;
+            healthState = SimplifiedContainerHealthStateForReporting.MISSING;
           } else {
-            healthState = ContainerHealthState.UNHEALTHY;
+            healthState = SimplifiedContainerHealthStateForReporting.UNHEALTHY;
           }
         }
-        report.incrementAndSample(healthState, container);
       } else {
-        healthState = ContainerHealthState.UNDER_REPLICATED;
-        report.incrementAndSample(healthState, container);
+        healthState = SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED;
       }
       if (!underHealth.isReplicatedOkAfterPending() &&
           (!underHealth.isUnrecoverable()
               || (underHealth.hasUnreplicatedOfflineIndexes() && !underHealth.offlineIndexesOkAfterPending()))) {
         request.getReplicationQueue().enqueue(underHealth);
       }
+      request.setSimplifiedHealthStateForReporting(healthState);
       LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending "
           + "is [{}]. isUnrecoverable is [{}]. isMissing is [{}]. "
           + "hasUnreplicatedOfflineIndexes is [{}]",
@@ -103,7 +100,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
       return true;
     } else if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
-      report.incrementAndSample(ContainerHealthState.OVER_REPLICATED, container);
+      request.setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting.OVER_REPLICATED);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isReplicatedOkAfterPending()) {

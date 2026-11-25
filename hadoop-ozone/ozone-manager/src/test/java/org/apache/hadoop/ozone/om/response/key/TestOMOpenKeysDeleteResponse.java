@@ -26,12 +26,12 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.key.OMOpenKeysDeleteResponse.OpenKeyToDelete;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -41,7 +41,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Tests the OM Response when open keys are deleted.
  */
-public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
+public class TestOMOpenKeysDeleteResponse extends OMKeyResponseTests {
   private static final long KEY_LENGTH = 100;
   private BucketLayout bucketLayout;
 
@@ -68,8 +68,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
-    Map<String, Pair<Long, OmKeyInfo>> keysToDelete = addOpenKeysToDB(volumeName, 3);
-    Map<String, Pair<Long, OmKeyInfo>> keysToKeep = addOpenKeysToDB(volumeName, 3);
+    Map<String, OpenKeyToDelete> keysToDelete = addOpenKeysToDB(volumeName, 3);
+    Map<String, OpenKeyToDelete> keysToKeep = addOpenKeysToDB(volumeName, 3);
 
     createAndCommitResponse(keysToDelete, Status.OK);
 
@@ -98,32 +98,26 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
-    Map<String, Pair<Long, OmKeyInfo>> keysToDelete = addOpenKeysToDB(volumeName, 3,
-        KEY_LENGTH);
-    Map<String, Pair<Long, OmKeyInfo>> keysToKeep = addOpenKeysToDB(volumeName, 3,
-        KEY_LENGTH);
+    Map<String, OpenKeyToDelete> keysToDelete = addOpenKeysToDB(volumeName, 3, KEY_LENGTH);
+    Map<String, OpenKeyToDelete> keysToKeep = addOpenKeysToDB(volumeName, 3, KEY_LENGTH);
 
     createAndCommitResponse(keysToDelete, Status.OK);
 
-    for (Map.Entry<String, Pair<Long, OmKeyInfo>> entry: keysToDelete.entrySet()) {
+    for (Map.Entry<String, OpenKeyToDelete> openKeyEntry: keysToDelete.entrySet()) {
       // These keys should have been moved from the open key table to the
       // delete table.
-      assertFalse(
-          omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(
-              entry.getKey()));
+      assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKeyEntry.getKey()));
       String deleteKey = omMetadataManager.getOzoneDeletePathKey(
-          entry.getValue().getValue().getObjectID(), entry.getKey());
+          openKeyEntry.getValue().keyInfo().getObjectID(), openKeyEntry.getKey());
       assertTrue(omMetadataManager.getDeletedTable().isExist(deleteKey));
       assertFalse(omMetadataManager.getDeletedTable().get(deleteKey).getOmKeyInfoList().get(0).isDeletedKeyCommitted());
     }
 
-    for (Map.Entry<String, Pair<Long, OmKeyInfo>> entry: keysToKeep.entrySet()) {
+    for (Map.Entry<String, OpenKeyToDelete> openKeyEntry: keysToKeep.entrySet()) {
       // These keys should not have been moved out of the open key table.
-      assertTrue(
-          omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(
-              entry.getKey()));
+      assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKeyEntry.getKey()));
       String deleteKey = omMetadataManager.getOzoneDeletePathKey(
-          entry.getValue().getValue().getObjectID(), entry.getKey());
+          openKeyEntry.getValue().keyInfo().getObjectID(), openKeyEntry.getKey());
       assertFalse(omMetadataManager.getDeletedTable().isExist(deleteKey));
     }
   }
@@ -140,7 +134,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
-    Map<String, Pair<Long, OmKeyInfo>> keysToDelete = addOpenKeysToDB(volumeName, 3);
+    Map<String, OpenKeyToDelete> keysToDelete = addOpenKeysToDB(volumeName, 3);
 
     createAndCommitResponse(keysToDelete, Status.INTERNAL_ERROR);
 
@@ -159,8 +153,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * to a batch operation and committed to the database.
    * @throws Exception
    */
-  private void createAndCommitResponse(Map<String, Pair<Long, OmKeyInfo>> keysToDelete,
-      Status status) throws Exception {
+  private void createAndCommitResponse(Map<String, OpenKeyToDelete> keysToDelete, Status status) throws Exception {
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setStatus(status)
@@ -182,8 +175,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * new {@link OmKeyInfo} object, adds them to the open key table cache, and
    * returns them. These keys will have no associated block data.
    */
-  private Map<String, Pair<Long, OmKeyInfo>> addOpenKeysToDB(String volume, int numKeys)
-      throws Exception {
+  private Map<String, OpenKeyToDelete> addOpenKeysToDB(String volume, int numKeys) throws Exception {
     return addOpenKeysToDB(volume, numKeys, 0);
   }
 
@@ -195,10 +187,9 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * bytes of data for each key.
    * @throws Exception
    */
-  private Map<String, Pair<Long, OmKeyInfo>> addOpenKeysToDB(String volume, int numKeys,
-      long keyLength) throws Exception {
+  private Map<String, OpenKeyToDelete> addOpenKeysToDB(String volume, int numKeys, long keyLength) throws Exception {
 
-    Map<String, Pair<Long, OmKeyInfo>> newOpenKeys = new HashMap<>();
+    Map<String, OpenKeyToDelete> newOpenKeys = new HashMap<>();
 
     for (int i = 0; i < numKeys; i++) {
       String bucket = UUID.randomUUID().toString();
@@ -238,7 +229,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
       assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
           .isExist(openKey));
 
-      newOpenKeys.put(openKey, Pair.of(bucketInfo.getObjectID(), omKeyInfo));
+      newOpenKeys.put(openKey, new OpenKeyToDelete(bucketInfo.getObjectID(), omKeyInfo));
     }
 
     return newOpenKeys;

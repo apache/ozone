@@ -32,6 +32,15 @@ import org.apache.hadoop.ozone.s3.util.S3Consts;
 class ObjectAclHandler extends ObjectOperationHandler {
 
   @Override
+  Response handleGetRequest(ObjectRequestContext context, String keyName) throws IOException {
+    if (context.ignore(getAction())) {
+      return null;
+    }
+
+    throw newError(NOT_IMPLEMENTED, keyName);
+  }
+
+  @Override
   Response handlePutRequest(ObjectRequestContext context, String keyName, InputStream body) throws IOException {
     if (context.ignore(getAction())) {
       return null;
@@ -45,17 +54,19 @@ class ObjectAclHandler extends ObjectOperationHandler {
     }
   }
 
-  @SuppressWarnings("SwitchStatementWithTooFewBranches")
+  @Override
   S3GAction getAction() {
     if (queryParams().get(S3Consts.QueryParams.ACL) == null) {
       return null;
     }
 
     switch (getContext().getMethod()) {
+    case HttpMethod.GET:
+      return S3GAction.GET_OBJECT_ACL;
     case HttpMethod.PUT:
       return S3GAction.PUT_OBJECT_ACL;
     default:
-      return null;
+      return S3GAction.NOT_IMPLEMENTED;
     }
   }
 }

@@ -25,7 +25,6 @@ import:
     - type: ozone/tracing
     - type: ozone/profiler
     - type: ozone/emptydir
-    - type: ozone/csi
     - type: ozone/onenode
   - path: prometheus
   - path: jaeger
@@ -37,12 +36,6 @@ import:
     - type: Image
       image: "@docker.image@"
     - type: ozone/tracing
-  - path: test-webserver
-    destination: pv-test
-  - path: ozone-csi
-    destination: csi
-  - path: test-webserver
-    destination: pv-test
 transformations:
   - type: Namespace
   - type: kustomize

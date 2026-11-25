@@ -89,8 +89,6 @@ public class ContainerHealthTask extends ReconScmTask {
         Thread.currentThread().interrupt();
         LOG.info("ContainerHealthTask interrupted");
         break;
-      } catch (Exception e) {
-        LOG.error("Error in ContainerHealthTask", e);
       }
     }
   }

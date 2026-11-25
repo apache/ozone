@@ -24,8 +24,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_CANDIDATE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.processFile;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
@@ -61,24 +63,30 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -87,8 +95,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.slf4j.event.Level;
 
 /**
@@ -162,6 +172,75 @@ class TestOmSnapshotManager {
   }
 
   @Test
+  public void testGetActiveSnapshotWithNullExpectedId() throws Exception {
+    OmSnapshotManager snapshots = mock(OmSnapshotManager.class);
+    OzoneManager manager = mock(OzoneManager.class);
+    SnapshotCache cache = mock(SnapshotCache.class);
+    HddsWhiteboxTestUtils.setInternalState(snapshots, "ozoneManager", manager);
+    HddsWhiteboxTestUtils.setInternalState(snapshots, "snapshotCache", cache);
+    Mockito.doCallRealMethod().when(snapshots).getActiveSnapshot("vol", "bucket", "snap", null);
+
+    OMException failure = assertThrows(OMException.class,
+        () -> snapshots.getActiveSnapshot("vol", "bucket", "snap", null));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, failure.getResult());
+    assertThat(failure).hasMessage("expectedSnapshotId must not be null");
+    Mockito.verifyNoInteractions(manager, cache);
+  }
+
+  private enum SnapshotScenario {
+    ACTIVE,
+    MISSING,
+    UUID_MISMATCH,
+    DELETED,
+    NAME_REUSED_AFTER_VALIDATION
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @EnumSource(SnapshotScenario.class)
+  public void testGetActiveSnapshotWithExpectedId(SnapshotScenario scenario) throws Exception {
+    OzoneManager manager = mock(OzoneManager.class);
+    OMMetadataManager metadata = mock(OMMetadataManager.class);
+    @SuppressWarnings("unchecked")
+    Table<String, SnapshotInfo> table = mock(Table.class);
+    SnapshotCache cache = mock(SnapshotCache.class);
+    OmSnapshotManager snapshots = mock(OmSnapshotManager.class);
+    when(manager.getMetadataManager()).thenReturn(metadata);
+    when(metadata.getSnapshotInfoTable()).thenReturn(table);
+    HddsWhiteboxTestUtils.setInternalState(snapshots, "ozoneManager", manager);
+    HddsWhiteboxTestUtils.setInternalState(snapshots, "snapshotCache", cache);
+    UUID expected = UUID.randomUUID();
+    SnapshotInfo info = SnapshotInfo.newInstance("vol", "bucket", "snap", expected, 1);
+    if (scenario == SnapshotScenario.DELETED) {
+      info.setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
+    }
+    SnapshotInfo replacement = info.toBuilder().setSnapshotId(UUID.randomUUID()).build();
+    when(table.get(info.getTableKey())).thenReturn(
+        scenario == SnapshotScenario.MISSING ? null : scenario == SnapshotScenario.UUID_MISMATCH ? replacement : info);
+    Mockito.doCallRealMethod().when(snapshots).getActiveSnapshot("vol", "bucket", "snap", expected);
+    if (scenario == SnapshotScenario.MISSING || scenario == SnapshotScenario.UUID_MISMATCH ||
+        scenario == SnapshotScenario.DELETED) {
+      OMException failure = assertThrows(OMException.class,
+          () -> snapshots.getActiveSnapshot("vol", "bucket", "snap", expected));
+      assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, failure.getResult());
+      Mockito.verifyNoInteractions(cache);
+    } else {
+      @SuppressWarnings("unchecked")
+      UncheckedAutoCloseableSupplier<OmSnapshot> handle =
+          mock(UncheckedAutoCloseableSupplier.class);
+      when(cache.get(expected)).thenAnswer(invocation -> {
+        if (scenario == SnapshotScenario.NAME_REUSED_AFTER_VALIDATION) {
+          // Rename/name reuse after validation must not change the UUID passed to the cache.
+          when(table.get(info.getTableKey())).thenReturn(replacement);
+        }
+        return handle;
+      });
+      assertEquals(handle, snapshots.getActiveSnapshot("vol", "bucket", "snap", expected));
+      verify(cache).get(expected);
+      verify(table).get(info.getTableKey());
+    }
+  }
+
+  @Test
   public void testSnapshotFeatureFlagSafetyCheck() throws IOException {
     // Verify that the snapshot feature config safety check method
     // is returning the expected value.
@@ -174,6 +253,25 @@ class TestOmSnapshotManager {
 
     when(snapshotInfoTable.isEmpty()).thenReturn(true);
     assertTrue(om.getOmSnapshotManager().canDisableFsSnapshot(om.getMetadataManager()));
+  }
+
+  @Test
+  public void testSnapshotDiffDbFormatVersion() throws IOException {
+    // db.snapdiff must use the pinned format_version, so that it stays readable after a downgrade.
+    Path snapDiffDb = Paths.get(ServerUtils.getDBPath(om.getConfiguration(), OZONE_OM_SNAPSHOT_DIFF_DB_DIR).toString(),
+        OM_SNAPSHOT_DIFF_DB_NAME);
+    Path optionsFile;
+    try (Stream<Path> files = Files.list(snapDiffDb)) {
+      optionsFile = files.filter(p -> p.getFileName().toString().matches("OPTIONS-[0-9]+"))
+          .max(Path::compareTo)
+          .orElseThrow(() -> new IOException("No OPTIONS file in " + snapDiffDb));
+    }
+    List<String> formatVersions = Files.readAllLines(optionsFile, StandardCharsets.UTF_8).stream()
+        .map(String::trim)
+        .filter(line -> line.startsWith("format_version="))
+        .collect(Collectors.toList());
+    assertThat(formatVersions).isNotEmpty()
+        .allMatch(line -> line.equals("format_version=" + ManagedBlockBasedTableConfig.FORMAT_VERSION));
   }
 
   @Test

@@ -21,9 +21,11 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 
 /**
  * Holds configuration items for OM RocksDB.
@@ -83,6 +85,27 @@ public class RocksDBConfiguration {
           + " file size exceeds this limit, the earliest files will be deleted."
           + "Default 0 means no limit.")
   private long walSizeLimit = 0;
+
+  @Config(key = "hadoop.hdds.db.rocksdb.compaction.deletion.ratio",
+      type = ConfigType.DOUBLE,
+      defaultValue = "0",
+      tags = {OM, SCM, DATANODE},
+      description = "Request automatic compaction when the fraction of deletion tombstones in a newly created SST "
+          + "reaches this ratio. Valid values are between 0 and 1; 0 disables the collector. "
+          + "Applies to default DB profiles; explicit column family options and options files take precedence. "
+          + "Does not flush tombstones from memtables or override disabled automatic compaction. Requires restart.")
+  private double compactionDeletionRatio;
+
+  @PostConstruct
+  public void validate() {
+    Preconditions.checkArgument(compactionDeletionRatio >= 0 && compactionDeletionRatio <= 1,
+        "hadoop.hdds.db.rocksdb.compaction.deletion.ratio must be between 0 and 1 inclusive: %s",
+        compactionDeletionRatio);
+  }
+
+  public double getCompactionDeletionRatio() {
+    return compactionDeletionRatio;
+  }
 
   public void setRocksdbLoggingEnabled(boolean enabled) {
     this.rocksdbLogEnabled = enabled;

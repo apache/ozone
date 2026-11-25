@@ -50,7 +50,7 @@ import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
@@ -63,8 +63,8 @@ import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -131,46 +131,70 @@ public final class HAUtils {
    */
   public static ScmBlockLocationProtocol getScmBlockClient(
       OzoneConfiguration conf) {
+    return getScmBlockClient(conf,
+        new SCMBlockLocationFailoverProxyProvider(conf));
+  }
+
+  /**
+   * Creates an SCM block client using the provided proxy provider.
+   * Retains the provider reference to support dynamic SCM node updates.
+   */
+  public static ScmBlockLocationProtocol getScmBlockClient(
+      OzoneConfiguration conf,
+      SCMBlockLocationFailoverProxyProvider proxyProvider) {
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
-        new ScmBlockLocationProtocolClientSideTranslatorPB(
-            new SCMBlockLocationFailoverProxyProvider(conf), conf);
+        new ScmBlockLocationProtocolClientSideTranslatorPB(proxyProvider, conf);
     return TracingUtil
-        .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
+        .createClientProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
   }
 
-  public static StorageContainerLocationProtocol getScmContainerClient(
+  public static StorageContainerLocationInternalInterface getScmContainerClient(
       ConfigurationSource conf) {
-    SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(conf, null);
-    StorageContainerLocationProtocol scmContainerClient =
-        TracingUtil.createProxy(
+    return getScmContainerClient(conf,
+        new SCMContainerLocationFailoverProxyProvider(conf, null));
+  }
+
+  /**
+   * Creates an SCM container client using the provided proxy provider.
+   * Retains the provider reference to support dynamic SCM node updates.
+   */
+  public static StorageContainerLocationInternalInterface getScmContainerClient(
+      ConfigurationSource conf,
+      SCMContainerLocationFailoverProxyProvider proxyProvider) {
+    StorageContainerLocationInternalInterface scmContainerClient =
+        TracingUtil.createClientProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider), StorageContainerLocationProtocol.class, conf);
+                proxyProvider), StorageContainerLocationInternalInterface.class, conf);
     return scmContainerClient;
   }
 
   @VisibleForTesting
-  public static StorageContainerLocationProtocol getScmContainerClient(
+  public static StorageContainerLocationInternalInterface getScmContainerClient(
       ConfigurationSource conf, UserGroupInformation userGroupInformation) {
     SCMContainerLocationFailoverProxyProvider proxyProvider =
         new SCMContainerLocationFailoverProxyProvider(conf,
             userGroupInformation);
-    StorageContainerLocationProtocol scmContainerClient =
-        TracingUtil.createProxy(
+    StorageContainerLocationInternalInterface scmContainerClient =
+        TracingUtil.createClientProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider), StorageContainerLocationProtocol.class, conf);
+                proxyProvider), StorageContainerLocationInternalInterface.class, conf);
     return scmContainerClient;
   }
 
-  public static StorageContainerLocationProtocol getScmContainerClientForNode(
+  public static StorageContainerLocationInternalInterface getScmContainerClientForNode(
       ConfigurationSource conf, ScmNodeTarget targetScmNode) {
+    return getScmContainerClientForNode(conf, targetScmNode, null);
+  }
+
+  public static StorageContainerLocationInternalInterface getScmContainerClientForNode(
+      ConfigurationSource conf, ScmNodeTarget targetScmNode, UserGroupInformation ugi) {
     SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(conf, null);
-    StorageContainerLocationProtocol scmContainerClient =
-        TracingUtil.createProxy(
+        new SCMContainerLocationFailoverProxyProvider(conf, ugi);
+    StorageContainerLocationInternalInterface scmContainerClient =
+        TracingUtil.createClientProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider, targetScmNode), StorageContainerLocationProtocol.class, conf);
+                proxyProvider, targetScmNode), StorageContainerLocationInternalInterface.class, conf);
     return scmContainerClient;
   }
 
@@ -413,21 +437,26 @@ public final class HAUtils {
     try {
       return retriableTask.call();
     } catch (Exception ex) {
-      if (containsAccessControlException(ex)) {
-        throw new AccessControlException();
+      AccessControlException ace = accessControlExceptionInCauseChain(ex);
+      if (ace != null) {
+        throw new IOException(ace.getMessage(), ex);
       }
       throw new SCMSecurityException("Unable to obtain complete CA list", ex);
     }
   }
 
-  private static boolean containsAccessControlException(Throwable e) {
+  private static AccessControlException accessControlExceptionInCauseChain(Throwable e) {
     while (e != null) {
       if (e instanceof AccessControlException) {
-        return true;
+        return (AccessControlException) e;
       }
       e = e.getCause();
     }
-    return false;
+    return null;
+  }
+
+  private static boolean containsAccessControlException(Throwable e) {
+    return accessControlExceptionInCauseChain(e) != null;
   }
 
   private static List<String> waitForCACerts(

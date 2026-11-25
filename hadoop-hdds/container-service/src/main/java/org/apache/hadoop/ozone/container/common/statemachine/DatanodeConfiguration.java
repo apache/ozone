@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.STORAGE;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Duration;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.hdds.conf.Config;
@@ -51,6 +52,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(DatanodeConfiguration.class);
 
+  public static final String BLOCK_DELETING_SERVICE_INTERVAL_KEY = "hdds.datanode.block.deleting.service.interval";
   static final String CONTAINER_DELETE_THREADS_MAX_KEY = "hdds.datanode.container.delete.threads.max";
   static final String CONTAINER_CLOSE_THREADS_MAX_KEY = "hdds.datanode.container.close.threads.max";
   static final String PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY = "hdds.datanode.periodic.disk.check.interval.minutes";
@@ -81,6 +83,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
       "hdds.datanode.volume.min.free.space.percent";
   public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT = 0.02f;
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT =
+      "hdds.datanode.volume.min.free.space.hard.limit.percent";
+  public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT =
+      0.015f;
 
   public static final String WAIT_ON_ALL_FOLLOWERS = "hdds.datanode.wait.on.all.followers";
   public static final String CONTAINER_SCHEMA_V3_ENABLED = "hdds.datanode.container.schema.v3.enabled";
@@ -88,6 +94,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String CONTAINER_CLIENT_CACHE_SIZE = "hdds.datanode.container.client.cache.size";
   public static final String CONTAINER_CLIENT_CACHE_STALE_THRESHOLD =
       "hdds.datanode.container.client.cache.stale.threshold";
+  public static final String CONTAINER_INIT_TIMEOUT_KEY = "hdds.datanode.container.init.timeout";
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
@@ -139,9 +146,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final int CONTAINER_CLOSE_THREADS_DEFAULT = 3;
   static final int BLOCK_DELETE_THREADS_DEFAULT = 5;
 
+  public static final String GRPC_SO_BACKLOG_KEY = "hdds.datanode.grpc.so.backlog";
+  public static final int GRPC_SO_BACKLOG_DEFAULT = 256;
+
   public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
       "hdds.datanode.block.delete.command.worker.interval";
   public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT = Duration.ofSeconds(2);
+  public static final String STREAM_READ_FILE_IDLE_TIMEOUT_KEY = "hdds.datanode.stream.read.file.idle.timeout";
+  public static final Duration STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT = Duration.ofMinutes(1);
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -153,6 +165,30 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       description = "Number of threads per volume that Datanode will use for reading replicated chunks."
   )
   private int numReadThreadPerVolume = 10;
+
+  @Config(key = STREAM_READ_FILE_IDLE_TIMEOUT_KEY,
+      type = ConfigType.TIME,
+      defaultValue = "1m",
+      tags = {DATANODE},
+      description = "How long a streaming ReadBlock stream may stay idle before the datanode closes the block file "
+          + "held open for it. The stream itself stays open and the file is reopened by the next request, so this "
+          + "only bounds the file descriptors pinned by idle streams."
+  )
+  private Duration streamReadFileIdleTimeout = STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT;
+
+  /**
+   * SO_BACKLOG value for the gRPC server socket.
+   */
+  @Config(key = "hdds.datanode.grpc.so.backlog",
+      type = ConfigType.INT,
+      defaultValue = "256",
+      tags = {DATANODE},
+      description = "The SO_BACKLOG value for the Datanode gRPC server socket. " +
+          "This limits the number of pending connections in the kernel's " +
+          "accept queue. When this limit is reached, the kernel will reject " +
+          "new connection attempts with SYN drops."
+  )
+  private int grpcSoBacklog = GRPC_SO_BACKLOG_DEFAULT;
 
   /**
    * The maximum number of threads used to delete containers on a datanode
@@ -235,6 +271,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   @Config(key = "hdds.datanode.block.deleting.service.interval",
           defaultValue = "60s",
+          reconfigurable = true,
           type = ConfigType.TIME,
           tags = { ConfigTag.SCM, ConfigTag.DELETION },
           description =
@@ -301,11 +338,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "-1",
       type = ConfigType.SIZE,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
-      description = "This determines the free space to be used for closing containers" +
-          " When the difference between volume capacity and used reaches this number," +
-          " containers that reside on this volume will be closed and no new containers" +
-          " would be allocated on this volume." +
-          " Max of min.free.space and min.free.space.percent will be used as final value."
+      description = "Minimum free space (bytes) applied together with min.free.space.percent "
+          + "(reported to SCM in heartbeat as freeSpaceToSpare) and "
+          + "min.free.space.hard.limit.percent (local write enforcement). "
+          + "The effective value for each tier is max(this bytes, capacity * ratio)."
   )
   private long minFreeSpace = getDefaultFreeSpace();
 
@@ -313,13 +349,25 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "0.02", // match HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT
       type = ConfigType.FLOAT,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
-      description = "This determines the free space percent to be used for closing containers" +
-          " When the difference between volume capacity and used reaches (free.space.percent of volume capacity)," +
-          " containers that reside on this volume will be closed and no new containers" +
-          " would be allocated on this volume." +
-          " Max of min.free.space or min.free.space.percent will be used as final value."
+      description = "Minimum fraction of volume capacity reported to SCM as freeSpaceToSpare "
+          + "(heartbeat / storage reports). Local write rejection uses "
+          + "hdds.datanode.volume.min.free.space.hard.limit.percent instead. "
+          + "The soft band is the gap between these two (e.g. 2000GB disk: 2% = 40GB reported vs "
+          + "1.5% = 30GB hard → 10GB band) where the DN may send close-container actions while "
+          + "writes still succeed."
   )
   private float minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
+  @Config(key = "hdds.datanode.volume.min.free.space.hard.limit.percent",
+      defaultValue = "0.015",
+      type = ConfigType.FLOAT,
+      tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
+      description = "Minimum fraction of volume capacity reserved for local enforcement: "
+          + "writes fail when available space would drop below max(this ratio * capacity, "
+          + "hdds.datanode.volume.min.free.space). Should be <= min.free.space.percent "
+          + "so SCM can plan for a larger headroom than the DN enforces locally."
+  )
+  private float minFreeSpaceHardLimitRatio =
+      HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT;
 
   @Config(key = "hdds.datanode.periodic.disk.check.interval.minutes",
       defaultValue = "60",
@@ -384,6 +432,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private boolean isDiskCheckEnabled = true;
 
+  @Config(key = "hdds.datanode.disk.check.rocksdb.check.io.test.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {DATANODE},
+      description = "The configuration to enable or disable RocksDb disk IO checks."
+  )
+  private boolean isRocksDbDiskCheckEnabled = true;
+
   @Config(key = "hdds.datanode.disk.check.io.failures.tolerated",
       defaultValue = "1",
       type = ConfigType.INT,
@@ -427,6 +483,22 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           + " postfix (ns,ms,s,m,h,d)."
   )
   private Duration diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+
+  @Config(key = "hdds.datanode.container.init.timeout",
+      defaultValue = "0s",
+      type = ConfigType.TIME,
+      tags = { DATANODE },
+      description = "Maximum time allowed for datanode container services to"
+          + " initialize at startup. Initialization builds the container set"
+          + " and starts the Ratis write channel, which recovers all Raft"
+          + " groups from disk. If it does not complete within this time,"
+          + " startup is failed so the datanode shuts down cleanly instead of"
+          + " hanging indefinitely (for example when Ratis group recovery"
+          + " stalls on a failing volume). A value of 0 (the default) disables"
+          + " the watchdog and preserves the previous behavior of waiting"
+          + " indefinitely. Unit could be defined with postfix (ns,ms,s,m,h,d)."
+  )
+  private Duration containerInitTimeout = Duration.ZERO;
 
   @Config(key = "hdds.datanode.disk.check.sliding.window.timeout",
       defaultValue = "70m",
@@ -795,6 +867,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
     }
 
+    if (streamReadFileIdleTimeout.isNegative() || streamReadFileIdleTimeout.isZero()) {
+      LOG.warn(STREAM_READ_FILE_IDLE_TIMEOUT_KEY + " must be greater than zero and was set to {}. Defaulting to {}",
+          streamReadFileIdleTimeout, STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT);
+      streamReadFileIdleTimeout = STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT;
+    }
+
     if (rocksdbLogMaxFileSize < 0) {
       LOG.warn(ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY +
               " must be no less than zero and was set to {}. Defaulting to {}",
@@ -850,6 +928,23 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
           minFreeSpaceRatio);
       minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
+    }
+    if (minFreeSpaceHardLimitRatio > 1 || minFreeSpaceHardLimitRatio < 0) {
+      LOG.warn("{} = {} is invalid, should be between 0 and 1; resetting to default {}",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
+          minFreeSpaceHardLimitRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT);
+      minFreeSpaceHardLimitRatio =
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT_DEFAULT;
+    }
+    if (minFreeSpaceHardLimitRatio > minFreeSpaceRatio) {
+      LOG.warn("{} = {} must not exceed {} = {}, setting hard limit to soft limit. "
+              + "Set hard.limit.percent <= min.free.space.percent to enable the soft band.",
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_HARD_LIMIT_PERCENT,
+          minFreeSpaceHardLimitRatio,
+          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+          minFreeSpaceRatio);
+      minFreeSpaceHardLimitRatio = minFreeSpaceRatio;
     }
 
     if (minFreeSpace < 0) {
@@ -917,8 +1012,31 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     this.containerCloseThreads = containerCloseThreads;
   }
 
+  /**
+   * Minimum free space reported to SCM (freeSpaceToSpare in storage reports).
+   */
   public long getMinFreeSpace(long capacity) {
     return Math.max((long) (capacity * minFreeSpaceRatio), minFreeSpace);
+  }
+
+  /**
+   * Minimum free space enforced locally for writes (disk full / out-of-space)
+   * and for choosing a volume for a new container (same threshold as writes).
+   */
+  public long getHardLimitMinFreeSpace(long capacity) {
+    return Math.max((long) (capacity * minFreeSpaceHardLimitRatio), minFreeSpace);
+  }
+
+  /**
+   * Width of the soft band: reported spare minus hard spare. For example, with 2000GB capacity,
+   * 2% reported (40GB) and 1.5% hard (30GB), this is 10GB — the gap where the DN may send
+   * close-container actions while writes still succeed.
+   */
+  @VisibleForTesting
+  public long getSoftBandMinFreeSpaceWidth(long capacity) {
+    long reported = getMinFreeSpace(capacity);
+    long hard = getHardLimitMinFreeSpace(capacity);
+    return Math.max(0L, reported - hard);
   }
 
   public long getMinFreeSpace() {
@@ -927,6 +1045,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public float getMinFreeSpaceRatio() {
     return minFreeSpaceRatio;
+  }
+
+  @VisibleForTesting
+  public float getMinFreeSpaceHardLimitRatio() {
+    return minFreeSpaceHardLimitRatio;
   }
 
   public long getPeriodicDiskCheckIntervalMinutes() {
@@ -1005,12 +1128,24 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     diskCheckTimeout = duration;
   }
 
+  public Duration getContainerInitTimeout() {
+    return containerInitTimeout;
+  }
+
+  public void setContainerInitTimeout(Duration duration) {
+    containerInitTimeout = duration;
+  }
+
   public void setDiskCheckEnabled(boolean diskCheckEnabled) {
     isDiskCheckEnabled = diskCheckEnabled;
   }
 
   public boolean isDiskCheckEnabled() {
     return isDiskCheckEnabled;
+  }
+
+  public boolean isRocksDbDiskCheckEnabled() {
+    return isRocksDbDiskCheckEnabled;
   }
 
   public Duration getDiskCheckSlidingWindowTimeout() {
@@ -1092,6 +1227,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public int getNumReadThreadPerVolume() {
     return numReadThreadPerVolume;
+  }
+
+  public Duration getStreamReadFileIdleTimeout() {
+    return streamReadFileIdleTimeout;
   }
 
   public void setNumReadThreadPerVolume(int threads) {
@@ -1211,5 +1350,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static long getDefaultFreeSpace() {
     final StorageSize measure = StorageSize.parse(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT);
     return Math.round(measure.getUnit().toBytes(measure.getValue()));
+  }
+
+  public int getGrpcSoBacklog() {
+    return grpcSoBacklog;
+  }
+
+  public void setGrpcSoBacklog(int grpcSoBacklog) {
+    this.grpcSoBacklog = grpcSoBacklog;
   }
 }

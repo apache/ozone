@@ -20,8 +20,9 @@ package org.apache.hadoop.ozone.recon.tasks;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
@@ -39,14 +40,14 @@ import org.slf4j.LoggerFactory;
 public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDeletionMetrics> {
 
   private static final Logger LOG = LoggerFactory.getLogger(DataNodeMetricsCollectionTask.class);
-  private final DatanodeDetails nodeDetails;
+  private final DatanodeInfo nodeDetails;
   private final boolean httpsEnabled;
   private final MetricsServiceProvider metricsServiceProvider;
   private static final String BEAN_NAME = "Hadoop:service=HddsDatanode,name=BlockDeletingService";
   private static final String METRICS_KEY = "TotalPendingBlockBytes";
 
   public DataNodeMetricsCollectionTask(
-      DatanodeDetails nodeDetails,
+      DatanodeInfo nodeDetails,
       boolean httpsEnabled,
       MetricsServiceProviderFactory factory) {
     this.nodeDetails = nodeDetails;
@@ -78,10 +79,8 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
 
   private String getJmxMetricsUrl() {
     String protocol = httpsEnabled ? "https" : "http";
-    Name portName = httpsEnabled ?  DatanodeDetails.Port.Name.HTTPS : DatanodeDetails.Port.Name.HTTP;
-    return String.format("%s://%s:%d/jmx",
-        protocol,
-        nodeDetails.getHostName(),
-        nodeDetails.getPort(portName).getValue());
+    Name portName = httpsEnabled ?  Name.HTTPS : Name.HTTP;
+    return protocol + "://" + HddsUtils.getHostPortString(nodeDetails.getHostName(),
+        nodeDetails.getPort(portName).getValue()) + "/jmx";
   }
 }

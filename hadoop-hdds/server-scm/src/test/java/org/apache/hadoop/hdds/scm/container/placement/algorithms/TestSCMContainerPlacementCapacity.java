@@ -64,7 +64,7 @@ public class TestSCMContainerPlacementCapacity {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto(),
+          UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
@@ -118,6 +118,10 @@ public class TestSCMContainerPlacementCapacity {
                 .filter(dn -> dn.getID().equals(invocation.getArgument(0)))
                 .findFirst()
                 .orElse(null));
+    when(mockNodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
+      DatanodeInfo di = invocation.getArgument(0);
+      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() >= 15L);
+    });
 
     SCMContainerPlacementCapacity scmContainerPlacementRandom =
         new SCMContainerPlacementCapacity(mockNodeManager, conf, null, true,

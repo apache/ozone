@@ -81,21 +81,20 @@ public class ContainerMapper {
       Map<Long, List<Map<Long, BlockIdDetails>>> dataMap = new HashMap<>();
 
       if (keyTable != null) {
-        try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-                 keyValueTableIterator = keyTable.iterator()) {
+        try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> keyValueTableIterator = keyTable.iterator()) {
           while (keyValueTableIterator.hasNext()) {
             Table.KeyValue<String, OmKeyInfo> keyValue =
                 keyValueTableIterator.next();
             OmKeyInfo omKeyInfo = keyValue.getValue();
             byte[] value = omKeyInfo
-                .getProtobuf(true, ClientVersion.CURRENT_VERSION)
+                .getProtobuf(true, ClientVersion.CURRENT)
                 .toByteArray();
             OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));
             for (OmKeyLocationInfoGroup keyLocationInfoGroup : keyInfo
                 .getKeyLocationVersions()) {
               List<OmKeyLocationInfo> keyLocationInfo = keyLocationInfoGroup
-                  .getLocationList();
+                  .createLocationList();
               for (OmKeyLocationInfo keyLocation : keyLocationInfo) {
                 BlockIdDetails blockIdDetails = new BlockIdDetails();
                 Map<Long, BlockIdDetails> innerMap = new HashMap<>();

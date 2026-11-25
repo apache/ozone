@@ -30,7 +30,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -50,7 +50,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * with/without versioning.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneRpcClientWithKeyLatestVersion implements NonHATests.TestCase {
+public abstract class TestOzoneRpcClientWithKeyLatestVersion implements ClusterForTests.TestCase {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
@@ -102,7 +102,7 @@ public abstract class TestOzoneRpcClientWithKeyLatestVersion implements NonHATes
 
   private static void writeKey(OzoneBucket bucket, String key, byte[] content,
       ReplicationConfig replication) throws IOException {
-    TestDataUtil.createKey(bucket, key, replication, content);
+    DataTestUtil.createKey(bucket, key, replication, content);
   }
 
   private void assertListStatus(OzoneBucket bucket, String keyName,

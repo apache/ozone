@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
@@ -100,5 +101,57 @@ public class TestDiskBalancerYaml {
     Files.write(file.toPath(), yaml.getBytes(StandardCharsets.UTF_8));
     DiskBalancerInfo info = DiskBalancerYaml.readDiskBalancerInfoFile(file);
     Assertions.assertEquals(DiskBalancerConfiguration.DEFAULT_CONTAINER_STATES, info.getContainerStates());
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidDiskBalancerYamlCases")
+  public void testReadYamlRejectsInvalidPersistedInfo(String yaml,
+      String expectedMessage) throws IOException {
+    File file = new File(tmpDir.toString(),
+        OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT);
+    Files.write(file.toPath(), yaml.getBytes(StandardCharsets.UTF_8));
+
+    IOException ex = assertThrows(IOException.class,
+        () -> DiskBalancerYaml.readDiskBalancerInfoFile(file));
+
+    Assertions.assertTrue(ex.getMessage().contains(expectedMessage),
+        () -> "Expected message to contain '" + expectedMessage + "': "
+            + ex.getMessage());
+  }
+
+  public static Stream<Arguments> invalidDiskBalancerYamlCases() {
+    return Stream.of(
+        Arguments.of(validYaml()
+            .replace("version: 1\n", "version: 99\n"),
+            "Unsupported DiskBalancer info version: 99"),
+        Arguments.of(validYaml()
+            .replace("version: 1\n", ""),
+            "DiskBalancer info version is missing"),
+        Arguments.of(validYaml()
+            .replace("operationalState: RUNNING\n", ""),
+            "DiskBalancer operationalState is missing"),
+        Arguments.of(validYaml()
+            .replace("threshold: 10.0\n", "threshold: 0.0\n"),
+            "Invalid DiskBalancer configuration in persisted info"),
+        Arguments.of(validYaml()
+            .replace("bandwidthInMB: 100\n", "bandwidthInMB: 0\n"),
+            "Invalid DiskBalancer configuration in persisted info"),
+        Arguments.of(validYaml()
+            .replace("parallelThread: 5\n", "parallelThread: 0\n"),
+            "Invalid DiskBalancer configuration in persisted info"),
+        Arguments.of(validYaml()
+            .replace("containerStates: CLOSED,QUASI_CLOSED\n",
+                "containerStates: OPEN\n"),
+            "Invalid DiskBalancer configuration in persisted info"));
+  }
+
+  private static String validYaml() {
+    return "operationalState: RUNNING\n"
+        + "threshold: 10.0\n"
+        + "bandwidthInMB: 100\n"
+        + "parallelThread: 5\n"
+        + "stopAfterDiskEven: true\n"
+        + "containerStates: CLOSED,QUASI_CLOSED\n"
+        + "version: 1\n";
   }
 }

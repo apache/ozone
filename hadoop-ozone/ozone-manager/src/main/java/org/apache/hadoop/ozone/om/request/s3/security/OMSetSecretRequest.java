@@ -55,11 +55,11 @@ public class OMSetSecretRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final OMRequest omRequest = super.preExecute(ozoneManager);
     final OMMetadataManager omMetadataManager =
         ozoneManager.getMetadataManager();
 
-    final SetS3SecretRequest request =
-        getOmRequest().getSetS3SecretRequest();
+    final SetS3SecretRequest request = omRequest.getSetS3SecretRequest();
 
     final String accessId = request.getAccessId();
 
@@ -89,12 +89,12 @@ public class OMSetSecretRequest extends OMClientRequest {
     }
 
     final UserGroupInformation ugi =
-        S3SecretRequestHelper.getOrCreateUgi(accessId);
+        S3SecretRequestHelper.getOrCreateUgi(ozoneManager, accessId);
     // Permission check
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(
         ozoneManager, ugi, accessId);
 
-    return getOmRequest();
+    return omRequest;
   }
 
   @Override

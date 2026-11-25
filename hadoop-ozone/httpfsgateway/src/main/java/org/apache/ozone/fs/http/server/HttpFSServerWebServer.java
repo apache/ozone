@@ -127,6 +127,10 @@ public class HttpFSServerWebServer {
         .setSSLConf(new LegacyHadoopConfigurationSource(sslConf))
         .authFilterConfigurationPrefix(HttpFSAuthenticationFilter.CONF_PREFIX)
         .setACL(new AccessControlList(conf.get(HTTP_ADMINS_KEY, " ")))
+        // WebHDFS paths (/webhdfs/v1/<path>) carry user file names, which may
+        // contain characters ('%' arrives as %25) or empty segments ("//")
+        // that Jetty 12 rejects with 400 unless ambiguous URIs are allowed.
+        .allowAmbiguousUri(true)
         .addEndpoint(endpoint)
         .build();
   }

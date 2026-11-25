@@ -23,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
+import java.util.Optional;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +41,16 @@ class TestOzoneClientConfig {
     OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
 
     assertEquals(OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE, subject.getBytesPerChecksum());
+  }
+
+  @Test
+  void nonPositiveEcParallelReadPoolLimit() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt("ozone.client.ec.parallel.read.pool.limit", 0);
+
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+
+    assertEquals(1, subject.getEcParallelReadPoolLimit());
   }
 
   @Test
@@ -84,11 +97,56 @@ class TestOzoneClientConfig {
     conf.set("ozone.client.stream.read.pre-read-size", "67108864");
     conf.set("ozone.client.stream.read.response-data-size", "2097152");
     conf.set("ozone.client.stream.read.timeout", "5s");
+    conf.set("ozone.client.stream.read.max-concurrent-streams", "12");
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
 
     assertEquals(64L << 20, clientConfig.getStreamReadPreReadSize());
     assertEquals(2 << 20, clientConfig.getStreamReadResponseDataSize());
     assertEquals(Duration.ofSeconds(5), clientConfig.getStreamReadTimeout());
+    assertEquals(12, clientConfig.getStreamReadMaxConcurrentStreams());
+
+    assertEquals(-1, new OzoneConfiguration().getObject(OzoneClientConfig.class).getStreamReadMaxConcurrentStreams());
+  }
+
+  @Test
+  void testDatastreamPutBlockWithoutRaftEnabledDefault() {
+    OzoneClientConfig subject = new OzoneConfiguration()
+        .getObject(OzoneClientConfig.class);
+    assertFalse(subject.isDatastreamPutBlockWithoutRaftEnabled());
+  }
+
+  @Test
+  void testDatastreamPutBlockWithoutRaftConfigParsing() {
+    final String key = OzoneClientConfig.OZONE_CLIENT_DATASTREAM_PUTBLOCK_WITHOUT_RAFT_ENABLED;
+
+    // assert experimental
+    final Optional<Config> config = ConfigurationReflectionUtil.getConfigByKey(OzoneClientConfig.class, key);
+    assertTrue(config.isPresent());
+    assertTrue(config.get().experimental());
+
+    // assert default
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+    assertFalse(subject.isDatastreamPutBlockWithoutRaftEnabled());
+
+    // assert set conf
+    conf.setBoolean(OzoneClientConfig.OZONE_CLIENT_DATASTREAM_PUTBLOCK_WITHOUT_RAFT_ENABLED, true);
+    subject = conf.getObject(OzoneClientConfig.class);
+    assertTrue(subject.isDatastreamPutBlockWithoutRaftEnabled());
+  }
+
+  @Test
+  void testNoDuplicatedKeys() {
+    ConfigurationReflectionUtil.assertNoDuplicatedKeys(OzoneClientConfig.class);
+  }
+
+  @Test
+  void testNettyWarmUpEnabledByDefault() {
+    assertTrue(new OzoneConfiguration().getObject(OzoneClientConfig.class).isNettyWarmUpEnabled());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.client.netty.warmup.enabled", false);
+    assertFalse(conf.getObject(OzoneClientConfig.class).isNettyWarmUpEnabled());
   }
 }

@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -40,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -314,5 +316,74 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
     }
     testReclaimableKeyFilter(volume, bucket, index, keyInfo, prevKeyInfo, prevPrevKeyInfo1,
         prevKeyInfo == null, size, replicatedSize);
+  }
+
+  /**
+   * Boundary of the flush-lag reclamation window: the purge of the last path snapshot has been APPLIED
+   * (the in-memory chain is empty) but is NOT yet flushed, so the on-disk snapshotInfoTable still holds the
+   * snapshot's row. Reclamation proceeding here is safe ONLY because the row can never be ACTIVE on disk:
+   * SnapshotDeletingService submits a purge only after the snapshot's deletion is flushed
+   * (shouldIgnoreSnapshot -> areSnapshotChangesFlushedToDB, which relies on OMSnapshotDeleteRequest stamping
+   * lastTransactionInfo). A DELETED-on-disk row is not user-readable, and re-processing it after a
+   * restore-from-backup re-runs moveTableKeys/purge idempotently. If a chain-removal path that bypasses that
+   * gate is ever added, this assumption breaks and reclamation here would resurrect an ACTIVE snapshot with
+   * physically deleted blocks.
+   */
+  @Test
+  public void testKeyReclaimableWhenChainEmptyingPurgeUnflushedButDeleteFlushed()
+      throws IOException, RocksDBException {
+    setup(2, 1, 1, 1, 1);
+    String volume = getVolumes().get(0);
+    String bucket = getBuckets().get(0);
+    SnapshotInfo purgedSnapshot = getSnapshotInfos().get(getKey(volume, bucket)).get(0);
+    purgedSnapshot.setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
+
+    // SnapshotPurge has been applied: the in-memory chain no longer has the snapshot...
+    getSnapshotInfos().get(getKey(volume, bucket)).clear();
+
+    // ReclaimableKeyFilter determines that the chain is empty without consulting snapshotInfoTable. These stubs
+    // document the invariant guaranteed by the SnapshotDeletingService flush gate: after the applied purge removes
+    // the snapshot from the in-memory chain, the unflushed on-disk row can only be DELETED.
+    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    OMMetadataManager metadataManager = getOzoneManager().getMetadataManager();
+    when(metadataManager.getSnapshotInfoTable()).thenReturn(snapshotInfoTable);
+    when(snapshotInfoTable.get(eq(purgedSnapshot.getTableKey()))).thenReturn(null);
+    when(snapshotInfoTable.getSkipCache(eq(purgedSnapshot.getTableKey()))).thenReturn(purgedSnapshot);
+
+    OmKeyInfo keyInfo = getMockedOmKeyInfo(1);
+    when(keyInfo.getVolumeName()).thenReturn(volume);
+    when(keyInfo.getBucketName()).thenReturn(bucket);
+
+    assertTrue(getReclaimableFilter().apply(Table.newKeyValue("deletedKey", keyInfo)),
+        "with the chain empty and the unflushed purge's on-disk row at worst DELETED, the AOS deleted key "
+            + "is reclaimable");
+  }
+
+  /**
+   * Control for the flush-lag repro above: when the chain is empty AND durably so (the on-disk
+   * snapshotInfoTable has no row either), reclamation must proceed.
+   */
+  @Test
+  public void testKeyReclaimableWhenChainDurablyEmpty() throws IOException, RocksDBException {
+    setup(2, 1, 1, 1, 1);
+    String volume = getVolumes().get(0);
+    String bucket = getBuckets().get(0);
+    SnapshotInfo purgedSnapshot = getSnapshotInfos().get(getKey(volume, bucket)).get(0);
+
+    getSnapshotInfos().get(getKey(volume, bucket)).clear();
+
+    // As above, these stubs document the durable-empty invariant but do not affect the filter result.
+    Table<String, SnapshotInfo> snapshotInfoTable = mock(Table.class);
+    OMMetadataManager metadataManager = getOzoneManager().getMetadataManager();
+    when(metadataManager.getSnapshotInfoTable()).thenReturn(snapshotInfoTable);
+    when(snapshotInfoTable.get(eq(purgedSnapshot.getTableKey()))).thenReturn(null);
+    when(snapshotInfoTable.getSkipCache(eq(purgedSnapshot.getTableKey()))).thenReturn(null);
+
+    OmKeyInfo keyInfo = getMockedOmKeyInfo(1);
+    when(keyInfo.getVolumeName()).thenReturn(volume);
+    when(keyInfo.getBucketName()).thenReturn(bucket);
+
+    assertTrue(getReclaimableFilter().apply(Table.newKeyValue("deletedKey", keyInfo)),
+        "with no snapshot in the chain and none on disk, the AOS deleted key is reclaimable");
   }
 }

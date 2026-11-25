@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.block;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR_DEFAULT;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
-import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
@@ -53,6 +52,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -117,7 +117,8 @@ public class DeletedBlockLogImpl
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
-            containerManager, metrics, scmCommandTimeoutMs);
+            containerManager, () -> scm.getReplicationManager().getContainerReplicaPendingOps(), metrics,
+            scmCommandTimeoutMs);
     int limit = (int) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
@@ -218,6 +219,14 @@ public class DeletedBlockLogImpl
   }
 
   /**
+   * Called in SCMStateMachine#notifyLeaderReady after the transaction buffer is flushed, when all transactions
+   * of the previous leader terms are applied.
+   */
+  public void onLeaderReady() {
+    transactionStatusManager.onLeaderReady();
+  }
+
+  /**
    * Called in SCMDBTransactionBuffer#flush when the cached deleting operations
    * are flushed.
    */
@@ -240,7 +249,7 @@ public class DeletedBlockLogImpl
       long currentBatchSizeBytes = 0;
       for (Map.Entry<Long, List<DeletedBlock>> entry :
           containerBlocksMap.entrySet()) {
-        long nextTXID = sequenceIdGen.getNextId(DEL_TXN_ID);
+        long nextTXID = sequenceIdGen.getNextId(SequenceIdType.delTxnId);
         DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
             entry.getKey(), entry.getValue());
         txsToBeAdded.add(tx);
@@ -330,8 +339,8 @@ public class DeletedBlockLogImpl
   private void addTxToTxSizeMap(DeletedBlocksTransaction tx) {
     if (tx.hasTotalBlockReplicatedSize()) {
       transactionStatusManager.getTxSizeMap().put(tx.getTxID(),
-          new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(tx.getLocalIDCount(),
-              tx.getTotalBlockSize(), tx.getTotalBlockReplicatedSize()));
+          new SCMDeletedBlockTransactionStatusManager.TxBlockInfo(tx.getTxID(), tx.getContainerID(),
+              tx.getLocalIDCount(), tx.getTotalBlockSize(), tx.getTotalBlockReplicatedSize()));
     }
   }
 
@@ -414,7 +423,11 @@ public class DeletedBlockLogImpl
                   .getContainerReplicas(
                       ContainerID.valueOf(txn.getContainerID()));
               if (!checkInadequateReplica(replicas, txn, dnList)) {
-                getTransaction(txn, transactions, replicas, commandStatus, maxDeleteBlocksPerDatanode);
+                if (transactionStatusManager.isPurgeableWithoutAck(txn.getTxID(), id)) {
+                  txIDs.add(txn.getTxID());
+                } else {
+                  getTransaction(txn, transactions, replicas, commandStatus, maxDeleteBlocksPerDatanode);
+                }
               } else {
                 metrics.incrSkippedTransaction();
               }
@@ -507,6 +520,11 @@ public class DeletedBlockLogImpl
       return;
     }
 
+    if (!scmContext.isLeaderReady()) {
+      LOG.debug("SCM is not ready to commit transactions.");
+      return;
+    }
+
     DatanodeDetails details = deleteBlockStatus.getDatanodeDetails();
     DatanodeID dnId = details.getID();
     for (CommandStatus commandStatus : deleteBlockStatus.getCmdStatus()) {
@@ -525,7 +543,7 @@ public class DeletedBlockLogImpl
           metrics.incrDNCommandsFailure(dnId, 1);
         } else {
           LOG.debug("Delete Block Command {} is not executed on the Datanode" +
-              " {}.", commandStatus.getCmdId(), dnId);
+              " {}.", commandStatus.getCmdId(), details);
         }
 
         getSCMDeletedBlockTransactionStatusManager()

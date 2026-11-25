@@ -44,7 +44,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.time.Duration;
@@ -182,7 +181,8 @@ public final class TestBlockTokensCLI {
   }
 
   @Test
-  public void testFetchKeyOMAdminCommand() throws UnsupportedEncodingException {
+  public void testFetchKeyOMAdminCommand() throws Exception {
+    getScmSecretKeyManager().checkAndRotate(true);
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     PrintStream printStream = new PrintStream(outputStream, true, "UTF-8");
     System.setOut(printStream);

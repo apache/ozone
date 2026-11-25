@@ -180,7 +180,7 @@ enum NodeState {
     HEALTHY = 1;
     STALE = 2;
     DEAD = 3;
-    HEALTHY_READONLY = 6;
+    HEALTHY_READONLY = 6; // (deprecated)
 }
 
 enum NodeOperationalState {
@@ -267,7 +267,8 @@ message ContainerInfoProto {
     required uint64 numberOfKeys = 5;
     optional int64 stateEnterTime = 6;
     required string owner = 7;
-    optional int64 deleteTransactionId = 8;
+    // Legacy SCM-side delete transaction ID. SCM no longer updates this field.
+    optional int64 deleteTransactionId = 8 [deprecated = true];
     optional int64 sequenceId = 9;
     optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
@@ -416,6 +417,7 @@ message BlockID {
     optional uint64 blockCommitSequenceId = 2 [default = 0];
 }
 
+// Deprecated, please use UpgradeStatus instead; kept for compatibility with old clients.
 message UpgradeFinalizationStatus {
     enum Status {
         ALREADY_FINALIZED = 1;
@@ -426,6 +428,23 @@ message UpgradeFinalizationStatus {
     }
     required Status status = 1;
     repeated string messages = 2;
+}
+
+// Finalization status of a component or group of components.
+enum FinalizationStatus {
+    UNFINALIZED = 1;
+    FINALIZED = 2;
+    IN_PROGRESS = 3;
+}
+
+message UpgradeStatus {
+  optional FinalizationStatus hddsFinalizationStatus = 1;
+  optional FinalizationStatus scmFinalizationStatus = 2;
+  optional int32 numDatanodesFinalized = 3;
+  optional int32 numDatanodesTotal = 4;
+  optional uint32 scmApparentVersion = 5;
+  optional uint32 minDatanodeApparentVersion = 6;
+  optional uint32 maxDatanodeApparentVersion = 7;
 }
 
 /**
@@ -591,6 +610,7 @@ message VolumeReportProto {
     optional uint64 committedBytes = 5;
     optional uint64 effectiveUsedSpace = 6;
     optional double utilization = 7;
+    optional uint64 ozoneAvailable = 8;
 }
 
 message DatanodeDiskBalancerInfoProto {

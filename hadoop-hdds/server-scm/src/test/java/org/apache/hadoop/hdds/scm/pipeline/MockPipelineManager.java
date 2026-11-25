@@ -87,7 +87,7 @@ public class MockPipelineManager implements PipelineManager {
     }
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION));
+        ClientVersion.CURRENT));
     return pipeline;
   }
 
@@ -111,7 +111,7 @@ public class MockPipelineManager implements PipelineManager {
   public void addEcPipeline(Pipeline pipeline)
       throws IOException {
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION));
+        ClientVersion.CURRENT));
   }
 
   @Override
@@ -290,16 +290,6 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void freezePipelineCreation() {
-
-  }
-
-  @Override
-  public void resumePipelineCreation() {
-
-  }
-
-  @Override
   public void close() {
   }
 
@@ -329,20 +319,13 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public boolean isPipelineCreationFrozen() {
-    return false;
-  }
-
-  @Override
-  public boolean hasEnoughSpace(Pipeline pipeline) {
-    return false;
-  }
-
-  @Override
-  public void recordPendingAllocation(Pipeline pipeline, ContainerID containerID) {
+  public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      nodeManager.recordPendingAllocationForDatanode(dn.getID(), containerID);
+      if (!nodeManager.checkSpaceAndRecordAllocation(nodeManager.getNode(dn.getID()), containerID)) {
+        return false;
+      }
     }
+    return true;
   }
 
   @Override

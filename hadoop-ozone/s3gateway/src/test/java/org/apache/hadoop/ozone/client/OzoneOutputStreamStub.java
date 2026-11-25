@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
@@ -69,7 +70,22 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
 
   @Override
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    return closed ? new OmMultipartCommitUploadPartInfo(partName,
-        ((KeyMetadataAware)getOutputStream()).getMetadata().get(OzoneConsts.ETAG)) : null;
+    final KeyOutputStream keyOutputStream = getKeyOutputStream();
+    if (closed && keyOutputStream != null) {
+      return new OmMultipartCommitUploadPartInfo(
+          partName, ((KeyMetadataAware) getOutputStream()).getMetadata().get(OzoneConsts.ETAG),
+          keyOutputStream.getModificationTime());
+    }
+    return null;
+  }
+
+  @Override
+  public long getModificationTime() {
+    final KeyOutputStream keyOutputStream = getKeyOutputStream();
+    if (keyOutputStream != null) {
+      return keyOutputStream.getModificationTime();
+    }
+    throw new IllegalStateException(
+        "OutputStream is not a KeyOutputStream: " + getOutputStream().getClass());
   }
 }

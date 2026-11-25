@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.debug.ldb;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.STATEFUL_SERVICE_CONFIG;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -28,11 +29,14 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.BufferedWriter;
+import com.google.protobuf.ByteString;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.PrintStream;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,6 +44,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -54,8 +59,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.security.RootCARotationManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -91,10 +100,16 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
   private static final Logger LOG = LoggerFactory.getLogger(DBScanner.class);
   private static final String SCHEMA_V3 = "V3";
 
+  private static final List<StatefulServiceDefinition<?>> STATEFUL_SERVICE_DEFINITIONS = Arrays.asList(
+      ContainerBalancer.SERVICE_DEFINITION,
+      DeletedBlockLogStateManagerImpl.SERVICE_DEFINITION,
+      RootCARotationManager.SERVICE_DEFINITION
+  );
+
   @CommandLine.ParentCommand
   private RDBParser parent;
 
-  @CommandLine.Option(names = {"--column_family", "--column-family", "--cf"},
+  @CommandLine.Option(names = {"--column-family", "--cf"},
       required = true,
       description = "Table name")
   private String tableName;
@@ -137,7 +152,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
           "     \"keyName:regex:^key.*$\" for showing records having keyName that matches the given regex.")
   private String filter;
 
-  @CommandLine.Option(names = {"--dnSchema", "--dn-schema", "-d"},
+  @CommandLine.Option(names = {"--dn-schema", "-d"},
       description = "Datanode DB Schema Version: V1/V2/V3",
       defaultValue = "V3")
   private String dnDBSchemaVersion;
@@ -252,8 +267,8 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     while (iterator.get().isValid() && withinLimit(globalCount)) {
       String fileNameTarget = recordsPerFile > 0 ? fileName + "." + fileSuffix++ :
           fileName;
-      try (PrintWriter out = new PrintWriter(new BufferedWriter(
-          new PrintWriter(fileNameTarget, UTF_8.name())))) {
+      Path path = Paths.get(fileNameTarget);
+      try (PrintStream out = new PrintStream(new BufferedOutputStream(Files.newOutputStream(path)), false, UTF_8)) {
         if (!displayTable(iterator, dbColumnFamilyDef, out, schemaV3)) {
           return false;
         }
@@ -264,7 +279,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
   private boolean displayTable(ManagedRocksIterator iterator,
                                DBColumnFamilyDefinition dbColumnFamilyDef,
-                               PrintWriter printWriter, boolean schemaV3) {
+                               PrintStream out, boolean schemaV3) {
     exception = false;
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setNameFormat("DBScanner-%d")
@@ -273,10 +288,10 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
         threadCount, threadCount, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(1024), factory,
         new ThreadPoolExecutor.CallerRunsPolicy());
-    LogWriter logWriter = new LogWriter(printWriter);
+    LogWriter logWriter = new LogWriter(out);
     try {
       // Start JSON object (map) or array
-      printWriter.print(withKey ? "{ " : "[ ");
+      out.print(withKey ? "{ " : "[ ");
       logWriter.start();
       processRecords(iterator, dbColumnFamilyDef, logWriter,
           threadPool, schemaV3);
@@ -288,7 +303,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
       logWriter.stop();
       logWriter.join();
       // End JSON object (map) or array
-      printWriter.println(withKey ? " }" : " ]");
+      out.println(withKey ? " }" : " ]");
     }
     return !exception;
   }
@@ -723,6 +738,9 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
           }
         }
 
+        final boolean statefulServiceConfig =
+            dbColumnFamilyDefinition.getName().equals(STATEFUL_SERVICE_CONFIG.getName());
+
         for (ByteArrayKeyValue byteArrayKeyValue : batch) {
           StringBuilder sb = new StringBuilder();
           if (!(sequenceId == FIRST_SEQUENCE_ID && results.isEmpty())) {
@@ -730,9 +748,10 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
             // one, to ensure valid JSON format.
             sb.append(", ");
           }
+          Object key = withKey || statefulServiceConfig
+              ? dbColumnFamilyDefinition.getKeyCodec().fromPersistedFormat(byteArrayKeyValue.getKey())
+              : null;
           if (withKey) {
-            Object key = dbColumnFamilyDefinition.getKeyCodec()
-                .fromPersistedFormat(byteArrayKeyValue.getKey());
             if (schemaV3) {
               int index =
                   DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixLength();
@@ -743,8 +762,8 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
                 exception = true;
                 break;
               }
-              String cid = key.toString().substring(0, index);
-              String blockId = key.toString().substring(index);
+              String cid = keyStr.substring(0, index);
+              String blockId = keyStr.substring(index);
               sb.append(writer.writeValueAsString(LongCodec.get()
                   .fromPersistedFormat(
                       FixedLengthStringCodec.string2Bytes(cid)) +
@@ -758,9 +777,13 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
           Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(byteArrayKeyValue.getValue());
 
+          if (statefulServiceConfig) {
+            o = parseStatefulServiceConfig(key, o);
+          }
+
           if (valueFields != null) {
             Map<String, Object> filteredValue = new HashMap<>();
-            filteredValue.putAll(getFieldsFilteredObject(o, dbColumnFamilyDefinition.getValueType(), fieldsSplitMap));
+            filteredValue.putAll(getFieldsFilteredObject(o, o.getClass(), fieldsSplitMap));
             sb.append(writer.writeValueAsString(filteredValue));
           } else {
             sb.append(writer.writeValueAsString(o));
@@ -829,6 +852,24 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
     }
   }
 
+  private static Object parseStatefulServiceConfig(Object key, Object value) {
+    if (!(value instanceof ByteString)) {
+      return value;
+    }
+    try {
+      for (StatefulServiceDefinition<?> def : STATEFUL_SERVICE_DEFINITIONS) {
+        if (Objects.equals(key, def.getServiceName())) {
+          return def.deserialize((ByteString) value);
+        }
+      }
+      LOG.info("Unknown {} key {}", STATEFUL_SERVICE_CONFIG.getName(), key);
+      return value;
+    } catch (IOException e) {
+      LOG.error("Failed to parse {} for key {}", STATEFUL_SERVICE_CONFIG.getName(), key, e);
+      return value;
+    }
+  }
+
   private static class ByteArrayKeyValue {
     private final byte[] key;
     private final byte[] value;
@@ -874,16 +915,16 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
 
   private static class LogWriter {
     private final Map<Long, ArrayList<String>> logs;
-    private final PrintWriter printWriter;
+    private final PrintStream out;
     private final Thread writerThread;
     private volatile boolean stop = false;
     private long expectedSequenceId = FIRST_SEQUENCE_ID;
     private final Object lock = new Object();
     private final AtomicLong inflightLogCount = new AtomicLong();
 
-    LogWriter(PrintWriter printWriter) {
+    LogWriter(PrintStream out) {
       this.logs = new HashMap<>();
-      this.printWriter = printWriter;
+      this.out = out;
       this.writerThread = new Thread(new WriterTask());
     }
 
@@ -917,7 +958,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
               ArrayList<String> results = logs.get(expectedSequenceId);
               if (results != null) {
                 for (String result : results) {
-                  printWriter.println(result);
+                  out.println(result);
                 }
                 inflightLogCount.decrementAndGet();
                 logs.remove(expectedSequenceId);
@@ -946,7 +987,7 @@ public class DBScanner extends AbstractSubcommand implements Callable<Void> {
       ArrayList<String> results;
       while ((results = logs.get(expectedSequenceId)) != null) {
         for (String result : results) {
-          printWriter.println(result);
+          out.println(result);
         }
         expectedSequenceId++;
       }

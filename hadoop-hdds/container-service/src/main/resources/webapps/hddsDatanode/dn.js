@@ -34,10 +34,12 @@
                  volume.OzoneUsed = transform(volume.OzoneUsed);
                  volume.OzoneAvailable = transform(volume.OzoneAvailable);
                  volume.Reserved = transform(volume.Reserved);
-                 volume.TotalCapacity = transform(volume.TotalCapacity);
                  volume.FilesystemCapacity = transform(volume.FilesystemCapacity);
                  volume.FilesystemAvailable = transform(volume.FilesystemAvailable);
                  volume.FilesystemUsed = transform(volume.FilesystemUsed);
+                 volume.MinFreeSpace = transform(volume.MinFreeSpace);
+                 volume.HardMinFreeSpace = transform(volume.HardMinFreeSpace);
+                 volume.NonOzoneUsed = transform(volume.NonOzoneUsed);
                 })
                 });
 
@@ -86,6 +88,33 @@
                 .then(function (result) {
                     ctrl.dnscanner = result.data.beans;
                 });
+        });
+
+    // Register Startup Progress Controller
+    angular.module('ozone').config(function ($routeProvider) {
+        $routeProvider.when('/startup', {
+            templateUrl: 'dn-startup.html',
+            controller: 'DNStartupController as startupCtrl',
+        });
+    });
+
+    angular.module('ozone')
+        .controller('DNStartupController', function ($http, $interval, $scope) {
+            var ctrl = this;
+            var refresh = function () {
+                $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=StartupProgress")
+                    .then(function (result) {
+                        ctrl.startup = result.data.beans[0];
+                        if (ctrl.startup && (ctrl.startup.Complete || ctrl.startup.Failed)) {
+                            $interval.cancel(timer);
+                        }
+                    });
+            };
+            var timer = $interval(refresh, 2000);
+            $scope.$on('$destroy', function () {
+                $interval.cancel(timer);
+            });
+            refresh();
         });
 
     angular.module('ozone')

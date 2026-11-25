@@ -23,6 +23,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 
 /**
  * Simple class to wrap the parameters needed to check a container's health
@@ -37,6 +38,8 @@ public final class ContainerCheckRequest {
   private final ReplicationManagerReport report;
   private final ReplicationQueue replicationQueue;
   private final boolean readOnly;
+  private SimplifiedContainerHealthStateForReporting simplifiedHealthStateForReporting =
+      SimplifiedContainerHealthStateForReporting.HEALTHY;
 
   private ContainerCheckRequest(Builder builder) {
     this.containerInfo = builder.containerInfo;
@@ -75,6 +78,15 @@ public final class ContainerCheckRequest {
 
   public boolean isReadOnly() {
     return readOnly;
+  }
+
+  public SimplifiedContainerHealthStateForReporting getSimplifiedHealthStateForReporting() {
+    return simplifiedHealthStateForReporting;
+  }
+
+  public void setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting state) {
+    this.simplifiedHealthStateForReporting = state;
+    report.incrementAndSample(state, containerInfo);
   }
 
   /**

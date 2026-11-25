@@ -25,8 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.net.URI;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -35,11 +33,13 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
+import org.apache.ozone.test.GenericTestUtils.PrintStreamCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemErrCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -50,7 +50,7 @@ import picocli.CommandLine;
  * Test cases for LeaseRecoverer.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestLeaseRecoverer implements NonHATests.TestCase {
+public abstract class TestLeaseRecoverer implements ClusterForTests.TestCase {
   private OzoneBucket fsoOzoneBucket;
   private OzoneClient client;
 
@@ -59,7 +59,7 @@ public abstract class TestLeaseRecoverer implements NonHATests.TestCase {
     client = cluster().newClient();
 
     // create a volume and a FSO bucket
-    fsoOzoneBucket = TestDataUtil
+    fsoOzoneBucket = DataTestUtil
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
@@ -92,42 +92,38 @@ public abstract class TestLeaseRecoverer implements NonHATests.TestCase {
     // call lease recovery cli
     String[] args = new String[] {
         "--path", file.toUri().toString()};
-    StringWriter stdout = new StringWriter();
-    PrintWriter pstdout = new PrintWriter(stdout);
-    StringWriter stderr = new StringWriter();
-    PrintWriter pstderr = new PrintWriter(stderr);
 
-    CommandLine cmd = new CommandLine(new LeaseRecoverer())
-        .setOut(pstdout)
-        .setErr(pstderr);
-    cmd.execute(args);
+    try (PrintStreamCapturer stderr = new SystemErrCapturer()) {
+      CommandLine cmd = new CommandLine(new LeaseRecoverer());
+      cmd.execute(args);
 
-    assertEquals("", stderr.toString());
+      assertEquals("", stderr.toString());
 
-    // make sure file is visible and closed
-    FileStatus fileStatus = fs.getFileStatus(file);
-    assertEquals(dataSize, fileStatus.getLen());
-    // write data
-    os.write(data);
-    // flush should fail since flush will call writeChunk and putBlock
-    assertThrows(IOException.class, os::flush);
+      // make sure file is visible and closed
+      FileStatus fileStatus = fs.getFileStatus(file);
+      assertEquals(dataSize, fileStatus.getLen());
+      // write data
+      os.write(data);
+      // flush should fail since flush will call writeChunk and putBlock
+      assertThrows(IOException.class, os::flush);
 
-    fileStatus = fs.getFileStatus(file);
-    assertEquals(dataSize, fileStatus.getLen());
-    // make sure hsync fails
-    assertThrows(IOException.class, os::hsync);
-    // make sure length remains the same
-    fileStatus = fs.getFileStatus(file);
-    assertEquals(dataSize, fileStatus.getLen());
-    // close succeeds since it's already closed in failure handling of flush
-    assertTrue(((LeaseRecoverable)fs).isFileClosed(file));
-    os.close();
-    // make sure length remains the same
-    fileStatus = fs.getFileStatus(file);
-    assertEquals(dataSize, fileStatus.getLen());
+      fileStatus = fs.getFileStatus(file);
+      assertEquals(dataSize, fileStatus.getLen());
+      // make sure hsync fails
+      assertThrows(IOException.class, os::hsync);
+      // make sure length remains the same
+      fileStatus = fs.getFileStatus(file);
+      assertEquals(dataSize, fileStatus.getLen());
+      // close succeeds since it's already closed in failure handling of flush
+      assertTrue(((LeaseRecoverable) fs).isFileClosed(file));
+      os.close();
+      // make sure length remains the same
+      fileStatus = fs.getFileStatus(file);
+      assertEquals(dataSize, fileStatus.getLen());
 
-    // recover the same file second time should succeed
-    cmd.execute(args);
-    assertEquals("", stderr.toString());
+      // recover the same file second time should succeed
+      cmd.execute(args);
+      assertEquals("", stderr.toString());
+    }
   }
 }

@@ -29,15 +29,20 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 import org.apache.hadoop.ozone.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Class which maintains metrics related to using GRPC.
+ *
+ * The two latency rates are kept outside the {@link MetricsRegistry} as
+ * lock-free {@link ConcurrentMutableRate}s, because they are updated on every
+ * gRPC call and {@code MutableStat.add} is synchronized. {@link #getMetrics}
+ * snapshots them next to the registry, keeping the emitted metric names unchanged.
  */
 @Metrics(about = "GRPC Metrics", context = OzoneConsts.OZONE)
 public class GrpcMetrics implements MetricsSource {
@@ -56,7 +61,8 @@ public class GrpcMetrics implements MetricsSource {
 
   private final MetricsRegistry registry;
   private final boolean grpcQuantileEnable;
-  private String requestType;
+  // written by the gRPC handler threads and read by the metrics snapshot
+  private volatile String requestType;
 
   @Metric("Number of sent bytes")
   private MutableCounterLong sentBytes;
@@ -70,19 +76,17 @@ public class GrpcMetrics implements MetricsSource {
   @Metric("Number of unknown messages received")
   private MutableCounterLong unknownMessagesReceived;
 
-  @Metric("Queue time")
-  private MutableRate grpcQueueTime;
+  private final ConcurrentMutableRate grpcQueueTime;
 
   // There should be no getter method to avoid
   // exposing internal representation. FindBugs error raised.
-  private MutableQuantiles[] grpcQueueTimeMillisQuantiles;
+  private MutableQuantiles[] grpcQueueTimeNanosQuantiles;
 
-  @Metric("Processing time")
-  private MutableRate grpcProcessingTime;
+  private final ConcurrentMutableRate grpcProcessingTime;
 
   // There should be no getter method to avoid
   // exposing internal representation. FindBugs error raised.
-  private MutableQuantiles[] grpcProcessingTimeMillisQuantiles;
+  private MutableQuantiles[] grpcProcessingTimeNanosQuantiles;
 
   @Metric("Number of active clients connected")
   private MutableCounterLong numOpenClientConnections;
@@ -90,23 +94,27 @@ public class GrpcMetrics implements MetricsSource {
   public GrpcMetrics(Configuration conf) {
     this.registry = new MetricsRegistry("grpc");
     this.requestType = "NoRequest";
+    // Names match what MutableMetricsFactory derived from the field names, so
+    // the emitted metrics are unchanged
+    grpcQueueTime = new ConcurrentMutableRate("GrpcQueueTime", "Queue time in nanoseconds", false);
+    grpcProcessingTime = new ConcurrentMutableRate("GrpcProcessingTime", "Processing time in nanoseconds", false);
     int[] intervals = conf.getInts(
         OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY);
     grpcQuantileEnable = (intervals.length > 0);
     if (grpcQuantileEnable) {
-      grpcQueueTimeMillisQuantiles =
+      grpcQueueTimeNanosQuantiles =
           new MutableQuantiles[intervals.length];
-      grpcProcessingTimeMillisQuantiles =
+      grpcProcessingTimeNanosQuantiles =
           new MutableQuantiles[intervals.length];
       for (int i = 0; i < intervals.length; i++) {
         int interval = intervals[i];
-        grpcQueueTimeMillisQuantiles[i] = registry
+        grpcQueueTimeNanosQuantiles[i] = registry
             .newQuantiles("grpcQueueTime" + interval
-                    + "s", "grpc queue time in millisecond", "ops",
+                    + "s", "grpc queue time in nanoseconds", "ops",
                 "latency", interval);
-        grpcProcessingTimeMillisQuantiles[i] = registry.newQuantiles(
+        grpcProcessingTimeNanosQuantiles[i] = registry.newQuantiles(
             "grpcProcessingTime" + interval + "s",
-            "grpc processing time in millisecond",
+            "grpc processing time in nanoseconds",
             "ops", "latency", interval);
       }
     }
@@ -129,13 +137,16 @@ public class GrpcMetrics implements MetricsSource {
    */
   public void unRegister() {
     DefaultMetricsSystem.instance().unregisterSource(SOURCE_NAME);
-    MetricUtil.stop(grpcProcessingTimeMillisQuantiles);
-    MetricUtil.stop(grpcQueueTimeMillisQuantiles);
+    MetricUtil.stop(grpcProcessingTimeNanosQuantiles);
+    MetricUtil.stop(grpcQueueTimeNanosQuantiles);
   }
 
   @Override
   public synchronized void getMetrics(MetricsCollector collector, boolean all) {
-    registry.snapshot(collector.addRecord(registry.info()), all);
+    MetricsRecordBuilder builder = collector.addRecord(registry.info());
+    registry.snapshot(builder, all);
+    grpcQueueTime.snapshot(builder, all);
+    grpcProcessingTime.snapshot(builder, all);
     MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
     recordBuilder.tag(LATEST_REQUEST_TYPE, requestType);
   }
@@ -156,10 +167,10 @@ public class GrpcMetrics implements MetricsSource {
     unknownMessagesReceived.incr();
   }
 
-  public void addGrpcQueueTime(int queueTime) {
+  public void addGrpcQueueTime(long queueTime) {
     grpcQueueTime.add(queueTime);
     if (grpcQuantileEnable) {
-      for (MutableQuantiles q : grpcQueueTimeMillisQuantiles) {
+      for (MutableQuantiles q : grpcQueueTimeNanosQuantiles) {
         if (q != null) {
           q.add(queueTime);
         }
@@ -167,10 +178,10 @@ public class GrpcMetrics implements MetricsSource {
     }
   }
 
-  public void addGrpcProcessingTime(int processingTime) {
+  public void addGrpcProcessingTime(long processingTime) {
     grpcProcessingTime.add(processingTime);
     if (grpcQuantileEnable) {
-      for (MutableQuantiles q : grpcProcessingTimeMillisQuantiles) {
+      for (MutableQuantiles q : grpcProcessingTimeNanosQuantiles) {
         if (q != null) {
           q.add(processingTime);
         }
@@ -202,11 +213,11 @@ public class GrpcMetrics implements MetricsSource {
     return unknownMessagesReceived.value();
   }
   
-  MutableRate getGrpcQueueTime() {
+  ConcurrentMutableRate getGrpcQueueTime() {
     return grpcQueueTime;
   }
 
-  MutableRate getGrpcProcessingTime() {
+  ConcurrentMutableRate getGrpcProcessingTime() {
     return grpcProcessingTime;
   }
 

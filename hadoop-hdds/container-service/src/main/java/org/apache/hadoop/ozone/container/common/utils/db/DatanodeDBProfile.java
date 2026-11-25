@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
@@ -129,8 +130,9 @@ public abstract class DatanodeDBProfile {
 
     private ManagedColumnFamilyOptions createColumnFamilyOptions(
         ConfigurationSource config) {
-      ManagedColumnFamilyOptions options =
-          baseProfile.getColumnFamilyOptions();
+      double deletionRatio = config == null ? 0
+          : config.getObject(RocksDBConfiguration.class).getCompactionDeletionRatio();
+      ManagedColumnFamilyOptions options = baseProfile.getColumnFamilyOptions(deletionRatio);
       options.setReused(true);
       return options.closeAndSetTableFormatConfig(
           getBlockBasedTableConfig(config));

@@ -66,27 +66,35 @@ public final class ContainerScanHelper {
     long containerId = containerData.getContainerID();
     logScanStart(containerData, "data");
     DataScanResult result = container.scanData(throttler, canceler);
-
+    Instant now = Instant.now();
+    
     if (result.isDeleted()) {
       log.debug("Container [{}] has been deleted during the data scan.", containerId);
-    } else {
+      logScanCompleted(containerData, now);
+      return;
+    }
+
+    boolean isTransientFailure = ScanTransientIOUtil.scanErrorsAreOnlyTooManyOpenFiles(result);
+
+    if (!isTransientFailure) {
       try {
         controller.updateContainerChecksum(containerId, result.getDataTree());
       } catch (IOException ex) {
         log.warn("Failed to update container checksum after scan of container {}", containerId, ex);
       }
-      if (result.hasErrors()) {
-        handleUnhealthyScanResult(containerData, result);
-      }
-      metrics.incNumContainersScanned();
     }
 
-    Instant now = Instant.now();
-    if (!result.isDeleted()) {
-      controller.updateDataScanTimestamp(containerId, now);
+    if (result.hasErrors()) {
+      handleUnhealthyScanResult(containerData, result, isTransientFailure);
     }
-    // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
-    logScanCompleted(containerData, now);
+
+    if (!isTransientFailure) {
+      metrics.incNumContainersScanned();
+      controller.updateDataScanTimestamp(containerId, now);
+      logScanCompleted(containerData, now);
+    } else {
+      logScanIncomplete(containerData, now, "data");
+    }
   }
 
   public void scanMetadata(Container<?> container)
@@ -103,20 +111,37 @@ public final class ContainerScanHelper {
       log.debug("Container [{}] has been deleted during metadata scan.", containerId);
       return;
     }
+
+    boolean isTransientFailure = ScanTransientIOUtil.scanErrorsAreOnlyTooManyOpenFiles(result);
+
     if (result.hasErrors()) {
-      handleUnhealthyScanResult(containerData, result);
+      handleUnhealthyScanResult(containerData, result, isTransientFailure);
     }
 
     Instant now = Instant.now();
     // Do not update the scan timestamp after the scan since this was just a
     // metadata scan, not a full data scan.
-    metrics.incNumContainersScanned();
-    // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
-    logScanCompleted(containerData, now);
+    if (!isTransientFailure) {
+      metrics.incNumContainersScanned();
+      // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
+      logScanCompleted(containerData, now);
+    } else {
+      logScanIncomplete(containerData, now, "metadata");
+    }
   }
 
-  public void handleUnhealthyScanResult(ContainerData containerData, ScanResult result) throws IOException {
+  /**
+   * Marks container UNHEALTHY when the scan reports real errors.
+   * If every scan error is related to file-descriptor exhaustion, return without marking container unhealthy.
+   */
+  public void handleUnhealthyScanResult(ContainerData containerData, ScanResult result,
+      boolean isTransientFailure) throws IOException {
     long containerID = containerData.getContainerID();
+    if (isTransientFailure) {
+      log.warn("Skipped marking container UNHEALTHY [{}]: scan failed due to transient " +
+          "file descriptor exhaustion ('Too many open files'). {}", containerID, result);
+      return;
+    }
     log.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerID, result);
     if (log.isDebugEnabled()) {
       StringBuilder allErrorString = new StringBuilder();
@@ -204,5 +229,12 @@ public final class ContainerScanHelper {
       ContainerData containerData, Instant timestamp) {
     log.debug("Completed scan of container {} at {}",
         containerData.getContainerID(), timestamp);
+  }
+
+  private void logScanIncomplete(ContainerData containerData, Instant timestamp, String scanType) {
+    if (log.isDebugEnabled()) {
+      log.debug("Incomplete {} scan of container {} at {} due to transient file descriptor exhaustion",
+          scanType, containerData.getContainerID(), timestamp);
+    }
   }
 }

@@ -67,7 +67,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
@@ -340,16 +339,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public void close() {
     if (!closed) {
       synchronized (this) {
-        if (!closed) {
-          closed = true;
-          if (scheduler != null) {
-            LOG.info("Shutting down {}.", DAG_PRUNING_SERVICE_NAME);
-            scheduler.close();
-          }
-          if (sstFilePruningMetrics != null) {
-            sstFilePruningMetrics.unRegister();
-          }
+        if (closed) {
+          return;
         }
+        closed = true;
+      }
+      // Not under the lock: a task waiting for it must be able to get it, see closed and stop.
+      if (scheduler != null) {
+        LOG.info("Shutting down {}.", DAG_PRUNING_SERVICE_NAME);
+        scheduler.close();
+      }
+      if (sstFilePruningMetrics != null) {
+        sstFilePruningMetrics.unRegister();
       }
     }
   }
@@ -692,14 +693,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     synchronized (this) {
       preconditionChecksForLoadAllCompactionLogs();
       addEntriesFromLogFilesToDagAndCompactionLogTable();
-      loadCompactionDagFromDB();
+      Set<String> referencedInputSstFiles = loadCompactionDagFromDB();
+      cleanupOrphanedSstBackupFiles(referencedInputSstFiles);
     }
   }
 
   /**
    * Read a compactionLofTable and create entries in the dags.
    */
-  private void loadCompactionDagFromDB() {
+  private Set<String> loadCompactionDagFromDB() {
+    Set<String> inputSstFilesFromCompactionLog = new HashSet<>();
     try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
         activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
       managedRocksIterator.get().seekToFirst();
@@ -707,6 +710,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         byte[] value = managedRocksIterator.get().value();
         CompactionLogEntry compactionLogEntry =
             CompactionLogEntry.getFromProtobuf(CompactionLogEntryProto.parseFrom(value));
+        compactionLogEntry.getInputFileInfoList()
+            .forEach(inputFile -> inputSstFilesFromCompactionLog.add(inputFile.getFileName()));
         compactionDag.populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
             compactionLogEntry.getOutputFileInfoList(), compactionLogEntry.getDbSequenceNumber());
         // Add the compaction log entry to the prune queue so that the backup input sst files can be pruned.
@@ -722,6 +727,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         sstFilePruningMetrics.updateQueueSize(pruneQueue.size());
       }
     }
+    return inputSstFilesFromCompactionLog;
   }
 
   private void preconditionChecksForLoadAllCompactionLogs() {
@@ -1092,10 +1098,9 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     if (!shouldRun()) {
       return;
     }
-    Pair<Set<String>, List<byte[]>> fileNodeToKeyPair =
-        getOlderFileNodes();
-    Set<String> lastCompactionSstFiles = fileNodeToKeyPair.getLeft();
-    List<byte[]> keysToRemove = fileNodeToKeyPair.getRight();
+    CompactionKeys compactionKeys = getOlderFileNodes();
+    Set<String> lastCompactionSstFiles = compactionKeys.compactionNodes();
+    List<byte[]> keysToRemove = compactionKeys.keysToRemove();
 
     Set<String> sstFileNodesRemoved =
         pruneSstFileNodesFromDag(lastCompactionSstFiles);
@@ -1117,7 +1122,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Returns the list of input files from the compaction entries which are
    * older than the maximum allowed in the compaction DAG.
    */
-  private synchronized Pair<Set<String>, List<byte[]>> getOlderFileNodes() {
+  private synchronized CompactionKeys getOlderFileNodes() {
+    if (closed) {
+      return new CompactionKeys(Collections.emptySet(), Collections.emptyList());
+    }
     long compactionLogPruneStartTime = System.currentTimeMillis();
     Set<String> compactionNodes = new HashSet<>();
     List<byte[]> keysToRemove = new ArrayList<>();
@@ -1146,11 +1154,14 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       // TODO: Handle this properly before merging the PR.
       throw new RuntimeException(exception);
     }
-    return Pair.of(compactionNodes, keysToRemove);
+    return new CompactionKeys(compactionNodes, keysToRemove);
   }
 
   private synchronized void removeKeyFromCompactionLogTable(
       List<byte[]> keysToRemove) {
+    if (closed) {
+      return;
+    }
     try {
       for (byte[] key: keysToRemove) {
         activeRocksDB.get().delete(compactionLogTableCFHandle, key);
@@ -1158,6 +1169,45 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     } catch (RocksDBException exception) {
       // TODO Handle exception properly before merging the PR.
       throw new RuntimeException(exception);
+    }
+  }
+
+  /**
+   * Removes SST files from the backup directory that were hard-linked during
+   * {@code onCompactionBegin} but never recorded in the compaction log because
+   * the compaction did not complete (for example, due to an OM crash/restart).
+   */
+  @VisibleForTesting
+  void cleanupOrphanedSstBackupFiles(Set<String> referencedInputSstFiles) {
+    Path sstBackupDirPath = Paths.get(sstBackupDir);
+    if (!Files.isDirectory(sstBackupDirPath)) {
+      return;
+    }
+
+    Set<String> orphanedFiles = new HashSet<>();
+    try (Stream<Path> pathStream = Files.list(sstBackupDirPath)) {
+      pathStream.filter(path -> path.getFileName().toString().endsWith(SST_FILE_EXTENSION))
+          .forEach(path -> {
+            String fileName = FilenameUtils.getBaseName(path.getFileName().toString());
+            if (!referencedInputSstFiles.contains(fileName)) {
+              orphanedFiles.add(fileName);
+            }
+          });
+    } catch (IOException e) {
+      LOG.warn("Failed to list SST backup directory " + sstBackupDir, e);
+    }
+
+    if (orphanedFiles.isEmpty()) {
+      return;
+    }
+
+    LOG.info("Removing orphaned SST backup files left by incomplete compactions: {}",
+        orphanedFiles);
+    try (UncheckedAutoCloseable ignored = getBootstrapStateLock().acquireReadLock()) {
+      removeSstFiles(orphanedFiles);
+    } catch (InterruptedException e) {
+      LOG.warn("Failed to remove orphaned SST backup files", e);
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -1296,6 +1346,10 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         CompactionLogEntry compactionLogEntry;
         // Get the compaction log entry.
         synchronized (this) {
+          // close() waits for this task only up to a timeout, then the DB is freed.
+          if (closed) {
+            break;
+          }
           try {
             compactionLogEntry = CompactionLogEntry.getCodec().fromPersistedFormat(
                 activeRocksDB.get().get(compactionLogTableCFHandle, compactionLogEntryKey));
@@ -1364,16 +1418,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private void removeValueFromSSTFile(ManagedOptions options, String sstFilePath, File prunedFile) throws IOException {
     try (ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader(options, sstFilePath, SST_READ_AHEAD_SIZE);
-         ManagedRawSSTFileIterator<Pair<CodecBuffer, Integer>> itr = sstFileReader.newIterator(
-             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
+         ManagedRawSSTFileIterator<CodecBufferAndType> itr = sstFileReader.newIterator(
+             keyValue -> new CodecBufferAndType(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
          RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(prunedFile);
          CodecBuffer emptyCodecBuffer = CodecBuffer.getEmptyBuffer()) {
       while (itr.hasNext()) {
-        Pair<CodecBuffer, Integer> keyValue = itr.next();
-        if (keyValue.getValue() == 0) {
-          sstFileWriter.delete(keyValue.getKey());
+        CodecBufferAndType keyValue = itr.next();
+        if (keyValue.type() == 0) {
+          sstFileWriter.delete(keyValue.buffer());
         } else {
-          sstFileWriter.put(keyValue.getKey(), emptyCodecBuffer);
+          sstFileWriter.put(keyValue.buffer(), emptyCodecBuffer);
         }
       }
     }
@@ -1463,4 +1517,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   public SSTFilePruningMetrics getPruningMetrics() {
     return sstFilePruningMetrics;
   }
+
+  /**
+   * The old compaction SST file nodes paired with the compaction log keys to remove,
+   * used to prune older snapshots from the compaction DAG.
+   */
+  private record CompactionKeys(Set<String> compactionNodes, List<byte[]> keysToRemove) { }
+
+  /**
+   * An SST key buffer paired with its entry type (0 = delete, otherwise put),
+   * used to rewrite SST files without values when pruning.
+   */
+  record CodecBufferAndType(CodecBuffer buffer, int type) { }
 }

@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -605,6 +606,12 @@ public final class OMRequestTestUtils {
         new OmKeyLocationInfoGroup(0L, new ArrayList<>(), false));
   }
 
+  // Returns for each block of the first version of the key info whether it has the given property.
+  public static List<Boolean> blocksWith(KeyInfo keyInfo, Predicate<KeyLocation> property) {
+    return keyInfo.getKeyLocationList(0).getKeyLocationsList().stream()
+        .map(property::test).collect(Collectors.toList());
+  }
+
   /**
    * Create OmDirectoryInfo.
    */
@@ -780,7 +787,7 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OMRequest.newBuilder()
         .setCreateBucketRequest(req)
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
         .setClientId(UUID.randomUUID().toString());
   }
@@ -1030,6 +1037,13 @@ public final class OMRequestTestUtils {
         omDirectoryInfo.getName());
     omMetadataManager.getDeletedDirTable().put(ozoneKey, omKeyInfo);
     omMetadataManager.getDirectoryTable().delete(ozoneKey);
+
+    String bucketKey = omMetadataManager.getBucketKey(volume, bucket);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    if (omBucketInfo != null) {
+      omBucketInfo.decrUsedNamespace(1L, true);
+      omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
+    }
     return ozoneKey;
   }
 
@@ -1374,7 +1388,8 @@ public final class OMRequestTestUtils {
               .setKey(deletedKey.getKey())
               .addAllKeyInfos(
                   deletedKey.getValue().stream()
-                  .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT_VERSION)).collect(Collectors.toList()))
+                      .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT))
+                      .collect(Collectors.toList()))
               .build();
       deletedMoveKeys.add(snapshotMoveKeyInfos);
     }
@@ -1386,7 +1401,7 @@ public final class OMRequestTestUtils {
               .setKey(deletedKey.getKey())
               .addAllKeyInfos(
                   deletedKey.getValue().stream()
-                      .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT_VERSION))
+                      .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT))
                       .collect(Collectors.toList()))
               .build();
       deletedDirMoveKeys.add(snapshotMoveKeyInfos);
@@ -1739,4 +1754,11 @@ public final class OMRequestTestUtils {
         .build();
   }
 
+  /**
+   * @return an EC replication config with an unknown codec
+   */
+  public static HddsProtos.ECReplicationConfig invalidEcReplicationConfig() {
+    return HddsProtos.ECReplicationConfig.newBuilder().setData(3).setParity(2).setCodec("NO_SUCH_CODEC")
+        .setEcChunkSize(1024 * 1024).build();
+  }
 }

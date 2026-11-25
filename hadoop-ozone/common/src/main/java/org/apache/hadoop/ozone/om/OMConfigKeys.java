@@ -243,12 +243,6 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT
       = TimeDuration.valueOf(3000, TimeUnit.MILLISECONDS);
-  public static final String
-      OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY
-      = "ozone.om.ratis.server.retry.cache.timeout";
-  public static final TimeDuration
-      OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT
-      = TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
   public static final String OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY
       = "ozone.om.ratis.minimum.timeout";
   public static final TimeDuration OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
@@ -290,6 +284,18 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT =
       TimeDuration.valueOf(300000, TimeUnit.MILLISECONDS);
+
+  public static final String OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY =
+      "ozone.om.bootstrap.min.space";
+  public static final String OZONE_OM_BOOTSTRAP_MIN_SPACE_DEFAULT = "5GB";
+
+  /**
+   * Multiplier applied to the leader-reported estimated SST bytes when deciding
+   * minimum free space before downloading a checkpoint (tar + unpack headroom).
+   */
+  public static final String OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_KEY =
+      "ozone.om.bootstrap.checkpoint.estimated.space.headroom.ratio";
+  public static final double OZONE_OM_BOOTSTRAP_CHECKPOINT_HEADROOM_RATIO_DEFAULT = 2.0D;
 
   public static final String OZONE_OM_FS_SNAPSHOT_MAX_LIMIT =
       "ozone.om.fs.snapshot.max.limit";
@@ -401,7 +407,7 @@ public final class OMConfigKeys {
    * Configuration properties for Snapshot Directory Service.
    */
   public static final String OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED = "ozone.snapshot.deep.cleaning.enabled";
-  public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = false;
+  public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = true;
   /**
    * DirectoryDeepCleaning snapshots have been moved from SnapshotDirectoryCleaningService to DirectoryDeletingService.
    * Configs related to SnapshotDirectoryCleaningService are deprecated as this won't be used anywhere.
@@ -469,6 +475,22 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_S3_GPRC_SERVER_ENABLED =
       "ozone.om.s3.grpc.server_enabled";
   public static final boolean OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT =
+      true;
+
+  /**
+   * When {@code ozone.security.enabled} is true, reject OMRequests received on
+   * the OM S3 gateway gRPC endpoint that do not carry S3 authentication. The S3
+   * Gateway attaches S3 authentication to the requests it forwards on behalf of
+   * its clients; requests without it would otherwise be processed with a
+   * client-asserted identity. Identity-free bootstrap reads the S3 Gateway must
+   * issue before any per-request S3 authentication exists (ServiceList) are
+   * exempt. Set to false only for compatibility with deployments that rely on
+   * unauthenticated (anonymous) access through this endpoint. Has no effect when
+   * {@code ozone.security.enabled} is false.
+   */
+  public static final String OZONE_OM_S3_GRPC_AUTH_REQUIRED =
+      "ozone.om.s3.grpc.auth.required";
+  public static final boolean OZONE_OM_S3_GRPC_AUTH_REQUIRED_DEFAULT =
       true;
 
   public static final String OZONE_OM_NAMESPACE_STRICT_S3 =
@@ -591,7 +613,7 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
       = 100;
   public static final int OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
-      = 1000;
+      = 5000;
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE
       = "ozone.om.snapshot.diff.thread.pool.size";
@@ -621,7 +643,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.cache.cleanup.service.run.interval";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.MINUTES.toMillis(1);
+      = TimeUnit.MINUTES.toMillis(60);
   public static final long
       OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
       = TimeUnit.MINUTES.toMillis(1);
@@ -638,7 +660,20 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.diff.max.allowed.keys.changed.per.job";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
-      = 10_000_000;
+      = 1_000_000_000L;
+
+  public static final String
+      OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB
+      = "ozone.om.snapshot.diff.max.in.memory.entries.per.job";
+  public static final int
+      OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT
+      = 1_000_000;
+
+  public static final String OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED
+      = "ozone.om.snapshot.diff.optimized.enabled";
+
+  public static final boolean OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED_DEFAULT
+      = false;
 
   public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
       = "ozone.om.upgrade.quota.recalculate.enabled";
@@ -664,24 +699,6 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_EDEKCACHELOADER_MAX_RETRIES_DEFAULT = 10;
 
   /**
-   * Configuration properties for Compaction Service.
-   */
-  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.om.compaction.service.enabled";
-  public static final boolean OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT = false;
-  public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
-      "ozone.om.compaction.service.run.interval";
-  public static final long OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.HOURS.toMillis(6);
-
-  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT
-      = "ozone.om.compaction.service.timeout";
-  public static final String OZONE_OM_COMPACTION_SERVICE_TIMEOUT_DEFAULT = "10m";
-  public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES
-      = "ozone.om.compaction.service.columnfamilies";
-  public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
-      "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable,multipartPartsTable";
-
-  /**
    * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.
    */
   public static final String OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES = 
@@ -699,9 +716,23 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.local.data.manager.service.interval";
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
 
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_INTERVAL
+      = "ozone.om.sts.token.cleanup.service.interval";
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_INTERVAL_DEFAULT
+      = "3h";
+
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT
+      = "ozone.om.sts.token.cleanup.service.timeout";
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = "15m";
+
   public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
       "ozone.om.ratis.events.max.limit";
   public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
+
+  public static final String OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL =
+      "ozone.om.upgrade.finalization.check.interval";
+  public static final String OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL_DEFAULT = "1m";
 
   /**
    * Never constructed.

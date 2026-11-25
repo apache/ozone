@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.parseETag;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.OptionalLong;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
@@ -45,59 +44,90 @@ final class S3ConditionalRequest {
   private S3ConditionalRequest() {
   }
 
-  static Response evaluateReadPreconditions(HttpHeaders headers,
-      String keyPath, OzoneKey key) throws OS3Exception {
+  /**
+   * Context for evaluating preconditions, defining which headers to check
+   * and how to handle cache validation scenarios.
+   */
+  enum PreconditionContext {
+    /**
+     * For GET/HEAD requests. Returns 304 Not Modified when If-None-Match
+     * matches or If-Modified-Since is not satisfied (cache validation).
+     */
+    READ(
+        S3Consts.IF_MATCH_HEADER,
+        S3Consts.IF_NONE_MATCH_HEADER,
+        S3Consts.IF_MODIFIED_SINCE_HEADER,
+        S3Consts.IF_UNMODIFIED_SINCE_HEADER),
+
+    /**
+     * For CopyObject and UploadPartCopy source validation. Always throws 412 Precondition Failed
+     * when any condition is not met (no 304 responses).
+     */
+    COPY_SOURCE(
+        S3Consts.COPY_SOURCE_IF_MATCH,
+        S3Consts.COPY_SOURCE_IF_NONE_MATCH,
+        S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE,
+        S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE);
+
+    private final String ifMatchHeader;
+    private final String ifNoneMatchHeader;
+    private final String ifModifiedSinceHeader;
+    private final String ifUnmodifiedSinceHeader;
+
+    PreconditionContext(String ifMatchHeader, String ifNoneMatchHeader,
+        String ifModifiedSinceHeader, String ifUnmodifiedSinceHeader) {
+      this.ifMatchHeader = ifMatchHeader;
+      this.ifNoneMatchHeader = ifNoneMatchHeader;
+      this.ifModifiedSinceHeader = ifModifiedSinceHeader;
+      this.ifUnmodifiedSinceHeader = ifUnmodifiedSinceHeader;
+    }
+  }
+
+  /**
+   * Evaluates preconditions based on the given context.
+   *
+   * @param headers HTTP headers containing the conditional headers
+   * @param keyPath path of the key for error messages
+   * @param key the key metadata
+   * @param context determines which headers to check and response behavior
+   * @return Response with 304 status for READ context cache hits, null otherwise
+   * @throws OS3Exception with 412 Precondition Failed if conditions are not met
+   */
+  static Response evaluatePreconditions(HttpHeaders headers,
+      String keyPath, OzoneKey key, PreconditionContext context) throws OS3Exception {
     String currentETag = key.getMetadata().get(OzoneConsts.ETAG);
-    String ifMatch = headers.getHeaderString(S3Consts.IF_MATCH_HEADER);
+
+    String ifMatch = headers.getHeaderString(context.ifMatchHeader);
     if (ifMatch != null && !eTagMatches(ifMatch, currentETag)) {
       throw newError(PRECOND_FAILED, keyPath);
     }
 
-    String ifUnmodifiedSince = headers.getHeaderString(
-        S3Consts.IF_UNMODIFIED_SINCE_HEADER);
+    String ifUnmodifiedSince = headers.getHeaderString(context.ifUnmodifiedSinceHeader);
     if (ifMatch == null && ifUnmodifiedSince != null
         && !matchesIfUnmodifiedSince(key, ifUnmodifiedSince)) {
       throw newError(PRECOND_FAILED, keyPath);
     }
 
-    String ifNoneMatch = headers.getHeaderString(
-        S3Consts.IF_NONE_MATCH_HEADER);
+    String ifNoneMatch = headers.getHeaderString(context.ifNoneMatchHeader);
     if (ifNoneMatch != null) {
       if (eTagMatches(ifNoneMatch, currentETag)) {
+        if (context == PreconditionContext.COPY_SOURCE) {
+          throw newError(PRECOND_FAILED, keyPath);
+        }
         return buildNotModifiedResponse(key);
       }
       return null;
     }
 
-    String ifModifiedSince = headers.getHeaderString(
-        S3Consts.IF_MODIFIED_SINCE_HEADER);
-    if (ifModifiedSince != null && !matchesIfModifiedSince(key,
-        ifModifiedSince)) {
+    String ifModifiedSince = headers.getHeaderString(context.ifModifiedSinceHeader);
+    if (ifModifiedSince != null && !matchesIfModifiedSince(key, ifModifiedSince)) {
+      if (context == PreconditionContext.COPY_SOURCE) {
+        throw newError(PRECOND_FAILED, keyPath);
+      }
       return buildNotModifiedResponse(key);
     }
 
     return null;
-  }
-
-  static boolean checkCopySourceModificationTime(Long lastModificationTime,
-      String copySourceIfModifiedSinceStr,
-      String copySourceIfUnmodifiedSinceStr) {
-    long copySourceIfModifiedSince = Long.MIN_VALUE;
-    long copySourceIfUnmodifiedSince = Long.MAX_VALUE;
-
-    OptionalLong modifiedDate =
-        parseAndValidatePastOrPresentDate(copySourceIfModifiedSinceStr);
-    if (modifiedDate.isPresent()) {
-      copySourceIfModifiedSince = modifiedDate.getAsLong();
-    }
-
-    OptionalLong unmodifiedDate =
-        parseAndValidatePastOrPresentDate(copySourceIfUnmodifiedSinceStr);
-    if (unmodifiedDate.isPresent()) {
-      copySourceIfUnmodifiedSince = unmodifiedDate.getAsLong();
-    }
-    return (copySourceIfModifiedSince <= lastModificationTime)
-        && (lastModificationTime <= copySourceIfUnmodifiedSince);
   }
 
   static WriteConditions parseWriteConditions(HttpHeaders headers,
@@ -126,15 +156,18 @@ final class S3ConditionalRequest {
       throw ex;
     }
 
-    if (trimmedIfNoneMatch != null
-        && !"*".equals(parseETag(trimmedIfNoneMatch))) {
+    return new WriteConditions(trimmedIfNoneMatch, trimmedIfMatch);
+  }
+
+  static DeleteCondition parseDeleteCondition(HttpHeaders headers, String keyPath)
+      throws OS3Exception {
+    String ifMatch = headers.getHeaderString(S3Consts.IF_MATCH_HEADER);
+    if (ifMatch != null && StringUtils.isBlank(ifMatch)) {
       OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-      ex.setErrorMessage(
-          "Only If-None-Match: * is supported for conditional put.");
+      ex.setErrorMessage("If-Match header cannot be empty.");
       throw ex;
     }
-
-    return new WriteConditions(trimmedIfNoneMatch, trimmedIfMatch);
+    return new DeleteCondition(ifMatch);
   }
 
   private static Response buildNotModifiedResponse(OzoneKey key) {
@@ -161,8 +194,7 @@ final class S3ConditionalRequest {
     return false;
   }
 
-  private static boolean matchesIfModifiedSince(OzoneKey key,
-      String headerValue) {
+  private static boolean matchesIfModifiedSince(OzoneKey key, String headerValue) {
     Instant since = parseConditionalInstant(headerValue);
     if (since == null) {
       return true;
@@ -172,14 +204,12 @@ final class S3ConditionalRequest {
     return lastModified.isAfter(since);
   }
 
-  private static boolean matchesIfUnmodifiedSince(OzoneKey key,
-      String headerValue) {
+  private static boolean matchesIfUnmodifiedSince(OzoneKey key, String headerValue) {
     Instant since = parseConditionalInstant(headerValue);
     if (since == null) {
       return true;
     }
-    Instant lastModified = key.getModificationTime()
-        .truncatedTo(ChronoUnit.SECONDS);
+    Instant lastModified = key.getModificationTime().truncatedTo(ChronoUnit.SECONDS);
     return !lastModified.isAfter(since);
   }
 
@@ -188,31 +218,14 @@ final class S3ConditionalRequest {
       return null;
     }
     try {
-      return Instant.ofEpochMilli(OzoneUtils.formatDate(headerValue))
-          .truncatedTo(ChronoUnit.SECONDS);
+      Instant since = Instant.ofEpochMilli(OzoneUtils.formatDate(headerValue));
+      if (since.isAfter(Instant.now())) {
+        return null;
+      }
+      return since.truncatedTo(ChronoUnit.SECONDS);
     } catch (IllegalArgumentException | ParseException ex) {
       return null;
     }
-  }
-
-  private static OptionalLong parseAndValidatePastOrPresentDate(
-      String ozoneDateStr) {
-    if (ozoneDateStr == null) {
-      return OptionalLong.empty();
-    }
-
-    long ozoneDateInMs;
-    try {
-      ozoneDateInMs = OzoneUtils.formatDate(ozoneDateStr);
-    } catch (ParseException e) {
-      return OptionalLong.empty();
-    }
-
-    long currentDate = System.currentTimeMillis();
-    if (ozoneDateInMs <= currentDate) {
-      return OptionalLong.of(ozoneDateInMs);
-    }
-    return OptionalLong.empty();
   }
 
   static final class WriteConditions {
@@ -226,6 +239,30 @@ final class S3ConditionalRequest {
 
     boolean hasIfNoneMatch() {
       return ifNoneMatch != null;
+    }
+
+    boolean isCreateIfAbsent() {
+      return "*".equals(parseETag(ifNoneMatch));
+    }
+
+    String getExcludedETag() {
+      return isCreateIfAbsent() ? null : parseETag(ifNoneMatch);
+    }
+
+    boolean hasIfMatch() {
+      return ifMatch != null;
+    }
+
+    String getExpectedETag() {
+      return parseETag(ifMatch);
+    }
+  }
+
+  static final class DeleteCondition {
+    private final String ifMatch;
+
+    private DeleteCondition(String ifMatch) {
+      this.ifMatch = ifMatch;
     }
 
     boolean hasIfMatch() {

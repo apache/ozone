@@ -27,7 +27,7 @@ services:
       POSTGRES_PASSWORD: "rangerR0cks!"
     volumes:
       # The location of the init_postgres.sh file changed in Ranger 2.8
-      - ${RANGER_SOURCE_DIR}/dev-support/ranger-docker/scripts/rdbms/init_postgres.sh:/docker-entrypoint-initdb.d/init_postgres.sh
+      - ${RANGER_INIT_POSTGRES_SH}:/docker-entrypoint-initdb.d/init_postgres.sh
     healthcheck:
       test: 'su -c "pg_isready -q" postgres'
       interval: 10s
@@ -63,8 +63,20 @@ services:
       RANGER_AUDIT_DB_USERNAME: "rangeradmin"
       RANGER_AUDIT_DB_PASSWORD: "rangerR0cks!"
       RANGER_VERSION: ${RANGER_VERSION}
+      FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION: "${FF_ENABLE_OZONE_ACTION_MATCHES_CONDITION:-false}"
+      # apache/ranger:2.9.0 currently uses Java 8, so Java 9+ flags like
+      # --add-opens must be opt-in for Ranger images that need them.
+      JAVA_OPTS: "${RANGER_JAVA_OPTS:-}"
+    entrypoint:
+      - bash
+      - -c
+      - |
+        if [ -f /opt/ranger/admin/install.properties ]; then
+          cp /opt/ranger/admin/install.properties /home/ranger/scripts/ranger-admin-install.properties
+        fi
+        exec /home/ranger/scripts/ranger.sh
     volumes:
-      - ${RANGER_SOURCE_DIR}/dev-support/ranger-docker/scripts/admin/ranger-admin-install-postgres.properties:/opt/ranger/admin/install.properties
+      - ${RANGER_ADMIN_INSTALL_PROPERTIES}:/opt/ranger/admin/install.properties
     healthcheck:
       test: 'grep "Successfully retrieved .*dev_ozone" /var/log/ranger/ranger-admin*log'
       interval: 2s

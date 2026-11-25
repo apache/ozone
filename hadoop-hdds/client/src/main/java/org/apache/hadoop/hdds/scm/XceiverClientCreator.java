@@ -17,11 +17,16 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED_DEFAULT;
+
 import java.io.IOException;
 import java.util.Objects;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -36,6 +41,8 @@ public class XceiverClientCreator implements XceiverClientFactory {
   private final boolean topologyAwareRead;
   private final ClientTrustManager trustManager;
   private final boolean securityEnabled;
+  private boolean shortCircuitEnabled;
+  private DomainSocketFactory domainSocketFactory;
 
   public XceiverClientCreator(ConfigurationSource conf) {
     this(conf, null);
@@ -51,6 +58,14 @@ public class XceiverClientCreator implements XceiverClientFactory {
     if (securityEnabled) {
       Objects.requireNonNull(trustManager, "trustManager == null");
     }
+    final OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    if (clientConfig.isNettyWarmUpEnabled()) {
+      NettyWarmUp.start(securityEnabled && conf.getBoolean(HDDS_GRPC_TLS_ENABLED, HDDS_GRPC_TLS_ENABLED_DEFAULT));
+    }
+    shortCircuitEnabled = clientConfig.isShortCircuitEnabled();
+    if (shortCircuitEnabled) {
+      domainSocketFactory = DomainSocketFactory.getInstance(conf);
+    }
   }
 
   public static void enableErrorInjection(ErrorInjector injector) {
@@ -61,14 +76,27 @@ public class XceiverClientCreator implements XceiverClientFactory {
     return securityEnabled;
   }
 
+  @Override
+  public boolean isShortCircuitEnabled() {
+    return shortCircuitEnabled && domainSocketFactory.isServiceReady();
+  }
+
   protected XceiverClientSpi newClient(Pipeline pipeline) throws IOException {
+    return newClient(pipeline, null);
+  }
+
+  protected XceiverClientSpi newClient(Pipeline pipeline, DatanodeDetails dn) throws IOException {
     XceiverClientSpi client;
     switch (pipeline.getType()) {
     case RATIS:
       client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf, trustManager, errorInjector);
       break;
     case STAND_ALONE:
-      client = new XceiverClientGrpc(pipeline, conf, trustManager);
+      if (dn != null) {
+        client = new XceiverClientShortCircuit(pipeline, conf, dn);
+      } else {
+        client = new XceiverClientGrpc(pipeline, conf, trustManager);
+      }
       break;
     case EC:
       client = new ECXceiverClientGrpc(pipeline, conf, trustManager);
@@ -96,7 +124,14 @@ public class XceiverClientCreator implements XceiverClientFactory {
   }
 
   @Override
-  public XceiverClientSpi acquireClientForReadData(Pipeline pipeline) throws IOException {
+  public XceiverClientSpi acquireClientForReadData(Pipeline pipeline, boolean allowShortCircuit)
+      throws IOException {
+    return acquireClient(pipeline, false, allowShortCircuit);
+  }
+
+  @Override
+  public XceiverClientSpi acquireClient(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit)
+      throws IOException {
     return acquireClient(pipeline);
   }
 
@@ -116,7 +151,10 @@ public class XceiverClientCreator implements XceiverClientFactory {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     // clients are not tracked, closing each client is the responsibility of users of this class
+    if (domainSocketFactory != null) {
+      domainSocketFactory.close();
+    }
   }
 }

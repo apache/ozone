@@ -49,16 +49,17 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -66,21 +67,21 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
@@ -131,10 +132,10 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
 
   private ConfigurationSource conf;
   private List<DatanodeSimulationState> datanodes;
-  private Map<UUID, DatanodeSimulationState> datanodesMap;
+  private Map<DatanodeID, DatanodeSimulationState> datanodesMap;
 
   private ScheduledExecutorService heartbeatScheduler;
-  private LayoutVersionProto layoutInfo;
+  private DatanodeVersionProto versionInfo;
 
   @CommandLine.ParentCommand
   private Freon freonCommand;
@@ -163,7 +164,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
   private AtomicLong totalHeartbeats = new AtomicLong(0);
   private AtomicLong totalFCRs = new AtomicLong(0);
   private AtomicLong totalICRs = new AtomicLong(0);
-  private StorageContainerLocationProtocol scmContainerClient;
+  private StorageContainerLocationInternalInterface scmContainerClient;
 
   @Override
   public Void call() throws Exception {
@@ -295,7 +296,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
 
     datanodesMap = new HashMap<>();
     for (DatanodeSimulationState datanode : datanodes) {
-      datanodesMap.put(datanode.getDatanodeDetails().getUuid(), datanode);
+      datanodesMap.put(datanode.getDatanodeDetails().getID(), datanode);
     }
   }
 
@@ -317,8 +318,8 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
               ReplicationFactor.THREE, "test");
 
       for (DatanodeDetails datanode : cp.getPipeline().getNodeSet()) {
-        if (datanodesMap.containsKey(datanode.getUuid())) {
-          datanodesMap.get(datanode.getUuid())
+        if (datanodesMap.containsKey(datanode.getID())) {
+          datanodesMap.get(datanode.getID())
               .newContainer(cp.getContainerInfo().getContainerID());
           totalAssignedContainers++;
         }
@@ -395,7 +396,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
                          DatanodeSimulationState dn) {
     try {
       SCMHeartbeatRequestProto heartbeat = dn.heartbeatRequest(endpoint,
-          layoutInfo);
+          versionInfo);
       SCMHeartbeatResponseProto response = client.sendHeartbeat(heartbeat);
       dn.ackHeartbeatResponse(response);
 
@@ -414,7 +415,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
         client.register(
             dn.getDatanodeDetails().getExtendedProtoBufMessage(),
             dn.createNodeReport(), dn.createFullContainerReport(),
-            dn.createPipelineReport(), this.layoutInfo);
+            dn.createPipelineReport(), this.versionInfo);
       }
     } catch (Exception e) {
       LOGGER.info("Error sending heartbeat for {}: {}",
@@ -424,44 +425,44 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
 
   private void init() throws IOException {
     conf = freonCommand.getOzoneConf();
-    Collection<InetSocketAddress> addresses = getSCMAddressForDatanodes(conf);
+    final Collection<HostAndPort> addresses = getSCMAddressForDatanodes(conf);
     scmClients = new HashMap<>(addresses.size());
-    for (InetSocketAddress address : addresses) {
+    for (HostAndPort a : addresses) {
+      InetSocketAddress address = a.getAddress();
       scmClients.put(address, createScmClient(address));
     }
 
-    reconAddress = getReconAddressForDatanodes(conf);
+    reconAddress = getReconAddressForDatanodes(conf).getAddress();
     reconClient = createReconClient(reconAddress);
 
     heartbeatScheduler = Executors.newScheduledThreadPool(threadCount);
 
     scmContainerClient = HAUtils.getScmContainerClient(conf);
 
-    this.layoutInfo = createLayoutInfo();
+    this.versionInfo = createVersionInfo();
   }
 
-  private LayoutVersionProto createLayoutInfo() throws IOException {
-    Storage layoutStorage = new DatanodeLayoutStorage(conf,
+  private DatanodeVersionProto createVersionInfo() throws IOException {
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString());
 
-    HDDSLayoutVersionManager layoutVersionManager =
-        new HDDSLayoutVersionManager(layoutStorage.getLayoutVersion());
+    DatanodeVersionManager versionManager = new DatanodeVersionManager(layoutStorage, null);
 
-    return LayoutVersionProto.newBuilder()
-        .setMetadataLayoutVersion(
-            layoutVersionManager.getMetadataLayoutVersion())
-        .setSoftwareLayoutVersion(
-            layoutVersionManager.getSoftwareLayoutVersion())
+    return DatanodeVersionProto.newBuilder()
+        .setApparentVersion(
+            versionManager.getApparentVersion().serialize())
+        .setSoftwareVersion(
+            versionManager.getSoftwareVersion().serialize())
         .build();
   }
 
   private DatanodeDetails randomDatanodeDetails(ConfigurationSource config)
       throws UnknownHostException {
     DatanodeDetails details = DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID())
+        .setID(DatanodeID.randomID())
         .build();
-    details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
-    details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
+    details.setInitialVersion(HDDSVersion.SOFTWARE_VERSION);
+    details.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
     details.setHostName(HddsUtils.getHostName(config));
     details.setIpAddress(randomIp());
     details.setStandalonePort(0);
@@ -470,7 +471,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
     details.setVersion(HDDS_VERSION_INFO.getVersion());
     details.setSetupTime(Time.now());
     details.setRevision(HDDS_VERSION_INFO.getRevision());
-    details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
+    details.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
     return details;
   }
 
@@ -491,7 +492,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
         SCMRegisteredResponseProto response =
             client.register(
                 dn.getDatanodeDetails().getExtendedProtoBufMessage(),
-                nodeReport, containerReports, pipelineReports, this.layoutInfo);
+                nodeReport, containerReports, pipelineReports, this.versionInfo);
         if (response.hasHostname() && response.hasIpAddress()) {
           dn.getDatanodeDetails().setHostName(response.getHostname());
           dn.getDatanodeDetails().setIpAddress(response.getIpAddress());
@@ -511,7 +512,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
 
     try {
       reconClient.register(dn.getDatanodeDetails().getExtendedProtoBufMessage(),
-          nodeReport, containerReports, pipelineReports, this.layoutInfo);
+          nodeReport, containerReports, pipelineReports, this.versionInfo);
     } catch (IOException e) {
       LOGGER.error("Error register datanode to Recon", e);
     }

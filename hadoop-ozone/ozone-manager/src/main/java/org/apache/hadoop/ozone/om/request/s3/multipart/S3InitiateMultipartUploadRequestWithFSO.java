@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -114,7 +115,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // check if the directory already existed in OM
       checkDirectoryResult(keyName, pathInfoFSO.getDirectoryResult());
 
-      final OmBucketInfo bucketInfo = getBucketInfo(omMetadataManager,
+      final OmBucketInfo bucketInfo = getBucketInfoForUpdate(omMetadataManager,
           volumeName, bucketName);
 
       // add all missing parents to dir table
@@ -168,6 +169,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
           .setParentID(pathInfoFSO.getLastKnownParentId())
+          // Source of truth is the value stamped onto the proto in preExecute
+          // (before Ratis). Never re-check MLV here in the replicated apply path.
+          .setSchemaVersion(multipartInfoInitiateRequest.getSchemaVersion())
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
@@ -210,6 +214,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // Add to cache
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           multipartKey, multipartKeyInfo, transactionLogIndex);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), bucketInfo, transactionLogIndex);
 
       omClientResponse =
           new S3InitiateMultipartUploadResponseWithFSO(
@@ -256,6 +263,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
     if (omDirectoryResult == DIRECTORY_EXISTS) {
       throw new OMException("Can not write to directory: " + keyName,
               OMException.ResultCodes.NOT_A_FILE);
+    } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
+      throw new OMException("Can not create file: " + keyName + " as there is already file in the given path",
+          OMException.ResultCodes.NOT_A_FILE);
     }
   }
 }

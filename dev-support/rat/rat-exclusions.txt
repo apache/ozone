@@ -18,9 +18,12 @@
 **/*.json
 .gitattributes
 .github/*
+AGENTS.md
+CLAUDE.md
 CONTRIBUTING.md
 README.md
 SECURITY.md
+THREAT_MODEL.md
 
 # hadoop-hdds/interface-client
 src/main/resources/proto.lock
@@ -48,10 +51,6 @@ src/test/resources/incorrect.checksum.container
 src/test/resources/incorrect.container
 src/test/resources/test.db.ini
 
-# hadoop-hdds/docs
-**/themes/ozonedoc/**
-static/slides/*
-
 # hadoop-ozone/dist
 **/.ssh/id_rsa*
 **/log.html
@@ -65,6 +64,8 @@ src/test/resources/ssl/*
 # hadoop-ozone/recon
 **/pnpm-lock.yaml
 src/test/resources/prometheus-test-response.txt
+src/main/resources/chatbot/*.txt
+src/main/resources/chatbot/*.md
 
 # hadoop-ozone/shaded
 **/dependency-reduced-pom.xml

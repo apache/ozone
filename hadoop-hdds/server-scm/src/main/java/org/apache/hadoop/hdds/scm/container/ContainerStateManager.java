@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -28,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ha.SCMHandler;
-import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvokerCodeGenerator;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -107,13 +105,14 @@ public interface ContainerStateManager extends SCMHandler {
   boolean contains(ContainerID containerID);
 
   /**
-   * Get {@link ContainerID}s for the given state.
+   * Get {@link ContainerID}s for the given optional lifeCycleState and healthState.
    *
    * @param start the start {@link ContainerID} (inclusive)
    * @param count the size limit
    * @return a list of {@link ContainerID};
    */
-  List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count);
+  List<ContainerID> getContainerIDs(LifeCycleState state, SimplifiedContainerHealthStateForReporting healthState, 
+       ContainerID start, int count);
 
   /**
    * Get {@link ContainerInfo}s.
@@ -171,6 +170,11 @@ public interface ContainerStateManager extends SCMHandler {
   void addContainer(ContainerInfoProto containerInfo)
       throws IOException;
 
+  @Deprecated
+  @Replicate
+  void updateContainerState(HddsProtos.ContainerID id,
+      HddsProtos.LifeCycleEvent event) throws IOException, InvalidStateTransitionException;
+
   /**
    * Updates container state with sequenceId synchronization for HA consistency.
    * This method ensures that all SCM nodes have the same sequenceId when 
@@ -180,7 +184,7 @@ public interface ContainerStateManager extends SCMHandler {
   void updateContainerStateWithSequenceId(HddsProtos.ContainerID id,
                                           HddsProtos.LifeCycleEvent event,
                                           Long sequenceId)
-      throws IOException, InvalidStateTransitionException;
+      throws IOException;
 
 
   /**
@@ -195,11 +199,12 @@ public interface ContainerStateManager extends SCMHandler {
       throws IOException;
 
   /**
-   *
+   * Kept to apply Raft log entries written by SCM 2.0 and 2.1.
+   * Same as {@link #transitionDeletingOrDeletedToTargetState} with CLOSED.
    */
-  // Make this as @Replicate
-  void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap)
-      throws IOException;
+  @Deprecated
+  @Replicate
+  void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID id) throws IOException;
 
   /**
    *
@@ -238,7 +243,4 @@ public interface ContainerStateManager extends SCMHandler {
   void updateContainerInfo(HddsProtos.ContainerInfoProto containerInfo)
       throws IOException;
 
-  static void main(String[] args) {
-    ScmInvokerCodeGenerator.generate(ContainerStateManager.class, true);
-  }
 }

@@ -24,12 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
-import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.junit.jupiter.api.Test;
@@ -51,18 +51,17 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSet = metaData.getColumns(null, null,
         GLOBAL_STATS_TABLE_NAME, null);
 
-    List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
+    // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
+    List<ColumnNameAndType> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("key", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("value", Types.BIGINT));
-    expectedPairs.add(new ImmutablePair<>("last_updated_timestamp",
-        Types.TIMESTAMP));
+    expectedPairs.add(new ColumnNameAndType("key", Types.VARCHAR));
+    expectedPairs.add(new ColumnNameAndType("value", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("last_updated_timestamp", Types.VARCHAR));
 
-    List<Pair<String, Integer>> actualPairs = new ArrayList<>();
+    List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ImmutablePair<>(resultSet.getString("COLUMN_NAME"),
-          resultSet.getInt("DATA_TYPE")));
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"), resultSet.getInt("DATA_TYPE")));
     }
 
     assertEquals(3, actualPairs.size());
@@ -84,16 +83,18 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
     GlobalStatsDao dao = getDao(GlobalStatsDao.class);
 
-    long now = System.currentTimeMillis();
+    // SQLite keeps timestamps at millisecond precision.
+    LocalDateTime now = LocalDateTime.now(Clock.systemUTC().getZone()).truncatedTo(ChronoUnit.MILLIS);
     GlobalStats newRecord = new GlobalStats();
-    newRecord.setLastUpdatedTimestamp(new Timestamp(now));
+    newRecord.setLastUpdatedTimestamp(now);
     newRecord.setKey("key1");
     newRecord.setValue(500L);
 
     // Create
     dao.insert(newRecord);
     GlobalStats newRecord2 = new GlobalStats();
-    newRecord2.setLastUpdatedTimestamp(new Timestamp(now + 1000L));
+    LocalDateTime dateTime1 = now.plusSeconds(1);
+    newRecord2.setLastUpdatedTimestamp(dateTime1);
     newRecord2.setKey("key2");
     newRecord2.setValue(10L);
     dao.insert(newRecord2);
@@ -103,25 +104,23 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
     assertEquals("key1", dbRecord.getKey());
     assertEquals(Long.valueOf(500), dbRecord.getValue());
-    assertEquals(new Timestamp(now),
-        dbRecord.getLastUpdatedTimestamp());
+    assertEquals(now, dbRecord.getLastUpdatedTimestamp());
 
     dbRecord = dao.findById("key2");
     assertEquals("key2", dbRecord.getKey());
     assertEquals(Long.valueOf(10), dbRecord.getValue());
-    assertEquals(new Timestamp(now + 1000L),
-        dbRecord.getLastUpdatedTimestamp());
+    assertEquals(dateTime1, dbRecord.getLastUpdatedTimestamp());
 
     // Update
+    LocalDateTime dateTime2 = dateTime1.plusSeconds(1);
     dbRecord.setValue(100L);
-    dbRecord.setLastUpdatedTimestamp(new Timestamp(now + 2000L));
+    dbRecord.setLastUpdatedTimestamp(dateTime2);
     dao.update(dbRecord);
 
     // Read updated
     dbRecord = dao.findById("key2");
 
-    assertEquals(new Timestamp(now + 2000L),
-        dbRecord.getLastUpdatedTimestamp());
+    assertEquals(dateTime2, dbRecord.getLastUpdatedTimestamp());
     assertEquals(Long.valueOf(100L), dbRecord.getValue());
 
     // Delete

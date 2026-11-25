@@ -28,7 +28,7 @@ import picocli.CommandLine;
  * Base Ratis Log Parser used by generic, datanode etc.
  */
 public abstract class BaseLogParser {
-  @CommandLine.Option(names = {"-s", "--segmentPath", "--segment-path"},
+  @CommandLine.Option(names = {"-s", "--segment-path"},
       required = true,
       description = "Path of the segment file")
   private File segmentFile;

@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
  */
 @Path("/namespace")
 @Produces(MediaType.APPLICATION_JSON)
-@AdminOnly
 public class NSSummaryEndpoint {
 
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;

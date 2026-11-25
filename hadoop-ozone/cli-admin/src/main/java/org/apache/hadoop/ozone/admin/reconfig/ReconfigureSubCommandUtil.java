@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -102,7 +103,7 @@ final class ReconfigureSubCommandUtil {
       }
       Port port = details.getPort(Port.Name.CLIENT_RPC);
       if (port != null) {
-        addresses.add(details.getIpAddress() + ":" + port.getValue());
+        addresses.add(HddsUtils.getHostPortString(details.getIpAddress(), port.getValue()));
       } else {
         System.out.printf("host: %s(%s) %s port not found",
             details.getHostName(), details.getIpAddress(),

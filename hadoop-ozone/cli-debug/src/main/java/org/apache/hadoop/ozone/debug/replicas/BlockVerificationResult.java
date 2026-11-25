@@ -28,11 +28,18 @@ public class BlockVerificationResult {
   private final boolean completed;
   private final boolean pass;
   private final List<String> failures;
+  private final boolean refreshKeyLocation;
 
   public BlockVerificationResult(boolean completed, boolean pass, List<String> failures) {
+    this(completed, pass, failures, false);
+  }
+
+  public BlockVerificationResult(boolean completed, boolean pass, List<String> failures,
+      boolean refreshKeyLocation) {
     this.completed = completed;
     this.pass = pass;
     this.failures = failures;
+    this.refreshKeyLocation = refreshKeyLocation;
   }
 
   public static BlockVerificationResult pass() {
@@ -41,6 +48,10 @@ public class BlockVerificationResult {
 
   public static BlockVerificationResult failCheck(String message) {
     return new BlockVerificationResult(true, false, Collections.singletonList(message));
+  }
+
+  public static BlockVerificationResult failCheckAndRefreshKeyLocation(String message) {
+    return new BlockVerificationResult(true, false, Collections.singletonList(message), true);
   }
 
   public static BlockVerificationResult failIncomplete(String message) {
@@ -57,6 +68,10 @@ public class BlockVerificationResult {
 
   public List<String> getFailures() {
     return failures;
+  }
+
+  public boolean shouldRefreshKeyLocation() {
+    return refreshKeyLocation;
   }
 
 }

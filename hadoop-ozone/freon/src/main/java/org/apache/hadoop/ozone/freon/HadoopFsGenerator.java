@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -72,16 +73,21 @@ public class HadoopFsGenerator extends HadoopBaseFreonGenerator
   public Void call() throws Exception {
     super.init();
 
-    Path file = new Path(getRootPath() + "/" + generateObjectName(0));
-    getFileSystem().mkdirs(file.getParent());
+    FileSystem fileSystem = getFileSystem();
+    try {
+      Path file = new Path(getRootPath() + "/" + generateObjectName(0));
+      fileSystem.mkdirs(file.getParent());
 
-    contentGenerator =
-        new ContentGenerator(fileSize.toBytes(), bufferSize, copyBufferSize,
-            flushOrSync);
+      contentGenerator =
+          new ContentGenerator(fileSize.toBytes(), bufferSize, copyBufferSize,
+              flushOrSync);
 
-    timer = getMetrics().timer("file-create");
+      timer = getMetrics().timer("file-create");
 
-    runTests(this::createFile);
+      runTests(this::createFile);
+    } finally {
+      IOUtils.closeQuietly(fileSystem);
+    }
 
     return null;
   }

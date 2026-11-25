@@ -25,6 +25,9 @@ x-old-config:
     - ../..:/opt/ozone
     - ../_keytabs:/etc/security/keytabs
     - ./krb5.conf:/etc/krb5.conf
+  depends_on:
+    kdc:
+      condition: service_healthy
 
 services:
   kdc:
@@ -36,7 +39,7 @@ services:
       - ../_keytabs:/etc/security/keytabs
     command: ["/opt/ozone/compose/common/init-kdc.sh"]
   kms:
-    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_IMAGE_VERSION}
     hostname: kms
     dns_search: .
     ports:

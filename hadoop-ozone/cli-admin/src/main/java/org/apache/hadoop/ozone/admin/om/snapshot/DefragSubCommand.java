@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.admin.om.OmAddressOptions;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
@@ -48,7 +49,8 @@ public class DefragSubCommand extends AbstractSubcommand implements Callable<Voi
 
   @CommandLine.Option(
       names = {"--node-id"},
-      description = "NodeID of the OM to trigger snapshot defragmentation on.",
+      description = "NodeID of the OM to trigger snapshot defragmentation on. "
+          + "Required when OM HA is configured.",
       required = false
   )
   private String nodeId;
@@ -64,6 +66,13 @@ public class DefragSubCommand extends AbstractSubcommand implements Callable<Voi
   @Override
   public Void call() throws Exception {
     OzoneConfiguration conf = getOzoneConf();
+
+    if (nodeId == null && OmUtils.isServiceIdsDefined(conf)) {
+      System.err.println("Error: This is an HA OM cluster; specify --node-id "
+          + "to select which OM to defragment.");
+      return null;
+    }
+
     OMNodeDetails omNodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(
         conf, omServiceOption.getServiceID(), nodeId);
 

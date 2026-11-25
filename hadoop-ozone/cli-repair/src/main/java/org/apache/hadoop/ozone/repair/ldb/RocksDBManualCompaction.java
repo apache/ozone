@@ -57,10 +57,17 @@ public class RocksDBManualCompaction extends RepairTool {
       description = "Database File Path")
   private String dbPath;
 
-  @CommandLine.Option(names = {"--column-family", "--column_family", "--cf"},
+  @CommandLine.Option(names = {"--column-family", "--cf"},
       required = true,
       description = "Column family name")
   private String columnFamilyName;
+
+  @CommandLine.Option(names = {"--bottommost-level-compaction", "--blc"},
+      description = "BottommostLevelCompaction algorithm for RocksDB compaction." +
+          "  Valid values: ${COMPLETION-CANDIDATES}",
+      defaultValue = "kSkip",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private ManagedCompactRangeOptions.BottommostLevelCompaction bottommostLevelCompaction;
 
   private String getConsoleReadLineWithFormat() {
     err().printf(WARNING_TO_STOP_SERVICE);
@@ -96,11 +103,12 @@ public class RocksDBManualCompaction extends RepairTool {
             " is not in a column family in DB for the given path.");
       }
 
-      info("Running compaction on " + columnFamilyName);
+      info("Running compaction on " + columnFamilyName +
+          " with bottommost level compaction: " + bottommostLevelCompaction.name());
       long startTime = Time.monotonicNow();
       if (!isDryRun()) {
         ManagedCompactRangeOptions compactOptions = new ManagedCompactRangeOptions();
-        compactOptions.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+        compactOptions.setBottommostLevelCompaction(bottommostLevelCompaction);
         db.get().compactRange(cfh, null, null, compactOptions);
       }
       long duration = Time.monotonicNow() - startTime;

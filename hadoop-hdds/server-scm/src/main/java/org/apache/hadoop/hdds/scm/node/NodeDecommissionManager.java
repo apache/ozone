@@ -24,7 +24,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -34,7 +33,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -66,8 +64,7 @@ public class NodeDecommissionManager {
   private ContainerManager containerManager;
   private final SCMContext scmContext;
   private final boolean useHostnames;
-  private Integer maintenanceReplicaMinimum;
-  private Integer maintenanceRemainingRedundancy;
+  private final ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   // Decommissioning and Maintenance mode progress related metrics.
   private final NodeDecommissionMetrics metrics;
@@ -106,7 +103,7 @@ public class NodeDecommissionManager {
 
         if (this.hostname == null) {
           throw new InvalidHostStringException("The string " + rawHostname +
-              " does not contain a value hostname or hostname:port definition");
+              " does not contain a valid hostname or hostname:port definition");
         }
       } catch (URISyntaxException e) {
         throw new InvalidHostStringException(
@@ -230,18 +227,16 @@ public class NodeDecommissionManager {
     if (dns.size() < 2) {
       return dns.isEmpty() ? null : dns.get(0);
     }
-    List<Pair<DatanodeDetails, Long>> dnsWithHeartbeat = dns.stream()
-        .map(dn -> Pair.of(dn, nodeManager.getLastHeartbeat(dn)))
-        .sorted(Comparator.comparingLong(Pair::getRight))
+    List<DatanodeHeartbeat> dnsWithHeartbeat = dns.stream()
+        .map(dn -> new DatanodeHeartbeat(dn, nodeManager.getLastHeartbeat(dn)))
+        .sorted(Comparator.comparingLong(DatanodeHeartbeat::lastHeartbeat))
         .collect(Collectors.toList());
     // The last element should have the largest (newest) heartbeat. But also
     // check it is not identical to the last but 1 element, as then we cannot
     // determine which node to decommission.
-    Pair<DatanodeDetails, Long> last = dnsWithHeartbeat.get(
-        dnsWithHeartbeat.size() - 1);
-    if (last.getRight() > dnsWithHeartbeat.get(
-        dnsWithHeartbeat.size() - 2).getRight()) {
-      return last.getLeft();
+    DatanodeHeartbeat last = dnsWithHeartbeat.get(dnsWithHeartbeat.size() - 1);
+    if (last.lastHeartbeat() > dnsWithHeartbeat.get(dnsWithHeartbeat.size() - 2).lastHeartbeat()) {
+      return last.datanode();
     }
     return null;
   }
@@ -263,6 +258,7 @@ public class NodeDecommissionManager {
     this.nodeManager = nm;
     this.containerManager = cm;
     this.scmContext = scmContext;
+    this.rmConf = rm.getConfig();
 
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder()
@@ -281,9 +277,6 @@ public class NodeDecommissionManager {
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-
-    setMaintenanceConfigs(config.getInt("hdds.scm.replication.maintenance.replica.minimum", 2),
-        config.getInt("hdds.scm.replication.maintenance.remaining.redundancy", 1));
 
     monitor = new DatanodeAdminMonitorImpl(config, eventQueue, nodeManager,
         rm);
@@ -379,7 +372,7 @@ public class NodeDecommissionManager {
   }
 
   private synchronized boolean checkIfDecommissionPossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
-    int numDecom = dns.size();
+    int healthyNodesToDecommission = 0;
     List<DatanodeDetails> validDns = new ArrayList<>(dns);
     int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
     for (DatanodeDetails dn : dns) {
@@ -387,12 +380,12 @@ public class NodeDecommissionManager {
         NodeStatus nodeStatus = getNodeStatus(dn);
         NodeOperationalState opState = nodeStatus.getOperationalState();
         if (opState != NodeOperationalState.IN_SERVICE) {
-          numDecom--;
           validDns.remove(dn);
           LOG.warn("Cannot decommission {} because it is not IN-SERVICE", dn.getHostName());
+        } else if (nodeStatus.isHealthy()) {
+          healthyNodesToDecommission++;
         }
       } catch (NodeNotFoundException ex) {
-        numDecom--;
         validDns.remove(dn);
         LOG.warn("Cannot decommission {} because it is not found in SCM", dn.getHostName());
       }
@@ -422,10 +415,11 @@ public class NodeDecommissionManager {
             continue;
           }
           int reqNodes = cif.getReplicationConfig().getRequiredNodes();
-          if ((inServiceTotal - numDecom) < reqNodes) {
+          if ((inServiceTotal - healthyNodesToDecommission) < reqNodes) {
             final int unHealthyTotal = nodeManager.getAllNodeCount() - inServiceTotal;
             String errorMsg = "Insufficient nodes. Tried to decommission " + dns.size() +
-                " nodes out of " + inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
+                " nodes (of which " + healthyNodesToDecommission + " are IN-SERVICE HEALTHY) out of " + inServiceTotal +
+                " IN-SERVICE HEALTHY and " + unHealthyTotal +
                 " not IN-SERVICE or not HEALTHY nodes. Cannot decommission as a minimum of " + reqNodes +
                 " IN-SERVICE HEALTHY nodes are required to maintain replication after decommission. ";
             LOG.info(errorMsg + "Failing due to datanode : {}, container : {}", dn, cid);
@@ -536,21 +530,20 @@ public class NodeDecommissionManager {
   }
 
   private synchronized boolean checkIfMaintenancePossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
-    int numMaintenance = dns.size();
-    List<DatanodeDetails> validDns = dns.stream().collect(Collectors.toList());
-    Collections.copy(validDns, dns);
+    int healthyNodesEnteringMaintenance = 0;
+    List<DatanodeDetails> validDns = new ArrayList<>(dns);
     int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
     for (DatanodeDetails dn : dns) {
       try {
         NodeStatus nodeStatus = getNodeStatus(dn);
         NodeOperationalState opState = nodeStatus.getOperationalState();
         if (opState != NodeOperationalState.IN_SERVICE) {
-          numMaintenance--;
           validDns.remove(dn);
           LOG.warn("{} cannot enter maintenance because it is not IN-SERVICE", dn.getHostName());
+        } else if (nodeStatus.isHealthy()) {
+          healthyNodesEnteringMaintenance++;
         }
       } catch (NodeNotFoundException ex) {
-        numMaintenance--;
         validDns.remove(dn);
         LOG.warn("{} cannot enter maintenance because it is not found in SCM", dn.getHostName());
       }
@@ -586,14 +579,15 @@ public class NodeDecommissionManager {
           if (replicationType.equals(HddsProtos.ReplicationType.EC)) {
             int reqNodes = cif.getReplicationConfig().getRequiredNodes();
             int data = ((ECReplicationConfig)cif.getReplicationConfig()).getData();
-            minInService = Math.min((data + maintenanceRemainingRedundancy), reqNodes);
+            minInService = Math.min((data + rmConf.getMaintenanceRemainingRedundancy()), reqNodes);
           } else {
-            minInService = maintenanceReplicaMinimum;
+            minInService = rmConf.getMaintenanceReplicaMinimum();
           }
-          if ((inServiceTotal - numMaintenance) < minInService) {
+          if ((inServiceTotal - healthyNodesEnteringMaintenance) < minInService) {
             final int unHealthyTotal = nodeManager.getAllNodeCount() - inServiceTotal;
             String errorMsg = "Insufficient nodes. Tried to start maintenance for " + dns.size() +
-                " nodes out of " + inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
+                " nodes (of which " + healthyNodesEnteringMaintenance + " are IN-SERVICE HEALTHY) out of " +
+                inServiceTotal + " IN-SERVICE HEALTHY and " + unHealthyTotal +
                 " not IN-SERVICE or not HEALTHY nodes. Cannot enter maintenance mode as a minimum of " + minInService +
                 " IN-SERVICE HEALTHY nodes are required to maintain replication after maintenance. ";
             LOG.info(errorMsg + "Failing due to datanode : {}, container : {}", dn, cid);
@@ -639,10 +633,18 @@ public class NodeDecommissionManager {
   }
 
   @VisibleForTesting
-  public void setMaintenanceConfigs(int replicaMinimum, int remainingRedundancy) {
-    synchronized (this) {
-      maintenanceRemainingRedundancy = remainingRedundancy;
-      maintenanceReplicaMinimum = replicaMinimum;
-    }
+  public int getMaintenanceReplicaMinimum() {
+    return rmConf.getMaintenanceReplicaMinimum();
   }
+
+  @VisibleForTesting
+  public int getMaintenanceRemainingRedundancy() {
+    return rmConf.getMaintenanceRemainingRedundancy();
+  }
+
+  /**
+   * A datanode paired with the time of its last heartbeat, used to pick the datanode
+   * with the most recent heartbeat to decommission.
+   */
+  private record DatanodeHeartbeat(DatanodeDetails datanode, long lastHeartbeat) { }
 }

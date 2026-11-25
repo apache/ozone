@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -47,6 +45,8 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -217,17 +217,6 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return bytes of DB key.
    */
   String getOpenKey(String volume, String bucket, String key, String clientId);
-
-  /**
-   * Returns client ID in Long of an OpenKeyTable DB Key String.
-   * @param dbOpenKeyName An OpenKeyTable DB Key String.
-   * @return Client ID (Long)
-   */
-  static long getClientIDFromOpenKeyDBKey(String dbOpenKeyName) {
-    final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
-    final String clientIdString = dbOpenKeyName.substring(lastPrefix + 1);
-    return Long.parseLong(clientIdString);
-  }
 
   /**
    * Given a volume, check if it is empty, i.e there are no buckets inside it.
@@ -495,11 +484,43 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
 
   Table<String, CompactionLogEntry> getCompactionLogTable();
 
+  Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable();
+
+  /**
+   * Gets the LifecycleScanStateTable.
+   *
+   * @return Table
+   */
+  Table<String, OmLifecycleScanState> getLifecycleScanStateTable();
+
+  /**
+   * @return list all LifecycleConfigurations.
+   */
+  List<OmLifecycleConfiguration> listLifecycleConfigurations() throws IOException;
+
+  /**
+   * Fetches the lifecycle configuration by bucketName.
+   *
+   * @param bucketName bucketName of the lifecycle configuration
+   * @return OmLifecycleConfiguration
+   * @throws IOException
+   */
+  OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException;
+
   /**
    * Gets the OM Meta table.
    * @return meta table reference.
    */
   Table<String, String> getMetaTable();
+
+  /**
+   * Gets the S3RevokedStsTokenTable.
+   *
+   * @return Table.
+   */
+  Table<String, Long> getS3RevokedStsTokenTable();
+
 
   /**
    * Returns number of rows in a table.  This should not be used for very
@@ -521,6 +542,18 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    */
   <KEY, VALUE> long countEstimatedRowsInTable(Table<KEY, VALUE> table)
       throws IOException;
+
+  /**
+   * Returns the number of buckets that exist in the bucket table cache,
+   * excluding entries marked for deletion (cache values with a null payload).
+   * Used for enforcing {@code ozone.om.max.buckets} where
+   * {@link Table#getEstimatedKeyCount()} would still count delete tombstones
+   * until cache cleanup runs.
+   *
+   * @return number of live buckets
+   * @throws IOException
+   */
+  long countLiveBuckets() throws IOException;
 
   /**
    * Return the existing upload keys which includes volumeName, bucketName,
@@ -558,11 +591,13 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    */
   Set<String> listTableNames();
 
+  Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+      getVolumeIterator();
+
   Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
       getBucketIterator();
 
-  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-      getKeyIterator() throws IOException;
+  TableIterator<String, Table.KeyValue<String, OmKeyInfo>> getKeyIterator() throws IOException;
 
   /**
    * Given parent object id and path component name, return the corresponding
