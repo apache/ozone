@@ -431,8 +431,9 @@ public class TestSCMBlockProtocolServer {
     when(mockScm.getPerfMetrics()).thenReturn(mock(SCMPerformanceMetrics.class));
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfig.HDDS_SCM_BLOCK_ALLOCATION_PREFER_CLIENT_LOCAL, preferLocal);
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
 
-    try (SCMBlockProtocolServer testServer = new SCMBlockProtocolServer(conf, mockScm)) {
+    try (SCMBlockProtocolServer testServer = new SCMBlockProtocolServer(conf, mockScm, scmConfig)) {
       testServer.allocateBlock(128 * MB, 1, RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "o",
           new ExcludeList(), clientAddress, false);
     }
@@ -616,7 +617,8 @@ public class TestSCMBlockProtocolServer {
     when(mockScm.getScmNodeManager()).thenReturn(mockNodeManager);
     when(mockScm.getScmContext()).thenReturn(SCMContext.emptyContext());
 
-    try (SCMBlockProtocolServer testServer = new SCMBlockProtocolServer(new OzoneConfiguration(), mockScm)) {
+    try (SCMBlockProtocolServer testServer = new SCMBlockProtocolServer(new OzoneConfiguration(), mockScm,
+        new ScmConfig())) {
       HddsProtos.UpgradeStatus status = testServer.queryUpgradeStatus();
       assertEquals(HddsProtos.FinalizationStatus.FINALIZED, status.getScmFinalizationStatus());
       assertEquals(HddsProtos.FinalizationStatus.IN_PROGRESS, status.getHddsFinalizationStatus());
@@ -667,7 +669,7 @@ public class TestSCMBlockProtocolServer {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getDatanodeFinalizationCounts()).thenReturn(datanodeCounts);
     when(mockScm.getScmNodeManager()).thenReturn(mockNodeManager);
-    return new SCMBlockProtocolServer(new OzoneConfiguration(), mockScm);
+    return new SCMBlockProtocolServer(new OzoneConfiguration(), mockScm, new ScmConfig());
   }
 
   private StorageContainerManager mockScmForBlockServer() {

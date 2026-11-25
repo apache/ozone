@@ -284,6 +284,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private ContainerTokenSecretManager containerTokenMgr;
 
   private OzoneConfiguration configuration;
+  private final ScmConfig scmConfig;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
@@ -352,6 +353,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     Objects.requireNonNull(configurator, "configurator cannot be null");
     configuration = Objects.requireNonNull(conf, "configuration cannot be null");
+    scmConfig = conf.getObject(ScmConfig.class);
     TracingConfig tracingConfig = configuration.getObject(TracingConfig.class);
     TracingReconfigurationCallback tracingReconfigurationCallback =
         TracingReconfigurationCallback.init("StorageContainerManager", tracingConfig);
@@ -464,7 +466,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue, scmContext);
-    blockProtocolServer = new SCMBlockProtocolServer(conf, this);
+    blockProtocolServer = new SCMBlockProtocolServer(conf, this, scmConfig);
     clientProtocolServer = new SCMClientProtocolServer(conf, this,
         reconfigurationHandler);
 
@@ -810,7 +812,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerReplicaPendingOps);
     }
 
-    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     pipelineChoosePolicy = PipelineChoosePolicyFactory
         .getPolicy(scmNodeManager, scmConfig, false);
     ecPipelineChoosePolicy = PipelineChoosePolicyFactory

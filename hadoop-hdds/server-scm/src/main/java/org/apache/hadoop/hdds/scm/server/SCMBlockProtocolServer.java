@@ -121,12 +121,12 @@ public class SCMBlockProtocolServer implements
   /**
    * The RPC server that listens to requests from block service clients.
    */
-  public SCMBlockProtocolServer(OzoneConfiguration conf,
-      StorageContainerManager scm) throws IOException {
+  public SCMBlockProtocolServer(OzoneConfiguration conf, StorageContainerManager scm, ScmConfig scmConfig)
+      throws IOException {
     this.scm = scm;
     this.perfMetrics = scm.getPerfMetrics();
     this.omPrincipal = conf.get(OM_KERBEROS_PRINCIPAL_KEY, "");
-    this.preferClientLocalPipeline = conf.getObject(ScmConfig.class).isPreferClientLocalPipeline();
+    this.preferClientLocalPipeline = scmConfig.isPreferClientLocalPipeline();
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
