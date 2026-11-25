@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY;
-
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,6 +29,7 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.util.PerformanceMetrics;
 import org.slf4j.Logger;
@@ -60,7 +58,7 @@ public final class OmClientMetrics implements MetricsSource {
 
   /** The first active client supplies the percentile intervals until the last client closes. */
   public static synchronized Handle acquireHandle(ConfigurationSource conf) {
-    int[] intervals = readIntervals(conf);
+    int[] intervals = conf.getObject(OMClientConfig.class).getMetricsPercentilesIntervals();
     if (instance == null) {
       instance = DefaultMetricsSystem.instance().register(SOURCE_NAME, "OM Client Metrics",
           new OmClientMetrics(intervals));
@@ -70,30 +68,6 @@ public final class OmClientMetrics implements MetricsSource {
     }
     referenceCount++;
     return new Handle(instance);
-  }
-
-  private static int[] readIntervals(ConfigurationSource conf) {
-    String configured = conf.getTrimmed(OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
-    if (configured != null) {
-      if (configured.isEmpty()) {
-        return new int[0];
-      }
-      int[] intervals;
-      try {
-        intervals = conf.getInts(OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
-      } catch (NumberFormatException e) {
-        intervals = new int[0];
-      }
-      if (intervals.length > 0 && Arrays.stream(intervals).allMatch(interval -> interval > 0)
-          && Arrays.stream(intervals).distinct().count() == intervals.length) {
-        return intervals;
-      }
-      LOG.warn("Invalid {}: {}. The default interval is {} seconds.",
-          OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY,
-          conf.get(OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY),
-          OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_DEFAULT);
-    }
-    return new int[]{OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_DEFAULT};
   }
 
   private static synchronized void release() {

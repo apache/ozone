@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.protocolPB;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY;
 import static org.apache.ozone.test.MetricsAsserts.getDoubleGauge;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
@@ -51,6 +50,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.OmClientMetrics;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -173,7 +173,9 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
 
   private static OmClientMetrics.Handle attachMetrics(OzoneManagerProtocolClientSideTranslatorPB client) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY, "");
+    OMClientConfig clientConfig = conf.getObject(OMClientConfig.class);
+    clientConfig.setMetricsPercentilesIntervals("");
+    conf.setFromObject(clientConfig);
     OmClientMetrics.Handle handle = OmClientMetrics.acquireHandle(conf);
     client.setOmClientMetrics(handle.metrics());
     return handle;

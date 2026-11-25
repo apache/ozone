@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY;
 import static org.apache.ozone.test.MetricsAsserts.getDoubleGauge;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
@@ -36,6 +35,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.OmClientMetrics.Handle;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.jupiter.api.Test;
@@ -180,7 +180,9 @@ class TestOmClientMetrics {
 
   private static OzoneConfiguration configuration(String intervals) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY, intervals);
+    OMClientConfig clientConfig = conf.getObject(OMClientConfig.class);
+    clientConfig.setMetricsPercentilesIntervals(intervals);
+    conf.setFromObject(clientConfig);
     return conf;
   }
 
