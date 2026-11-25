@@ -150,7 +150,9 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   /**
    * Fails if the witnessed container DB has an entry for the container: it was already created on this datanode,
-   * possibly deleted since, and must not be created again by an ordinary create.
+   * possibly deleted since, and must not be created again by an ordinary create. The state in the entry does not
+   * matter. It is the state that the replica had when the entry was written, and it is not updated when the container
+   * is closed.
    * @param containerId ID of the container to be created
    * @throws StorageContainerException with {@code CLOSED_CONTAINER_IO} if there is an entry, or with
    *                                   {@code IO_EXCEPTION} if the entry cannot be read
@@ -168,8 +170,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     }
     if (info != null) {
       throw new StorageContainerException("Container " + containerId + " was already created on this datanode"
-          + " (witnessed state " + info.getState() + ") and cannot be created again",
-          ContainerProtos.Result.CLOSED_CONTAINER_IO);
+          + " and cannot be created again", ContainerProtos.Result.CLOSED_CONTAINER_IO);
     }
   }
 
@@ -233,15 +234,7 @@ public class ContainerSet implements Iterable<Container<?>> {
         LOG.debug("Container with container Id {} is added to containerMap",
             containerId);
       }
-      try {
-        updateContainerIdTable(containerId, container.getContainerData(), overwrite);
-      } catch (StorageContainerException e) {
-        if (overwrite) {
-          // A repair whose entry could not be written is not registered.
-          containerMap.remove(containerId, container);
-        }
-        throw e;
-      }
+      updateContainerIdTable(containerId, container.getContainerData(), overwrite);
       missingContainerSet.remove(containerId);
       if (container.getContainerData().getState() == RECOVERING) {
         recoveringContainerMap.put(containerId, getCurrentTime() + recoveringTimeout);
@@ -264,7 +257,8 @@ public class ContainerSet implements Iterable<Container<?>> {
    * <ul>
    *   <li>there is none: this is the first replica of the container on this datanode;</li>
    *   <li>it is DELETED: this datanode deleted its replica, and now loads one from disk at startup or gets one through
-   *   repair. An ordinary create does not get here for a DELETED entry, KeyValueHandler refuses it;</li>
+   *   repair. An ordinary create does not get here when there is an entry, whatever its state: KeyValueHandler refuses
+   *   it;</li>
    *   <li>it has no replica index: it was written in the older table format;</li>
    *   <li>{@code replaceReplicaIndex} is set and the replica has another index than the entry: a repair replaces the
    *   replica that this datanode held.</li>

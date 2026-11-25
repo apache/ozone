@@ -2542,33 +2542,28 @@ public class KeyValueHandler extends Handler {
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
         // Steps to delete
-        // 1. witnessed container DB entry set to DELETED, container is removed from container set
-        // 2. container marked deleted
+        // 1. container marked deleted
+        // 2. container is removed from container set
         // 3. container db handler and content removed from db
         // 4. container moved to tmp folder
         // 5. container content deleted from tmp folder
-        long waitTime = clock.millis() - startTime;
-        if (waitTime > maxDeleteLockWaitMs) {
-          LOG.warn("An attempt to delete container {} took {} ms acquiring locks and pre-checks. " +
-                  "The delete has been skipped and should be retried automatically by SCM.",
-              containerLocked.getContainerData().getContainerID(), waitTime);
-          return;
-        }
-        // Step 1 is first and outside the try below. If the entry cannot be written, nothing has changed yet: the
-        // delete fails with the witnessed container DB error and the replica stays as it was. If the datanode stops
-        // after step 1, the replica on disk is intact and is loaded again at startup.
-        containerSet.removeContainer(containerId);
         try {
+          long waitTime = clock.millis() - startTime;
+          if (waitTime > maxDeleteLockWaitMs) {
+            LOG.warn("An attempt to delete container {} took {} ms acquiring locks and pre-checks. " +
+                    "The delete has been skipped and should be retried automatically by SCM.",
+                containerLocked.getContainerData().getContainerID(), waitTime);
+            return;
+          }
           containerLocked.markContainerForDelete();
+          containerSet.removeContainer(containerId);
           ContainerLogger.logDeleted(containerLocked.getContainerData(), force);
           KeyValueContainerUtil.removeContainer(keyValueContainerData, conf);
         } catch (IOException ioe) {
-          LOG.error("Failed to move container under " + hddsVolume
-              .getDeletedContainerDir());
-          String errorMsg =
-              "Failed to move container" + containerLocked.getContainerData()
-                  .getContainerID();
-          triggerVolumeScanAndThrowException(containerLocked, errorMsg,
+          LOG.error("Failed to delete container {} on volume {}", containerId, hddsVolume, ioe);
+          // Trigger a volume scan as exception occurred.
+          StorageVolumeUtil.onFailure(hddsVolume);
+          throw new StorageContainerException("Failed to delete container " + containerId, ioe,
               CONTAINER_INTERNAL_ERROR);
         }
       }

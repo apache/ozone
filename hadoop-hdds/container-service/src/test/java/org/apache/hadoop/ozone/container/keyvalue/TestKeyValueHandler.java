@@ -678,7 +678,7 @@ public class TestKeyValueHandler {
       try {
         kvHandler.deleteContainer(container, true);
       } catch (StorageContainerException sce) {
-        assertThat(sce.getMessage()).contains("Failed to move container");
+        assertThat(sce.getMessage()).contains("Failed to delete container");
       }
       verify(volumeSet).checkVolumeAsync(hddsVolume);
       // cleanup
@@ -868,8 +868,8 @@ public class TestKeyValueHandler {
   }
 
   /**
-   * A delete fails with the witnessed container DB error, and leaves the replica loaded and unchanged, when the DELETED
-   * entry cannot be written. The delete succeeds when it is sent again.
+   * A delete whose DELETED entry cannot be written fails, and the cause names the witnessed container DB. The replica
+   * stays in the container set, marked deleted on disk. The delete succeeds when it is sent again.
    */
   @Test
   public void testDeleteFailsWhenWitnessedEntryCannotBeWritten() throws Exception {
@@ -885,10 +885,11 @@ public class TestKeyValueHandler {
     failWitnessPut.set(true);
     StorageContainerException e = assertThrows(StorageContainerException.class,
         () -> kvHandler.deleteContainer(container, true));
-    assertEquals(ContainerProtos.Result.IO_EXCEPTION, e.getResult());
-    assertThat(e.getMessage()).contains("witnessed container DB");
+    assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, e.getResult());
+    assertThat(e.getMessage()).contains("Failed to delete container");
+    assertThat(e.getCause()).hasMessageContaining("witnessed container DB");
     assertSame(container, containerSet.getContainer(containerID));
-    assertNotEquals(State.DELETED, container.getContainerState());
+    assertEquals(State.DELETED, container.getContainerState());
     assertTrue(containerDirExists(handlerWithVolume, containerID));
 
     failWitnessPut.set(false);

@@ -982,8 +982,8 @@ public class TestContainerReader {
   }
 
   /**
-   * A delete writes the DELETED entry before it marks the replica deleted on disk. If the datanode stops between the
-   * two, the replica on disk is intact: it is loaded again at startup and the entry follows it.
+   * A replica on disk is loaded at startup even if its witnessed entry is DELETED, and the entry then follows the
+   * replica. This is the state after a delete that could not mark the replica deleted on disk and then stopped.
    */
   @ContainerTestVersionInfo.ContainerTest
   public void testReplicaLoadsWhenWitnessEntryIsDeleted(ContainerTestVersionInfo versionInfo) throws Exception {

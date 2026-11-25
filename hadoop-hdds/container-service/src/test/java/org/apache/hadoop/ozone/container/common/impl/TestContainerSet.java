@@ -713,29 +713,31 @@ public class TestContainerSet {
   }
 
   /**
-   * If the entry write fails, the add through the repair route is undone: nothing is left in memory, and an ID that was
-   * missing is still missing.
+   * If the entry write fails, the add through the repair route reports the failure. The replica stays in the container
+   * map, but the steps after the entry write do not run: an ID that was missing is still missing, and a recovering
+   * replica gets no timeout.
    */
   @Test
-  public void testAddByOverwriteUndoneWhenEntryWriteFails() throws IOException {
+  public void testAddByOverwriteStaysInMapWhenEntryWriteFails() throws IOException {
     WitnessedTable witnessed = new WitnessedTable();
     ContainerSet containerSet = witnessed.containerSet;
     containerSet.removeMissingContainer(100L);
     assertTrue(containerSet.getMissingContainerSet().contains(100L));
+    KeyValueContainer replica = newReplica(100L, State.RECOVERING, 0);
     witnessed.failPut.set(true);
 
     StorageContainerException e = assertThrows(StorageContainerException.class,
-        () -> containerSet.addContainerByOverwriteMissingContainer(newReplica(100L, State.RECOVERING, 0)));
+        () -> containerSet.addContainerByOverwriteMissingContainer(replica));
 
     assertEquals(ContainerProtos.Result.IO_EXCEPTION, e.getResult());
-    assertNull(containerSet.getContainer(100L));
+    assertSame(replica, containerSet.getContainer(100L));
     assertFalse(containerSet.getRecoveringContainerMap().containsKey(100L));
     assertTrue(containerSet.getMissingContainerSet().contains(100L));
   }
 
   /**
-   * If the entry write fails, an ordinary add reports the failure and the replica stays registered, as it did before
-   * the witnessed entry was kept on delete. Only the repair route undoes the registration.
+   * If the entry write fails, an ordinary add reports the failure and the replica stays in the container map, as it did
+   * before the witnessed entry was kept on delete.
    */
   @Test
   public void testAddStaysRegisteredWhenEntryWriteFails() throws IOException {
