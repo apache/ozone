@@ -46,18 +46,27 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ratis.proto.RaftProtos.LogEntryProto;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.statemachine.TransactionContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -228,6 +237,83 @@ public class TestSCMHATransactionBufferMonitorTask {
     assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
     assertEquals(ByteString.copyFromUtf8("value"),
         statefulServiceConfigTable.get("key"));
+  }
+
+  @Test
+  public void testSaveConfigurationDoesNotFlushUnderStaleIndexDuringApply() throws Exception {
+    StatefulServiceStateManager stateManager = StatefulServiceStateManagerImpl.newBuilder()
+        .setStatefulServiceConfig(statefulServiceConfigTable)
+        .setSCMDBTransactionBuffer(transactionBuffer)
+        .setRatisServer(SCMHAManagerStub.getInstance(true, transactionBuffer).getRatisServer())
+        .build();
+    ByteString config = ByteString.copyFromUtf8("value");
+
+    transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
+    transactionBuffer.flush();
+    // Ensure the zero-wait flush is deferred by the apply guard, not by timeDiff == 0.
+    advanceClockPastFlushInterval();
+
+    transactionBuffer.beginApplyingTransaction();
+    try {
+      stateManager.saveConfiguration("svc", config);
+      assertEquals(TRX_INFO_T4, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+      assertNull(statefulServiceConfigTable.get("svc"),
+          "saveConfiguration must not commit config under the stale transaction index");
+      transactionBuffer.updateLatestTrxInfo(TRX_INFO_T5);
+    } finally {
+      transactionBuffer.endApplyingTransaction();
+    }
+
+    transactionBuffer.flushIfNeeded(0);
+    assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+    assertEquals(config, statefulServiceConfigTable.get("svc"));
+  }
+
+  @Test
+  public void testSaveConfigurationIsReadableAfterApply() throws Exception {
+    transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
+    transactionBuffer.flush();
+    advanceClockPastFlushInterval();
+
+    StorageContainerManager scm = mock(StorageContainerManager.class);
+    SCMContext context = mock(SCMContext.class);
+    when(context.isLeader()).thenReturn(true);
+    when(scm.getScmContext()).thenReturn(context);
+    when(scm.getMetrics()).thenReturn(mock(SCMMetrics.class));
+    when(scm.getDatanodeProtocolServer()).thenReturn(mock(SCMDatanodeProtocolServer.class));
+    when(scm.getScmSafeModeManager()).thenReturn(mock(SCMSafeModeManager.class));
+    SCMStateMachine stateMachine = new SCMStateMachine(scm, transactionBuffer);
+    try {
+      SCMRatisServer ratisServer = mock(SCMRatisServer.class);
+      when(ratisServer.getProxyHandler(any())).thenAnswer(invocation -> {
+        ScmInvoker<?> invoker = invocation.getArgument(0);
+        stateMachine.registerInvoker(invoker.getType(), invoker);
+        return invoker.getProxy();
+      });
+      StatefulServiceStateManager stateManager = StatefulServiceStateManagerImpl.newBuilder()
+          .setStatefulServiceConfig(statefulServiceConfigTable)
+          .setSCMDBTransactionBuffer(transactionBuffer)
+          .setRatisServer(ratisServer)
+          .build();
+      ByteString config = ByteString.copyFromUtf8("value");
+      SCMRatisRequest request = SCMRatisRequest.of(RequestType.STATEFUL_SERVICE_CONFIG, "saveConfiguration",
+          new Class<?>[] {String.class, ByteString.class}, "svc", config);
+      StateMachineLogEntryProto smLogEntry = StateMachineLogEntryProto.newBuilder()
+          .setLogData(request.encode().getContent()).build();
+      LogEntryProto logEntry = LogEntryProto.newBuilder().setTerm(1).setIndex(5)
+          .setStateMachineLogEntry(smLogEntry).build();
+      TransactionContext trx = mock(TransactionContext.class);
+      when(trx.getStateMachineLogEntry()).thenReturn(smLogEntry);
+      when(trx.getLogEntry()).thenReturn(logEntry);
+
+      stateMachine.applyTransaction(trx).get();
+
+      assertEquals(config, stateManager.readConfiguration("svc"));
+      assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+      assertEquals(TermIndex.valueOf(1, 5), stateMachine.getLastAppliedTermIndex());
+    } finally {
+      stateMachine.stopDNServerStartRetry();
+    }
   }
 
   @Test

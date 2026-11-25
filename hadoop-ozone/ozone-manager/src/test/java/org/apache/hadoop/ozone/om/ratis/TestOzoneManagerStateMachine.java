@@ -682,6 +682,21 @@ public class TestOzoneManagerStateMachine {
         () -> sm.processResponse(response));
   }
 
+  @Test
+  public void testNotifyLogFailedTerminates() {
+    IOException cause = new IOException("Raft log write failed");
+    try {
+      assertThatThrownBy(() -> sm.notifyLogFailed(cause, null))
+          .isInstanceOfSatisfying(ExitUtils.ExitException.class, e -> assertThat(e.getStatus()).isEqualTo(1))
+          .hasCause(cause);
+      assertThatThrownBy(() -> sm.notifyLogFailed(cause, LogProtoUtils.toLogEntryProto(7, 2, 7)))
+          .isInstanceOfSatisfying(ExitUtils.ExitException.class, e -> assertThat(e.getStatus()).isEqualTo(1))
+          .hasMessageContaining(TermIndex.valueOf(2, 7).toString());
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
   // --- createErrorResponse tests ---
 
   @Test
@@ -1349,6 +1364,38 @@ public class TestOzoneManagerStateMachine {
   // --- notifySnapshotInstalled tests ---
 
   @Test
+  public void testNotifyInstallSnapshotFromLeaderSuccess() throws Exception {
+    TermIndex termIndex = TermIndex.valueOf(1, 10);
+    when(om.installSnapshotFromLeader("leader-om")).thenReturn(termIndex);
+
+    CompletableFuture<TermIndex> future = sm.notifyInstallSnapshotFromLeader(
+        roleInfoWithLeader("leader-om"), TermIndex.valueOf(1, 11));
+
+    assertEquals(termIndex, future.get());
+  }
+
+  @Test
+  public void testNotifyInstallSnapshotFromLeaderNullResult() throws Exception {
+    CompletableFuture<TermIndex> future = sm.notifyInstallSnapshotFromLeader(
+        roleInfoWithLeader("leader-om"), TermIndex.valueOf(1, 11));
+
+    assertNull(future.get());
+  }
+
+  @Test
+  public void testNotifyInstallSnapshotFromLeaderFailure() throws Exception {
+    IOException failure = new IOException("Failed to install checkpoint");
+    doThrow(failure).when(om).installSnapshotFromLeader("leader-om");
+
+    CompletableFuture<TermIndex> future = sm.notifyInstallSnapshotFromLeader(
+        roleInfoWithLeader("leader-om"), TermIndex.valueOf(1, 11));
+
+    ExecutionException exception = assertThrows(ExecutionException.class, future::get);
+
+    assertSame(failure, exception.getCause());
+  }
+
+  @Test
   public void testNotifySnapshotInstalledSuccess() {
     RaftPeer localPeer = RaftPeer.newBuilder()
         .setId("om1").setAddress("localhost:9862").build();
@@ -1737,6 +1784,15 @@ public class TestOzoneManagerStateMachine {
         .setMessage(Message.valueOf(
             OMRatisHelper.convertRequestToByteString(omRequest)))
         .setType(RaftClientRequest.writeRequestType())
+        .build();
+  }
+
+  private RaftProtos.RoleInfoProto roleInfoWithLeader(String leaderId) {
+    return RaftProtos.RoleInfoProto.newBuilder()
+        .setFollowerInfo(RaftProtos.FollowerInfoProto.newBuilder()
+            .setLeaderInfo(RaftProtos.ServerRpcProto.newBuilder()
+                .setId(RaftProtos.RaftPeerProto.newBuilder()
+                    .setId(ByteString.copyFromUtf8(leaderId)))))
         .build();
   }
 

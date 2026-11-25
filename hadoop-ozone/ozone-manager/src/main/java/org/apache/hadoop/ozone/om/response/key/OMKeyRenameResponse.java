@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om.response.key;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -76,18 +78,30 @@ public class OMKeyRenameResponse extends OmKeyResponse {
             omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
             renameKeyInfo);
 
-    // Check if the bucket is in snapshot scope, if yes
-    // add the key to snapshotRenamedTable.
-    boolean isSnapshotBucket = OMClientRequestUtils.
-        isSnapshotBucket(omMetadataManager, renameKeyInfo);
+    addToSnapshotRenamedTable(omMetadataManager, batchOperation, renameKeyInfo,
+        omMetadataManager.getKeyTable(getBucketLayout()), fromDbKey);
+  }
+
+  /**
+   * If the bucket is in snapshot scope and this is the first rename of the object since the latest snapshot,
+   * records {@code fromDbKey} as the object's name in that snapshot in snapshotRenamedTable.
+   */
+  static void addToSnapshotRenamedTable(OMMetadataManager omMetadataManager, BatchOperation batchOperation,
+      OmKeyInfo renameKeyInfo, Table<String, ? extends WithObjectID> fromTable, String fromDbKey) throws IOException {
+    if (!OMClientRequestUtils.isSnapshotBucket(omMetadataManager, renameKeyInfo)) {
+      return;
+    }
     String renameDbKey = omMetadataManager.getRenameKey(
-        renameKeyInfo.getVolumeName(), renameKeyInfo.getBucketName(),
-        renameKeyInfo.getObjectID());
-    String renamedKey = omMetadataManager.getSnapshotRenamedTable()
-        .get(renameDbKey);
-    if (isSnapshotBucket && renamedKey == null) {
-      omMetadataManager.getSnapshotRenamedTable().putWithBatch(
-          batchOperation, renameDbKey, fromDbKey);
+        renameKeyInfo.getVolumeName(), renameKeyInfo.getBucketName(), renameKeyInfo.getObjectID());
+    if (omMetadataManager.getSnapshotRenamedTable().get(renameDbKey) != null) {
+      return;
+    }
+    // The read above does not see a put made earlier in the same batch. If an earlier rename of this object is in
+    // the batch, the committed DB does not hold the object at fromDbKey, and this rename must not replace the name
+    // that rename recorded.
+    WithObjectID committed = fromTable.getSkipCache(fromDbKey);
+    if (committed != null && committed.getObjectID() == renameKeyInfo.getObjectID()) {
+      omMetadataManager.getSnapshotRenamedTable().putWithBatch(batchOperation, renameDbKey, fromDbKey);
     }
   }
 

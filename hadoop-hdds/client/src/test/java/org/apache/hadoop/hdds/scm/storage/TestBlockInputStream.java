@@ -473,6 +473,39 @@ public class TestBlockInputStream {
     }
   }
 
+  @Test
+  public void testUpdateBlockLengthUsesLengthFromDatanodeForUnderConstructionBlock() throws Exception {
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    BlockLocationInfo blockInfo =
+        new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize - CHUNK_SIZE));
+    blockInfo.setUnderConstruction(true);
+    try (BlockInputStream subject = new BlockInputStream(blockInfo, MockPipeline.createSingleNodePipeline(), null,
+        mock(XceiverClientFactory.class), refreshFunction, clientConfig) {
+      @Override
+      protected ContainerProtos.BlockData getBlockData() {
+        return ContainerProtos.BlockData.newBuilder().setBlockID(getBlockID().getDatanodeBlockIDProtobuf())
+            .addAllChunks(chunks).setSize(blockSize).build();
+      }
+    }) {
+      subject.updateBlockLength();
+      assertEquals(blockSize, subject.getLength());
+    }
+  }
+
+  @Test
+  public void testPositionedReadOfClosedUninitializedStreamFailsWithIOException() throws IOException {
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    BlockInputStream subject = new BlockInputStream(
+        new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize)),
+        MockPipeline.createSingleNodePipeline(), null, mock(XceiverClientFactory.class), refreshFunction,
+        clientConfig);
+    subject.close();
+
+    // the stream has no client to initialize with, which must be reported as an IOException
+    IOException e = assertThrows(IOException.class, () -> subject.read(0, ByteBuffer.allocate(10)));
+    assertThat(e).hasMessageContaining("closed");
+  }
+
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
   public void testRefreshOnReadFailureAfterUnbuffer(IOException ex)

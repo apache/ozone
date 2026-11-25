@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.apache.hadoop.ozone.om.helpers.S3STSUtils.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.Test;
 
@@ -94,5 +96,64 @@ public class TestS3STSUtils {
 
     final OMException tooLong = assertThrows(OMException.class, () -> S3STSUtils.validateDuration(43201));
     assertThat(tooLong.getMessage()).isEqualTo(DURATION_VALIDATION_ERROR_MESSAGE);
+  }
+
+  @Test
+  public void testGetMinDurationSecondsDefault() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    assertEquals(900, S3STSUtils.getMinDurationSeconds(conf));
+  }
+
+  @Test
+  public void testGetMinDurationSecondsOverride() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 5);
+    assertEquals(5, S3STSUtils.getMinDurationSeconds(conf));
+
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 1);
+    assertEquals(1, S3STSUtils.getMinDurationSeconds(conf));
+
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, S3STSUtils.MIN_DURATION_SECONDS);
+    assertEquals(900, S3STSUtils.getMinDurationSeconds(conf));
+  }
+
+  @Test
+  public void testGetMinDurationSecondsRejectsOutOfRange() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 0);
+    final IllegalArgumentException tooSmall = assertThrows(
+        IllegalArgumentException.class, () -> S3STSUtils.getMinDurationSeconds(conf));
+    assertEquals(
+        "ozone.s3g.sts.test.min.duration.seconds must be between 1 and 900, but was 0",
+        tooSmall.getMessage());
+
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 901);
+    final IllegalArgumentException tooLarge = assertThrows(
+        IllegalArgumentException.class, () -> S3STSUtils.getMinDurationSeconds(conf));
+    assertEquals(
+        "ozone.s3g.sts.test.min.duration.seconds must be between 1 and 900, but was 901",
+        tooLarge.getMessage());
+  }
+
+  @Test
+  public void testValidateDurationWithCustomMinimum() throws OMException {
+    assertEquals(5, S3STSUtils.validateDuration(5, 5));
+
+    final OMException tooShort = assertThrows(OMException.class, () -> S3STSUtils.validateDuration(4, 5));
+    assertEquals(
+        "Invalid Value: DurationSeconds must be a number between 5 and 43200 seconds", tooShort.getMessage());
+  }
+
+  @Test
+  public void testValidateDurationStringWithCustomMinimum() throws OMException {
+    assertEquals(5, S3STSUtils.validateDuration("5", 5));
+
+    final OMException tooShort = assertThrows(OMException.class, () -> S3STSUtils.validateDuration("4", 5));
+    assertEquals(
+        "Invalid Value: DurationSeconds must be a number between 5 and 43200 seconds", tooShort.getMessage());
+
+    final OMException nonNumeric = assertThrows(OMException.class, () -> S3STSUtils.validateDuration("abc", 5));
+    assertEquals(
+        "Invalid Value: DurationSeconds must be a number between 5 and 43200 seconds", nonNumeric.getMessage());
   }
 }

@@ -32,7 +32,7 @@ Check safemode with explicit host
                         Should contain   ${output}   SCM is out of safe mode
 
 Wait for safemode exit
-    ${output} =         Execute          ozone admin safemode wait -t 2
+    ${output} =         Execute          ozone admin safemode wait -t 10
                         Should contain   ${output}   SCM is out of safe mode
 
 Incomplete command

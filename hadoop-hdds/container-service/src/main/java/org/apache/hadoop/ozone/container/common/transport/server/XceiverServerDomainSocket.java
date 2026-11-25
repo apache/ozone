@@ -32,9 +32,9 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.DomainPeer;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
 import org.apache.hadoop.hdds.utils.FaultInjector;
@@ -65,7 +65,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
    * running out of memory.
    */
   private final int maxXceiverCount;
-  private final AtomicInteger xceriverCount;
+  private final AtomicInteger xceiverCount;
   private DomainSocket domainSocket;
   private final ConfigurationSource config;
   private final String threadPrefix;
@@ -94,7 +94,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         conf.getObject(DatanodeConfiguration.class).getNumReadThreadPerVolume();
     final int numberOfDisks = HddsServerUtil.getDatanodeStorageDirs(conf).size();
     this.maxXceiverCount = threadCountPerDisk * numberOfDisks * 5;
-    this.xceriverCount = new AtomicInteger(0);
+    this.xceiverCount = new AtomicInteger(0);
     this.dispatcher = dispatcher;
     this.readExecutors = executor;
     this.metrics = metrics;
@@ -127,16 +127,6 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   @Override
   public int getIPCPort() {
     return this.port;
-  }
-
-  /**
-   * Returns the Replication type supported by this end-point.
-   *
-   * @return enum STAND_ALONE
-   */
-  @Override
-  public HddsProtos.ReplicationType getServerType() {
-    return HddsProtos.ReplicationType.STAND_ALONE;
   }
 
   @Override
@@ -187,13 +177,12 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   }
 
   @Override
-  public void submitRequest(ContainerCommandRequestProto request,
-      HddsProtos.PipelineID pipelineID) throws IOException {
+  public void submitRequest(ContainerCommandRequestProto request, PipelineID pipelineID) throws IOException {
     throw new UnsupportedOperationException("Operation is not supported for " + this.getClass().getSimpleName());
   }
 
   @Override
-  public boolean isExist(HddsProtos.PipelineID pipelineId) {
+  public boolean isExist(PipelineID pipelineId) {
     throw new UnsupportedOperationException("Operation is not supported for " + this.getClass().getSimpleName());
   }
 
@@ -210,15 +199,17 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
       boolean releaseCount = false;
       try {
         DomainSocket connSock = domainSocket.accept();
-        xceriverCount.incrementAndGet();
+        xceiverCount.incrementAndGet();
         releaseCount = true;
         peer = new DomainPeer(connSock);
         peer.setReadTimeout(readTimeoutMs);
         peer.setWriteTimeout(writeTimeoutMs);
-        LOG.info("Accepted a new connection {}, xceriverCount {}", connSock, xceriverCount.get());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Accepted a new connection {}, xceiverCount {}", connSock, xceiverCount.get());
+        }
 
         // Make sure the xceiver count is not exceeded
-        if (xceriverCount.get() > maxXceiverCount) {
+        if (xceiverCount.get() > maxXceiverCount) {
           throw new IOException("Xceiver count exceeds the limit " + maxXceiverCount);
         }
         Daemon daemon = new Daemon(Receiver.create(peer, config, this, dispatcher, readExecutors, metrics));
@@ -232,9 +223,19 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         // another thread closed our listener socket - that's expected during shutdown, but not in other circumstances
         LOG.info("XceiverServerDomainSocket is closed", ace);
       } catch (IOException ie) {
-        // usually when the xceiver count limit is hit.
-        LOG.warn("Got an exception. Peer {}", peer, ie);
-        IOUtils.closeQuietly(peer);
+        if (peer == null) {
+          // accept() itself failed, for example with no file descriptor left, and would fail again right away
+          LOG.warn("accept() failed. Will retry after 1 second.", ie);
+          try {
+            Thread.sleep(TimeUnit.SECONDS.toMillis(1L));
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        } else {
+          // usually when the xceiver count limit is hit.
+          LOG.warn("Got an exception. Peer {}", peer, ie);
+          IOUtils.closeQuietly(peer);
+        }
       } catch (OutOfMemoryError ie) {
         IOUtils.closeQuietly(peer);
         // DataNode can run out of memory if there is too many transfers.
@@ -250,7 +251,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         LOG.error("XceiverServerDomainSocket: Exiting.", te);
       } finally {
         if (releaseCount) {
-          xceriverCount.decrementAndGet();
+          xceiverCount.decrementAndGet();
         }
       }
     }
@@ -302,7 +303,9 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
     }
     peers.put(peer, t);
     peersReceiver.put(peer, receiver);
-    LOG.info("Peer {} is added", peer.getDomainSocket());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Peer {} is added", peer.getDomainSocket());
+    }
   }
 
   void closePeer(DomainPeer peer) throws IOException {
@@ -312,8 +315,10 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
     peers.remove(peer);
     peersReceiver.remove(peer);
     org.apache.hadoop.io.IOUtils.closeStream(peer);
-    xceriverCount.decrementAndGet();
-    LOG.info("Peer {} is closed", peer.getDomainSocket());
+    xceiverCount.decrementAndGet();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Peer {} is closed", peer.getDomainSocket());
+    }
   }
 
   @VisibleForTesting
@@ -323,7 +328,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
 
   @VisibleForTesting
   public int getXceiverCount() {
-    return xceriverCount.get();
+    return xceiverCount.get();
   }
 
   @VisibleForTesting

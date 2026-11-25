@@ -66,4 +66,6 @@ public @interface Config {
    * Indicates whether this property can be dynamically reconfigured at runtime.
    */
   boolean reconfigurable() default false;
+
+  boolean experimental() default false;
 }

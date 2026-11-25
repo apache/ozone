@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -43,7 +43,7 @@ import org.junit.jupiter.api.TestInstance;
  * Test cases to verify the metrics exposed by SCMPipelineManager.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestSCMPipelineMetrics implements NonHATests.TestCase {
+public abstract class TestSCMPipelineMetrics implements ClusterForTests.TestCase {
 
   private MiniOzoneCluster cluster;
 

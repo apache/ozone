@@ -34,17 +34,17 @@
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <asm.version>9.11.1</asm.version>
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
-    <aspectj.java11.version>1.9.20</aspectj.java11.version>
-    <aspectj.java21.version>1.9.24</aspectj.java21.version>
-    <aspectj.java25.version>1.9.25.1</aspectj.java25.version>
-    <aspectj.java8.version>1.9.7</aspectj.java8.version>
+    <aspectj.version>1.9.27</aspectj.version>
     <assertj.version>3.27.7</assertj.version>
-    <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
     <aws-java-sdk2.version>2.55.6</aws-java-sdk2.version>
+    <ban-httpcomponents.skip>true</ban-httpcomponents.skip>
+    <ban-rocksdb.skip>true</ban-rocksdb.skip>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.86</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.2</build-helper-maven-plugin.version>
     <byte-buddy.version>1.18.15</byte-buddy.version>
+    <!-- 2.x: the last line that runs on Java 8, which the client modules target -->
+    <caffeine.version>2.9.3</caffeine.version>
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
@@ -67,7 +67,6 @@
     <cyclonedx.version>2.9.3</cyclonedx.version>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
-    <derby.version>10.14.2.0</derby.version>
     <disruptor.version>3.4.4</disruptor.version>
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
@@ -95,7 +94,7 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <io.grpc.version>1.77.1</io.grpc.version>
+    <io.grpc.version>1.82.4</io.grpc.version>
     <jackson2-bom.version>2.21.8</jackson2-bom.version>
     <jacoco.version>0.8.15</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
@@ -143,6 +142,7 @@
     <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
     <maven-patch-plugin.version>1.3</maven-patch-plugin.version>
     <maven-remote-resources-plugin.version>3.3.0</maven-remote-resources-plugin.version>
+    <maven-replacer-plugin.skip>false</maven-replacer-plugin.skip>
     <maven-replacer-plugin.version>1.5.3</maven-replacer-plugin.version>
     <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
@@ -158,7 +158,6 @@
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
     <native.lib.tmp.dir />
-    <netty.version>4.1.139.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>24.22.1</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
@@ -188,10 +187,10 @@
     <protobuf.version>3.25.9</protobuf.version>
     <ranger.version>2.9.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
-    <ratis-thirdparty.grpc.version>1.82.1</ratis-thirdparty.grpc.version>
-    <ratis-thirdparty.netty.version>4.1.136.Final</ratis-thirdparty.netty.version>
+    <ratis-thirdparty.grpc.version>1.82.4</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.netty.version>4.1.139.Final</ratis-thirdparty.netty.version>
     <ratis-thirdparty.protobuf.version>3.25.9</ratis-thirdparty.protobuf.version>
-    <ratis.thirdparty.version>1.1.0</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.1.1</ratis.thirdparty.version>
     <ratis.version>3.3.1</ratis.version>
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
@@ -210,7 +209,7 @@
     <sonar.projectKey>hadoop-ozone</sonar.projectKey>
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
-    <spring.version>6.2.19</spring.version>
+    <spring.version>7.0.10</spring.version>
     <sqlite.version>3.53.4.0</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
@@ -235,20 +234,6 @@
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
         <version>${jackson2-bom.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-bom</artifactId>
-        <version>${io.grpc.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-bom</artifactId>
-        <version>${netty.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -364,23 +349,6 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>com.amazonaws</groupId>
-        <artifactId>aws-java-sdk-core</artifactId>
-        <version>${aws-java-sdk.version}</version>
-        <exclusions>
-          <exclusion>
-            <!-- depend on jcl-over-slf4j instead -->
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.amazonaws</groupId>
-        <artifactId>aws-java-sdk-s3</artifactId>
-        <version>${aws-java-sdk.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.bettercloud</groupId>
         <artifactId>vault-java-driver</artifactId>
         <version>${vault.driver.version}</version>
@@ -389,6 +357,18 @@
         <groupId>com.fasterxml.woodstox</groupId>
         <artifactId>woodstox-core</artifactId>
         <version>${woodstox.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>caffeine</artifactId>
+        <version>${caffeine.version}</version>
+        <exclusions>
+          <exclusion>
+            <!-- annotations only, not shipped -->
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
@@ -761,11 +741,6 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>org.apache.derby</groupId>
-        <artifactId>derby</artifactId>
-        <version>${derby.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-annotations</artifactId>
         <version>${hadoop.version}</version>
@@ -852,6 +827,10 @@
             <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
           </exclusion>
@@ -916,6 +895,10 @@
             <!-- depend on jcl-over-slf4j instead -->
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
             <groupId>javax.servlet</groupId>
@@ -1214,11 +1197,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-docs</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-erasurecode</artifactId>
         <version>${hdds.version}</version>
       </dependency>
@@ -1263,6 +1241,11 @@
         <artifactId>hdds-rocks-native</artifactId>
         <version>${hdds.rocks.native.version}</version>
         <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-rocksdb-checkpoint-differ</artifactId>
+        <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
@@ -1406,6 +1389,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-integration-test-utils</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-interface-client</artifactId>
         <version>${ozone.version}</version>
       </dependency>
@@ -1459,11 +1447,6 @@
         <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-vapor</artifactId>
         <version>${ozone.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>rocksdb-checkpoint-differ</artifactId>
-        <version>${hdds.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ranger</groupId>
@@ -1702,9 +1685,9 @@
         <version>${spring.version}</version>
         <exclusions>
           <exclusion>
-            <!-- avoid conflict with Commons Logging -->
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-jcl</artifactId>
+            <!-- depend on jcl-over-slf4j instead -->
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1881,8 +1864,8 @@
           <artifactId>aspectj-maven-plugin</artifactId>
           <version>${aspectj-plugin.version}</version>
           <configuration>
-            <complianceLevel>${maven.compiler.release}</complianceLevel>
             <argumentFileDirectory>${project.build.directory}/aspectj-build</argumentFileDirectory>
+            <release>${maven.compiler.release}</release>
           </configuration>
           <dependencies>
             <dependency>
@@ -2091,7 +2074,6 @@
                     <allowedImports>
                       <!-- Allow non-RocksObject classes. -->
                       <allowedImport>org.rocksdb.ColumnFamilyDescriptor</allowedImport>
-                      <allowedImport>org.rocksdb.CompactRangeOptions.BottommostLevelCompaction</allowedImport>
                       <allowedImport>org.rocksdb.CompactionStyle</allowedImport>
                       <allowedImport>org.rocksdb.KeyMayExist</allowedImport>
                       <allowedImport>org.rocksdb.HistogramData</allowedImport>
@@ -2123,6 +2105,80 @@
                       <exclusion>org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer</exclusion>
                     </exclusions>
                   </RestrictImports>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-aws-sdk-v1</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>com.amazonaws</exclude>
+                    </excludes>
+                    <message>AWS SDK for Java v1 is end of life, use AWS SDK for Java v2 (software.amazon.awssdk)</message>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-rocksdb</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <!-- enabled in client modules -->
+                <skip>${ban-rocksdb.skip}</skip>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>org.rocksdb:rocksdbjni</exclude>
+                    </excludes>
+                    <message>Ozone client artifacts must not depend on RocksDB, which adds about 85 MB of native libraries to them</message>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-unshaded-grpc</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>io.grpc</exclude>
+                      <exclude>io.netty</exclude>
+                    </excludes>
+                    <message>Use Ratis's shaded gRPC and Netty, not unshaded io.grpc / io.netty</message>
+                    <searchTransitive>false</searchTransitive>
+                  </bannedDependencies>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-httpcomponents</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <phase>validate</phase>
+              <configuration>
+                <!-- enabled in the shaded filesystem module; unshaded client modules get httpclient from Hadoop -->
+                <skip>${ban-httpcomponents.skip}</skip>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>org.apache.httpcomponents</exclude>
+                    </excludes>
+                    <message>The Ozone filesystem jar must not bundle Apache HttpComponents, use java.net.URI instead</message>
+                  </bannedDependencies>
                 </rules>
               </configuration>
             </execution>
@@ -2193,6 +2249,28 @@
                     <bannedImports>
                       <bannedImport>org.apache.hadoop.hdfs.MiniDFSCluster</bannedImport>
                       <bannedImport>org.apache.hadoop.hdfs.DFSConfigKeys</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>AWS SDK for Java v1 is end of life, use AWS SDK for Java v2 (software.amazon.awssdk)</reason>
+                    <bannedImports>
+                      <bannedImport>com.amazonaws.**</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use Caffeine (com.github.benmanes.caffeine.cache), as Guava recommends</reason>
+                    <bannedImports>
+                      <bannedImport>com.google.common.cache.**</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
@@ -2907,71 +2985,14 @@
         </plugins>
       </build>
     </profile>
-    <!-- Profiles for specific aspectj versions -->
-    <profile>
-      <id>aspectj-java8-10</id>
-      <activation>
-        <jdk>[1.8,11)</jdk>
-      </activation>
-      <properties>
-        <aspectj.version>${aspectj.java8.version}</aspectj.version>
-      </properties>
-    </profile>
-    <profile>
-      <id>aspectj-java11-20</id>
-      <activation>
-        <jdk>[11,21)</jdk>
-      </activation>
-      <properties>
-        <aspectj.version>${aspectj.java11.version}</aspectj.version>
-      </properties>
-    </profile>
-    <profile>
-      <id>aspectj-java21-24</id>
-      <activation>
-        <jdk>[21,25)</jdk>
-      </activation>
-      <properties>
-        <aspectj.version>${aspectj.java21.version}</aspectj.version>
-      </properties>
-    </profile>
-    <profile>
-      <id>aspectj-java25-or-later</id>
-      <activation>
-        <jdk>[25,]</jdk>
-      </activation>
-      <properties>
-        <aspectj.version>${aspectj.java25.version}</aspectj.version>
-      </properties>
-    </profile>
-    <profile>
-      <id>java11+</id>
-      <activation>
-        <jdk>[11,]</jdk>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>dev.aspectj</groupId>
-            <artifactId>aspectj-maven-plugin</artifactId>
-            <configuration>
-              <release>${maven.compiler.release}</release>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <profile>
       <id>go-offline</id>
       <properties>
-        <cyclonedx.skip>true</cyclonedx.skip>
         <enforcer.skip>true</enforcer.skip>
         <jacoco.skip>true</jacoco.skip>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <mdep.analyze.skip>true</mdep.analyze.skip>
-        <skip.installnodepnpm>true</skip.installnodepnpm>
         <skip.pnpm>true</skip.pnpm>
-        <skipDocs>true</skipDocs>
         <test>void</test>
       </properties>
     </profile>
@@ -3139,23 +3160,6 @@
                 <!-- default excludes -->
                 <exclude>**/*$*</exclude>
               </excludes>
-              <excludedGroups>${unstable-test-groups}</excludedGroups>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>test-recon</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <includes>
-                <include>org.apache.hadoop.ozone.recon.**</include>
-              </includes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
           </plugin>

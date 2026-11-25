@@ -49,7 +49,7 @@ public class TestCommandQueue {
     SCMCommand<?> createPipelineCommand =
         new CreatePipelineCommand(PipelineID.randomId(),
             HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Collections.emptyList());
+            HddsProtos.ReplicationFactor.THREE, Collections.emptyList(), null);
     SCMCommand<?> replicationCommand = ContainerTestUtils
         .getReplicateContainerCommand(containerID, MockDatanodeDetails.randomDatanodeDetails());
 

@@ -212,6 +212,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       if (response == null) {
         this.lastRequestToSubmit = request;
         response = ozoneManager.getOmExecutionFlow().submit(request, true);
+      } else if (response.getSuccess()) {
+        // Cached replies come from Ratis apply, so leader-only postExecute steps still need to run.
+        response = ozoneManager.getOmExecutionFlow().postExecute(request, response);
       }
       if (derivedKey != null && response.getSuccess() && response.hasCreateKeyResponse()) {
         return response.toBuilder().setCreateKeyResponse(response.getCreateKeyResponse().toBuilder()

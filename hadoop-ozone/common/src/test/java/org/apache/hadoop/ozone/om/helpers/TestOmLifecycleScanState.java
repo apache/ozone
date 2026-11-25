@@ -36,6 +36,7 @@ public class TestOmLifecycleScanState {
         .setScanEndTime(123456799L)
         .setLastScannedKey("key1")
         .setLastScannedDir("subDir1")
+        .setLastScannedMpuKey("mpuKey1")
         .build();
 
     assertEquals("/vol1/bucket1", state.getBucketKey());
@@ -43,6 +44,7 @@ public class TestOmLifecycleScanState {
     assertEquals(123456799L, state.getScanEndTime());
     assertEquals("key1", state.getLastScannedKey());
     assertEquals("subDir1", state.getLastScannedDir());
+    assertEquals("mpuKey1", state.getLastScannedMpuKey());
 
     LifecycleScanState proto = state.getProtobuf();
     OmLifecycleScanState decodedState = OmLifecycleScanState.getFromProtobuf(proto);
@@ -52,6 +54,8 @@ public class TestOmLifecycleScanState {
     assertEquals(state.getScanEndTime(), decodedState.getScanEndTime());
     assertEquals(state.getLastScannedKey(), decodedState.getLastScannedKey());
     assertEquals(state.getLastScannedDir(), decodedState.getLastScannedDir());
+    assertEquals(state.getLastScannedMpuKey(), decodedState.getLastScannedMpuKey());
+    assertEquals(state.getLastScannedMpuKey(), state.toBuilder().build().getLastScannedMpuKey());
   }
 
   @Test
@@ -75,5 +79,6 @@ public class TestOmLifecycleScanState {
     assertNull(decodedState.getScanEndTime());
     assertNull(decodedState.getLastScannedKey());
     assertNull(decodedState.getLastScannedDir());
+    assertNull(decodedState.getLastScannedMpuKey());
   }
 }
