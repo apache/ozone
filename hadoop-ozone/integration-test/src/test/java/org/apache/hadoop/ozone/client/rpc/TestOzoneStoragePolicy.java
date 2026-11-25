@@ -750,7 +750,7 @@ public class TestOzoneStoragePolicy {
 
   private void writeFile(OzoneBucket bucket, String keyName, byte[] data, long size, boolean overWrite,
       OzoneStoragePolicy storagePolicy) throws IOException {
-    try (OzoneOutputStream out = bucket.createFile(keyName, new CreateFileOptions.Builder()
+    try (OzoneOutputStream out = bucket.createFile(keyName, CreateFileOptions.builder()
         .setSize(size)
         .setReplicationConfig(RATIS_THREE)
         .setOverWrite(overWrite)

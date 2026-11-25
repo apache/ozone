@@ -130,7 +130,7 @@ public class TestOMFileStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgra
       throws IOException {
     OzoneBucket bucket = client.getObjectStore().getVolume(VOLUME_NAME).getBucket(bucketName);
     String keyName = "file-" + UUID.randomUUID();
-    bucket.createFile(keyName, new CreateFileOptions.Builder()
+    bucket.createFile(keyName, CreateFileOptions.builder()
         .setReplicationConfig(REPLICATION)
         .setStoragePolicy(requestedPolicy)
         .build()).close();

@@ -2677,8 +2677,8 @@ public class RpcClient implements ClientProtocol {
             + " Erasure Coded replication.");
       }
     }
-    if (storagePolicy != null && !OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
-      throw new IOException("OzoneManager does not support storage policy");
+    if (storagePolicy != null) {
+      checkStoragePolicySupported();
     }
     String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
