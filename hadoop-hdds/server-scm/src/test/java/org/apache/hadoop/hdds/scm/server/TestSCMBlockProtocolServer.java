@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -63,18 +64,21 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
@@ -100,6 +104,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 /**
@@ -404,6 +411,33 @@ public class TestSCMBlockProtocolServer {
         }
       }
     }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"true, true, true", "true, false, false", "false, true, false"})
+  void allocateBlockPassesClientDatanodeOnlyWhenPreferredAndHasSpace(boolean preferLocal, boolean hasSpace,
+      boolean expectLocal) throws Exception {
+    final String clientAddress = "1.2.3.4";
+    DatanodeInfo client = mock(DatanodeInfo.class);
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.getNodesByAddress(clientAddress)).thenReturn(Collections.singletonList(client));
+    when(mockNodeManager.hasAvailableSpace(client)).thenReturn(hasSpace);
+    BlockManager blockManager = mock(BlockManager.class);
+    StorageContainerManager mockScm = mockScmForBlockServer();
+    when(mockScm.getScmNodeManager()).thenReturn(mockNodeManager);
+    when(mockScm.getScmBlockManager()).thenReturn(blockManager);
+    when(mockScm.getPerfMetrics()).thenReturn(mock(SCMPerformanceMetrics.class));
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfig.HDDS_SCM_BLOCK_ALLOCATION_PREFER_CLIENT_LOCAL, preferLocal);
+
+    try (SCMBlockProtocolServer testServer = new SCMBlockProtocolServer(conf, mockScm)) {
+      testServer.allocateBlock(128 * MB, 1, RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "o",
+          new ExcludeList(), clientAddress);
+    }
+
+    ArgumentCaptor<DatanodeDetails> localDatanode = ArgumentCaptor.forClass(DatanodeDetails.class);
+    verify(blockManager).allocateBlock(anyLong(), any(), any(), any(), localDatanode.capture());
+    assertThat(localDatanode.getValue()).isEqualTo(expectLocal ? client : null);
   }
 
   @Test

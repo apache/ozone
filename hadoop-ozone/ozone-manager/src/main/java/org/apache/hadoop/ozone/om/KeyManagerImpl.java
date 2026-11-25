@@ -236,6 +236,10 @@ public class KeyManagerImpl implements KeyManager {
         HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
     this.preferClientLocalPipeline = conf.getObject(ScmConfig.class).isPreferClientLocalPipeline();
+    if (preferClientLocalPipeline) {
+      LOG.info("{} is enabled on OM; it takes effect only if SCM enables it too.",
+          ScmConfig.HDDS_SCM_BLOCK_ALLOCATION_PREFER_CLIENT_LOCAL);
+    }
 
     this.ozoneManager = om;
     this.scmClient = scmClient;

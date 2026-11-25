@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
@@ -126,6 +127,10 @@ public class SCMBlockProtocolServer implements
     this.perfMetrics = scm.getPerfMetrics();
     this.omPrincipal = conf.get(OM_KERBEROS_PRINCIPAL_KEY, "");
     this.preferClientLocalPipeline = conf.getObject(ScmConfig.class).isPreferClientLocalPipeline();
+    if (preferClientLocalPipeline) {
+      LOG.info("{} is enabled on SCM; it takes effect only if OM enables it too.",
+          ScmConfig.HDDS_SCM_BLOCK_ALLOCATION_PREFER_CLIENT_LOCAL);
+    }
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
@@ -239,8 +244,9 @@ public class SCMBlockProtocolServer implements
     }
     try {
       final Node client = getClientNode(clientMachine);
-      final DatanodeDetails localDatanode = preferClientLocalPipeline && client instanceof DatanodeDetails
-          ? (DatanodeDetails) client : null;
+      // Skip the preference when the client's datanode has no room for another container, as pipeline creation does.
+      final DatanodeDetails localDatanode = preferClientLocalPipeline && client instanceof DatanodeInfo
+          && scm.getScmNodeManager().hasAvailableSpace((DatanodeInfo) client) ? (DatanodeDetails) client : null;
       for (int i = 0; i < num; i++) {
         AllocatedBlock block =
             scm.getScmBlockManager().allocateBlock(size, replicationConfig, owner, excludeList, localDatanode);
