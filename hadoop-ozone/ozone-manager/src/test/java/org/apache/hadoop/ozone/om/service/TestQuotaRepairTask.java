@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
+import org.apache.hadoop.hdds.utils.db.ParallelScanConfig;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -174,6 +175,67 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     assertEquals(30000, obsUpdateBucketInfo.getUsedBytes());
     assertEquals(13, fsoUpdateBucketInfo.getUsedNamespace());
     assertEquals(10000, fsoUpdateBucketInfo.getUsedBytes());
+  }
+
+  @Test
+  public void testQuotaRepairWithParallelScan() throws Exception {
+    final boolean prevEnabled = ozoneManager.getConfiguration().getBoolean(
+        ParallelScanConfig.ENABLED_KEY, ParallelScanConfig.ENABLED_DEFAULT);
+    final int prevMaxThreads = ozoneManager.getConfiguration().getInt(
+        ParallelScanConfig.MAX_THREADS_KEY, ParallelScanConfig.MAX_THREADS_DEFAULT);
+    ozoneManager.getConfiguration().setBoolean(ParallelScanConfig.ENABLED_KEY, true);
+    ozoneManager.getConfiguration().setInt(ParallelScanConfig.MAX_THREADS_KEY, 4);
+    try {
+      AtomicReference<OzoneManagerProtocolProtos.OMRequest> ref = mockQuotaRepairRequest();
+      OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+          omMetadataManager, BucketLayout.OBJECT_STORE);
+      String fsoBucketName = "fso" + bucketName;
+      OMRequestTestUtils.addBucketToDB(volumeName, fsoBucketName,
+          omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      long parentId = OMRequestTestUtils.addParentsToDirTable(volumeName,
+          fsoBucketName, "c/d/e", omMetadataManager);
+
+      // Flush between batches so the checkpoint has multiple SSTs for RDBTableSplitter.
+      final int batches = 4;
+      final int perBatch = 25;
+      final int total = batches * perBatch;
+      for (int b = 0; b < batches; b++) {
+        for (int j = 0; j < perBatch; j++) {
+          int i = b * perBatch + j;
+          String suffix = String.format("%04d", i);
+          OMRequestTestUtils.addKeyToTableAndCache(volumeName, bucketName,
+              "/user/key" + suffix, -1, RatisReplicationConfig.getInstance(THREE), 150L + i, omMetadataManager);
+          String fileName = "file" + suffix;
+          OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, fsoBucketName, fileName,
+                  RatisReplicationConfig.getInstance(ONE))
+              .setObjectID(parentId + 1 + i)
+              .setParentObjectID(parentId)
+              .setUpdateID(100L + i)
+              .build();
+          omKeyInfo.setKeyName(fileName);
+          OMRequestTestUtils.addFileToKeyTable(false, false,
+              fileName, omKeyInfo, -1, 50L + i, omMetadataManager);
+        }
+        omMetadataManager.getStore().flushDB();
+      }
+
+      zeroOutBucketUsedBytes(volumeName, bucketName, 1L);
+      zeroOutBucketUsedBytes(volumeName, fsoBucketName, 2L);
+
+      applyQuotaRepair(ref, 1000L);
+
+      OmBucketInfo obsBucket = omMetadataManager.getBucketTable().get(
+          omMetadataManager.getBucketKey(volumeName, bucketName));
+      OmBucketInfo fsoBucket = omMetadataManager.getBucketTable().get(
+          omMetadataManager.getBucketKey(volumeName, fsoBucketName));
+      assertEquals(total, obsBucket.getUsedNamespace());
+      assertEquals(total * 3000L, obsBucket.getUsedBytes());
+      assertEquals(total + 3, fsoBucket.getUsedNamespace());
+      assertEquals(total * 1000L, fsoBucket.getUsedBytes());
+    } finally {
+      ozoneManager.getConfiguration().setBoolean(ParallelScanConfig.ENABLED_KEY, prevEnabled);
+      ozoneManager.getConfiguration().setInt(ParallelScanConfig.MAX_THREADS_KEY, prevMaxThreads);
+    }
   }
 
   @Test

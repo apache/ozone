@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.ParallelScanConfig;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -538,15 +539,10 @@ public class QuotaRepairTask {
       throws UncheckedIOException {
     LOG.info("Starting recalculate snapshot usages from deletedTable ({})", sourceLabel);
 
-    int count = 0;
     long startTime = Time.monotonicNow();
-    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> keyIter
-        = deletedTable.iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
-        count++;
-        countDeletedKey(kv.getValue(), bucketById, snapshotCountByBucketNameKey);
-      }
+    try {
+      long count = deletedTable.parallelScan(null, parallelScanThreads(), VALUE_ONLY,
+          kv -> countDeletedKey(kv.getValue(), bucketById, snapshotCountByBucketNameKey));
       LOG.info("Recalculate snapshot usages from deletedTable ({}) completed, count {} time {}ms",
           sourceLabel, count, (Time.monotonicNow() - startTime));
     } catch (IOException ex) {
@@ -579,19 +575,15 @@ public class QuotaRepairTask {
     LOG.info("Starting recalculate snapshot namespace from deletedDirectoryTable ({})",
         sourceLabel);
 
-    int count = 0;
     long startTime = Time.monotonicNow();
-    try (Table.KeyValueIterator<String, OmKeyInfo> keyIter
-        = deletedDirTable.iterator(null, KEY_ONLY)) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        count++;
+    try {
+      long count = deletedDirTable.parallelScan(null, parallelScanThreads(), KEY_ONLY, kv -> {
         String prefix = getVolumeBucketPrefix(kv.getKey());
         CountPair usage = snapshotDirNsByIdPrefix.get(prefix);
         if (usage != null) {
           usage.incrNamespace(1L);
         }
-      }
+      });
       LOG.info(
           "Recalculate snapshot namespace from deletedDirectoryTable ({}) completed, count {} time {}ms",
           sourceLabel, count, (Time.monotonicNow() - startTime));
@@ -671,14 +663,21 @@ public class QuotaRepairTask {
     }
   }
 
+  private int parallelScanThreads() {
+    return ParallelScanConfig.from(om.getConfiguration()).getMaxThreads();
+  }
+
   private <VALUE> void recalculateUsages(
       Table<String, VALUE> table, Map<String, CountPair> prefixUsageMap,
-      String strType, boolean haveValue) throws UncheckedIOException,
-      UncheckedExecutionException {
-    try (Table.KeyValueIterator<String, VALUE> keyIter
-        = table.iterator(null, haveValue ? KEY_AND_VALUE : KEY_ONLY)) {
-      scanTableInBatches(executor, keyIter, strType,
+      String strType, boolean haveValue) throws UncheckedIOException {
+    LOG.info("Starting recalculate {}", strType);
+    long startTime = Time.monotonicNow();
+    try {
+      long count = table.parallelScan(null, parallelScanThreads(),
+          haveValue ? KEY_AND_VALUE : KEY_ONLY,
           kv -> extractCount(kv, prefixUsageMap, haveValue));
+      LOG.info("Recalculate {} completed, count {} time {}ms", strType,
+          count, (Time.monotonicNow() - startTime));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
