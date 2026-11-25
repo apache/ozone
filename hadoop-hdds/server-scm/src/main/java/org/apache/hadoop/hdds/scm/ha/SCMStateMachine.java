@@ -240,7 +240,6 @@ public class SCMStateMachine extends BaseStateMachine {
       tryStartDNServerAndRefreshSafeMode();
     } catch (Exception ex) {
       TracingUtil.recordException(span, ex);
-      // terminate exits the JVM, so end the span before it rather than in finally
       span.end();
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
