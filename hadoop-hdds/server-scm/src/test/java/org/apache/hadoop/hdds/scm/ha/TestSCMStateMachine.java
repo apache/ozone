@@ -580,6 +580,43 @@ public class TestSCMStateMachine {
   }
 
   @Test
+  public void testFlushFailureIsRecordedOnTheApplySpan() throws Exception {
+    ExitUtils.disableSystemExit();
+    try (TestSpanCollector spans = TestSpanCollector.install("scm-state-machine-test")) {
+      SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+      doThrow(new IllegalStateException("injected flush failure")).when(buffer).flushIfPendingLimitReached();
+      SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, succeedingInvoker());
+      TransactionContext trx = TracingUtil.executeInNewSpan("submit", () -> newTransaction(RequestType.PIPELINE, 9));
+
+      assertThrows(ExitUtils.ExitException.class, () -> applyingStateMachine.applyTransaction(trx));
+
+      spans.assertError("SCMStateMachine.applyTransaction", "injected flush failure");
+      spans.assertExceptionRecorded("SCMStateMachine.applyTransaction", IllegalStateException.class);
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
+  @Test
+  public void testUnexpectedApplyFailureIsRecordedOnTheApplySpan() throws Exception {
+    ExitUtils.disableSystemExit();
+    try (TestSpanCollector spans = TestSpanCollector.install("scm-state-machine-test")) {
+      SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+      ScmInvoker<?> invoker = mock(ScmInvoker.class);
+      when(invoker.invokeLocal(anyString(), any())).thenThrow(new IllegalStateException("unexpected"));
+      SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, invoker);
+      TransactionContext trx = TracingUtil.executeInNewSpan("submit", () -> newTransaction(RequestType.PIPELINE, 4));
+
+      assertThrows(ExitUtils.ExitException.class, () -> applyingStateMachine.applyTransaction(trx));
+
+      spans.assertError("SCMStateMachine.applyTransaction", "unexpected");
+      spans.assertExceptionRecorded("SCMStateMachine.applyTransaction", IllegalStateException.class);
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
+  @Test
   public void testDeletedBlockSummaryReloadedOnLeaderReady() throws Exception {
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     DeletedBlockLogImpl deletedBlockLog = mock(DeletedBlockLogImpl.class);

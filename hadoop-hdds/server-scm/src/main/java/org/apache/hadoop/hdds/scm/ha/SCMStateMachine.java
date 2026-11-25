@@ -198,6 +198,7 @@ public class SCMStateMachine extends BaseStateMachine {
     final CompletableFuture<Message> applyTransactionFuture =
         new CompletableFuture<>();
     transactionBuffer.beginApplyingTransaction();
+    Span span = Span.getInvalid();
     try {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
@@ -205,23 +206,22 @@ public class SCMStateMachine extends BaseStateMachine {
       if (LOG.isDebugEnabled()) {
         LOG.debug("{}: applyTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
       }
-      final Span span = request.getTraceID().isEmpty() ? Span.getInvalid()
-          : TracingUtil.importAndCreateSpan("SCMStateMachine.applyTransaction", request.getTraceID());
+      if (!request.getTraceID().isEmpty()) {
+        span = TracingUtil.importAndCreateSpan("SCMStateMachine.applyTransaction", request.getTraceID());
+      }
       try (Scope ignored = span.makeCurrent()) {
         applyTransactionFuture.complete(process(request));
       } catch (SCMException ex) {
-        TracingUtil.recordException(span, ex);
         // For SCM exceptions while applying a transaction, if the error
         // code indicate a FATAL issue, let it crash SCM.
         if (ex.getResult() == ResultCodes.INTERNAL_ERROR
             || ex.getResult() == ResultCodes.IO_EXCEPTION) {
           throw ex;
         }
+        TracingUtil.recordException(span, ex);
         // Otherwise, it's considered as a logical rejection and is returned to
         // Ratis client, leaving SCM intact.
         applyTransactionFuture.completeExceptionally(ex);
-      } finally {
-        span.end();
       }
 
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
@@ -239,9 +239,13 @@ public class SCMStateMachine extends BaseStateMachine {
       // in both places. No-op once the datanode protocol server has started.
       tryStartDNServerAndRefreshSafeMode();
     } catch (Exception ex) {
+      TracingUtil.recordException(span, ex);
+      // terminate exits the JVM, so end the span before it rather than in finally
+      span.end();
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
     } finally {
+      span.end();
       transactionBuffer.endApplyingTransaction();
     }
     return applyTransactionFuture;
