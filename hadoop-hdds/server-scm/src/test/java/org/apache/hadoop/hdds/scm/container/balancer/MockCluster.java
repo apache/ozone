@@ -257,6 +257,8 @@ public final class MockCluster {
         .setOriginNodeId(datanodeDetails.getID())
         .setSequenceId(1000L)
         .setBytesUsed(usedBytes)
+        .setStorageType(StorageType.DISK)
+        .setVolumeStorageType(StorageType.DISK)
         .build();
   }
 }
