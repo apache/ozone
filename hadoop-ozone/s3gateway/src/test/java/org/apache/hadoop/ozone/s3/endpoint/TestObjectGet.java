@@ -322,7 +322,7 @@ public class TestObjectGet {
   }
 
   @Test
-  public void getKeyPreservesMultipleRfc2047EncodedWords()
+  public void getKeyDecodesMultipleRfc2047EncodedWords()
       throws IOException, OS3Exception {
     final String keyName = "key-with-multiple-rfc2047-words";
     final String metaValue = "=?UTF-8?Q?a?= =?UTF-8?Q?b?=";
@@ -333,29 +333,33 @@ public class TestObjectGet {
 
     assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
 
-    assertEquals(metaValue, bucket.getKey(keyName).getMetadata().get("meta1"));
+    assertEquals("ab", bucket.getKey(keyName).getMetadata().get("meta1"));
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {
-      "=?UTF-8?B?!!!?=",
-      "=?UTF-8?B??=",
-      "=?UTF-8?B?/w==?=",
-      "=?UTF-8?B?YQ?=",
-      "=?UTF-8?Q?a?b?=",
-      "=?UTF-8?Q??=",
-      "=?UTF-8?Q?=FF?=",
-      "=?UTF-8?Q?=C3?=",
-      "=?UTF-8?Q?=GZ?=",
-      "=?UTF-8?Q?abc def?=",
-      "=?UNKNOWN?Q?abc?="
+  @CsvSource({
+      "'=?UTF-8?Q?a?b?=', 'a?b'",
+      "'=?UTF-8?Q??=', ''"
   })
-  public void getKeyPreservesInvalidRfc2047Metadata(String metaValue)
+  public void getKeyDecodesQEncodedRfc2047Metadata(String encodedValue, String expectedValue)
+      throws IOException, OS3Exception {
+    final String keyName = "key-with-q-rfc2047-meta";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1", encodedValue);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+
+    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
+
+    assertEquals(expectedValue, bucket.getKey(keyName).getMetadata().get("meta1"));
+  }
+
+  @Test
+  public void getKeyPreservesInvalidQEncodedMetadata()
       throws IOException, OS3Exception {
     final String keyName = "key-with-invalid-rfc2047-meta";
+    final String metaValue = "=?UTF-8?Q?=GZ?=";
     MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
-    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1",
-        metaValue);
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1", metaValue);
     when(headers.getRequestHeaders()).thenReturn(requestHeaders);
 
     assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));

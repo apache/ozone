@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
@@ -59,18 +58,15 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nullable;
+import jakarta.mail.internet.MimeUtility;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CodingErrorAction;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -89,10 +85,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import net.jcip.annotations.Immutable;
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.EncoderException;
-import org.apache.commons.codec.net.QCodec;
-import org.apache.commons.codec.net.QuotedPrintableCodec;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -147,8 +139,6 @@ import org.slf4j.LoggerFactory;
  * Basic helpers for all the REST endpoints.
  */
 public abstract class EndpointBase {
-
-  private static final QCodec RFC_2047_Q_CODEC = createRfc2047QCodec();
 
   protected static final String ETAG_CUSTOM =
       RESERVED_USER_METADATA_KEY_PREFIX + "etag";
@@ -503,48 +493,9 @@ public abstract class EndpointBase {
   }
 
   private static String decodeRfc2047MetadataValue(String value) {
-    if (!value.startsWith("=?")) {
-      return value;
-    }
-
-    int charsetEnd = value.indexOf('?', 2);
-    int encodingEnd = charsetEnd < 0 ? -1 : value.indexOf('?', charsetEnd + 1);
-    int encodedTextEnd = encodingEnd < 0
-        ? -1 : value.indexOf("?=", encodingEnd + 1);
-    if (encodedTextEnd != value.length() - 2
-        || encodedTextEnd <= encodingEnd + 1
-        || value.indexOf('?', encodingEnd + 1) != encodedTextEnd) {
-      return value;
-    }
-
-    String encodedText = value.substring(encodingEnd + 1, encodedTextEnd);
-    if (encodedText.chars().anyMatch(character -> character < '!'
-        || character > '~')) {
-      return value;
-    }
-
-    String encoding = value.substring(charsetEnd + 1, encodingEnd);
     try {
-      byte[] decodedBytes;
-      if (encoding.equalsIgnoreCase("Q")) {
-        decodedBytes = QuotedPrintableCodec.decodeQuotedPrintable(
-            encodedText.replace('_', ' ').getBytes(US_ASCII));
-      } else if (encoding.equalsIgnoreCase("B")) {
-        if (encodedText.length() % 4 != 0) {
-          return value;
-        }
-        decodedBytes = Base64.getDecoder().decode(encodedText);
-      } else {
-        return value;
-      }
-
-      Charset charset = Charset.forName(value.substring(2, charsetEnd));
-      return charset.newDecoder()
-          .onMalformedInput(CodingErrorAction.REPORT)
-          .onUnmappableCharacter(CodingErrorAction.REPORT)
-          .decode(ByteBuffer.wrap(decodedBytes)).toString();
-    } catch (DecoderException | CharacterCodingException
-        | IllegalArgumentException ex) {
+      return MimeUtility.decodeText(value);
+    } catch (UnsupportedEncodingException ex) {
       return value;
     }
   }
@@ -553,22 +504,15 @@ public abstract class EndpointBase {
     if (value.chars().allMatch(EndpointBase::isSafeAsciiMetadataCharacter)) {
       return value;
     }
-
     try {
-      return RFC_2047_Q_CODEC.encode(value);
-    } catch (EncoderException ex) {
+      return MimeUtility.encodeText(value, "UTF-8", "Q");
+    } catch (UnsupportedEncodingException ex) {
       throw new IllegalStateException("Failed to encode S3 metadata", ex);
     }
   }
 
   private static boolean isSafeAsciiMetadataCharacter(int value) {
     return value == '\t' || value >= ' ' && value <= '~';
-  }
-
-  private static QCodec createRfc2047QCodec() {
-    QCodec codec = new QCodec(UTF_8);
-    codec.setEncodeBlanks(true);
-    return codec;
   }
 
   /**
