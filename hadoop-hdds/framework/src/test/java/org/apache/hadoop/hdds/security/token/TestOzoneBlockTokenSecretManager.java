@@ -179,6 +179,36 @@ public class TestOzoneBlockTokenSecretManager {
   }
 
   @Test
+  public void tokenCannotBeUsedForOtherContainer() throws Exception {
+    // GIVEN
+    BlockID blockID = new BlockID(101, 0);
+    long otherContainerID = 102;
+
+    // WHEN
+    Token<OzoneBlockTokenIdentifier> token =
+        secretManager.generateToken("testUser", blockID,
+            EnumSet.allOf(AccessModeProto.class), 100);
+    String encodedToken = token.encodeToUrlString();
+    ContainerCommandRequestProto writeChunkRequest =
+        newWriteChunkRequestBuilder(pipeline, blockID, 100)
+            .setContainerID(otherContainerID)
+            .setEncodedToken(encodedToken).build();
+    ContainerCommandRequestProto getBlockCommand =
+        getBlockRequest(pipeline, newPutBlockRequestBuilder(pipeline, writeChunkRequest.getWriteChunk()).getPutBlock())
+            .toBuilder()
+            .setContainerID(otherContainerID)
+            .setEncodedToken(encodedToken).build();
+
+    // THEN
+    BlockTokenException e = assertThrows(BlockTokenException.class,
+        () -> tokenVerifier.verify(token, writeChunkRequest));
+    assertThat(e.getMessage()).contains("can't be used to access container " + otherContainerID);
+    e = assertThrows(BlockTokenException.class,
+        () -> tokenVerifier.verify(token, getBlockCommand));
+    assertThat(e.getMessage()).contains("can't be used to access container " + otherContainerID);
+  }
+
+  @Test
   public void testBlockTokenReadAccessMode() throws Exception {
     final String testUser1 = "testUser1";
     BlockID blockID = new BlockID(101, 0);

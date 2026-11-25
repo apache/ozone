@@ -21,28 +21,45 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.abortMultipa
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import javax.ws.rs.core.HttpHeaders;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.http.HttpStatus;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * This class tests abort multipart upload request.
  */
 public class TestAbortMultipartUpload {
+
+  @BeforeEach
+  public void setup() {
+    S3GatewayMetrics.create(new OzoneConfiguration());
+  }
 
   @Test
   public void testAbortMultipartUpload() throws Exception {
@@ -75,4 +92,45 @@ public class TestAbortMultipartUpload {
     // test with unknown upload Id.
     assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD, () -> abortMultipartUpload(rest, bucket, key, "random"));
   }
+
+  @ParameterizedTest
+  @CsvSource({", 0", "'', 0", "owner, 1"})
+  public void testAbortOnlyLooksUpBucketForOwner(String expectedOwner, int bucketLookups) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
+    ObjectEndpoint endpoint = newEndpoint(proxy, headers);
+    String volumeName = bucketLookups == 0 ? null : "volume1";
+
+    assertStatus(HttpStatus.SC_NO_CONTENT, () -> abortMultipartUpload(endpoint, "bucket1", "key1", "upload1"));
+
+    verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
+    verify(proxy, times(bucketLookups)).getBucketDetails(null, "bucket1");
+    verify(proxy).abortMultipartUpload(volumeName, "bucket1", "key1", "upload1");
+  }
+
+  @Test
+  public void testAbortMapsPermissionDenied() throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    ObjectEndpoint endpoint = newEndpoint(proxy, mock(HttpHeaders.class));
+    doThrow(new OMException("Abort failed", ResultCodes.PERMISSION_DENIED)).when(proxy)
+        .abortMultipartUpload(null, "bucket1", "key1", "upload1");
+
+    assertErrorResponse(S3ErrorTable.ACCESS_DENIED, () -> abortMultipartUpload(endpoint, "bucket1", "key1", "upload1"));
+
+    verify(proxy).abortMultipartUpload(null, "bucket1", "key1", "upload1");
+  }
+
+  private ObjectEndpoint newEndpoint(ClientProtocol proxy, HttpHeaders headers) throws Exception {
+    OzoneBucket bucket = OzoneBucket.newBuilder(new OzoneConfiguration(), proxy)
+        .setVolumeName("volume1").setName("bucket1").setOwner("owner").build();
+    when(proxy.getBucketDetails(null, "bucket1")).thenReturn(bucket);
+    ObjectStore store = mock(ObjectStore.class);
+    when(store.getClientProxy()).thenReturn(proxy);
+    OzoneClient client = mock(OzoneClient.class);
+    when(client.getObjectStore()).thenReturn(store);
+    when(client.getProxy()).thenReturn(proxy);
+    return EndpointBuilder.newObjectEndpointBuilder().setClient(client).setHeaders(headers).build();
+  }
+
 }

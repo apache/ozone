@@ -26,17 +26,21 @@ OZONE_ROOT=$(pwd -P)
 : ${OZONE_ACCEPTANCE_TEST_TYPE:="robot"}
 : ${OZONE_WITH_COVERAGE:="false"}
 
+source "${DIR}/_lib.sh"
+
 if [[ "${OZONE_TEST_SELECTOR}" == "xcompat/test-old.sh" ]]; then
   : ${OZONE_OLD_VERSIONS:="${2:-}"}
   export OZONE_OLD_VERSIONS
-fi
 
-source "${DIR}/_lib.sh"
+  # use JDK8 image for Rebot in compat-old, to avoid pulling JDK25 image just for generating reports
+  # TODO after HDDS-17509 this can be moved to env: of compat-old job
+  export OZONE_RUNNER_VERSION=$(get_version "docker.ozone-runner.client" -f hadoop-ozone/dist)
+fi
 
 REPORT_DIR=${OUTPUT_DIR:-"${OZONE_ROOT}/target/acceptance"}
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
+OZONE_VERSION=$(get_version ozone)
 DIST_DIR="${OZONE_ROOT}/hadoop-ozone/dist/target/ozone-$OZONE_VERSION"
 
 # workaround attempt for https://github.com/docker/compose/issues/12747

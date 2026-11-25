@@ -34,8 +34,6 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.recon.upgrade.ReconVersion;
 import org.apache.hadoop.ozone.recon.upgrade.ReconVersionManager;
 import org.apache.ozone.recon.schema.SchemaVersionTableDefinition;
@@ -62,16 +60,16 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSet = metaData.getColumns(null, null,
         SCHEMA_VERSION_TABLE_NAME, null);
 
-    List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
+    // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
+    List<ColumnNameAndType> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("version_number", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("applied_on", Types.TIMESTAMP));
+    expectedPairs.add(new ColumnNameAndType("version_number", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("applied_on", Types.VARCHAR));
 
-    List<Pair<String, Integer>> actualPairs = new ArrayList<>();
+    List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ImmutablePair<>(resultSet.getString("COLUMN_NAME"),
-          resultSet.getInt("DATA_TYPE")));
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"), resultSet.getInt("DATA_TYPE")));
     }
 
     assertEquals(2, actualPairs.size(), "Unexpected number of columns");
@@ -152,7 +150,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize the schema
     SchemaVersionTableDefinition schemaVersionTable = new SchemaVersionTableDefinition(getDataSource());
-    schemaVersionTable.setSoftwareVersion(3);
+    schemaVersionTable.setFreshInstallVersion(3);
     schemaVersionTable.initializeSchema();
 
     // Verify that the SchemaVersionTable is created
@@ -235,7 +233,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize the schema
     SchemaVersionTableDefinition schemaVersionTable = new SchemaVersionTableDefinition(getDataSource());
-    schemaVersionTable.setSoftwareVersion(3);
+    schemaVersionTable.setFreshInstallVersion(3);
     schemaVersionTable.initializeSchema();
 
     try (ReconVersionManager versionManager = new ReconVersionManager(getDataSource())) {
