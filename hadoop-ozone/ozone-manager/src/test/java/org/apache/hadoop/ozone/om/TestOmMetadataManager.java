@@ -585,12 +585,13 @@ public class TestOmMetadataManager {
     addKeysToOM(volumeName, bucketName, ".cache/0", 0);
     addKeysToOM(volumeName, bucketName, ".cache/1", 1);
     addKeysToOM(volumeName, bucketName, ".cache/2", 2);
+    addKeysToOM(volumeName, bucketName, "/keep", 3);
 
-    List<String> expected = Arrays.asList(".cache/0", ".cache/1", ".cache/2");
+    List<String> expected = Arrays.asList(".cache/0", ".cache/1", ".cache/2", "/keep");
 
     assertEquals(expected.subList(0, 2), listKeyNames(volumeName, bucketName, null, "/", 2));
-    assertEquals(expected.subList(2, 3), listKeyNames(volumeName, bucketName, ".cache/1", "/", 2));
-    assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, ".cache/2", "/", 2));
+    assertEquals(expected.subList(2, 4), listKeyNames(volumeName, bucketName, ".cache/1", "/", 2));
+    assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, "/keep", "/", 2));
   }
 
   /**

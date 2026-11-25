@@ -2176,6 +2176,24 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
     assertThat(v2.contents()).isEmpty();
   }
 
+  /**
+   * FSO removes the leading "/" from key names, so only an OBS bucket can have a key matching Prefix "/".
+   */
+  @Test
+  @Timeout(120)
+  public void testListObjectsSlashPrefixMatchesKey() throws Exception {
+    final String bucketName = getBucketName("slash-prefix-key");
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE).build());
+    }
+    s3Client.putObject(b -> b.bucket(bucketName).key(".cache/0"), RequestBody.fromString("x"));
+    s3Client.putObject(b -> b.bucket(bucketName).key("/keep"), RequestBody.fromString("x"));
+
+    ListObjectsV2Response v2 = s3Client.listObjectsV2(b -> b.bucket(bucketName).prefix("/"));
+    assertThat(v2.contents()).extracting(S3Object::key).containsExactly("/keep");
+  }
+
   private void testListObjectsMany(boolean isListV2) throws Exception {
     final String bucketName = getBucketName();
     s3Client.createBucket(b -> b.bucket(bucketName));
