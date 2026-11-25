@@ -977,10 +977,10 @@ public class TestRDBTableStore {
         }
       }
 
-      if (prefix.equals(prefixes[0])) {
+      if (Arrays.equals(prefix, prefixes[0])) {
         assertEquals(5, collected.size());
         assertEquals(Arrays.asList("p1/k1", "p1/k2", "p1/k3", "p1/k4", "p1/k5"), collected);
-      } else if (prefix.equals(prefixes[1])) {
+      } else if (Arrays.equals(prefix, prefixes[1])) {
         assertEquals(0, collected.size());
       } else {
         assertEquals(5, collected.size());
