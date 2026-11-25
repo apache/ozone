@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -60,7 +61,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
   public static final Logger LOG = LoggerFactory.getLogger(BlockInputStream.class);
 
   private final BlockID blockID;
-  private long length;
   private final BlockLocationInfo blockInfo;
   private final AtomicReference<Pipeline> pipelineRef =
       new AtomicReference<>();
@@ -72,23 +72,12 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private XceiverClientShortCircuit xceiverClientShortCircuit;
   private final AtomicBoolean fallbackToGrpc = new AtomicBoolean(false);
   private volatile FileInputStream blockFileInputStream;
-  private volatile boolean initialized = false;
+  // Set by initialize(). Positioned reads read it without the lock.
+  private volatile BlockChunks blockChunks;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy;
 
   private int retries;
-
-  // List of ChunkInputStreams, one for each chunk in the block
-  private List<ChunkInputStream> chunkStreams;
-
-  // chunkOffsets[i] stores the index of the first data byte in
-  // chunkStream i w.r.t the block data.
-  // Let’s say we have chunk size as 40 bytes. And let's say the parent
-  // block stores data from index 200 and has length 400.
-  // The first 40 bytes of this block will be stored in chunk[0], next 40 in
-  // chunk[1] and so on. But since the chunkOffsets are w.r.t the block only
-  // and not the key, the values in chunkOffsets will be [0, 40, 80,....].
-  private long[] chunkOffsets = null;
 
   // Index of the chunkStream corresponding to the current position of the
   // BlockInputStream i.e offset of the data to be read next from this block
@@ -109,8 +98,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
 
-  private BlockData blockData;
-
   public BlockInputStream(
       BlockLocationInfo blockInfo,
       Pipeline pipeline,
@@ -120,7 +107,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
       OzoneClientConfig config) throws IOException {
     this.blockInfo = blockInfo;
     this.blockID = blockInfo.getBlockID();
-    this.length = blockInfo.getLength();
     pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.verifyChecksum = config.isChecksumVerify();
@@ -136,18 +122,18 @@ public class BlockInputStream extends BlockExtendedInputStream {
   public synchronized void initialize() throws IOException {
 
     // Pre-check that the stream has not been intialized already
-    if (initialized) {
+    if (isInitialized()) {
       return;
     }
     // A closed stream has no client to get the block with.
     checkOpen();
 
-    List<ChunkInfo> chunks = null;
+    BlockData blockData = null;
+    long length = blockInfo.getLength();
     IOException catchEx = null;
     do {
       try {
         blockData = getBlockData();
-        chunks = blockData.getChunksList();
         if (blockInfo.isUnderConstruction()) {
           // use the block length from DN if block is under construction.
           length = blockData.getSize();
@@ -172,27 +158,28 @@ public class BlockInputStream extends BlockExtendedInputStream {
       }
     } while (shouldRetryRead(catchEx, retryPolicy, ++retries));
 
-    if (chunks == null) {
+    if (blockData == null) {
       throw catchEx;
     } else {
       // Reset retry count if we get chunks successfully.
       retries = 0;
     }
 
+    // For each chunk in the block, create a ChunkInputStream and compute
+    // its chunkOffset
+    final List<ChunkInfo> chunks = blockData.getChunksList();
+    final long[] chunkOffsets = new long[chunks.size()];
+    long tempOffset = 0;
+
+    final List<ChunkInputStream> chunkStreams = new ArrayList<>(chunks.size());
+    for (int i = 0; i < chunks.size(); i++) {
+      chunkStreams.add(createChunkInputStream(chunks.get(i)));
+      chunkOffsets[i] = tempOffset;
+      tempOffset += chunks.get(i).getLen();
+    }
+    blockChunks = new BlockChunks(blockData, length, chunkOffsets, chunkStreams);
+
     if (!chunks.isEmpty()) {
-      // For each chunk in the block, create a ChunkInputStream and compute
-      // its chunkOffset
-      this.chunkOffsets = new long[chunks.size()];
-      long tempOffset = 0;
-
-      this.chunkStreams = new ArrayList<>(chunks.size());
-      for (int i = 0; i < chunks.size(); i++) {
-        addStream(chunks.get(i));
-        chunkOffsets[i] = tempOffset;
-        tempOffset += chunks.get(i).getLen();
-      }
-
-      initialized = true;
       this.chunkIndex = 0;
 
       if (blockPosition > 0) {
@@ -201,6 +188,12 @@ public class BlockInputStream extends BlockExtendedInputStream {
         seek(blockPosition);
       }
     }
+  }
+
+  /** A block with no chunks is not initialized, so the next read gets its block data again. */
+  private boolean isInitialized() {
+    final BlockChunks chunks = blockChunks;
+    return chunks != null && !chunks.streams.isEmpty();
   }
 
   private synchronized void refreshBlockInfo(IOException cause) throws IOException {
@@ -320,14 +313,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   /**
-   * Append another ChunkInputStream to the end of the list. Note that the
-   * ChunkInputStream is only created here. The chunk will be read from the
-   * Datanode only when a read operation is performed on for that chunk.
+   * Create a ChunkInputStream for the chunk. The chunk will be read from the
+   * Datanode only when a read operation is performed on that chunk.
    */
-  protected synchronized void addStream(ChunkInfo chunkInfo) {
-    chunkStreams.add(createChunkInputStream(chunkInfo));
-  }
-
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
     if (blockFileInputStream != null) {
       // a non-empty blockFileInputStream means we have a direct local block replica to read from
@@ -343,11 +331,12 @@ public class BlockInputStream extends BlockExtendedInputStream {
   protected synchronized int readWithStrategy(ByteReaderStrategy strategy)
       throws IOException {
     Preconditions.checkArgument(strategy != null);
-    if (!initialized) {
+    if (!isInitialized()) {
       initialize();
     }
 
     checkOpen();
+    final List<ChunkInputStream> chunkStreams = blockChunks.streams;
     int totalReadLen = 0;
     int len = strategy.getTargetLength();
     while (len > 0) {
@@ -417,6 +406,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * without mutating this stream's cursor ({@code chunkIndex},
    * {@code blockPosition}) or the sequential chunk streams' buffered state.
    * Reuses each chunk's range reader, whose buffers and client references belong to the request.
+   * Takes this stream's lock only to initialize it or to refresh the block info after a read error,
+   * so it does not wait for a sequential read in progress.
+   * It does not check that this stream is open: {@link MultipartInputStream} checks that before it calls this method.
    *
    * @return bytes copied into {@code dst}, or {@link #EOF} at EOF
    */
@@ -429,22 +421,17 @@ public class BlockInputStream extends BlockExtendedInputStream {
       return EOF;
     }
 
-    if (!initialized) {
+    if (!isInitialized()) {
       initialize();
     }
-    final long[] offsets;
-    final List<ChunkInputStream> streams;
-    final long blockLength;
-    synchronized (this) {
-      checkOpen();
-      if (chunkOffsets == null || blockData == null || blockRelativePosition >= length) {
-        return EOF;
-      }
-
-      offsets = chunkOffsets;
-      streams = chunkStreams;
-      blockLength = length;
+    final BlockChunks chunks = blockChunks;
+    if (chunks.streams.isEmpty() || blockRelativePosition >= chunks.length) {
+      return EOF;
     }
+
+    final long[] offsets = chunks.offsets;
+    final List<ChunkInputStream> streams = chunks.streams;
+    final long blockLength = chunks.length;
 
     int index = MultipartInputStream.binarySearchOffsetIndex(offsets, blockRelativePosition);
 
@@ -468,7 +455,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private int readChunkAt(ChunkInputStream chunk, long chunkOffset, int readLength, ByteBuffer dst) throws IOException {
     int preadRetries = 0;
     while (true) {
-      checkOpen();
       final ByteBuffer target = dst.duplicate();
       target.limit(target.position() + readLength);
       final int numBytesRead;
@@ -520,7 +506,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
    */
   @Override
   public synchronized void seek(long pos) throws IOException {
-    if (!initialized) {
+    if (!isInitialized()) {
       // Stream has not been initialized yet. Save the position so that it
       // can be seeked when the stream is initialized.
       blockPosition = pos;
@@ -528,7 +514,10 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
 
     checkOpen();
-    if (pos < 0 || pos > length) {
+    final BlockChunks chunks = blockChunks;
+    final long[] chunkOffsets = chunks.offsets;
+    final List<ChunkInputStream> chunkStreams = chunks.streams;
+    if (pos < 0 || pos > chunks.length) {
       if (pos == 0) {
         // It is possible for length and pos to be zero in which case
         // seek should return instead of throwing exception
@@ -571,15 +560,15 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   @Override
   public synchronized long getPos() {
-    if (length == 0) {
+    if (getLength() == 0) {
       return 0;
     }
 
-    if (!initialized) {
+    if (!isInitialized()) {
       // The stream is not initialized yet. Return the blockPosition
       return blockPosition;
     } else {
-      return chunkOffsets[chunkIndex] + chunkStreams.get(chunkIndex).getPos();
+      return blockChunks.offsets[chunkIndex] + blockChunks.streams.get(chunkIndex).getPos();
     }
   }
 
@@ -593,7 +582,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     releaseClient();
     xceiverClientFactory = null;
 
-    final List<ChunkInputStream> inputStreams = this.chunkStreams;
+    final List<ChunkInputStream> inputStreams = getChunkStreams();
     if (inputStreams != null) {
       for (ChunkInputStream is : inputStreams) {
         is.close();
@@ -637,7 +626,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   @Override
   public long getLength() {
-    return length;
+    final BlockChunks chunks = blockChunks;
+    return chunks != null ? chunks.length : blockInfo.getLength();
   }
 
   public synchronized int getChunkIndex() {
@@ -658,7 +648,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     storePosition();
     releaseClient();
 
-    final List<ChunkInputStream> inputStreams = this.chunkStreams;
+    final List<ChunkInputStream> inputStreams = getChunkStreams();
     if (inputStreams != null) {
       for (ChunkInputStream is : inputStreams) {
         is.unbuffer();
@@ -672,7 +662,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private synchronized void handleReadError(IOException cause) throws IOException {
     releaseClient();
-    final List<ChunkInputStream> inputStreams = this.chunkStreams;
+    final List<ChunkInputStream> inputStreams = getChunkStreams();
     if (inputStreams != null) {
       for (ChunkInputStream is : inputStreams) {
         is.releaseClient();
@@ -683,11 +673,34 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   public synchronized List<ChunkInputStream> getChunkStreams() {
-    return chunkStreams;
+    final BlockChunks chunks = blockChunks;
+    return chunks != null ? chunks.streams : null;
   }
 
   public BlockData getStreamBlockData() {
-    return blockData;
+    final BlockChunks chunks = blockChunks;
+    return chunks != null ? chunks.blockData : null;
   }
 
+  /** The block data from the datanode and a ChunkInputStream for each chunk. Nothing changes it after initialize(). */
+  private static final class BlockChunks {
+    private final BlockData blockData;
+    private final long length;
+    // offsets[i] stores the index of the first data byte in
+    // streams[i] w.r.t the block data.
+    // Let’s say we have chunk size as 40 bytes. And let's say the parent
+    // block stores data from index 200 and has length 400.
+    // The first 40 bytes of this block will be stored in chunk[0], next 40 in
+    // chunk[1] and so on. But since the offsets are w.r.t the block only
+    // and not the key, the values in offsets will be [0, 40, 80,....].
+    private final long[] offsets;
+    private final List<ChunkInputStream> streams;
+
+    BlockChunks(BlockData blockData, long length, long[] offsets, List<ChunkInputStream> streams) {
+      this.blockData = blockData;
+      this.length = length;
+      this.offsets = offsets;
+      this.streams = Collections.unmodifiableList(streams);
+    }
+  }
 }
