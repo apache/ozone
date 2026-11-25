@@ -81,7 +81,7 @@
     "npm-run-all2": "^9.0.4",
     "prettier": "^2.8.4",
     "typescript-eslint": "^8.63.0",
-    "vite": "6.4.4",
+    "vite": "6.4.5",
     "vite-tsconfig-paths": "^3.6.0",
     "vitest": "^4.1.11"
   },

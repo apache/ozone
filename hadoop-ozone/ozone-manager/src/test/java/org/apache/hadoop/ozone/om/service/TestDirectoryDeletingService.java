@@ -57,12 +57,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -91,6 +89,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.ExitUtils;
@@ -412,8 +411,8 @@ public class TestDirectoryDeletingService {
           RatisReplicationConfig.getInstance(ONE)).setObjectID(3).setParentObjectID(2).build();
       String childDeleteKey = metadataManager.getOzoneDeletePathKey(child.getObjectID(),
           metadataManager.getOzonePathKey(1, 2, child.getParentObjectID(), child.getFileName()));
-      List<Pair<String, OmKeyInfo>> subDirs = new ArrayList<>();
-      subDirs.add(Pair.of(childDeleteKey, child));
+      List<DirectoryDeletingService.PendingSubDir> subDirs = new ArrayList<>();
+      subDirs.add(new DirectoryDeletingService.PendingSubDir(childDeleteKey, child));
       PurgePathRequest parent = PurgePathRequest.newBuilder().setVolumeId(1).setBucketId(2)
           .setDeletedDir("parent").addMarkDeletedSubDirs(child.getProtobuf(ClientVersion.CURRENT)).build();
       List<PurgePathRequest> purgeList = new ArrayList<>();

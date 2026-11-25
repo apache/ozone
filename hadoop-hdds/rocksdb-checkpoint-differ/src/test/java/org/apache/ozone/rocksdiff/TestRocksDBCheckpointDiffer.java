@@ -43,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -54,6 +55,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.MutableGraph;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -76,6 +78,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -89,10 +92,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
 import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
@@ -1604,6 +1608,72 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   /**
+   * A prune task can still be running when close() returns, because the scheduler wait is bounded, and RDBStore
+   * frees the DB right after close(). Such a task must not use the DB any more.
+   */
+  @Test
+  public void testPruneTasksDoNotUseDbAfterClose() throws Exception {
+    long oldCompactionTime = System.currentTimeMillis() - MINUTES.toMillis(20);
+    byte[] prunedKey = rocksDBCheckpointDiffer.addToCompactionLogTable(new CompactionLogEntry(1, oldCompactionTime,
+        Collections.singletonList(new CompactionFileInfo("000011", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        Collections.singletonList(new CompactionFileInfo("000012", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        null));
+    rocksDBCheckpointDiffer.pruneOlderSnapshotsWithCompactionHistory();
+    assertThat(activeRocksDB.get().get(compactionLogTableCFHandle, prunedKey)).isNull();
+
+    byte[] key = rocksDBCheckpointDiffer.addToCompactionLogTable(new CompactionLogEntry(2, oldCompactionTime,
+        Collections.singletonList(new CompactionFileInfo("000013", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        Collections.singletonList(new CompactionFileInfo("000014", "/vol/bucket/a", "/vol/bucket/z", "keyTable")),
+        null));
+    rocksDBCheckpointDiffer.loadAllCompactionLogs();
+    SSTFilePruningMetrics pruningMetrics = rocksDBCheckpointDiffer.getPruningMetrics();
+    assertThat(pruningMetrics.getPruneQueueSize()).isEqualTo(1L);
+
+    rocksDBCheckpointDiffer.close();
+    rocksDBCheckpointDiffer.pruneSstFileValues();
+    rocksDBCheckpointDiffer.pruneOlderSnapshotsWithCompactionHistory();
+
+    assertThat(activeRocksDB.get().get(compactionLogTableCFHandle, key)).isNotNull();
+    assertThat(pruningMetrics.getPruneQueueSize()).isEqualTo(1L);
+  }
+
+  /**
+   * A prune task that waits for the differ lock while close() runs cannot be interrupted, so close() must not hold
+   * that lock while it waits for the tasks to end.
+   */
+  @Test
+  public void testCloseDoesNotWaitForTaskBlockedOnDifferLock(@TempDir Path dir) throws Exception {
+    ConfigurationSource config = mock(ConfigurationSource.class);
+    when(config.getTimeDuration(eq(OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL), anyLong(), any()))
+        .thenReturn(TimeUnit.HOURS.toMillis(1));
+    RocksDBCheckpointDiffer differ = new RocksDBCheckpointDiffer(dir.toString(), SST_BACK_UP_DIR_NAME,
+        COMPACTION_LOG_DIR_NAME, dir.resolve("db").toString(), config, readLock -> () -> { });
+    Scheduler scheduler = (Scheduler) FieldUtils.readField(differ, "scheduler", true);
+
+    CountDownLatch taskStarted = new CountDownLatch(1);
+    CountDownLatch closing = new CountDownLatch(1);
+    CountDownLatch taskDone = new CountDownLatch(1);
+    // Stands in for a prune task that reaches synchronized (this) between two entries while close() runs.
+    scheduler.schedule(() -> {
+      taskStarted.countDown();
+      Uninterruptibles.awaitUninterruptibly(closing);
+      synchronized (differ) {
+        taskDone.countDown();
+      }
+    }, 0, TimeUnit.MILLISECONDS);
+    assertThat(taskStarted.await(10, TimeUnit.SECONDS)).isTrue();
+
+    Thread closer = new Thread(differ::close);
+    closer.start();
+    GenericTestUtils.waitFor(scheduler::isClosed, 10, 10000);
+    closing.countDown();
+    closer.join(TimeUnit.SECONDS.toMillis(10));
+
+    assertThat(closer.isAlive()).as("close() still waiting").isFalse();
+    assertThat(taskDone.getCount()).isZero();
+  }
+
+  /**
    * Test cases for testGetSSTDiffListWithoutDB.
    */
   private static Stream<Arguments> casesGetSSTDiffListWithoutDB2() {
@@ -1669,10 +1739,10 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(0L, sstFilePruningMetrics.getCompactionsProcessed());
     assertEquals(0L, sstFilePruningMetrics.getFilesRemovedTotal());
 
-    List<Pair<String, Integer>> keys = new ArrayList<Pair<String, Integer>>();
-    keys.add(Pair.of("key1", Integer.valueOf(1)));
-    keys.add(Pair.of("key2", Integer.valueOf(0)));
-    keys.add(Pair.of("key3", Integer.valueOf(1)));
+    List<KeyType> keys = new ArrayList<KeyType>();
+    keys.add(new KeyType("key1", Integer.valueOf(1)));
+    keys.add(new KeyType("key2", Integer.valueOf(0)));
+    keys.add(new KeyType("key3", Integer.valueOf(1)));
 
     String inputFile78 = "000078";
     String inputFile73 = "000073";
@@ -1706,10 +1776,10 @@ public class TestRocksDBCheckpointDiffer {
         MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
             ManagedRawSSTFileReader.class, (mock, context) -> {
               ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
-              Iterator<Pair<CodecBuffer, Integer>> keyItr = keys.stream().map(i -> {
+              Iterator<RocksDBCheckpointDiffer.CodecBufferAndType> keyItr = keys.stream().map(i -> {
                 keyCodecBuffer.clear();
-                keyCodecBuffer.put(ByteBuffer.wrap(i.getKey().getBytes(UTF_8)));
-                return Pair.of(keyCodecBuffer, i.getValue());
+                keyCodecBuffer.put(ByteBuffer.wrap(i.key().getBytes(UTF_8)));
+                return new RocksDBCheckpointDiffer.CodecBufferAndType(keyCodecBuffer, i.type());
               }).iterator();
               doAnswer(i -> keyItr.hasNext()).when(mockedRawSSTFileItr).hasNext();
               doAnswer(i -> keyItr.next()).when(mockedRawSSTFileItr).next();
@@ -1760,16 +1830,16 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(1L, sstFilePruningMetrics.getFilesRemovedTotal());
   }
 
-  private void createSSTFileWithKeys(File file, List<Pair<String, Integer>> keys) throws RocksDatabaseException {
+  private void createSSTFileWithKeys(File file, List<KeyType> keys) throws RocksDatabaseException {
     byte[] value = "dummyValue".getBytes(UTF_8);
     try (RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(file)) {
-      Iterator<Pair<String, Integer>> itr = keys.iterator();
+      Iterator<KeyType> itr = keys.iterator();
       while (itr.hasNext()) {
-        Pair<String, Integer> entry = itr.next();
-        if (entry.getValue() == 0) {
-          sstFileWriter.delete(entry.getKey().getBytes(UTF_8));
+        KeyType entry = itr.next();
+        if (entry.type() == 0) {
+          sstFileWriter.delete(entry.key().getBytes(UTF_8));
         } else {
-          sstFileWriter.put(entry.getKey().getBytes(UTF_8), value);
+          sstFileWriter.put(entry.key().getBytes(UTF_8), value);
         }
       }
     }
@@ -2004,4 +2074,10 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(expectedResult, rocksDBCheckpointDiffer
         .shouldSkipCompaction(columnFamilyBytes, inputFiles, outputFiles));
   }
+
+  /**
+   * An SST key paired with its entry type (0 = delete, otherwise put),
+   * used to build SST files containing both puts and deletes.
+   */
+  private record KeyType(String key, int type) { }
 }

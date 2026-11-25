@@ -24,7 +24,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 
 /**
- * Class to hold RocksDB metrics.
+ * RocksDB metrics shared by all RDBStores for the lifetime of the JVM.
  */
 public class RDBMetrics {
 
@@ -121,12 +121,6 @@ public class RDBMetrics {
 
   public long getWalUpdateSequenceCount() {
     return walUpdateSequenceCount.value();
-  }
-
-  public static synchronized void unRegister() {
-    instance = null;
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
   }
 
 }

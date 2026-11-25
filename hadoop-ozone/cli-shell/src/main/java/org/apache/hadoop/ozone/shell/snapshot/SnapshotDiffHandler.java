@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.server.JsonUtils.toJsonStringWithDefaultPre
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.io.PrintWriter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -96,6 +95,11 @@ public class SnapshotDiffHandler extends Handler {
       hidden = true)
   private boolean diffDisableNativeLibs;
 
+  @CommandLine.Option(names = {"--ordered"},
+      description = "emit FSO snapshot diff report entries in dependency order",
+      defaultValue = "false")
+  private boolean orderedReport;
+
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",
       description = "Format output as JSON")
@@ -129,25 +133,25 @@ public class SnapshotDiffHandler extends Handler {
     SubmitSnapshotDiffResponse response;
     try {
       response = store.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-          forceFullDiff, diffDisableNativeLibs);
+          forceFullDiff, diffDisableNativeLibs, orderedReport);
     } catch (OMException ex) {
       // submit snapshot diff falls back to legacy snapshotDiff is server does not support it.
       if (ex.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
         SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
             token, pageSize, forceFullDiff, diffDisableNativeLibs);
-        try (PrintWriter writer = out()) {
-          if (json) {
-            writer.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
-          } else {
-            writer.println(diffResponse);
-          }
-        }
+        printResponse(diffResponse);
         return;
       }
       throw ex;
     }
-    try (PrintWriter writer = out()) {
-      writer.println(response);
+    out().println(response);
+  }
+
+  private void printResponse(SnapshotDiffResponse diffResponse) throws IOException {
+    if (json) {
+      out().println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
+    } else {
+      out().println(diffResponse);
     }
   }
 
@@ -155,20 +159,12 @@ public class SnapshotDiffHandler extends Handler {
                                String bucketName) throws IOException {
     SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
         token, pageSize);
-    try (PrintWriter writer = out()) {
-      if (json) {
-        writer.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
-      } else {
-        writer.println(diffResponse);
-      }
-    }
+    printResponse(diffResponse);
   }
 
   private void cancelSnapshotDiff(ObjectStore store, String volumeName,
                                   String bucketName) throws IOException {
-    try (PrintWriter writer = out()) {
-      writer.println(store.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot));
-    }
+    out().println(store.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot));
   }
 
   private ObjectNode getJsonObject(SnapshotDiffResponse diffResponse) {

@@ -207,7 +207,8 @@ final class Receiver implements Runnable {
               "This command is not supported through DomainSocket channel.")
               .build();
         }
-        if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock) {
+        if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock
+            && responseProto.getGetBlock().getShortCircuitAccessGranted()) {
           // get FileDescriptor
           RandomAccessFile file = context.getShortCircuitBlockFile();
           Objects.requireNonNull(file,
@@ -256,13 +257,17 @@ final class Receiver implements Runnable {
       }
     } catch (Throwable e) {
       LOG.error("Failed to send response {} {}", responseProto.getCmdType(), peer.getDomainSocket(), e);
+      // A partial response frame may already be on the wire; close the peer so the next response is not appended to it.
+      IOUtils.closeStream(peer);
     } finally {
       lock.unlock();
       entry.setSendFinishTimeNs();
-      try {
-        entry.getFile().close();
-      } catch (IOException e) {
-        LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+      if (entry.getFile() != null) {
+        try {
+          entry.getFile().close();
+        } catch (IOException e) {
+          LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+        }
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Request {} {}:{}, receive {} ns, in queue {} ns, " +

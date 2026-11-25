@@ -19,10 +19,6 @@ package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.util.ProtobufUtils.computeLongSizeWithTag;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -43,7 +39,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -94,8 +89,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final ScmBlockLocationProtocol scmClient;
 
   private int keyLimitPerTask;
-  private final long scmFollowerLagThrottleThreshold;
-  private final int throttledLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
@@ -118,15 +111,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
     Preconditions.checkArgument(keyLimitPerTask >= 0,
         OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
-    this.scmFollowerLagThrottleThreshold = conf.getInt(
-        OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD,
-        OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD_DEFAULT);
-    int throttledLimit = conf.getInt(
-        OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK,
-        OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK_DEFAULT);
-    Preconditions.checkArgument(throttledLimit > 0,
-        OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK + " must be positive.");
-    this.throttledLimitPerTask = throttledLimit;
     this.deletedKeyCount = new AtomicLong(0);
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
@@ -150,11 +134,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return deletedKeyCount;
   }
 
-  Pair<Pair<Integer, Long>, Boolean> processKeyDeletes(Map<String, PurgedKey> keyBlocksList,
+  KeyPurgeResult processKeyDeletes(Map<String, PurgedKey> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
     long startTime = Time.monotonicNow();
-    Pair<Pair<Integer, Long>, Boolean> purgeResult = Pair.of(Pair.of(0, 0L), false);
+    KeyPurgeResult purgeResult = new KeyPurgeResult(0, 0L, false);
     
     // Filter out empty files (files with no blocks) before sending to SCM
     Map<String, PurgedKey> nonEmptyKeyBlocksList = keyBlocksList.entrySet().stream()
@@ -210,7 +194,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       int limit = getOzoneManager().getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
-          purgeResult.getKey().getKey(), blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
+          purgeResult.deletedCount(), blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
     getPerfMetrics().setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
     return purgeResult;
@@ -277,7 +261,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
   @SuppressWarnings("checkstyle:MethodLength")
-  private Pair<Pair<Integer, Long>, Boolean> submitPurgeKeysRequest(
+  private KeyPurgeResult submitPurgeKeysRequest(
       List<DeleteBlockGroupResult> results,
       Map<String, PurgedKey> purgedKeys,
       Map<String, RepeatedOmKeyInfo> keysToModify,
@@ -358,7 +342,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     if (purgedKeyList.isEmpty() && keysToUpdateList.isEmpty() &&
         (renameEntriesToBeDeleted == null || renameEntriesToBeDeleted.isEmpty())) {
-      return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
+      return new KeyPurgeResult(deletedCount, deletedReplSize, purgeSuccess);
     }
 
     int purgeKeyIndex = 0, updateIndex = 0, renameIndex = 0;
@@ -439,7 +423,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
     }
 
-    return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
+    return new KeyPurgeResult(deletedCount, deletedReplSize, purgeSuccess);
   }
 
   private boolean hasPendingItems(PurgeKeysRequest.Builder builder) {
@@ -540,29 +524,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   }
 
   /**
-   * Returns the per-task key deletion limit for this run, reduced to
-   * {@code throttledLimitPerTask} when SCM reports its Ratis follower
-   * replication lag at or above the configured threshold.
-   */
-  int getEffectiveKeyLimitPerTask() {
-    if (scmFollowerLagThrottleThreshold <= 0) {
-      return keyLimitPerTask;
-    }
-    long lag = scmClient.getLastKnownFollowerReplicationLag();
-    if (lag >= scmFollowerLagThrottleThreshold) {
-      int effective = Math.min(keyLimitPerTask, throttledLimitPerTask);
-      if (effective < keyLimitPerTask) {
-        getMetrics().incrNumKeyDeletionThrottledBySCMLag();
-        LOG.info("Throttling block deletion to SCM: follower replication lag {} >= threshold {}; "
-            + "reducing keys per task from {} to {}.", lag, scmFollowerLagThrottleThreshold,
-            keyLimitPerTask, effective);
-      }
-      return effective;
-    }
-    return keyLimitPerTask;
-  }
-
-  /**
    * A key deleting task scans OM DB and looking for a certain number of
    * pending-deletion keys, sends these keys along with their associated blocks
    * to SCM for deletion. Once SCM confirms keys are deleted (once SCM persisted
@@ -657,21 +618,21 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             // Validating if the previous snapshot is still the same before purging the blocks.
             SnapshotUtils.validatePreviousSnapshotId(currentSnapshotInfo, snapshotChainManager,
                 expectedPreviousSnapshotId);
-            Pair<Pair<Integer, Long>, Boolean> purgeResult = processKeyDeletes(purgedKeys,
+            KeyPurgeResult purgeResult = processKeyDeletes(purgedKeys,
                 pendingKeysDeletion.getKeysToModify(), renamedTableEntries, snapshotTableKey,
                 expectedPreviousSnapshotId);
-            remainNum -= purgeResult.getKey().getKey();
-            successStatus = purgeResult.getValue();
+            remainNum -= purgeResult.deletedCount();
+            successStatus = purgeResult.purgeSuccess();
             getMetrics().incrNumKeysProcessed(purgedKeys.size());
-            getMetrics().incrNumKeysSentForPurge(purgeResult.getKey().getKey());
+            getMetrics().incrNumKeysSentForPurge(purgeResult.deletedCount());
 
             DeletionStats statsToUpdate = currentSnapshotInfo == null ? aosDeletionStats : snapshotDeletionStats;
-            statsToUpdate.updateDeletionStats(purgeResult.getKey().getKey(), purgeResult.getKey().getValue(),
+            statsToUpdate.updateDeletionStats(purgeResult.deletedCount(), purgeResult.deletedReplSize(),
                 purgedKeys.size() + pendingKeysDeletion.getNotReclaimableKeyCount(),
                 pendingKeysDeletion.getNotReclaimableKeyCount()
             );
             if (successStatus) {
-              deletedKeyCount.addAndGet(purgeResult.getKey().getKey());
+              deletedKeyCount.addAndGet(purgeResult.deletedCount());
             }
           }
 
@@ -721,7 +682,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         } else {
           LOG.debug("Running KeyDeletingService for snapshot : {}, {}", snapshotId, run);
         }
-        int remainNum = getEffectiveKeyLimitPerTask();
+        int remainNum = keyLimitPerTask;
         OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
         SnapshotInfo snapInfo = null;
         try {
@@ -786,5 +747,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       iteratedKeyCount.set(0L);
       notReclaimableKeyCount.set(0L);
     }
+  }
+
+  /**
+   * The number and replicated size of the purged keys paired with the purge success flag,
+   * used as the result of a key purge request submission by the key deleting service.
+   */
+  record KeyPurgeResult(int deletedCount, long deletedReplSize, boolean purgeSuccess) {
   }
 }

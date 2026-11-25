@@ -499,6 +499,7 @@ message OMResponse {
   optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 159;
   optional QueryUpgradeStatusResponse        queryUpgradeStatusResponse    = 160;
   optional CompleteFinalizeUpgradeResponse   completeFinalizeUpgradeResponse = 161;
+  optional string userPrincipal = 162;
 }
 
 enum Status {
@@ -1002,6 +1003,7 @@ message SnapshotDiffJobProto {
   optional SnapshotDiffResponse.SubStatus subStatus = 12;
   optional double keysProcessedPct = 13;
   optional string largestEntryKey = 14;
+  optional bool ordered = 15;
 }
 
 message OzoneObj {
@@ -1178,10 +1180,15 @@ message KeyArgs {
     // If-None-Match entity ETag: an absent key or a different ETag is allowed.
     optional string excludedETag = 25;
 
+    // IV of a multipart upload part in an encrypted bucket. Set by OM when the
+    // part is created, the part is encrypted with it instead of the IV in the
+    // FileEncryptionInfo, which is still used to decrypt the EDEK.
+    optional bytes partIv = 26;
+
     // storagePolicy, when set, overrides the bucket's storage policy for this
     // key. When unset, OM falls back to the bucket policy, then to the cluster
     // default, so older clients keep their current behaviour.
-    optional hadoop.hdds.StoragePolicyProto storagePolicy = 26;
+    optional hadoop.hdds.StoragePolicyProto storagePolicy = 27;
 }
 
 message KeyLocation {
@@ -1200,8 +1207,11 @@ message KeyLocation {
     optional hadoop.hdds.Pipeline pipeline = 7;
 
     optional int32 partNumber = 9 [default = -1];
-    optional hdds.StorageTierProto storageTier = 10;
-    optional bool isFallBack = 11;
+    // IV of the multipart upload part this block belongs to. When set, it
+    // overrides the IV in the key's FileEncryptionInfo for this part.
+    optional bytes partIv = 10;
+    optional hdds.StorageTierProto storageTier = 11;
+    optional bool isFallBack = 12;
 }
 
 message KeyLocationList {
@@ -1277,10 +1287,12 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+    // See KeyArgs.partIv. Only set on the open key of a multipart upload part.
+    optional bytes partIv = 23;
 
     // Storage policy this key was created with. Absent for keys written before
     // storage policy support, which are read back using the bucket policy.
-    optional hadoop.hdds.StoragePolicyProto storagePolicy = 23;
+    optional hadoop.hdds.StoragePolicyProto storagePolicy = 24;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
@@ -1490,6 +1502,10 @@ message RenameKeyRequest{
     required KeyArgs keyArgs = 1;
     required string toKeyName = 2;
     optional uint64 updateID = 3;
+    // Set by file system clients that rely on atomic directory rename: OM
+    // rejects the request with NOT_SUPPORTED_OPERATION unless the resolved
+    // bucket layout is FILE_SYSTEM_OPTIMIZED.
+    optional bool requireFileSystemOptimized = 4;
 }
 
 message RenameKeyResponse{
@@ -1498,6 +1514,7 @@ message RenameKeyResponse{
 
 message DeleteKeyRequest {
     required KeyArgs keyArgs = 1;
+    optional uint64 updateID = 2; // the key's update ID when key is identified for deletion
 }
 
 message DeleteKeysRequest {
@@ -1876,6 +1893,8 @@ message GetBucketDeletedBytesResponse {
   optional uint64 purgeableKeys = 4;
   optional uint64 snapshotTrappedDirs = 5;
   optional uint64 purgeableDirs = 6;
+  optional uint64 purgeableKeyBytes = 7;
+  optional uint64 purgeableDirBytes = 8;
 }
 
 message ServicePort {
@@ -2252,6 +2271,7 @@ message SubmitSnapshotDiffRequest {
   optional string toSnapshot = 4;
   optional bool forceFullDiff = 7;
   optional bool disableNativeDiff = 8;
+  optional bool ordered = 9;
 }
 
 message CancelSnapshotDiffRequest {
@@ -2545,7 +2565,7 @@ message S3Authentication {
     optional string resolvedStsTempAccessKeyId = 8;
     optional string resolvedStsSecretKeyId = 9;
     // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
-    // in finer-grained STS permissions.
+    // in S3 action-based authorization (STS session policies and authorizers such as Ranger).
     optional string s3Action = 10;
     // Resolved so GetCallerIdentity can return the assumed-role identity from the session token.
     optional string resolvedStsAssumedRoleId = 11;
@@ -2692,10 +2712,12 @@ message RevokeSTSTokenResponse {
 
 /**
  This will contain a list of originalAccessKeyIds whose revocation entries should be removed from
- the s3RevokedStsTokenTable.
+ the s3RevokedStsTokenTable. An entry is deleted only if its current cutoff is older than
+ purgeBeforeMillis. Requests without purgeBeforeMillis delete all listed entries.
 */
 message DeleteRevokedSTSTokensRequest {
   repeated string originalAccessKeyId = 1;
+  optional uint64 purgeBeforeMillis = 2;
 }
 
 message DeleteRevokedSTSTokensResponse {
@@ -2882,6 +2904,33 @@ service OzoneManagerService {
     // A client-to-OM RPC to send client requests to OM Ratis server
     rpc submitRequest(OMRequest)
           returns(OMResponse);
+}
+
+/**
+ The error that OzoneManagerService sends in the gRPC trailers when submitRequest fails.
+*/
+message OMGrpcErrorProto {
+  message NotLeader {
+    optional string message = 1;
+    optional string suggestedLeaderNodeId = 2;
+  }
+  message LeaderNotReady {
+    optional string message = 1;
+  }
+  message ReadIndexFailed {
+    optional string message = 1;
+  }
+  message ReadFailed {
+    optional string message = 1;
+  }
+
+  // Not set for any other error.
+  oneof error {
+    NotLeader notLeader = 1;
+    LeaderNotReady leaderNotReady = 2;
+    ReadIndexFailed readIndexFailed = 3;
+    ReadFailed readFailed = 4;
+  }
 }
 
 message GetLifecycleServiceStatusRequest {
