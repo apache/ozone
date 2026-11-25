@@ -114,7 +114,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   private final ImmutableMap<String, String> tags;
 
   private final boolean objectLockEnabled;
-  private final Retention defaultRetention;
+  private final BucketRetention defaultRetention;
 
   private OmBucketInfo(Builder b) {
     super(b);
@@ -146,7 +146,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     return objectLockEnabled;
   }
 
-  public Retention getDefaultRetention() {
+  public BucketRetention getDefaultRetention() {
     return defaultRetention;
   }
 
@@ -466,7 +466,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private long snapshotUsedBytes;
     private long snapshotUsedNamespace;
     private boolean objectLockEnabled;
-    private Retention defaultRetention;
+    private BucketRetention defaultRetention;
 
     public Builder() {
       acls = AclListBuilder.empty();
@@ -484,7 +484,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       return this;
     }
 
-    public Builder setDefaultRetention(Retention defaultRetention) {
+    public Builder setDefaultRetention(BucketRetention defaultRetention) {
       this.defaultRetention = defaultRetention;
       return this;
     }
@@ -768,7 +768,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
     obib.setObjectLockEnabled(bucketInfo.getObjectLockEnabled());
     if (bucketInfo.hasDefaultRetention()) {
-      obib.setDefaultRetention(Retention.fromProto(bucketInfo.getDefaultRetention()));
+      obib.setDefaultRetention(BucketRetention.fromProto(bucketInfo.getDefaultRetention()));
     }
     return obib;
   }

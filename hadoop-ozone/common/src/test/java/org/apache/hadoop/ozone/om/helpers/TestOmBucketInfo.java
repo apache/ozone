@@ -44,7 +44,7 @@ public class TestOmBucketInfo {
 
   @Test
   public void objectLockProtobufConversionAndCopy() {
-    Retention retention = new Retention(OzoneManagerProtocolProtos.RetentionMode.COMPLIANCE,
+    BucketRetention retention = new BucketRetention(OzoneManagerProtocolProtos.RetentionMode.COMPLIANCE,
         new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.DAYS, 30), null);
     OmBucketInfo bucket = OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("bucket")
         .setObjectLockEnabled(true).setDefaultRetention(retention).build();
@@ -69,7 +69,7 @@ public class TestOmBucketInfo {
 
   @Test
   public void comparesObjectLockFields() {
-    Retention retention = new Retention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
+    BucketRetention retention = new BucketRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
         new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.DAYS, 30), null);
     OmBucketInfo bucket = OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("bucket")
         .setObjectLockEnabled(true).setDefaultRetention(retention).build();
@@ -77,7 +77,7 @@ public class TestOmBucketInfo {
     assertNotEquals(bucket, bucket.toBuilder().setObjectLockEnabled(false).build());
     assertNotEquals(bucket, bucket.toBuilder().setDefaultRetention(null).build());
     assertNotEquals(bucket, bucket.toBuilder().setDefaultRetention(
-        new Retention(retention.getRetentionMode(),
+        new BucketRetention(retention.getRetentionMode(),
             new RetentionDuration(retention.getDuration().getTimeUnit(), 31), null))
         .build());
     assertEquals("true", bucket.toAuditMap().get(OzoneConsts.OBJECT_LOCK_ENABLED));

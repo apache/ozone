@@ -19,18 +19,18 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.protobuf.TextFormat;
 import java.util.Objects;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRetention;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 
 /**
  * Immutable default retention configuration for a bucket.
  */
-public final class Retention {
+public final class BucketRetention {
   private final RetentionMode retentionMode;
   private final RetentionDuration duration;
   private final RetentionDuration defaultEventHold;
 
-  public Retention(RetentionMode retentionMode, RetentionDuration duration, RetentionDuration defaultEventHold) {
+  public BucketRetention(RetentionMode retentionMode, RetentionDuration duration, RetentionDuration defaultEventHold) {
     this.retentionMode = Objects.requireNonNull(retentionMode, "retention mode is null");
     this.duration = duration;
     this.defaultEventHold = defaultEventHold;
@@ -48,15 +48,16 @@ public final class Retention {
     return defaultEventHold;
   }
 
-  public static Retention fromProto(BucketRetention proto) {
+  public static BucketRetention fromProto(OzoneManagerProtocolProtos.BucketRetention proto) {
     Objects.requireNonNull(proto, "retention config is null");
-    return new Retention(proto.getRetentionMode(),
+    return new BucketRetention(proto.getRetentionMode(),
         proto.hasDuration() ? RetentionDuration.fromProto(proto.getDuration()) : null,
         proto.hasDefaultEventHold() ? RetentionDuration.fromProto(proto.getDefaultEventHold()) : null);
   }
 
-  public BucketRetention toProto() {
-    BucketRetention.Builder builder = BucketRetention.newBuilder().setRetentionMode(retentionMode);
+  public OzoneManagerProtocolProtos.BucketRetention toProto() {
+    OzoneManagerProtocolProtos.BucketRetention.Builder builder =
+        OzoneManagerProtocolProtos.BucketRetention.newBuilder().setRetentionMode(retentionMode);
     if (duration != null) {
       builder.setDuration(duration.toProto());
     }
@@ -71,17 +72,17 @@ public final class Retention {
     if (this == obj) {
       return true;
     }
-    if (!(obj instanceof Retention)) {
+    if (!(obj instanceof BucketRetention)) {
       return false;
     }
-    Retention that = (Retention) obj;
+    BucketRetention that = (BucketRetention) obj;
     return retentionMode == that.retentionMode && Objects.equals(duration, that.duration) &&
         Objects.equals(defaultEventHold, that.defaultEventHold);
   }
 
   @Override
   public String toString() {
-    return "Retention{" + TextFormat.shortDebugString(toProto()) + '}';
+    return "BucketRetention{" + TextFormat.shortDebugString(toProto()) + '}';
   }
 
   @Override
