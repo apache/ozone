@@ -358,7 +358,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertEquals(Status.OK, service.send(null, ALLOCATE_BLOCK).getStatus());
       collector.assertNotError("AllocateScmBlock");
-      collector.assertNoAttribute("AllocateScmBlock", OzoneTracingAttributes.STATUS);
+      collector.assertNoAttribute("AllocateScmBlock", OzoneTracingAttributes.ERROR_STATUS);
     }
   }
 
@@ -370,7 +370,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertEquals(Status.SAFE_MODE_EXCEPTION, service.send(null, ALLOCATE_BLOCK).getStatus());
       collector.assertError("AllocateScmBlock", "safe mode");
-      collector.assertAttribute("AllocateScmBlock", OzoneTracingAttributes.STATUS, "SAFE_MODE_EXCEPTION");
+      collector.assertAttribute("AllocateScmBlock", OzoneTracingAttributes.ERROR_STATUS, "SAFE_MODE_EXCEPTION");
       collector.assertExceptionRecorded("AllocateScmBlock", SCMException.class);
     }
   }
@@ -383,7 +383,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertThrows(ServiceException.class, () -> service.send(null, ALLOCATE_BLOCK));
       collector.assertExceptionRecorded("AllocateScmBlock", ServiceException.class);
-      collector.assertNoAttribute("AllocateScmBlock", OzoneTracingAttributes.STATUS);
+      collector.assertNoAttribute("AllocateScmBlock", OzoneTracingAttributes.ERROR_STATUS);
     }
   }
 }

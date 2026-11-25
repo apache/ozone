@@ -197,7 +197,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       TracingUtil.recordExceptionInCurrentSpan(e);
       response.setSuccess(false);
       response.setStatus(exceptionToResponseStatus(e));
-      TracingUtil.addAttributesToCurrentSpan(OzoneTracingAttributes.STATUS, response.getStatus().name());
+      TracingUtil.addAttributesToCurrentSpan(OzoneTracingAttributes.ERROR_STATUS, response.getStatus().name());
       if (e.getMessage() != null) {
         response.setMessage(e.getMessage());
       }

@@ -64,7 +64,7 @@ class TestSecretKeyProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertEquals(Status.OK, service.submitRequest(null, request).getStatus());
       collector.assertNotError("GetAllSecretKeys");
-      collector.assertNoAttribute("GetAllSecretKeys", OzoneTracingAttributes.STATUS);
+      collector.assertNoAttribute("GetAllSecretKeys", OzoneTracingAttributes.ERROR_STATUS);
     }
   }
 
@@ -77,7 +77,8 @@ class TestSecretKeyProtocolServerSideTranslatorPB {
       SCMSecretKeyResponse response = service.submitRequest(null, REQUEST);
       assertEquals(Status.SECRET_KEY_NOT_INITIALIZED, response.getStatus());
       collector.assertError("GetCurrentSecretKey", "not initialized");
-      collector.assertAttribute("GetCurrentSecretKey", OzoneTracingAttributes.STATUS, "SECRET_KEY_NOT_INITIALIZED");
+      collector.assertAttribute("GetCurrentSecretKey", OzoneTracingAttributes.ERROR_STATUS,
+          "SECRET_KEY_NOT_INITIALIZED");
       collector.assertExceptionRecorded("GetCurrentSecretKey", SCMSecretKeyException.class);
     }
   }
@@ -89,7 +90,7 @@ class TestSecretKeyProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertThrows(ServiceException.class, () -> service.submitRequest(null, REQUEST));
       collector.assertExceptionRecorded("GetCurrentSecretKey", ServiceException.class);
-      collector.assertNoAttribute("GetCurrentSecretKey", OzoneTracingAttributes.STATUS);
+      collector.assertNoAttribute("GetCurrentSecretKey", OzoneTracingAttributes.ERROR_STATUS);
     }
   }
 }

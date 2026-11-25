@@ -61,7 +61,7 @@ class TestSCMSecurityProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertEquals(Status.OK, service.submitRequest(null, REQUEST).getStatus());
       collector.assertNotError("ListCACertificate");
-      collector.assertNoAttribute("ListCACertificate", OzoneTracingAttributes.STATUS);
+      collector.assertNoAttribute("ListCACertificate", OzoneTracingAttributes.ERROR_STATUS);
     }
   }
 
@@ -74,7 +74,7 @@ class TestSCMSecurityProtocolServerSideTranslatorPB {
       SCMSecurityResponse response = service.submitRequest(null, REQUEST);
       assertEquals(Status.GET_CA_CERT_FAILED, response.getStatus());
       collector.assertError("ListCACertificate", "no CA");
-      collector.assertAttribute("ListCACertificate", OzoneTracingAttributes.STATUS, "GET_CA_CERT_FAILED");
+      collector.assertAttribute("ListCACertificate", OzoneTracingAttributes.ERROR_STATUS, "GET_CA_CERT_FAILED");
       collector.assertExceptionRecorded("ListCACertificate", SCMSecurityException.class);
     }
   }
@@ -88,7 +88,7 @@ class TestSCMSecurityProtocolServerSideTranslatorPB {
     try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
       assertThrows(ServiceException.class, () -> service.submitRequest(null, REQUEST));
       collector.assertExceptionRecorded("ListCACertificate", ServiceException.class);
-      collector.assertNoAttribute("ListCACertificate", OzoneTracingAttributes.STATUS);
+      collector.assertNoAttribute("ListCACertificate", OzoneTracingAttributes.ERROR_STATUS);
     }
   }
 }

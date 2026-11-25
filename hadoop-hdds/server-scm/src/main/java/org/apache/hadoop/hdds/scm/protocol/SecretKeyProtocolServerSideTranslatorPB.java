@@ -122,7 +122,8 @@ public class SecretKeyProtocolServerSideTranslatorPB
       TracingUtil.recordExceptionInCurrentSpan(e);
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
-      TracingUtil.addAttributesToCurrentSpan(OzoneTracingAttributes.STATUS, scmSecurityResponse.getStatus().name());
+      TracingUtil.addAttributesToCurrentSpan(OzoneTracingAttributes.ERROR_STATUS,
+          scmSecurityResponse.getStatus().name());
       // If actual cause is set in SCMSecurityException, set message with
       // actual cause message.
       if (e.getMessage() != null) {
