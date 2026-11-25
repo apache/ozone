@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIFECYCLE_EXPIRATION_HEADER_ENABLED;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIFECYCLE_EXPIRATION_HEADER_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_PART_ORDER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
@@ -34,6 +36,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPIRATION_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.MP_PARTS_COUNT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_MATCH_PATTERN;
@@ -91,6 +94,7 @@ import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -336,10 +340,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       perf.appendSizeBytes(putLength);
       long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
       perf.appendOpLatencyNanos(opLatencyNs);
-      return ServerSideEncryption.withHeaders(Response.ok()
+      ResponseBuilder responseBuilder = Response.ok()
           .header(HttpHeaders.ETAG, wrapInQuotes(md5Hash))
-          .status(HttpStatus.SC_OK)
-          .build(), sseHeaders);
+          .status(HttpStatus.SC_OK);
+      addExpirationHeader(responseBuilder, bucket, keyPath, tags);
+      return ServerSideEncryption.withHeaders(responseBuilder.build(), sseHeaders);
     } catch (IOException | RuntimeException ex) {
       if (copyHeader != null) {
         getMetrics().updateCopyObjectFailureStats(startNanos);
@@ -353,6 +358,29 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       if (multiDigestInputStream != null) {
         multiDigestInputStream.resetDigests();
       }
+    }
+  }
+
+  /**
+   * Adds the {@code x-amz-expiration} header if enabled and the new object matches an enabled Expiration rule of
+   * the bucket lifecycle configuration. The object is already committed, so a failed lookup only omits the header.
+   */
+  private void addExpirationHeader(ResponseBuilder responseBuilder, OzoneBucket bucket, String keyPath,
+      Map<String, String> tags) {
+    if (!getOzoneConfiguration().getBoolean(OZONE_S3G_LIFECYCLE_EXPIRATION_HEADER_ENABLED,
+        OZONE_S3G_LIFECYCLE_EXPIRATION_HEADER_ENABLED_DEFAULT)) {
+      return;
+    }
+    try {
+      OzoneLifecycleConfiguration lifecycleConfiguration =
+          getClientProtocol().getLifecycleConfiguration(bucket.getVolumeName(), bucket.getName());
+      String expiration = S3LifecycleConfiguration.getExpirationHeader(lifecycleConfiguration, keyPath, tags,
+          Time.now());
+      if (expiration != null) {
+        responseBuilder.header(EXPIRATION_HEADER, expiration);
+      }
+    } catch (IOException ex) {
+      LOG.debug("Skipping {} header for {}/{}", EXPIRATION_HEADER, bucket.getName(), keyPath, ex);
     }
   }
 

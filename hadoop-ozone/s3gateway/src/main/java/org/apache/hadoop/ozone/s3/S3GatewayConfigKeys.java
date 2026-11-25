@@ -111,6 +111,14 @@ public final class S3GatewayConfigKeys {
   public static final boolean OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT = false;
 
   /**
+   * Configuration key that makes PutObject return the {@code x-amz-expiration} header when the new object matches
+   * an enabled Expiration rule of the bucket lifecycle configuration. Requires an extra OM call per PutObject.
+   */
+  public static final String OZONE_S3G_LIFECYCLE_EXPIRATION_HEADER_ENABLED =
+      "ozone.s3g.lifecycle.expiration.header.enabled";
+  public static final boolean OZONE_S3G_LIFECYCLE_EXPIRATION_HEADER_ENABLED_DEFAULT = false;
+
+  /**
    * Never constructed.
    */
   private S3GatewayConfigKeys() {

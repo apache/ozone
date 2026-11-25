@@ -17,6 +17,12 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleRuleAndOperator;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 
 /**
  * Request for put bucket lifecycle configuration.
@@ -653,5 +660,88 @@ public class S3LifecycleConfiguration {
     }
 
     return andOperator;
+  }
+
+  /**
+   * Builds the value of the {@code x-amz-expiration} response header for a newly written object, in the form
+   * {@code expiry-date="Fri, 27 Nov 2026 00:00:00 GMT", rule-id="rule1"}. Among the enabled rules with an
+   * Expiration action that match the object, the one with the earliest expiry date is used. For a Days rule,
+   * the expiry date is the creation time plus the given days, rounded up to the next midnight UTC, as AWS S3 does.
+   *
+   * @param lifecycleConfiguration lifecycle configuration of the bucket
+   * @param keyName name of the object
+   * @param tags tags of the object
+   * @param creationTime creation time of the object in milliseconds since epoch
+   * @return the header value, or null if no enabled Expiration rule matches the object
+   */
+  public static String getExpirationHeader(OzoneLifecycleConfiguration lifecycleConfiguration, String keyName,
+      Map<String, String> tags, long creationTime) {
+    ZonedDateTime earliest = null;
+    String ruleId = null;
+    for (OzoneLifecycleConfiguration.OzoneLCRule rule : lifecycleConfiguration.getRules()) {
+      if (!STATUS_ENABLED.equals(rule.getStatus()) || rule.getExpiration() == null
+          || !matches(rule, keyName, tags)) {
+        continue;
+      }
+      ZonedDateTime expiry = getExpiryDate(rule.getExpiration(), creationTime);
+      if (expiry != null && (earliest == null || expiry.isBefore(earliest))) {
+        earliest = expiry;
+        ruleId = rule.getId();
+      }
+    }
+    if (earliest == null) {
+      return null;
+    }
+    return "expiry-date=\"" + RFC1123Util.FORMAT.format(earliest) + "\", rule-id=\"" + ruleId + "\"";
+  }
+
+  private static boolean matches(OzoneLifecycleConfiguration.OzoneLCRule rule, String keyName,
+      Map<String, String> tags) {
+    if (rule.getPrefix() != null) {
+      return keyName.startsWith(rule.getPrefix());
+    }
+    OzoneLifecycleConfiguration.OzoneLCFilter filter = rule.getFilter();
+    if (filter == null) {
+      return false;
+    }
+    if (filter.getPrefix() != null) {
+      return keyName.startsWith(filter.getPrefix());
+    }
+    if (filter.getTag() != null) {
+      return filter.getTag().getValue().equals(tags.get(filter.getTag().getKey()));
+    }
+    OzoneLifecycleConfiguration.LifecycleAndOperator andOperator = filter.getAndOperator();
+    if (andOperator != null) {
+      if (andOperator.getPrefix() != null && !keyName.startsWith(andOperator.getPrefix())) {
+        return false;
+      }
+      if (andOperator.getTags() != null) {
+        for (Map.Entry<String, String> tag : andOperator.getTags().entrySet()) {
+          if (!tag.getValue().equals(tags.get(tag.getKey()))) {
+            return false;
+          }
+        }
+      }
+    }
+    // An empty filter applies to all objects in the bucket.
+    return true;
+  }
+
+  private static ZonedDateTime getExpiryDate(OzoneLifecycleConfiguration.OzoneLCExpiration expiration,
+      long creationTime) {
+    if (expiration.getDays() != null && expiration.getDays() > 0) {
+      ZonedDateTime expiry = Instant.ofEpochMilli(creationTime).atZone(ZoneOffset.UTC).plusDays(expiration.getDays());
+      ZonedDateTime midnight = expiry.truncatedTo(ChronoUnit.DAYS);
+      return midnight.equals(expiry) ? midnight : midnight.plusDays(1);
+    }
+    if (StringUtils.isNotBlank(expiration.getDate())) {
+      try {
+        return ZonedDateTime.parse(expiration.getDate(), DateTimeFormatter.ISO_DATE_TIME)
+            .withZoneSameInstant(ZoneOffset.UTC);
+      } catch (DateTimeParseException ex) {
+        return null;
+      }
+    }
+    return null;
   }
 }
