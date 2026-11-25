@@ -39,6 +39,8 @@ public final class ExportLimits {
   public static final int MAX_BATCH_SIZE = 1_000_000;
   /** Maximum allowed {@code partSize} override for a single export job. */
   public static final int MAX_PART_SIZE = 5_000_000;
+  /** Maximum number of part files a single export job may write, which bounds its temporary files on the SCM disk. */
+  public static final int MAX_PARTS = 10_000;
 
   private ExportLimits() {
   }

@@ -30,6 +30,7 @@ import java.util.concurrent.CompletionException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.util.Time;
 
 /**
  * In-memory state for a container ID export job.
@@ -41,10 +42,15 @@ public final class ExportJob {
   private final String jobStartTime = ExportFileManager.formatJobStartTime(Instant.now());
   private final ContainerID startContainerId;
   private final ExportSizing sizing;
+  private final String requestId;
   /** The .tar.gz output path, fixed at job creation; used by the worker to write the archive. */
   private final String fileName;
 
   private final CompletableFuture<Long> idsWrittenFuture = new CompletableFuture<>();
+  private final long startMs = Time.monotonicNow();
+  /** Set just before the future completes, so the elapsed time stops changing once the job is done. */
+  private volatile long endMs = -1;
+  private volatile long idsWritten;
 
   /**
    * Unique job identifier.
@@ -92,6 +98,7 @@ public final class ExportJob {
   public final class Status {
     private final Long idsWritten;
     private final Throwable exception;
+    private final long elapsedMs;
 
     private Status() {
       if (!idsWrittenFuture.isDone()) {
@@ -108,6 +115,7 @@ public final class ExportJob {
         this.idsWritten = rows;
         this.exception = cause;
       }
+      this.elapsedMs = ExportJob.this.getElapsedMs();
     }
 
     public ExportJob.Id getId() {
@@ -131,17 +139,22 @@ public final class ExportJob {
     public Throwable getException() {
       return exception;
     }
+
+    public long getElapsedMs() {
+      return elapsedMs;
+    }
   }
 
-  ExportJob(ExportScope scope, ContainerID startContainerId, ExportSizing sizing) {
+  ExportJob(ExportScope scope, ContainerID startContainerId, ExportSizing sizing, String requestId) {
     this.id = Id.newId();
     this.scope = scope;
     this.startContainerId = startContainerId != null ? startContainerId : ContainerID.valueOf(0);
     this.fileName = ExportFileManager.archiveFileName(scope, jobStartTime, id);
     this.sizing = sizing;
+    this.requestId = requestId;
   }
 
-  Id getId() {
+  public Id getId() {
     return id;
   }
 
@@ -173,8 +186,31 @@ public final class ExportJob {
     return sizing.getPartSize();
   }
 
-  CompletableFuture<Long> getFuture() {
-    return idsWrittenFuture;
+  String getRequestId() {
+    return requestId;
+  }
+
+  long getIdsWritten() {
+    return idsWritten;
+  }
+
+  void setIdsWritten(long written) {
+    this.idsWritten = written;
+  }
+
+  void complete(long totalIdsWritten) {
+    endMs = Time.monotonicNow();
+    idsWrittenFuture.complete(totalIdsWritten);
+  }
+
+  void fail(Throwable cause) {
+    endMs = Time.monotonicNow();
+    idsWrittenFuture.completeExceptionally(cause);
+  }
+
+  long getElapsedMs() {
+    final long end = endMs;
+    return (end >= 0 ? end : Time.monotonicNow()) - startMs;
   }
 
   Status getStatus() {
