@@ -445,4 +445,34 @@ public class TestRDBParallelScanner {
     }));
     assertEquals(java.util.Arrays.asList("b/1", "b/2"), found);
   }
+
+  @Test
+  public void testAbortsPromptlyOnDbClose() throws Exception {
+    populate("k", 20_000, 8);
+    final CountDownLatch scanStarted = new CountDownLatch(1);
+    final CountDownLatch closeInitiated = new CountDownLatch(1);
+    final Thread closer = new Thread(() -> {
+      try {
+        assertTrue(scanStarted.await(15, TimeUnit.SECONDS));
+        closeInitiated.countDown();
+        store.close();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    });
+    closer.start();
+    try {
+      assertThrows(RocksDatabaseException.class, () -> table.parallelScan(null, 4, kv -> {
+        scanStarted.countDown();
+        try {
+          assertTrue(closeInitiated.await(15, TimeUnit.SECONDS));
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }));
+    } finally {
+      closer.join(15_000);
+      assertTrue(!closer.isAlive(), "DB close should not be blocked by active parallel scan");
+    }
+  }
 }

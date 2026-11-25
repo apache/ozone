@@ -272,11 +272,18 @@ public final class RDBParallelScanner {
       return 0;
     }
     long count = 0;
-    final RDBSplitIterator it = new RDBSplitIterator(
-        ctx.db, ctx.family, ctx.snapshot, range, ctx.type);
-    ctx.counters.opened.incrementAndGet();
+    RDBSplitIterator it = null;
     try {
+      if (ctx.db.isClosed()) {
+        throw new RocksDatabaseException("RocksDatabase is closed");
+      }
+      it = new RDBSplitIterator(
+          ctx.db, ctx.family, ctx.snapshot, range, ctx.type);
+      ctx.counters.opened.incrementAndGet();
       while (it.hasNext() && !aborted.get()) {
+        if (ctx.db.isClosed()) {
+          throw new RocksDatabaseException("RocksDatabase is closed");
+        }
         ctx.consumer.accept(it.next());
         count++;
       }
@@ -287,8 +294,10 @@ public final class RDBParallelScanner {
       aborted.set(true);
       throw t;
     } finally {
-      it.close();
-      ctx.counters.closed.incrementAndGet();
+      if (it != null) {
+        it.close();
+        ctx.counters.closed.incrementAndGet();
+      }
     }
     return count;
   }
