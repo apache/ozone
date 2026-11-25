@@ -801,6 +801,49 @@ class TestKeyManagerUnit extends OzoneTestBase {
   }
 
   @Test
+  public void listStatusObjectStoreRootPreservesLeadingSlash() throws Exception {
+    String volume = volumeName();
+    String bucket = "object-store-root";
+    OMRequestTestUtils.addVolumeToDB(volume, OzoneConsts.OZONE, metadataManager);
+    OMRequestTestUtils.addBucketToDB(volume, bucket, metadataManager, BucketLayout.OBJECT_STORE);
+
+    RatisReplicationConfig replication = RatisReplicationConfig.getInstance(ReplicationFactor.ONE);
+    for (String key : List.of(".cache", "/a", "/b", "m")) {
+      OMRequestTestUtils.addKeyToTable(false, volume, bucket, key, 1L, replication, metadataManager);
+    }
+
+    OmKeyArgs args = new OmKeyArgs.Builder().setVolumeName(volume).setBucketName(bucket).setKeyName("").build();
+    assertThat(keyManager.listStatus(args, false, "/", 2, null, false, false))
+        .extracting(status -> status.getKeyInfo().getKeyName())
+        .containsExactly("/", "m");
+
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).addCacheEntry(
+        new CacheKey<>(metadataManager.getOzoneKey(volume, bucket, "/a")), CacheValue.get(2L));
+    assertThat(keyManager.listStatus(args, false, ".cache", 3, null, false, false))
+        .extracting(status -> status.getKeyInfo().getKeyName())
+        .containsExactly(".cache", "/", "m");
+
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).addCacheEntry(
+        new CacheKey<>(metadataManager.getOzoneKey(volume, bucket, "/b")), CacheValue.get(3L));
+    assertThat(keyManager.listStatus(args, false, ".cache", 3, null, false, false))
+        .extracting(status -> status.getKeyInfo().getKeyName())
+        .containsExactly(".cache", "m");
+
+    OMRequestTestUtils.addKeyToTableCache(volume, bucket, "//double", replication, metadataManager);
+    assertThat(keyManager.listStatus(args, false, ".cache", 3, null, false, false))
+        .extracting(status -> status.getKeyInfo().getKeyName())
+        .containsExactly(".cache", "/", "m");
+
+    OMRequestTestUtils.addKeyToTable(false, volume, bucket, "//", 1L, replication, metadataManager);
+    metadataManager.getKeyTable(BucketLayout.OBJECT_STORE).addCacheEntry(
+        new CacheKey<>(metadataManager.getOzoneKey(volume, bucket, "//")), CacheValue.get(4L));
+    OmKeyArgs slashArgs = args.toBuilder().setKeyName("/").build();
+    assertThat(keyManager.listStatus(slashArgs, false, "/", 3, null, false, false))
+        .extracting(status -> status.getKeyInfo().getKeyName())
+        .containsExactly("//");
+  }
+
+  @Test
   public void listStatusLightDoesNotRefreshPipeline() throws Exception {
     String volume = volumeName();
     String bucket = "bucket-light";

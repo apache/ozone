@@ -398,10 +398,15 @@ public class TestOmMetadataManager {
   }
 
   private void addBucketsToCache(String volumeName, String bucketName) {
+    addBucketsToCache(volumeName, bucketName, getDefaultBucketLayout());
+  }
+
+  private void addBucketsToCache(String volumeName, String bucketName, BucketLayout bucketLayout) {
 
     OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
+        .setBucketLayout(bucketLayout)
         .setStorageType(StorageType.DISK)
         .setIsVersionEnabled(false)
         .build();
@@ -570,27 +575,26 @@ public class TestOmMetadataManager {
     assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, "dir1bi", "dir1bh", 100));
   }
 
-  /**
-   * keyPrefix "/" maps to the DB prefix of the bucket, so it also matches keys that sort before "/",
-   * and pagination must not restart from the first key.
-   */
   @Test
-  public void testListKeysWithSlashPrefixAndStartKeyBeforeSlash() throws Exception {
+  public void testListKeysWithSlashPrefixAndStartKey() throws Exception {
     String volumeName = "volumeA";
     String bucketName = "slashPrefix";
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
-    addBucketsToCache(volumeName, bucketName);
+    addBucketsToCache(volumeName, bucketName, BucketLayout.OBJECT_STORE);
 
     // Even index keys go to the DB and odd index keys to the cache.
     addKeysToOM(volumeName, bucketName, ".cache/0", 0);
     addKeysToOM(volumeName, bucketName, ".cache/1", 1);
-    addKeysToOM(volumeName, bucketName, ".cache/2", 2);
+    assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, "/", null, 2));
+
+    addKeysToOM(volumeName, bucketName, "/", 2);
     addKeysToOM(volumeName, bucketName, "/keep", 3);
+    addKeysToOM(volumeName, bucketName, "//double", 4);
 
-    List<String> expected = Arrays.asList(".cache/0", ".cache/1", ".cache/2", "/keep");
-
-    assertEquals(expected.subList(0, 2), listKeyNames(volumeName, bucketName, null, "/", 2));
-    assertEquals(expected.subList(2, 4), listKeyNames(volumeName, bucketName, ".cache/1", "/", 2));
+    assertEquals(Arrays.asList(".cache/0", ".cache/1", "/", "//double", "/keep"),
+        listKeyNames(volumeName, bucketName, null, null, 5));
+    assertEquals(Collections.singletonList("/"), listKeyNames(volumeName, bucketName, ".cache/1", "/", 1));
+    assertEquals(Arrays.asList("//double", "/keep"), listKeyNames(volumeName, bucketName, "/", "/", 2));
     assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, "/keep", "/", 2));
   }
 

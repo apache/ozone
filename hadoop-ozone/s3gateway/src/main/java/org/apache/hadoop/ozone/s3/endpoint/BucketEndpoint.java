@@ -137,13 +137,10 @@ public class BucketEndpoint extends BucketOperationHandler {
       // ignore start After
       String prevKey = decodedToken != null ? decodedToken.getLastKey() : startAfter;
 
-      // If shallow is true, only list immediate children
-      // delimited by OZONE_URI_DELIMITER
-      boolean shallow = listKeysShallowEnabled && OZONE_URI_DELIMITER.equals(delimiter);
-
       bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
 
+      boolean shallow = listKeysShallowEnabled && OZONE_URI_DELIMITER.equals(delimiter);
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
     } catch (OMException ex) {
       getMetrics().updateGetBucketFailureStats(context.getStartNanos());
@@ -176,7 +173,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     response.setContinueToken(continueToken);
     response.setStartAfter(EncodingTypeObject.createNullable(startAfter, encodingType));
 
-    String prevDir = decodedToken != null ? decodedToken.getLastDir() : null;
+    String prevDir = getPreviousDirectory(decodedToken, prefix, delimiter);
     String lastKey = null;
     int count = 0;
     if (maxKeys > 0) {
@@ -236,7 +233,7 @@ public class BucketEndpoint extends BucketOperationHandler {
 
     if (count < maxKeys) {
       response.setTruncated(false);
-    } else if (ozoneKeyIterator.hasNext() && lastKey != null) {
+    } else if (lastKey != null && ozoneKeyIterator.hasNext()) {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());
@@ -253,6 +250,18 @@ public class BucketEndpoint extends BucketOperationHandler {
     context.getPerf().appendOpLatencyNanos(opLatencyNs);
     response.setKeyCount(keyCount);
     return Response.ok(toListResult(response)).build();
+  }
+
+  private static String getPreviousDirectory(ContinueToken token, String prefix, String delimiter) {
+    if (token == null) {
+      return null;
+    }
+    // The token encodes an empty directory name as null. Recover it from the last key.
+    if (token.getLastDir() == null && StringUtils.isNotEmpty(delimiter)
+        && token.getLastKey().startsWith(prefix + delimiter)) {
+      return "";
+    }
+    return token.getLastDir();
   }
 
   private boolean isListObjectVersions() {

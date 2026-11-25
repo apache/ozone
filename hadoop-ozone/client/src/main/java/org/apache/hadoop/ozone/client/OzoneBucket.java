@@ -1765,7 +1765,9 @@ public class OzoneBucket extends WithMetadata {
 
     protected void initDelimiterKeyPrefix() {
       setDelimiterKeyPrefix(getKeyPrefix());
-      if (!getKeyPrefix().endsWith(OZONE_URI_DELIMITER)) {
+      if (bucketLayout == BucketLayout.OBJECT_STORE) {
+        setDelimiterKeyPrefix(getKeyPrefix().substring(0, getKeyPrefix().lastIndexOf(OZONE_URI_DELIMITER) + 1));
+      } else if (!getKeyPrefix().endsWith(OZONE_URI_DELIMITER)) {
         setDelimiterKeyPrefix(OzoneFSUtils.getParentDir(getKeyPrefix()));
       }
     }

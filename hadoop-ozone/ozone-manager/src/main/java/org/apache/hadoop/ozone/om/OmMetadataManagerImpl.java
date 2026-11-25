@@ -1102,34 +1102,35 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     String bucketNameBytes = getBucketKey(volumeName, bucketName);
-    if (getBucketTable().get(bucketNameBytes) == null) {
+    OmBucketInfo bucketInfo = getBucketTable().get(bucketNameBytes);
+    if (bucketInfo == null) {
       throw new OMException("Bucket " + bucketName + " not found.",
           ResultCodes.BUCKET_NOT_FOUND);
     }
 
-    String seekPrefix;
-    if (StringUtils.isNotEmpty(keyPrefix)) {
-      seekPrefix = getOzoneKey(volumeName, bucketName, keyPrefix);
-    } else {
-      seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
-    }
+    String bucketPrefix = getBucketKeyPrefix(volumeName, bucketName);
+    boolean objectStore = bucketInfo.getBucketLayout() == BucketLayout.OBJECT_STORE;
+    String seekPrefix = StringUtils.isEmpty(keyPrefix) ? bucketPrefix
+        : objectStore ? bucketPrefix + keyPrefix : getOzoneKey(volumeName, bucketName, keyPrefix);
+    String startDbKey = StringUtils.isEmpty(startKey) ? null
+        : objectStore ? bucketPrefix + startKey : getOzoneKey(volumeName, bucketName, startKey);
 
-    String seekKey;
-    boolean skipStartKey = false;
-    // Every key matching keyPrefix sorts after a startKey that sorts before keyPrefix,
-    // so seek to keyPrefix; seeking to startKey would stop at the first non-matching key.
-    // Compare DB keys: keyPrefix "/" maps to the DB prefix of the bucket, which also matches keys sorting before "/".
-    if (StringUtils.isNotEmpty(startKey) && getOzoneKey(volumeName, bucketName, startKey).compareTo(seekPrefix) >= 0) {
-      // Seek to the specified key.
-      seekKey = getOzoneKey(volumeName, bucketName, startKey);
-      skipStartKey = true;
-    } else {
-      // This allows us to seek directly to the first key with the right prefix.
-      seekKey = getOzoneKey(volumeName, bucketName,
-          StringUtils.isNotEmpty(keyPrefix) ? keyPrefix : OM_KEY_PREFIX);
-    }
+    // A marker before the prefix must not move the seek outside the matching range.
+    boolean skipStartKey = startDbKey != null && startDbKey.compareTo(seekPrefix) >= 0;
+    String seekKey = skipStartKey ? startDbKey : seekPrefix;
 
     TreeMap<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();
+    if (objectStore) {
+      // The literal "/" is stored at the bucket prefix. Merge it at its logical sort position.
+      String slashKey = bucketPrefix + OM_KEY_PREFIX;
+      if (slashKey.startsWith(seekPrefix) && slashKey.compareTo(seekKey) >= 0
+          && !(skipStartKey && slashKey.equals(seekKey))) {
+        OmKeyInfo slash = keyTable.get(bucketPrefix);
+        if (slash != null && OM_KEY_PREFIX.equals(slash.getKeyName())) {
+          cacheKeyMap.put(slashKey, slash);
+        }
+      }
+    }
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
         keyTable.cacheIterator();
 
@@ -1150,6 +1151,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       // Making sure that entry in cache is not for delete key request.
 
       if (omKeyInfo != null
+          && !(objectStore && key.equals(bucketPrefix))
           && key.startsWith(seekPrefix)
           && key.compareTo(seekKey) >= 0) {
         cacheKeyMap.put(key, omKeyInfo);
@@ -1169,6 +1171,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       while (currentCount < maxKeys + 1 && keyIter.hasNext()) {
         kv = keyIter.next();
         if (kv != null && kv.getKey().startsWith(seekPrefix)) {
+
+          if (objectStore && kv.getKey().equals(bucketPrefix)) {
+            continue;
+          }
 
           // Entry should not be marked for delete, consider only those
           // entries.
