@@ -51,6 +51,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -888,6 +889,38 @@ public class TestStreamBlockInputStream {
     }
   }
 
+  /**
+   * A seek that reuses the buffered response must not rewind the requested length: once the buffer is drained,
+   * the next request must continue from the current position instead of re-requesting the buffered data.
+   */
+  @Test
+  public void testSeekReuseDoesNotRefetchBufferedData() throws Exception {
+    final int chunkSize = 16;
+    final byte[] data = new byte[2 * chunkSize];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+    XceiverClientGrpc client = mockOffsetAwareStreamingReadClient(data, mock(ClientCallStreamObserver.class));
+
+    try (StreamBlockInputStream sbis = newStreamForBlock(
+        newBlockInfo(new BlockID(1L, 15595L), data.length), mockStandalonePipeline(), client)) {
+      assertEquals(chunkSize, sbis.read(ByteBuffer.allocate(chunkSize)));
+
+      // Seek back into the buffered response and drain it: no new request is needed.
+      sbis.seek(4);
+      assertEquals(chunkSize - 4, sbis.read(ByteBuffer.allocate(chunkSize - 4)));
+      assertEquals(chunkSize, sbis.getPos());
+
+      // The first byte past the buffered response triggers the next request.
+      assertEquals(data[chunkSize], sbis.read());
+    }
+
+    ArgumentCaptor<ContainerCommandRequestProto> requests = ArgumentCaptor.forClass(ContainerCommandRequestProto.class);
+    verify(client, times(2)).streamRead(requests.capture(), any(StreamingReadResponse.class));
+    assertEquals(0, requests.getAllValues().get(0).getReadBlock().getOffset());
+    assertEquals(chunkSize, requests.getAllValues().get(1).getReadBlock().getOffset());
+  }
+
   /** A single-byte read returns the byte as 0 to 255: 0xFF must not look like the end of the stream. */
   @Test
   public void testReadReturnsUnsignedByte() throws Exception {
@@ -1469,6 +1502,64 @@ public class TestStreamBlockInputStream {
       assertArrayEquals(data, sequential.array());
       assertEquals(2, refreshes.get());
     }
+  }
+
+  /**
+   * A reader queued behind a full pipeline client is not failed by one admission timeout: the open is retried under
+   * the read retry policy and succeeds once a slot is free.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testStreamAdmissionTimeoutIsRetried(boolean positioned) throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setMaxReadRetryCount(1000);
+    clientConfig.setReadRetryInterval(0);
+    byte[] data = new byte[] {1, 2, 3, 4};
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    // Same admission as XceiverClientGrpc: a bounded wait for the only slot, held here by another stream.
+    Semaphore slots = new Semaphore(0);
+    CountDownLatch timedOut = new CountDownLatch(1);
+    AtomicReference<StreamingReaderSpi> lastReader = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      if (!slots.tryAcquire(20, TimeUnit.MILLISECONDS)) {
+        timedOut.countDown();
+        throw new TimeoutIOException("no stream slot");
+      }
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      lastReader.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+    doAnswer(inv -> {
+      slots.release();
+      return null;
+    }).when(xceiverClient).completeStreamRead();
+    doAnswer(inv -> {
+      lastReader.get().onNext(buildResponseProto(data, 0));
+      lastReader.get().onCompleted();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        newBlockInfo(new BlockID(1L, 24L), data.length), mockStandalonePipeline(), null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      ByteBuffer buffer = ByteBuffer.allocate(data.length);
+      Future<Integer> read = executor.submit(() -> positioned ? sbis.readPositioned(0, buffer) : sbis.read(buffer));
+      assertTrue(timedOut.await(10, TimeUnit.SECONDS), "the open should wait for a slot and time out");
+      slots.release();
+      assertEquals(data.length, read.get(10, TimeUnit.SECONDS));
+      assertArrayEquals(data, buffer.array());
+    } finally {
+      executor.shutdownNow();
+    }
+    assertEquals(1, slots.availablePermits(), "the retried stream must release exactly the slot it took");
   }
 
   /**

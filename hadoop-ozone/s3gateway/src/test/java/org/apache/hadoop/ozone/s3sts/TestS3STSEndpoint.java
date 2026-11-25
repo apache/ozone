@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3sts;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.om.helpers.S3STSUtils.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OSTSException;
@@ -114,6 +116,7 @@ public class TestS3STSEndpoint {
     when(clientStub.getObjectStore()).thenReturn(objectStore);
 
     endpoint = new S3STSEndpoint();
+    endpoint.setS3STSDurationConfig(new S3STSDurationConfig(config));
     endpoint.setClient(clientStub);
     endpoint.setContext(context);
     auditLogger = mock(AuditLogger.class);
@@ -344,6 +347,44 @@ public class TestS3STSEndpoint {
 
     final String arn = doc.getElementsByTagName("Arn").item(0).getTextContent();
     assertEquals(ROLE_USER_ARN, arn);
+  }
+
+  @Test
+  public void testStsAssumeRoleAllowsShortDurationWithTestMinOverride() throws Exception {
+    final OzoneConfiguration shortMinConf = new OzoneConfiguration();
+    shortMinConf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 5);
+    endpoint.setS3STSDurationConfig(new S3STSDurationConfig(shortMinConf));
+    shortMinConf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, S3STSUtils.MIN_DURATION_SECONDS);
+
+    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "5", "2011-06-15", null);
+
+    assertEquals(200, response.getStatus());
+    verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteFailure(any(AuditMessage.class));
+
+    final ArgumentCaptor<Integer> durationCaptor = ArgumentCaptor.forClass(Integer.class);
+    verify(objectStore).assumeRole(anyString(), anyString(), durationCaptor.capture(), any(), anyString());
+    assertEquals(5, durationCaptor.getValue());
+  }
+
+  @Test
+  public void testStsAssumeRoleRejectsDurationBelowTestMinOverride() throws Exception {
+    final OzoneConfiguration shortMinConf = new OzoneConfiguration();
+    shortMinConf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 5);
+    endpoint.setS3STSDurationConfig(new S3STSDurationConfig(shortMinConf));
+
+    final OSTSException ex = assertThrows(
+        OSTSException.class, () -> endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, "4", "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+    verify(objectStore, never()).assumeRole(anyString(), anyString(), anyInt(), any(), anyString());
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "ValidationError",
+        "Invalid Value: DurationSeconds must be a number between 5 and 43200 seconds");
   }
 
   @Test

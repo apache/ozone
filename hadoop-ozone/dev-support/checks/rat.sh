@@ -29,7 +29,7 @@ mkdir -p "$REPORT_DIR"
 
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-./mvnw -B --no-transfer-progress -fn org.apache.rat:apache-rat-plugin:check "$@" \
+./mvnw -B -fn org.apache.rat:apache-rat-plugin:check "$@" \
     | tee "${REPORT_DIR}/output.log"
 rc=$?
 
