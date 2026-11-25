@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 /**
@@ -24,11 +25,13 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
  */
 public final class ParallelScanConfig {
   public static final String ENABLED_KEY =
-      "ozone.metadata.db.parallel.scan.enabled";
-  public static final boolean ENABLED_DEFAULT = false;
+      HddsConfigKeys.OZONE_METADATA_DB_PARALLEL_SCAN_ENABLED;
+  public static final boolean ENABLED_DEFAULT =
+      HddsConfigKeys.OZONE_METADATA_DB_PARALLEL_SCAN_ENABLED_DEFAULT;
   public static final String MAX_THREADS_KEY =
-      "ozone.metadata.db.parallel.scan.max.threads";
-  public static final int MAX_THREADS_DEFAULT = 4;
+      HddsConfigKeys.OZONE_METADATA_DB_PARALLEL_SCAN_MAX_THREADS;
+  public static final int MAX_THREADS_DEFAULT =
+      HddsConfigKeys.OZONE_METADATA_DB_PARALLEL_SCAN_MAX_THREADS_DEFAULT;
 
   public static final ParallelScanConfig DISABLED =
       new ParallelScanConfig(false, 1);

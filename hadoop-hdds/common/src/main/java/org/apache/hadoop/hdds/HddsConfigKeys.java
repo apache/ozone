@@ -136,6 +136,15 @@ public final class HddsConfigKeys {
   // metadata locations must be configured explicitly.
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
 
+  public static final String OZONE_METADATA_DB_PARALLEL_SCAN_ENABLED =
+      "ozone.metadata.db.parallel.scan.enabled";
+  public static final boolean OZONE_METADATA_DB_PARALLEL_SCAN_ENABLED_DEFAULT =
+      false;
+  public static final String OZONE_METADATA_DB_PARALLEL_SCAN_MAX_THREADS =
+      "ozone.metadata.db.parallel.scan.max.threads";
+  public static final int OZONE_METADATA_DB_PARALLEL_SCAN_MAX_THREADS_DEFAULT =
+      4;
+
   public static final String DATANODE_DB_CONFIG_PATH = "hdds.datanode.db.config.path";
   public static final String DATANODE_DB_CONFIG_PATH_DEFAULT = "";
 
