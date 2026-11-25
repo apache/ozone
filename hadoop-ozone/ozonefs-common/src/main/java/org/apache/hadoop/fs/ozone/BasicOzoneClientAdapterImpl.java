@@ -426,10 +426,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       incrementCounter(Statistic.OBJECTS_QUERY, 1);
       OzoneFileStatus status = bucket.getFileStatus(key, headOp);
       // OM has no key for the bucket root, so take the EC policy from the bucket's default replication.
-      String dirEcPolicy = key.isEmpty()
+      String rootEcPolicy = key.isEmpty()
           ? OzoneClientUtils.getErasureCodingPolicyName(getReplicationConfigWithRefreshCheck()) : "";
       // An OM without HDDS-15678 still returns the block locations of a head op, without pipelines: ignore them.
-      return toFileStatusAdapter(status, userName, uri, qualifiedPath, !headOp, dirEcPolicy);
+      return toFileStatusAdapter(status, userName, uri, qualifiedPath, !headOp, rootEcPolicy);
 
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -544,7 +544,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
-      String owner, URI defaultUri, Path workingDir, boolean withBlockLocations, String dirEcPolicy) {
+      String owner, URI defaultUri, Path workingDir, boolean withBlockLocations, String rootEcPolicy) {
     OmKeyInfo keyInfo = status.getKeyInfo();
     short replication = (short) keyInfo.getReplicationConfig()
         .getRequiredNodes();
@@ -553,7 +553,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     if (isEc) {
       ecPolicy = keyInfo.getReplicationConfig().getReplication();
     } else {
-      ecPolicy = status.isFile() ? "Replicated" : dirEcPolicy;
+      ecPolicy = status.isFile() ? "Replicated" : rootEcPolicy;
     }
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
