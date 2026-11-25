@@ -58,6 +58,8 @@ import org.slf4j.MDC;
 public final class TracingUtil {
   private static final Logger LOG = LoggerFactory.getLogger(TracingUtil.class);
   private static final String NULL_SPAN_AS_STRING = "";
+  private static final String AUDIT_ATTRIBUTE_PREFIX = "ozone.audit.";
+  private static final int MAX_ATTRIBUTE_VALUE_LENGTH = 1024;
 
   private static volatile boolean isInit = false;
   private static volatile boolean tracingEnabled;
@@ -402,22 +404,13 @@ public final class TracingUtil {
     return createProxy(delegate, itf, conf, SpanKind.CLIENT);
   }
 
-  /** Creates a proxy with spans named {@code <delegate class>.<method>}, also usable at startup without a span. */
-  public static <T> T createProxy(T delegate, Class<T> itf, SpanKind spanKind) {
-    if (!tracingEnabled && !applicationAware) {
-      return delegate;
-    }
-    if (!hasUsableTracer()) {
-      return delegate;
-    }
-    return newProxy(delegate, itf, delegate.getClass().getSimpleName(), spanKind);
-  }
-
   private static <T> T createProxy(T delegate, Class<T> itf, ConfigurationSource conf, SpanKind spanKind) {
     if (!shouldCreateTracingProxy(conf)) {
       return delegate;
     }
-    return newProxy(delegate, itf, itf.getSimpleName(), spanKind);
+    String delegateName = delegate.getClass().getSimpleName();
+    String name = delegateName.contains("Lambda") ? itf.getSimpleName() : delegateName;
+    return newProxy(delegate, itf, name, spanKind);
   }
 
   private static <T> T newProxy(T delegate, Class<T> itf, String name, SpanKind spanKind) {
@@ -602,6 +595,13 @@ public final class TracingUtil {
     }
   }
 
+  public static void addAttributesToCurrentSpan(String key, Object value) {
+    Span span = Span.current();
+    if (value != null && span.isRecording()) {
+      span.setAttribute(key, value.toString());
+    }
+  }
+
   public static void addAttributesToCurrentSpan(String key, String value) {
     Span span = Span.current();
     if (value != null && span.isRecording()) {
@@ -621,6 +621,20 @@ public final class TracingUtil {
     if (span.isRecording()) {
       span.setAttribute(key, value);
     }
+  }
+
+  /** Adds each audit param as {@code ozone.audit.<key>}, truncating long values; same key overwrites. */
+  public static void addAuditParamsToCurrentSpan(Map<String, String> auditParams) {
+    Span span = Span.current();
+    if (auditParams == null || !span.isRecording()) {
+      return;
+    }
+    auditParams.forEach((key, value) -> {
+      if (value != null) {
+        span.setAttribute(AUDIT_ATTRIBUTE_PREFIX + key,
+            value.length() > MAX_ATTRIBUTE_VALUE_LENGTH ? value.substring(0, MAX_ATTRIBUTE_VALUE_LENGTH) : value);
+      }
+    });
   }
 
   public static void addEventToCurrentSpan(String name, String key, String value) {

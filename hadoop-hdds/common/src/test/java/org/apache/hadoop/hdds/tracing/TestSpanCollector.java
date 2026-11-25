@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
@@ -53,14 +54,18 @@ public final class TestSpanCollector implements SpanProcessor, AutoCloseable {
 
   /** Registers a collecting SDK as the global OpenTelemetry and initializes Ozone tracing with it. */
   public static TestSpanCollector install(String serviceName) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.tracing.enabled", true);
+    return install(serviceName, conf);
+  }
+
+  public static TestSpanCollector install(String serviceName, ConfigurationSource conf) {
     TracingUtil.shutdownTracing();
     GlobalOpenTelemetry.resetForTest();
     TestSpanCollector collector = new TestSpanCollector();
     GlobalOpenTelemetry.set(OpenTelemetrySdk.builder()
         .setTracerProvider(SdkTracerProvider.builder().addSpanProcessor(collector).build())
         .build());
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean("ozone.tracing.enabled", true);
     TracingUtil.initTracing(serviceName, conf);
     return collector;
   }

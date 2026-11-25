@@ -60,6 +60,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.io.Text;
@@ -75,6 +77,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.OmTracingAttributes;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMServiceManager;
@@ -258,6 +261,30 @@ public class TestOzoneManagerStateMachine {
     Message result = future.get();
 
     assertNotNull(result);
+  }
+
+  @Test
+  public void testStartAndApplyTransactionContinueTheRequestTrace() throws Exception {
+    RaftGroupId groupId = initializeStateMachine();
+    OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(
+        OMResponse.newBuilder().setCmdType(Type.CreateKey).setStatus(Status.OK).setSuccess(true).build());
+    when(handler.handleWriteRequest(any(OMRequest.class), any(), eq(doubleBuffer))).thenReturn(clientResponse);
+
+    try (TestSpanCollector spans = TestSpanCollector.install("om-state-machine-test")) {
+      // The OM request carries the trace ID of the span it was submitted under; Ratis then runs the state machine
+      // on its own threads, which are simulated here by calling it outside of the span.
+      OMRequest omRequest = TracingUtil.executeInNewSpan("submit",
+          () -> sampleWriteRequest().toBuilder().setTraceID(TracingUtil.exportCurrentSpan()).build());
+
+      TransactionContext trx = sm.startTransaction(buildClientRequest(groupId, omRequest));
+      sm.applyTransaction(mockTrx(omRequest, 1, 5, trx.getStateMachineContext())).get();
+
+      for (String name : Arrays.asList("OM.startTransaction", "OM.applyTransaction")) {
+        spans.assertParent(name, "submit");
+        spans.assertAttribute(name, OmTracingAttributes.OM_CMD_TYPE, "CreateKey");
+      }
+    }
   }
 
   @Test

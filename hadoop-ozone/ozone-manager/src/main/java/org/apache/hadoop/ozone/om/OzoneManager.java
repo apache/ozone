@@ -220,6 +220,7 @@ import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -1083,9 +1084,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OzoneAclUtils.setOMMultiTenantManager(multiTenantManager);
     }
 
-    volumeManager = new VolumeManagerImpl(metadataManager);
+    volumeManager = TracingUtil.createInternalProxy(new VolumeManagerImpl(metadataManager), VolumeManager.class,
+        configuration);
 
-    bucketManager = new BucketManagerImpl(this, metadataManager);
+    bucketManager = TracingUtil.createInternalProxy(new BucketManagerImpl(this, metadataManager), BucketManager.class,
+        configuration);
 
     Class<? extends S3SecretStoreProvider> storeProviderClass =
         configuration.getClass(
@@ -1103,13 +1106,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     S3SecretCacheProvider secretCacheProvider = S3SecretCacheProvider.IN_MEMORY;
 
-    s3SecretManager = new S3SecretLockedManager(
+    s3SecretManager = TracingUtil.createInternalProxy(new S3SecretLockedManager(
         new S3SecretManagerImpl(
             store,
             secretCacheProvider.get(configuration)
         ),
         metadataManager.getLock()
-    );
+    ), S3SecretManager.class, configuration);
     if (secConfig.isSecurityEnabled() || testSecureOmFlag) {
       try {
         delegationTokenMgr = createDelegationTokenSecretManager(configuration);
@@ -1128,8 +1131,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     prefixManager = new PrefixManagerImpl(this, metadataManager, true);
-    keyManager = new KeyManagerImpl(this, scmClient, configuration,
-        perfMetrics);
+    keyManager = TracingUtil.createInternalProxy(new KeyManagerImpl(this, scmClient, configuration,
+        perfMetrics), KeyManager.class, configuration);
     // If authorizer is not initialized or the authorizer is Native
     // re-initialize the authorizer, else for non-native authorizer
     // like ranger we can reuse previous value if it is initialized

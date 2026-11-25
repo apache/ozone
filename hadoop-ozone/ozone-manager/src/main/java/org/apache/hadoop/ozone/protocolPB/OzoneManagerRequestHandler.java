@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -99,7 +100,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.IOMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -473,6 +474,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       }
       responseBuilder.setSuccess(true);
     } catch (IOException ex) {
+      TracingUtil.recordExceptionInCurrentSpan(ex);
       responseBuilder.setSuccess(false);
       responseBuilder.setStatus(exceptionToResponseStatus(ex));
       if (ex.getMessage() != null) {
@@ -484,7 +486,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   @Override
   public OMClientResponse handleWriteRequestImpl(OMRequest omRequest, ExecutionContext context) throws IOException {
-    OMClientRequest omClientRequest =
+    IOMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
       OMClientResponse omClientResponse = captureLatencyNs(
