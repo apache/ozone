@@ -40,6 +40,8 @@ public class KeyInfoWithVolumeContext {
 
   private final Optional<BucketLayout> bucketLayout;
 
+  private final Optional<LifecycleExpirationInfo> lifecycleExpiration;
+
   public KeyInfoWithVolumeContext(OmVolumeArgs volumeArgs,
                                   String userPrincipal,
                                   OmKeyInfo keyInfo) {
@@ -50,10 +52,19 @@ public class KeyInfoWithVolumeContext {
                                   String userPrincipal,
                                   OmKeyInfo keyInfo,
                                   BucketLayout bucketLayout) {
+    this(volumeArgs, userPrincipal, keyInfo, bucketLayout, null);
+  }
+
+  public KeyInfoWithVolumeContext(OmVolumeArgs volumeArgs,
+                                  String userPrincipal,
+                                  OmKeyInfo keyInfo,
+                                  BucketLayout bucketLayout,
+                                  LifecycleExpirationInfo lifecycleExpiration) {
     this.volumeArgs = Optional.ofNullable(volumeArgs);
     this.userPrincipal = Optional.ofNullable(userPrincipal);
     this.keyInfo = keyInfo;
     this.bucketLayout = Optional.ofNullable(bucketLayout);
+    this.lifecycleExpiration = Optional.ofNullable(lifecycleExpiration);
   }
 
   public static KeyInfoWithVolumeContext fromProtobuf(
@@ -65,6 +76,8 @@ public class KeyInfoWithVolumeContext {
         .setKeyInfo(OmKeyInfo.getFromProtobuf(proto.getKeyInfo()))
         .setBucketLayout(proto.hasBucketLayout()
             ? BucketLayout.fromProto(proto.getBucketLayout()) : null)
+        .setLifecycleExpiration(proto.hasLifecycleExpiration()
+            ? LifecycleExpirationInfo.getFromProtobuf(proto.getLifecycleExpiration()) : null)
         .build();
   }
 
@@ -74,6 +87,7 @@ public class KeyInfoWithVolumeContext {
     userPrincipal.ifPresent(builder::setUserPrincipal);
     builder.setKeyInfo(keyInfo.getProtobuf(clientVersion));
     bucketLayout.ifPresent(layout -> builder.setBucketLayout(layout.toProto()));
+    lifecycleExpiration.ifPresent(expiration -> builder.setLifecycleExpiration(expiration.getProtobuf()));
     return builder.build();
   }
 
@@ -93,6 +107,10 @@ public class KeyInfoWithVolumeContext {
     return bucketLayout;
   }
 
+  public Optional<LifecycleExpirationInfo> getLifecycleExpiration() {
+    return lifecycleExpiration;
+  }
+
   public static Builder newBuilder() {
     return new Builder();
   }
@@ -105,6 +123,7 @@ public class KeyInfoWithVolumeContext {
     private String userPrincipal;
     private OmKeyInfo keyInfo;
     private BucketLayout bucketLayout;
+    private LifecycleExpirationInfo lifecycleExpiration;
 
     public Builder setVolumeArgs(OmVolumeArgs volumeArgs) {
       this.volumeArgs = volumeArgs;
@@ -126,8 +145,13 @@ public class KeyInfoWithVolumeContext {
       return this;
     }
 
+    public Builder setLifecycleExpiration(LifecycleExpirationInfo lifecycleExpiration) {
+      this.lifecycleExpiration = lifecycleExpiration;
+      return this;
+    }
+
     public KeyInfoWithVolumeContext build() {
-      return new KeyInfoWithVolumeContext(volumeArgs, userPrincipal, keyInfo, bucketLayout);
+      return new KeyInfoWithVolumeContext(volumeArgs, userPrincipal, keyInfo, bucketLayout, lifecycleExpiration);
     }
   }
 }

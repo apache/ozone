@@ -28,13 +28,17 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmLCFilter.Tag;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
@@ -306,5 +310,54 @@ public class TestOmLifeCycleConfiguration {
         .setAction(new OmLCExpiration.Builder().setDays(1).build())
         .build();
     return getOmLifecycleConfiguration("volume", "bucket", Collections.singletonList(rule));
+  }
+
+  @Test
+  public void testGetExpiration() throws OMException {
+    long modificationTime = Instant.parse("2026-11-25T10:30:00Z").toEpochMilli();
+    OmLifecycleConfiguration lcc = getOmLifecycleConfiguration("volume", "bucket", Arrays.asList(
+        getOmLCRuleBuilder("late", "", true, 10, null).build(),
+        getOmLCRuleBuilder("logs", "logs/", true, 2, null).build(),
+        getOmLCRuleBuilder("disabled", "", false, 1, null).build(),
+        getOmLCRuleBuilder("tag", null, true, 5,
+            getOmLCFilterBuilder(null, new Tag("k", "v"), null).build()).build(),
+        getOmLCRuleBuilder("and", null, true, 3, getOmLCFilterBuilder(null, null,
+            getOmLCAndOperatorBuilder("data/", ImmutableMap.of("k", "v")).build()).build()).build()))
+        .build();
+
+    // Earliest matching enabled rule wins; the disabled rule is ignored.
+    assertExpiration("logs", "2026-11-28T00:00:00Z", lcc, "logs/a", Collections.emptyMap(), modificationTime);
+    assertExpiration("late", "2026-12-06T00:00:00Z", lcc, "other/a", Collections.emptyMap(), modificationTime);
+    assertExpiration("tag", "2026-12-01T00:00:00Z", lcc, "other/a", ImmutableMap.of("k", "v"), modificationTime);
+    assertExpiration("and", "2026-11-29T00:00:00Z", lcc, "data/a", ImmutableMap.of("k", "v"), modificationTime);
+    assertExpiration("late", "2026-12-06T00:00:00Z", lcc, "data/a", ImmutableMap.of("k", "x"), modificationTime);
+
+    OmLifecycleConfiguration noMatch = getOmLifecycleConfiguration("volume", "bucket", Arrays.asList(
+        getOmLCRuleBuilder("logs", "logs/", true, 2, null).build(),
+        getOmLCRuleBuilder("disabled", "", false, 1, null).build()))
+        .build();
+    assertNull(noMatch.getExpiration(keyInfo("other/a", Collections.emptyMap(), modificationTime), "other/a"));
+  }
+
+  private static void assertExpiration(String ruleId, String expiryTime, OmLifecycleConfiguration lcc,
+      String keyName, Map<String, String> tags, long modificationTime) {
+    LifecycleExpirationInfo expiration = lcc.getExpiration(keyInfo(keyName, tags, modificationTime), keyName);
+    assertNotNull(expiration);
+    assertEquals(ruleId, expiration.getRuleId());
+    assertEquals(Instant.parse(expiryTime), expiration.getExpiryTime());
+
+    LifecycleExpirationInfo fromProto = LifecycleExpirationInfo.getFromProtobuf(expiration.getProtobuf());
+    assertEquals(expiration.getRuleId(), fromProto.getRuleId());
+    assertEquals(expiration.getExpiryTime(), fromProto.getExpiryTime());
+  }
+
+  private static OmKeyInfo keyInfo(String keyName, Map<String, String> tags, long modificationTime) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName("volume")
+        .setBucketName("bucket")
+        .setKeyName(keyName)
+        .setModificationTime(modificationTime)
+        .setTags(tags)
+        .build();
   }
 }

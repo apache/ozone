@@ -111,6 +111,8 @@ public final class S3Consts {
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";
 
+  public static final String EXPIRATION_HEADER = "x-amz-expiration";
+
   // Constants related to S3 tags
   public static final String TAG_HEADER = "x-amz-tagging";
   public static final String TAG_DIRECTIVE_HEADER = "x-amz-tagging-directive";

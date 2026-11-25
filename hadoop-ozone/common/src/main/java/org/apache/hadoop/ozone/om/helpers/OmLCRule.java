@@ -289,6 +289,23 @@ public final class OmLCRule {
     return matched;
   }
 
+  /**
+   * Whether this rule is enabled, has an Expiration action, and its prefix or filter applies to the key,
+   * regardless of whether the key has already expired.
+   *
+   * @param omKeyInfo detail Key info to evaluate against this rule
+   * @param keyPath path include key name and all its parent, except bucket and volume
+   */
+  public boolean appliesForExpiration(OmKeyInfo omKeyInfo, String keyPath) {
+    if (!enabled || getExpiration() == null) {
+      return false;
+    }
+    if (prefix != null) {
+      return keyPath.startsWith(prefix);
+    }
+    return filter != null && filter.match(omKeyInfo, keyPath);
+  }
+
   public LifecycleRule getProtobuf() {
     LifecycleRule.Builder builder = LifecycleRule.newBuilder()
         .setId(id)

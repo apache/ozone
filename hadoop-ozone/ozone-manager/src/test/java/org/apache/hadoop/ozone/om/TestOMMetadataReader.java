@@ -48,12 +48,14 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
@@ -61,10 +63,14 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.LifecycleExpirationInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
@@ -1074,6 +1080,10 @@ public class TestOMMetadataReader {
         OmVolumeArgs.newBuilder().setVolume("vol").setAdminName("admin").setOwnerName("owner").build(), "user"));
     when(keyManager.getKeyInfo(any(OmKeyArgs.class), any(ResolvedBucket.class), any()))
         .thenReturn(mock(OmKeyInfo.class));
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    when(metadataManager.getLifecycleConfigurationTable()).thenReturn(mock(Table.class));
+    when(keyManager.getMetadataManager()).thenReturn(metadataManager);
+    when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
     return new OmMetadataReader(keyManager, mock(PrefixManager.class), ozoneManager, mock(org.slf4j.Logger.class),
         mock(AuditLogger.class), mock(OmMetadataReaderMetrics.class), null);
   }
@@ -1124,6 +1134,39 @@ public class TestOMMetadataReader {
     assertNotNull(reader.getKeyInfo(getKeyInfoArgs("obs-bucket", false), assumeS3Context).getKeyInfo());
 
     verify(keyManager).getKeyInfo(any(OmKeyArgs.class), any(ResolvedBucket.class), any());
+  }
+
+  @Test
+  public void getKeyInfoReturnsLifecycleExpirationForS3Context() throws Exception {
+    KeyManager keyManager = mock(KeyManager.class);
+    OmMetadataReader reader = newGetKeyInfoReader(keyManager, "obs-bucket", BucketLayout.OBJECT_STORE);
+    when(keyManager.getKeyInfo(any(OmKeyArgs.class), any(ResolvedBucket.class), any()))
+        .thenReturn(new OmKeyInfo.Builder()
+            .setVolumeName("vol")
+            .setBucketName("obs-bucket")
+            .setKeyName("file")
+            .setModificationTime(Instant.parse("2026-11-25T10:30:00Z").toEpochMilli())
+            .build());
+    OMMetadataManager metadataManager = keyManager.getMetadataManager();
+    when(metadataManager.getBucketKey("vol", "obs-bucket")).thenReturn("/vol/obs-bucket");
+    Table<String, OmLifecycleConfiguration> table = metadataManager.getLifecycleConfigurationTable();
+    when(table.get("/vol/obs-bucket")).thenReturn(new OmLifecycleConfiguration.Builder()
+        .setVolume("vol")
+        .setBucket("obs-bucket")
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
+        .addRule(new OmLCRule.Builder().setId("rule1").setPrefix("").setEnabled(true)
+            .addAction(new OmLCExpiration.Builder().setDays(1).build()).build())
+        .build());
+
+    LifecycleExpirationInfo expiration = reader.getKeyInfo(getKeyInfoArgs("obs-bucket", false), true)
+        .getLifecycleExpiration().orElseThrow(AssertionError::new);
+    assertEquals("rule1", expiration.getRuleId());
+    assertEquals(Instant.parse("2026-11-27T00:00:00Z"), expiration.getExpiryTime());
+
+    // Not returned for non-S3 requests, nor for keys read from a snapshot.
+    assertFalse(reader.getKeyInfo(getKeyInfoArgs("obs-bucket", false), false).getLifecycleExpiration().isPresent());
+    when(keyManager.getMetadataManager()).thenReturn(mock(OMMetadataManager.class));
+    assertFalse(reader.getKeyInfo(getKeyInfoArgs("obs-bucket", false), true).getLifecycleExpiration().isPresent());
   }
 
   @Test

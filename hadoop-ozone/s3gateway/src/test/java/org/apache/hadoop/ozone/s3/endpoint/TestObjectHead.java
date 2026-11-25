@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPIRATION_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
@@ -53,7 +54,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -72,6 +78,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.helpers.LifecycleExpirationInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
@@ -84,6 +93,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.stubbing.Answer;
 
 /**
  * Test head object.
@@ -430,6 +440,52 @@ public class TestObjectHead {
         Arguments.of("bytes=0-" + Long.MAX_VALUE, HttpStatus.SC_PARTIAL_CONTENT, 10L, "bytes 0-9/10"),
         Arguments.of("bytes=0-9223372036854775808", HttpStatus.SC_OK, 10L, null),
         Arguments.of("bytes=0-99999999999999999999", HttpStatus.SC_OK, 10L, null));
+  }
+
+  @Test
+  public void testHeadObjectExpiration() throws Exception {
+    createKey("key1");
+    assertNull(keyEndpoint.head(bucketName, "key1").getHeaderString(EXPIRATION_HEADER));
+
+    OzoneClient client = spy(keyEndpoint.getClient());
+    ClientProtocol proxy = spy(client.getProxy());
+    doReturn(proxy).when(client).getProxy();
+    Answer<OzoneKey> withExpiration = invocation -> {
+      OzoneKey key = (OzoneKey) invocation.callRealMethod();
+      key.setLifecycleExpiration(new LifecycleExpirationInfo(Instant.parse("2026-11-27T00:00:00Z"), "rule1"));
+      return key;
+    };
+    doAnswer(withExpiration).when(proxy).headS3Object(anyString(), anyString());
+    doAnswer(withExpiration).when(proxy).headS3Object(anyString(), anyString(), anyInt());
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    assertEquals("expiry-date=\"Fri, 27 Nov 2026 00:00:00 GMT\", rule-id=\"rule1\"",
+        endpoint.head(bucketName, "key1").getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {
+      "rule1|rule-id=\"rule1\"",
+      "a\"b\\c|rule-id=\"a\\\"b\\\\c\"",
+  }, delimiter = '|')
+  public void testExpirationHeaderRuleId(String ruleId, String expectedRuleId) {
+    assertThat(expirationHeader(ruleId)).endsWith(expectedRuleId);
+  }
+
+  @Test
+  public void testExpirationHeaderOmittedForControlCharacter() {
+    assertNull(expirationHeader("rule\r\n1"));
+  }
+
+  private static String expirationHeader(String ruleId) {
+    OzoneKey key = new OzoneKey("s3v", "b1", "key1", 0, 0, 0, null, true, "owner");
+    key.setLifecycleExpiration(new LifecycleExpirationInfo(Instant.parse("2026-11-27T00:00:00Z"), ruleId));
+    Response.ResponseBuilder responseBuilder = Response.ok();
+    ObjectEndpoint.addExpirationIfAny(responseBuilder, key);
+    return responseBuilder.build().getHeaderString(EXPIRATION_HEADER);
   }
 
   private byte[] createKey(String keyPath) throws IOException {

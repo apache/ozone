@@ -1455,6 +1455,15 @@ message GetKeyInfoResponse {
   optional VolumeInfo volumeInfo = 2;
   optional string UserPrincipal = 3;
   optional BucketLayoutProto bucketLayout = 4;
+  // Set by OM for S3 requests when an enabled lifecycle Expiration rule of the bucket applies to the key.
+  optional LifecycleExpirationInfo lifecycleExpiration = 5;
+}
+
+// When a key expires under the bucket lifecycle configuration, as returned in the S3 x-amz-expiration header.
+message LifecycleExpirationInfo {
+  // Expiry time in milliseconds since epoch.
+  optional uint64 expiryTime = 1;
+  optional string ruleId = 2;
 }
 
 message RenameKeysRequest {

@@ -34,6 +34,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPIRATION_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.MP_PARTS_COUNT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_MATCH_PATTERN;
@@ -97,6 +98,7 @@ import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.LifecycleExpirationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -491,6 +493,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
 
       addLastModifiedDate(responseBuilder, keyDetails);
+      addExpirationIfAny(responseBuilder, keyDetails);
       addTagCountIfAny(responseBuilder, keyDetails);
       addCustomMetadataHeaders(responseBuilder, keyDetails);
       ServerSideEncryption.readHeaders(keyDetails).forEach(responseBuilder::header);
@@ -532,6 +535,22 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     responseBuilder
         .header(HttpHeaders.LAST_MODIFIED,
             RFC1123Util.FORMAT.format(lastModificationTime));
+  }
+
+  /**
+   * Adds the {@code x-amz-expiration} header, e.g. {@code expiry-date="Fri, 27 Nov 2026 00:00:00 GMT",
+   * rule-id="rule1"}, if an enabled lifecycle Expiration rule of the bucket applies to the key.
+   * The header is omitted if the rule ID contains a control character.
+   */
+  static void addExpirationIfAny(ResponseBuilder responseBuilder, OzoneKey key) {
+    LifecycleExpirationInfo expiration = key.getLifecycleExpiration();
+    if (expiration == null || expiration.getRuleId().chars().anyMatch(Character::isISOControl)) {
+      return;
+    }
+    ZonedDateTime expiryTime = expiration.getExpiryTime().atZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE));
+    String ruleId = expiration.getRuleId().replace("\\", "\\\\").replace("\"", "\\\"");
+    responseBuilder.header(EXPIRATION_HEADER,
+        "expiry-date=\"" + RFC1123Util.FORMAT.format(expiryTime) + "\", rule-id=\"" + ruleId + "\"");
   }
 
   /**
@@ -727,6 +746,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     addStoredObjectHeaders(response, key);
 
     addLastModifiedDate(response, key);
+    addExpirationIfAny(response, key);
     addTagCountIfAny(response, key);
     addCustomMetadataHeaders(response, key);
     ServerSideEncryption.readHeaders(key).forEach(response::header);
