@@ -28,13 +28,34 @@ public final class RetentionUtil {
   private RetentionUtil() {
   }
 
-  public static void validateRule(RetentionDuration rule) {
+  public static void validateBucketRetention(BucketRetention retention) {
+    if (retention.getDuration() != null) {
+      validateRule(retention.getDuration());
+    }
+    if (retention.getDefaultEventHold() != null) {
+      validateEventHoldRule(retention.getDefaultEventHold());
+    }
+  }
+
+  /**
+   * Validate retention submitted by a write request at the given time in epoch milliseconds.
+   */
+  public static void validateObjectRetention(ObjectRetention retention, long currentTime) {
+    if (retention.getRetentionDate() != 0) {
+      validateRetainUntilDate(retention.getRetentionDate(), currentTime);
+    }
+    if (retention.getEventHold() != null) {
+      validateEventHoldRule(retention.getEventHold().getDuration());
+    }
+  }
+
+  private static void validateRule(RetentionDuration rule) {
     if (rule == null || rule.getDuration() <= 0) {
       throw new IllegalArgumentException("Retention rule requires a time unit and positive signed-long duration");
     }
   }
 
-  public static void validateEventHoldRule(RetentionDuration rule) {
+  private static void validateEventHoldRule(RetentionDuration rule) {
     validateRule(rule);
     switch (rule.getTimeUnit()) {
     case DAYS:
@@ -77,7 +98,7 @@ public final class RetentionUtil {
     }
   }
 
-  public static void validateRetainUntilDate(long retentionDate, long currentTime) {
+  private static void validateRetainUntilDate(long retentionDate, long currentTime) {
     if (retentionDate < 0 || retentionDate <= currentTime) {
       throw new IllegalArgumentException("Retention expiration time must be in the future");
     }
