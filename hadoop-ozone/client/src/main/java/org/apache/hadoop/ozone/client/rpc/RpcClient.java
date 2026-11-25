@@ -133,6 +133,8 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -660,6 +662,9 @@ public class RpcClient implements ClientProtocol {
             + " bucket to Erasure Coded replication, as OzoneManager does"
             + " not support Erasure Coded replication.");
       }
+    }
+    if (bucketArgs.getStoragePolicy() != null || bucketArgs.getAllowFallbackStoragePolicy() != null) {
+      checkStoragePolicySupported();
     }
 
     final String owner;
@@ -1276,6 +1281,7 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(storagePolicy, "storagePolicy == null");
+    checkStoragePolicySupported();
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1288,6 +1294,7 @@ public class RpcClient implements ClientProtocol {
     Objects.requireNonNull(args, "args == null");
     verifyVolumeName(args.getVolumeName());
     verifyBucketName(args.getBucketName());
+    checkStoragePolicySupported();
     ozoneManagerClient.setBucketProperty(args);
   }
 
@@ -1486,27 +1493,27 @@ public class RpcClient implements ClientProtocol {
       ReplicationConfig replicationConfig,
       Map<String, String> metadata, Map<String, String> tags,
       boolean derivedKeyPiggyBacking) throws IOException {
-    String ownerName = getRealUserInfo().getShortUserName();
-    OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
-        bucketName, keyName, size, replicationConfig, metadata, tags);
-    builder.setOwnerName(ownerName);
-    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
-    return openOutputStream(builder.build(), size);
+    return createKey(volumeName, bucketName, keyName, CreateKeyOptions.builder()
+        .setSize(size)
+        .setReplicationConfig(replicationConfig)
+        .setMetadata(metadata)
+        .setTags(tags)
+        .setDerivedKeyPiggyBacking(derivedKeyPiggyBacking)
+        .build());
   }
 
   @Override
-  @SuppressWarnings("checkstyle:parameternumber")
   public OzoneOutputStream createKey(
-      String volumeName, String bucketName, String keyName, long size,
-      ReplicationConfig replicationConfig,
-      Map<String, String> metadata, Map<String, String> tags,
-      StoragePolicy storagePolicy) throws IOException {
+      String volumeName, String bucketName, String keyName, CreateKeyOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
     String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
-        bucketName, keyName, size, replicationConfig, metadata, tags);
+        bucketName, keyName, options.getSize(), options.getReplicationConfig(), options.getMetadata(),
+        options.getTags());
     builder.setOwnerName(ownerName);
-    builder.setStoragePolicy(storagePolicy);
-    return openOutputStream(builder.build(), size);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(options.isDerivedKeyPiggyBacking()));
+    builder.setStoragePolicy(options.getStoragePolicy());
+    return openOutputStream(builder.build(), options.getSize());
   }
 
   @Override
@@ -1605,6 +1612,12 @@ public class RpcClient implements ClientProtocol {
   private void checkIfNoneMatchETagSupport() throws IOException {
     if (!OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support If-None-Match entity ETags for writes.");
+    }
+  }
+
+  private void checkStoragePolicySupported() throws IOException {
+    if (!OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
+      throw new IOException("OzoneManager does not support storage policy");
     }
   }
 
@@ -2266,7 +2279,7 @@ public class RpcClient implements ClientProtocol {
       Map<String, String> metadata,
       Map<String, String> tags)
       throws IOException {
-    return initiateMultipartUpload(volumeName, bucketName, keyName, new MultipartUploadOptions.Builder()
+    return initiateMultipartUpload(volumeName, bucketName, keyName, MultipartUploadOptions.builder()
         .setReplicationConfig(replicationConfig)
         .setMetadata(metadata)
         .setTags(tags)
@@ -2303,8 +2316,8 @@ public class RpcClient implements ClientProtocol {
       }
     }
 
-    if (storagePolicy != null && !OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
-      throw new IOException("OzoneManager does not support storage policy");
+    if (storagePolicy != null) {
+      checkStoragePolicySupported();
     }
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -2695,9 +2708,23 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream createFile(String volumeName, String bucketName,
       String keyName, long size, ReplicationConfig replicationConfig,
       boolean overWrite, boolean recursive) throws IOException {
+    return createFile(volumeName, bucketName, keyName, CreateFileOptions.builder()
+        .setSize(size)
+        .setReplicationConfig(replicationConfig)
+        .setOverWrite(overWrite)
+        .setRecursive(recursive)
+        .build());
+  }
+
+  @Override
+  public OzoneOutputStream createFile(String volumeName, String bucketName,
+      String keyName, CreateFileOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
+    final ReplicationConfig replicationConfig = options.getReplicationConfig();
     if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(getOmVersion())) {
-      if (replicationConfig.getReplicationType()
-          == HddsProtos.ReplicationType.EC) {
+      if (replicationConfig != null &&
+          replicationConfig.getReplicationType()
+              == HddsProtos.ReplicationType.EC) {
         throw new IOException("Can not set the replication of the file to"
             + " Erasure Coded replication, as OzoneManager does not support"
             + " Erasure Coded replication.");
@@ -2708,13 +2735,13 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setDataSize(size)
+        .setDataSize(options.getSize())
         .setReplicationConfig(replicationConfig)
         .setLatestVersionLocation(getLatestVersionLocation)
         .setOwnerName(ownerName)
         .build();
     OpenKeySession keySession =
-        ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
+        ozoneManagerClient.createFile(keyArgs, options.isOverWrite(), options.isRecursive());
     return createOutputStream(keySession);
   }
 

@@ -19,14 +19,23 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DEFAULT_STORAGE_POLICY_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -87,6 +96,22 @@ public class TestOMStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgradeTe
     assertRejected(() -> setStoragePolicy(OzoneStoragePolicy.HOT, true, null));
     assertRejected(() -> setStoragePolicy(null, null, true));
 
+    // Through the client API, RpcClient refuses to send storage policy fields to an OM below
+    // STORAGE_POLICY_SUPPORT. It fails on the client, so the OM never sees the request.
+    OzoneVolume volume = getClient().getObjectStore().getVolume(VOLUME_NAME);
+    String clientRejected = "buck-" + UUID.randomUUID();
+    assertClientRejected(() -> volume.createBucket(clientRejected,
+        BucketArgs.newBuilder().setStoragePolicy(OzoneStoragePolicy.HOT).build()));
+    assertClientRejected(() -> volume.createBucket(clientRejected,
+        BucketArgs.newBuilder().setAllowFallbackStoragePolicy(true).build()));
+    assertThatThrownBy(() -> getOmClient().getBucketInfo(VOLUME_NAME, clientRejected))
+        .isInstanceOfSatisfying(OMException.class, ex -> assertThat(ex.getResult())
+            .isEqualTo(OMException.ResultCodes.BUCKET_NOT_FOUND));
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    assertClientRejected(() -> bucket.setStoragePolicy(OzoneStoragePolicy.HOT));
+    assertClientRejected(() -> bucket.setStoragePolicyProperty(null, null, true));
+    assertThat(getOmClient().getBucketInfo(VOLUME_NAME, bucketName).getStoragePolicy()).isNull();
+
     // Controls: the gate must not reject requests that carry no storage policy field
     createBucket(null, null);
     // The client API must not add a policy field on its own, or the gate rejects this request.
@@ -125,6 +150,34 @@ public class TestOMStoragePolicyUpgrade extends AbstractOMStoragePolicyUpgradeTe
     setStoragePolicy(null, null, true);
     assertThat(getOmClient().getBucketInfo(VOLUME_NAME, bucketName)
         .getStoragePolicy()).isNull();
+
+    // A client connected after finalization sees the new OM version and may send storage policy fields.
+    // The client used before finalization cached the old OM version, so it cannot be reused here.
+    OzoneClient postFinalizeClient = getCluster().newClient();
+    try {
+      OzoneVolume volume = postFinalizeClient.getObjectStore().getVolume(VOLUME_NAME);
+      String clientCreated = "buck-" + UUID.randomUUID();
+      volume.createBucket(clientCreated, BucketArgs.newBuilder()
+          .setStoragePolicy(OzoneStoragePolicy.HOT)
+          .setAllowFallbackStoragePolicy(false)
+          .build());
+      OmBucketInfo clientCreatedInfo = getOmClient().getBucketInfo(VOLUME_NAME, clientCreated);
+      assertThat(clientCreatedInfo.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+      assertThat(clientCreatedInfo.getAllowFallbackStoragePolicy()).isFalse();
+
+      volume.getBucket(bucketName).setStoragePolicy(OzoneStoragePolicy.COLD);
+      assertThat(getOmClient().getBucketInfo(VOLUME_NAME, bucketName)
+          .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    } finally {
+      IOUtils.closeQuietly(postFinalizeClient);
+    }
+  }
+
+  private void assertClientRejected(ThrowingCallable call) {
+    assertThatThrownBy(call)
+        .isInstanceOf(IOException.class)
+        .isNotInstanceOf(OMException.class)
+        .hasMessage("OzoneManager does not support storage policy");
   }
 
   private void setStoragePolicy(StoragePolicy storagePolicy,

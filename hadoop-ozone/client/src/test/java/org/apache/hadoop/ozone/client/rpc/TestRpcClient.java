@@ -51,6 +51,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -67,9 +68,12 @@ import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
@@ -1206,6 +1210,73 @@ public class TestRpcClient {
     }
   }
 
+  /**
+   * A single CreateKeyOptions carrying both a storage policy and derived key piggybacking must send both to the OM.
+   */
+  @Test
+  void testCreateKeyOptionsMappedToRequest() throws IOException {
+    AtomicReference<CreateKeyRequest> captured = new AtomicReference<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return super.submitRequest(request).toBuilder()
+              .setServiceListResponse(ServiceListResponse.newBuilder()
+                  .addServiceInfo(OzoneManagerProtocolProtos.ServiceInfo.newBuilder()
+                      .setNodeType(HddsProtos.NodeType.OM).setHostname("new-om")
+                      .setOMVersion(OzoneManagerVersion.STORAGE_POLICY_SUPPORT.serialize())))
+              .build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          captured.set(request.getCreateKeyRequest());
+          throw new IOException("Captured CreateKey request");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      CreateKeyOptions options = CreateKeyOptions.builder()
+          .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+          .setStoragePolicy(OzoneStoragePolicy.HOT)
+          .setDerivedKeyPiggyBacking(true)
+          .build();
+
+      assertThatThrownBy(() -> client.createKey("volume", "bucket", "key", options))
+          .isInstanceOf(IOException.class)
+          .hasMessage("Captured CreateKey request");
+      assertThat(captured.get()).isNotNull();
+      assertThat(captured.get().getDerivedKeyPiggyBacking()).isTrue();
+      assertThat(captured.get().getKeyArgs().getStoragePolicy()).isEqualTo(HddsProtos.StoragePolicyProto.HOT);
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  public void testCreateKeyRejectsNullOptions() throws IOException {
+    RpcClient client = createRpcClient();
+    try {
+      assertThatThrownBy(() -> client.createKey("vol", "bucket", "key", (CreateKeyOptions) null))
+          .isInstanceOf(NullPointerException.class)
+          .hasMessage("options == null");
+    } finally {
+      client.close();
+    }
+  }
+
+  @Test
+  public void testCreateFileRejectsNullOptions() throws IOException {
+    RpcClient client = createRpcClient();
+    try {
+      assertThatThrownBy(() -> client.createFile("vol", "bucket", "key", (CreateFileOptions) null))
+          .isInstanceOf(NullPointerException.class)
+          .hasMessage("options == null");
+    } finally {
+      client.close();
+    }
+  }
+
   @Test
   public void testInitiateMultipartUploadRejectsNullOptions() throws IOException {
     RpcClient client = createRpcClient();
@@ -1226,28 +1297,15 @@ public class TestRpcClient {
   public void testInitiateMultipartUploadWithStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
       throws IOException {
     List<KeyArgs> requests = new ArrayList<>();
-    OmTransport transport = new MockOmTransport() {
-      @Override
-      public OMResponse submitRequest(OMRequest request) throws IOException {
-        if (request.getCmdType() == Type.ServiceList) {
-          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
-              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
-              .build();
-        }
-        if (request.getCmdType() == Type.InitiateMultiPartUpload) {
-          requests.add(request.getInitiateMultiPartUploadRequest().getKeyArgs());
-          throw new IOException("captured");
-        }
-        return super.submitRequest(request);
-      }
-    };
+    OmTransport transport = transportWithOmVersion(version, Type.InitiateMultiPartUpload,
+        request -> requests.add(request.getInitiateMultiPartUploadRequest().getKeyArgs()));
     RpcClient client = createRpcClient(transport);
     try {
       ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
       IOException withoutPolicyError = assertThrows(IOException.class, () -> client.initiateMultipartUpload(
-          "vol", "bucket", "key", new MultipartUploadOptions.Builder().setReplicationConfig(replication).build()));
+          "vol", "bucket", "key", MultipartUploadOptions.builder().setReplicationConfig(replication).build()));
       IOException withPolicyError = assertThrows(IOException.class, () -> client.initiateMultipartUpload(
-          "vol", "bucket", "key", new MultipartUploadOptions.Builder().setReplicationConfig(replication)
+          "vol", "bucket", "key", MultipartUploadOptions.builder().setReplicationConfig(replication)
               .setStoragePolicy(OzoneStoragePolicy.COLD).build()));
 
       assertThat(withoutPolicyError).hasMessage("captured");
@@ -1346,6 +1404,116 @@ public class TestRpcClient {
         return super.submitRequest(request);
       }
     });
+  }
+
+  /**
+   * A storage policy field is sent only to an OM that supports it, and a request without one is never rejected.
+   */
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testCreateBucketWithStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
+      throws IOException {
+    List<BucketInfo> requests = new ArrayList<>();
+    OmTransport transport = transportWithOmVersion(version, Type.CreateBucket,
+        request -> requests.add(request.getCreateBucketRequest().getBucketInfo()));
+    RpcClient client = createRpcClient(transport);
+    try {
+      IOException withoutPolicyError = assertThrows(IOException.class, () -> client.createBucket(
+          "vol", "bucket", BucketArgs.newBuilder().build()));
+      IOException withPolicyError = assertThrows(IOException.class, () -> client.createBucket(
+          "vol", "bucket", BucketArgs.newBuilder().setStoragePolicy(OzoneStoragePolicy.COLD).build()));
+      IOException withFallbackError = assertThrows(IOException.class, () -> client.createBucket(
+          "vol", "bucket", BucketArgs.newBuilder().setAllowFallbackStoragePolicy(false).build()));
+
+      assertThat(withoutPolicyError).hasMessage("captured");
+      assertThat(requests.get(0).hasStoragePolicy()).isFalse();
+      assertThat(requests.get(0).hasAllowFallbackStoragePolicy()).isFalse();
+      if (OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(version)) {
+        assertThat(withPolicyError).hasMessage("captured");
+        assertThat(withFallbackError).hasMessage("captured");
+        assertThat(requests).hasSize(3);
+        assertThat(requests.get(1).getStoragePolicy()).isEqualTo(OzoneStoragePolicy.toProto(OzoneStoragePolicy.COLD));
+        assertThat(requests.get(2).hasAllowFallbackStoragePolicy()).isTrue();
+        assertThat(requests.get(2).getAllowFallbackStoragePolicy()).isFalse();
+      } else {
+        assertThat(withPolicyError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(withFallbackError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(requests).hasSize(1);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * Setting a storage policy needs an OM that supports it, whatever the arguments are. This includes
+   * arguments that carry no storage policy field, since the method is a public storage policy API.
+   */
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testSetBucketStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
+      throws IOException {
+    List<OzoneManagerProtocolProtos.BucketArgs> requests = new ArrayList<>();
+    OmTransport transport = transportWithOmVersion(version, Type.SetBucketProperty,
+        request -> requests.add(request.getSetBucketPropertyRequest().getBucketArgs()));
+    RpcClient client = createRpcClient(transport);
+    try {
+      IOException withPolicyError = assertThrows(IOException.class, () -> client.setBucketStoragePolicy(
+          "vol", "bucket", OzoneStoragePolicy.COLD));
+      IOException withFallbackError = assertThrows(IOException.class, () -> client.setBucketStoragePolicy(
+          OmBucketArgs.newBuilder().setVolumeName("vol").setBucketName("bucket")
+              .setAllowFallbackStoragePolicy(true).build()));
+      IOException withUnsetError = assertThrows(IOException.class, () -> client.setBucketStoragePolicy(
+          OmBucketArgs.newBuilder().setVolumeName("vol").setBucketName("bucket")
+              .setUnsetStoragePolicy(true).build()));
+      IOException withEmptyArgsError = assertThrows(IOException.class, () -> client.setBucketStoragePolicy(
+          OmBucketArgs.newBuilder().setVolumeName("vol").setBucketName("bucket").build()));
+
+      if (OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(version)) {
+        assertThat(withPolicyError).hasMessage("captured");
+        assertThat(withFallbackError).hasMessage("captured");
+        assertThat(withUnsetError).hasMessage("captured");
+        assertThat(withEmptyArgsError).hasMessage("captured");
+        assertThat(requests).hasSize(4);
+        assertThat(requests.get(0).getStoragePolicy()).isEqualTo(OzoneStoragePolicy.toProto(OzoneStoragePolicy.COLD));
+        assertThat(requests.get(1).getAllowFallbackStoragePolicy()).isTrue();
+        assertThat(requests.get(2).getUnsetStoragePolicy()).isTrue();
+        assertThat(requests.get(3).hasStoragePolicy()).isFalse();
+        assertThat(requests.get(3).hasAllowFallbackStoragePolicy()).isFalse();
+        assertThat(requests.get(3).hasUnsetStoragePolicy()).isFalse();
+      } else {
+        assertThat(withPolicyError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(withFallbackError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(withUnsetError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(withEmptyArgsError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(requests).isEmpty();
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * A transport whose OM reports the given version. A request of the captured type is passed to the captor and then
+   * fails with "captured", so that a test sees what the client sent without a real OM.
+   */
+  private static OmTransport transportWithOmVersion(
+      OzoneManagerVersion version, Type capturedType, Consumer<OMRequest> captor) {
+    return new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
+              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()))
+              .build();
+        }
+        if (request.getCmdType() == capturedType) {
+          captor.accept(request);
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
   }
 
   private static ServiceInfo om(OzoneManagerVersion version) {

@@ -29,6 +29,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -109,7 +110,7 @@ class TestContainerBalancerMoveFailureBreakdown {
       throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
     MockedSCM mockedScm = createMockedScm();
     when(mockedScm.getMoveManager().move(any(ContainerID.class),
-        any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class)))
         .thenReturn(CompletableFuture.completedFuture(
             MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT))
         .thenReturn(CompletableFuture.completedFuture(
@@ -122,7 +123,7 @@ class TestContainerBalancerMoveFailureBreakdown {
     assertThat(iteration.getContainerMovesTimeout()).isEqualTo(1);
     assertThat(iteration.getContainerMovesFailed()).isEqualTo(1);
     verify(mockedScm.getMoveManager(), atLeast(2)).move(
-            any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class));
+            any(ContainerID.class), any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class));
     assertBreakdownTotalsMatchHeadlineCounters(iteration);
   }
 
@@ -131,7 +132,7 @@ class TestContainerBalancerMoveFailureBreakdown {
       throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
     MockedSCM mockedScm = createMockedScm();
     when(mockedScm.getMoveManager().move(any(ContainerID.class),
-        any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class)))
         .thenThrow(ContainerNotFoundException.newInstanceForTesting())
         .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
 
@@ -148,7 +149,7 @@ class TestContainerBalancerMoveFailureBreakdown {
       throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
     MockedSCM mockedScm = createMockedScm();
     when(mockedScm.getMoveManager().move(any(ContainerID.class),
-        any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class)))
         .thenThrow(new NodeNotFoundException())
         .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
     ContainerBalancerTask task = mockedScm.startBalancerTask(buildConfig(mockedScm));
@@ -163,7 +164,7 @@ class TestContainerBalancerMoveFailureBreakdown {
       throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
     MockedSCM mockedScm = createMockedScm();
     when(mockedScm.getMoveManager().move(any(ContainerID.class),
-        any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class)))
         .thenThrow(new ContainerReplicaNotFoundException("test"))
         .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
     ContainerBalancerTask task = mockedScm.startBalancerTask(buildConfig(mockedScm));
@@ -206,7 +207,7 @@ class TestContainerBalancerMoveFailureBreakdown {
   private static void mockMoveFailureOnce(MockedSCM mockedScm, MoveManager.MoveResult failureResult)
       throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
     when(mockedScm.getMoveManager().move(any(ContainerID.class),
-        any(DatanodeDetails.class), any(DatanodeDetails.class)))
+        any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class)))
         .thenReturn(CompletableFuture.completedFuture(failureResult))
         .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
   }
@@ -215,7 +216,7 @@ class TestContainerBalancerMoveFailureBreakdown {
           throws NodeNotFoundException, ContainerReplicaNotFoundException, ContainerNotFoundException {
     AtomicInteger moveInvocations = new AtomicInteger(0);
     when(mockedScm.getMoveManager().move(any(ContainerID.class),
-            any(DatanodeDetails.class), any(DatanodeDetails.class)))
+            any(DatanodeDetails.class), any(DatanodeDetails.class), any(StorageType.class)))
             .thenAnswer(invocation -> {
               if (moveInvocations.getAndIncrement() == 0) {
                 return new CompletableFuture<>();
@@ -258,7 +259,7 @@ class TestContainerBalancerMoveFailureBreakdown {
     ArgumentCaptor<DatanodeDetails> sourceCaptor = ArgumentCaptor.forClass(DatanodeDetails.class);
     ArgumentCaptor<DatanodeDetails> targetCaptor = ArgumentCaptor.forClass(DatanodeDetails.class);
     verify(mockedScm.getMoveManager(), atLeastOnce()).move(
-            any(ContainerID.class), sourceCaptor.capture(), targetCaptor.capture());
+            any(ContainerID.class), sourceCaptor.capture(), targetCaptor.capture(), any(StorageType.class));
     assertThat(sourceCaptor.getAllValues().size()).isGreaterThan(moveIndex);
     assertThat(targetCaptor.getAllValues().size()).isGreaterThan(moveIndex);
     String sourceUuid = sourceCaptor.getAllValues().get(moveIndex).getUuidString();

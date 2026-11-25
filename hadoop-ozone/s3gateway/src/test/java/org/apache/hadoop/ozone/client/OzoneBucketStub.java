@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -201,6 +202,12 @@ public final class OzoneBucketStub extends OzoneBucket {
   public OzoneOutputStream createKey(String key, long size, ReplicationConfig rConfig,
       Map<String, String> metadata, Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
     return addDerivedKey(createKey(key, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  public OzoneOutputStream createKey(String key, CreateKeyOptions options) throws IOException {
+    return addDerivedKey(createKey(key, options.getSize(), options.getReplicationConfig(),
+        options.getMetadata(), options.getTags()), options.isDerivedKeyPiggyBacking());
   }
 
   @Override
