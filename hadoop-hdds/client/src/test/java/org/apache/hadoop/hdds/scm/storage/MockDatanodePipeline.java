@@ -33,6 +33,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
@@ -99,6 +101,8 @@ public class MockDatanodePipeline {
   private volatile int watchFailAfter = Integer.MAX_VALUE;
 
   private volatile boolean streamCloseFailure;
+  // When true, the stream close reply is completed asynchronously after a short delay.
+  private volatile boolean streamCloseDelayed;
   private final AtomicInteger streamCloseCount = new AtomicInteger(0);
 
   public MockDatanodePipeline() throws IOException {
@@ -198,7 +202,18 @@ public class MockDatanodePipeline {
           if (streamCloseFailure) {
             when(reply.isSuccess()).thenReturn(false);
           }
-          return CompletableFuture.completedFuture(reply);
+          if (!streamCloseDelayed) {
+            return CompletableFuture.completedFuture(reply);
+          }
+          return CompletableFuture.supplyAsync(() -> {
+            try {
+              TimeUnit.MILLISECONDS.sleep(50);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new CompletionException(e);
+            }
+            return reply;
+          });
         }
       }
       int count = chunkCount.incrementAndGet();
@@ -318,6 +333,12 @@ public class MockDatanodePipeline {
   /** Reply to the write with {@link StandardWriteOption#CLOSE} with an unsuccessful reply. */
   public MockDatanodePipeline failStreamClose() {
     this.streamCloseFailure = true;
+    return this;
+  }
+
+  /** Complete the stream close reply asynchronously, as a real Ratis pipeline does. */
+  public MockDatanodePipeline withDelayedStreamClose() {
+    this.streamCloseDelayed = true;
     return this;
   }
 

@@ -18,18 +18,32 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates.HEARTBEAT;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.security.PrivilegedExceptionAction;
+import javax.net.SocketFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 /**
  * Tests for SCMConnectionManager.
@@ -109,6 +123,23 @@ public class TestSCMConnectionManager {
       Assertions.assertFalse(cm.refreshSCMServer(address, ""));
       Assertions.assertTrue(cm.getValues().isEmpty());
       Assertions.assertEquals(before, address.getAddress());
+    }
+  }
+
+  @Test
+  public void addSCMServerUsesLoginUserWhenCalledAsRemoteUser() throws Exception {
+    try (SCMConnectionManager cm = new SCMConnectionManager(new OzoneConfiguration());
+         MockedStatic<RPC> rpc = mockStatic(RPC.class, CALLS_REAL_METHODS)) {
+      final HostAndPort address = new HostAndPort("127.0.0.1", 9861);
+      // Reconfiguration runs under the remote admin caller's UGI, which has no Kerberos credentials.
+      UserGroupInformation.createRemoteUser("admin").doAs((PrivilegedExceptionAction<Void>) () -> {
+        cm.addSCMServer(address, "");
+        return null;
+      });
+      final UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
+      rpc.verify(() -> RPC.getProtocolProxy(eq(StorageContainerDatanodeProtocolPB.class), anyLong(),
+          any(InetSocketAddress.class), eq(loginUser), any(Configuration.class), any(SocketFactory.class),
+          anyInt(), any(RetryPolicy.class)));
     }
   }
 

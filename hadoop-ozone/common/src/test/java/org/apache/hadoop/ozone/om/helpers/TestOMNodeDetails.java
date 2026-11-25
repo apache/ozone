@@ -480,7 +480,8 @@ public class TestOMNodeDetails {
    */
   @Test
   public void testSetRatisAddress() {
-    InetSocketAddress ratisAddr = new InetSocketAddress("192.168.1.100", 9873);
+    // Unresolved, so getHostName() does not do a reverse DNS lookup, which some CI runners answer.
+    InetSocketAddress ratisAddr = InetSocketAddress.createUnresolved("192.168.1.100", 9873);
     
     OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
         .setOMServiceId(OM_SERVICE_ID)

@@ -36,9 +36,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
@@ -131,10 +131,10 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
 
     Class<? extends ServerChannel> channelType;
     if (Epoll.isAvailable()) {
-      eventLoopGroup = new EpollEventLoopGroup(readExecutors.getPoolSize() / 10, factory);
+      eventLoopGroup = new EpollEventLoopGroup(readExecutors.getCorePoolSize() / 10, factory);
       channelType = EpollServerSocketChannel.class;
     } else {
-      eventLoopGroup = new NioEventLoopGroup(readExecutors.getPoolSize() / 10, factory);
+      eventLoopGroup = new NioEventLoopGroup(readExecutors.getCorePoolSize() / 10, factory);
       channelType = NioServerSocketChannel.class;
     }
 
@@ -196,16 +196,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     return this.port;
   }
 
-  /**
-   * Returns the Replication type supported by this end-point.
-   *
-   * @return enum -- {Stand_Alone, Ratis, Grpc, Chained}
-   */
-  @Override
-  public HddsProtos.ReplicationType getServerType() {
-    return HddsProtos.ReplicationType.STAND_ALONE;
-  }
-
   @Override
   public void start() throws IOException {
     if (!isStarted) {
@@ -257,8 +247,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   }
 
   @Override
-  public void submitRequest(ContainerCommandRequestProto request,
-      HddsProtos.PipelineID pipelineID) throws IOException {
+  public void submitRequest(ContainerCommandRequestProto request, PipelineID pipelineID) throws IOException {
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerGrpc." + request.getCmdType().name(),
@@ -277,8 +266,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   }
 
   @Override
-  public boolean isExist(HddsProtos.PipelineID pipelineId) {
-    return id.toPipelineID().getProtobuf().equals(pipelineId);
+  public boolean isExist(PipelineID pipelineId) {
+    return id.toPipelineID().equals(pipelineId);
   }
 
   @Override

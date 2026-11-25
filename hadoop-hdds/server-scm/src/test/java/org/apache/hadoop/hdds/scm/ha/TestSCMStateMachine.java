@@ -43,6 +43,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -80,8 +81,10 @@ import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.DivisionInfo;
+import org.apache.ratis.server.RaftConfiguration;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.TransactionContext;
@@ -106,6 +109,10 @@ public class TestSCMStateMachine {
   private final RaftPeerId followerId = RaftPeerId.valueOf("follower");
   private final RaftPeerId leaderId = RaftPeerId.valueOf("leader");
 
+  private volatile List<RaftPeer> currentPeers = Collections.singletonList(
+      RaftPeer.newBuilder().setId(followerId).build());
+
+  private StorageContainerManager mockScm;
   private SCMMetrics metrics;
   private SCMDatanodeProtocolServer datanodeProtocolServer;
   private SCMSafeModeManager safeModeManager;
@@ -113,7 +120,7 @@ public class TestSCMStateMachine {
 
   @BeforeEach
   void setUp() {
-    StorageContainerManager scm = mock(StorageContainerManager.class);
+    mockScm = mock(StorageContainerManager.class);
     metrics = SCMMetrics.create("scm1");
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     datanodeProtocolServer = mock(SCMDatanodeProtocolServer.class);
@@ -124,13 +131,17 @@ public class TestSCMStateMachine {
     SCMRatisServer ratisServer = mock(SCMRatisServer.class);
     RaftServer.Division division = mock(RaftServer.Division.class);
     DivisionInfo divisionInfo = mock(DivisionInfo.class);
+    RaftConfiguration raftConf = mock(RaftConfiguration.class);
 
-    when(scm.getMetrics()).thenReturn(metrics);
-    when(scm.isStopped()).thenAnswer(invocation -> scmStopped.get());
-    when(scm.getScmContext()).thenReturn(scmContext);
-    when(scm.getScmHAManager()).thenReturn(haManager);
-    when(scm.getDatanodeProtocolServer()).thenReturn(datanodeProtocolServer);
-    when(scm.getScmSafeModeManager()).thenReturn(safeModeManager);
+    when(mockScm.getMetrics()).thenReturn(metrics);
+    when(mockScm.getScmId()).thenReturn(followerId.toString());
+    when(division.getRaftConf()).thenReturn(raftConf);
+    when(raftConf.getCurrentPeers()).thenAnswer(invocation -> currentPeers);
+    when(mockScm.isStopped()).thenAnswer(invocation -> scmStopped.get());
+    when(mockScm.getScmContext()).thenReturn(scmContext);
+    when(mockScm.getScmHAManager()).thenReturn(haManager);
+    when(mockScm.getDatanodeProtocolServer()).thenReturn(datanodeProtocolServer);
+    when(mockScm.getScmSafeModeManager()).thenReturn(safeModeManager);
     when(haManager.getRatisServer()).thenReturn(ratisServer);
     when(ratisServer.getDivision()).thenReturn(division);
     when(division.getInfo()).thenReturn(divisionInfo);
@@ -145,7 +156,7 @@ public class TestSCMStateMachine {
     when(buffer.getLatestTrxInfo()).thenReturn(
         TransactionInfo.valueOf(TermIndex.valueOf(0, 0)));
 
-    stateMachine = new SCMStateMachine(scm, buffer, RETRY_INTERVAL, retryClock::get);
+    stateMachine = new SCMStateMachine(mockScm, buffer, RETRY_INTERVAL, retryClock::get);
   }
 
   @AfterEach
@@ -158,6 +169,37 @@ public class TestSCMStateMachine {
   void testRatisEventsRecording() {
     stateMachine.notifyConfigurationChanged(1, 1, RaftProtos.RaftConfigurationProto.getDefaultInstance());
     assertTrue(metrics.getRatisEvents().contains("Configuration changed at term index"));
+  }
+
+  @Test
+  void testNotifyServerShutdownTerminatesScm() {
+    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
+
+    verify(mockScm, timeout(5000)).shutDown(anyString());
+  }
+
+  @Test
+  void testNotifyServerShutdownExitsCleanlyWhenScmIsDecommissioned() {
+    ExitUtils.disableSystemExit();
+    ExitUtils.clear();
+    try {
+      currentPeers = Collections.singletonList(RaftPeer.newBuilder().setId(leaderId).build());
+      stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
+
+      verify(mockScm, timeout(5000)).stop();
+      verify(mockScm, never()).shutDown(anyString());
+      assertThat(ExitUtils.getFirstExitException().getStatus()).isZero();
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
+  @Test
+  void testNotifyServerShutdownIgnoredWhenScmStopped() {
+    scmStopped.set(true);
+    stateMachine.notifyServerShutdown(RaftProtos.RoleInfoProto.getDefaultInstance(), true);
+
+    verify(mockScm, after(500).never()).shutDown(anyString());
   }
 
   @Test
