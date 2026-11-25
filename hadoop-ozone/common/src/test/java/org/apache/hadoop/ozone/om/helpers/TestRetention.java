@@ -102,18 +102,19 @@ class TestRetention {
   }
 
   @Test
-  void preservesEventHoldEnabledPresence() {
+  void roundTripsEventHoldEnabled() {
     RetentionDuration duration = rule(RetentionTimeUnit.DAYS, 30);
-    for (Boolean enabled : new Boolean[]{null, false, true}) {
+    for (boolean enabled : new boolean[]{false, true}) {
       EventHold hold = new EventHold(enabled, duration);
       OzoneManagerProtocolProtos.EventHold proto = hold.toProto();
-      assertEquals(enabled != null, proto.hasEnabled());
-      assertEquals(enabled == null || enabled, proto.getEnabled());
+      assertEquals(!enabled, proto.hasEnabled());
+      assertEquals(enabled, proto.getEnabled());
       assertEquals(hold, EventHold.fromProto(proto));
       assertEquals(hold.hashCode(), EventHold.fromProto(proto).hashCode());
       assertEquals(proto, EventHold.fromProto(proto).toProto());
     }
-    assertNotEquals(new EventHold(null, duration), new EventHold(true, duration));
+    assertEquals(new EventHold(true, duration), EventHold.fromProto(
+        new EventHold(true, duration).toProto().toBuilder().setEnabled(true).build()));
     assertNotEquals(new EventHold(true, duration), new EventHold(false, duration));
     assertNotEquals(new EventHold(true, duration), new EventHold(true, rule(RetentionTimeUnit.DAYS, 31)));
     assertThrows(IllegalArgumentException.class,

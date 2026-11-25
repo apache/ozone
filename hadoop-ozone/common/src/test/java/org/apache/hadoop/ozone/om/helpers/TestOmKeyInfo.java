@@ -72,19 +72,19 @@ public class TestOmKeyInfo {
     OmKeyInfo decoded = OmKeyInfo.getFromProtobuf(proto);
     for (OmKeyInfo value : new OmKeyInfo[]{decoded, key.copyObject(), key.toBuilder().build()}) {
       assertEquals(retention, value.getRetention());
-      assertEquals(Boolean.TRUE, value.getLegalHold());
+      assertTrue(value.getLegalHold());
     }
     OmKeyInfo legacy = OmKeyInfo.getFromProtobuf(proto.toBuilder()
         .clearRetention().clearLegalHold().build());
     assertNull(legacy.getRetention());
-    assertNull(legacy.getLegalHold());
+    assertFalse(legacy.getLegalHold());
     OzoneManagerProtocolProtos.KeyInfo legacyProto = legacy.getProtobuf(ClientVersion.CURRENT);
     assertFalse(legacyProto.hasRetention());
     assertFalse(legacyProto.hasLegalHold());
     OmKeyInfo holdOff = legacy.toBuilder().setLegalHold(false).build();
     OzoneManagerProtocolProtos.KeyInfo holdOffProto = holdOff.getProtobuf(ClientVersion.CURRENT);
-    assertTrue(holdOffProto.hasLegalHold());
-    assertEquals(Boolean.FALSE, OmKeyInfo.getFromProtobuf(holdOffProto).getLegalHold());
+    assertEquals(legacyProto, holdOffProto);
+    assertFalse(OmKeyInfo.getFromProtobuf(holdOffProto.toBuilder().setLegalHold(false).build()).getLegalHold());
   }
 
   @Test

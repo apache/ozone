@@ -126,7 +126,7 @@ public final class OmKeyInfo extends WithParentObjectId
   private final Long expectedDataGeneration;
 
   private final ObjectRetention retention;
-  private final Boolean legalHold;
+  private final boolean legalHold;
 
   // IV of a multipart upload part in an encrypted bucket, set on the part's key.
   private final byte[] partIv;
@@ -158,7 +158,7 @@ public final class OmKeyInfo extends WithParentObjectId
     return retention;
   }
 
-  public Boolean getLegalHold() {
+  public boolean getLegalHold() {
     return legalHold;
   }
 
@@ -546,7 +546,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
     private ObjectRetention retention;
-    private Boolean legalHold;
+    private boolean legalHold;
     private byte[] partIv;
 
     public Builder() {
@@ -600,7 +600,7 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
-    public Builder setLegalHold(Boolean legalHold) {
+    public Builder setLegalHold(boolean legalHold) {
       this.legalHold = legalHold;
       return this;
     }
@@ -916,7 +916,7 @@ public final class OmKeyInfo extends WithParentObjectId
     if (retention != null) {
       kb.setRetention(retention.toProto());
     }
-    if (legalHold != null) {
+    if (legalHold) {
       kb.setLegalHold(legalHold);
     }
     return kb.build();
@@ -952,9 +952,7 @@ public final class OmKeyInfo extends WithParentObjectId
     if (keyInfo.hasRetention()) {
       builder.setRetention(ObjectRetention.fromProto(keyInfo.getRetention()));
     }
-    if (keyInfo.hasLegalHold()) {
-      builder.setLegalHold(keyInfo.getLegalHold());
-    }
+    builder.setLegalHold(keyInfo.getLegalHold());
     if (keyInfo.hasObjectID()) {
       builder.setObjectID(keyInfo.getObjectID());
     }
@@ -1020,7 +1018,7 @@ public final class OmKeyInfo extends WithParentObjectId
         Objects.equals(acls, omKeyInfo.acls) &&
         Objects.equals(getTags(), omKeyInfo.getTags()) &&
         Objects.equals(retention, omKeyInfo.retention) &&
-        Objects.equals(legalHold, omKeyInfo.legalHold) &&
+        legalHold == omKeyInfo.legalHold &&
         getObjectID() == omKeyInfo.getObjectID();
 
     if (isEqual && checkUpdateID) {

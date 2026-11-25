@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RetentionDuration;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionTimeUnit;
 import org.junit.jupiter.api.Test;
@@ -142,6 +143,20 @@ class TestSnapshotDiffValueParser {
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(afterRaw)));
   }
 
+  @Test
+  void testKeyInfoObjectLockSignatureWithExplicitDefaults() throws Exception {
+    OmKeyInfo key = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
+        createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
+        Collections.singletonList(createKeyLocationGroup(1L))).toBuilder()
+        .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null,
+            new EventHold(true, new RetentionDuration(RetentionTimeUnit.DAYS, 1)))).build();
+    byte[] raw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(key);
+    KeyInfo.Builder explicit = KeyInfo.parseFrom(raw).toBuilder().setLegalHold(false);
+    explicit.getRetentionBuilder().getEventHoldBuilder().setEnabled(true);
+    assertArrayEquals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(raw),
+        SnapshotDiffValueParser.computeKeyInfoCompareSignature(explicit.build().toByteArray()));
+  }
+
   private static Stream<Arguments> objectLockChanges() {
     OmKeyInfo keyInfo = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
@@ -172,7 +187,7 @@ class TestSnapshotDiffValueParser {
         Arguments.of("legal hold enabled", keyInfo, keyInfo.toBuilder().setLegalHold(true).build(), false),
         Arguments.of("legal hold disabled", retained, retained.toBuilder().setLegalHold(false).build(), false),
         Arguments.of("legal hold absent versus false", keyInfo,
-            keyInfo.toBuilder().setLegalHold(false).build(), false));
+            keyInfo.toBuilder().setLegalHold(false).build(), true));
   }
 
   @Test

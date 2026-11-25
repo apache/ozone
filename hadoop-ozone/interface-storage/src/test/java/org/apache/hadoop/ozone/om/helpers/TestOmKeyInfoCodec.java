@@ -148,7 +148,7 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
       byte[] rawData = codec.toPersistedFormat(key);
       OmKeyInfo decoded = codec.fromPersistedFormat(rawData);
       assertEquals(retention, decoded.getRetention());
-      assertEquals(Boolean.TRUE, decoded.getLegalHold());
+      assertTrue(decoded.getLegalHold());
 
       OzoneManagerProtocolProtos.KeyInfoProtoLight light =
           OzoneManagerProtocolProtos.KeyInfoProtoLight.parseFrom(rawData);

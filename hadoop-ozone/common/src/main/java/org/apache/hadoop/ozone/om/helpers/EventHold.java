@@ -24,16 +24,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
  * Immutable event hold with an optional enabled flag that defaults to true.
  */
 public final class EventHold {
-  private final Boolean enabled;
+  private final boolean enabled;
   private final RetentionDuration duration;
 
-  public EventHold(Boolean enabled, RetentionDuration duration) {
+  public EventHold(boolean enabled, RetentionDuration duration) {
     this.enabled = enabled;
     this.duration = Objects.requireNonNull(duration, "event hold duration is null");
   }
 
   public boolean getEnabled() {
-    return enabled == null || enabled;
+    return enabled;
   }
 
   public RetentionDuration getDuration() {
@@ -42,15 +42,14 @@ public final class EventHold {
 
   public static EventHold fromProto(OzoneManagerProtocolProtos.EventHold proto) {
     Objects.requireNonNull(proto, "event hold is null");
-    return new EventHold(proto.hasEnabled() ? proto.getEnabled() : null,
-        RetentionDuration.fromProto(proto.getDuration()));
+    return new EventHold(proto.getEnabled(), RetentionDuration.fromProto(proto.getDuration()));
   }
 
   public OzoneManagerProtocolProtos.EventHold toProto() {
     OzoneManagerProtocolProtos.EventHold.Builder builder = OzoneManagerProtocolProtos.EventHold.newBuilder()
         .setDuration(duration.toProto());
-    if (enabled != null) {
-      builder.setEnabled(enabled);
+    if (!enabled) {
+      builder.setEnabled(false);
     }
     return builder.build();
   }
@@ -64,7 +63,7 @@ public final class EventHold {
       return false;
     }
     EventHold that = (EventHold) obj;
-    return Objects.equals(enabled, that.enabled) && duration.equals(that.duration);
+    return enabled == that.enabled && duration.equals(that.duration);
   }
 
   @Override
