@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -614,6 +615,25 @@ public class TestSCMBlockProtocolServer {
       assertEquals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION, ex.getResult());
     } finally {
       scm.getScmContext().updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
+    }
+  }
+
+  @Test
+  void testDeleteKeyBlocksFailureInResponseIsRecordedOnSpan() throws Exception {
+    StorageContainerManager mockScm = mockScmForBlockServer();
+    when(mockScm.getPerfMetrics()).thenReturn(mock(SCMPerformanceMetrics.class));
+    BlockManager blockManager = mock(BlockManager.class);
+    doThrow(new SCMException("SafeModePrecheck failed for deleteBlocks", SCMException.ResultCodes.SAFE_MODE_EXCEPTION))
+        .when(blockManager).deleteBlocks(any());
+    when(mockScm.getScmBlockManager()).thenReturn(blockManager);
+    try (SCMBlockProtocolServer blockServer = new SCMBlockProtocolServer(new OzoneConfiguration(), mockScm);
+         TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      List<DeleteBlockGroupResult> results =
+          TracingUtil.executeInNewSpan("deleteKeyBlocks", () -> blockServer.deleteKeyBlocks(Collections.emptyList()));
+
+      assertThat(results).isEmpty();
+      collector.assertError("deleteKeyBlocks", "SafeModePrecheck failed for deleteBlocks");
+      collector.assertExceptionRecorded("deleteKeyBlocks", SCMException.class);
     }
   }
 
