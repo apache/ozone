@@ -121,7 +121,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
                   "ChunkReader-%d")
               .build());
     }
-    metrics = XceiverServerGrpcMetrics.create(readExecutors, datanodeDetails.getUuidString());
+    metrics = new XceiverServerGrpcMetrics(readExecutors, datanodeDetails.getUuidString());
 
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setDaemon(true)
@@ -180,13 +180,9 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         LOG.error("Unable to setup TLS for secure datanode GRPC endpoint.", ex);
       }
     }
-    try {
-      server = nettyServerBuilder.build();
-    } catch (RuntimeException e) {
-      metrics.unregister();
-      throw e;
-    }
+    server = nettyServerBuilder.build();
     storageContainer = dispatcher;
+    metrics.register();
   }
 
   @VisibleForTesting
@@ -240,19 +236,18 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
 
   @Override
   public void stop() {
-    try {
-      if (isStarted) {
+    metrics.unregister();
+    if (isStarted) {
+      isStarted = false;
+      try {
         server.shutdown();
         server.awaitTermination(5, TimeUnit.SECONDS);
         xceiverService.shutdown();
         eventLoopGroup.shutdownGracefully().sync();
+      } catch (InterruptedException e) {
+        LOG.error("failed to shutdown XceiverServerGrpc", e);
+        Thread.currentThread().interrupt();
       }
-    } catch (InterruptedException e) {
-      LOG.error("failed to shutdown XceiverServerGrpc", e);
-      Thread.currentThread().interrupt();
-    } finally {
-      isStarted = false;
-      metrics.unregister();
     }
   }
 

@@ -26,13 +26,15 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.ratis.thirdparty.io.grpc.Attributes;
 import org.apache.ratis.thirdparty.io.grpc.ServerTransportFilter;
 
 /**
- * Metrics for the datanode gRPC server.
+ * Metrics for the datanode read executor shared by gRPC and domain socket reads,
+ * and for gRPC client connections.
  */
-@Metrics(about = "Datanode gRPC server metrics", context = OzoneConsts.OZONE)
+@Metrics(about = "Datanode read executor and gRPC client connection metrics", context = OzoneConsts.OZONE)
 public final class XceiverServerGrpcMetrics implements MetricsSource {
 
   public static final String SOURCE_NAME = XceiverServerGrpcMetrics.class.getSimpleName();
@@ -41,17 +43,14 @@ public final class XceiverServerGrpcMetrics implements MetricsSource {
   private final AtomicLong activeClientConnections = new AtomicLong();
   private final String sourceName;
 
-  private XceiverServerGrpcMetrics(ThreadPoolExecutor readExecutor, String sourceName) {
+  XceiverServerGrpcMetrics(ThreadPoolExecutor readExecutor, String datanodeUuid) {
     this.readExecutor = readExecutor;
-    this.sourceName = sourceName;
+    this.sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, datanodeUuid);
   }
 
-  public static XceiverServerGrpcMetrics create(ThreadPoolExecutor readExecutor, String datanodeUuid) {
-    String sourceName = DefaultMetricsSystem.inMiniClusterMode()
-        ? SOURCE_NAME + '-' + datanodeUuid : SOURCE_NAME;
-    XceiverServerGrpcMetrics metrics = new XceiverServerGrpcMetrics(readExecutor, sourceName);
-    DefaultMetricsSystem.instance().register(sourceName, "Datanode gRPC server metrics", metrics);
-    return metrics;
+  void register() {
+    DefaultMetricsSystem.instance().register(sourceName,
+        "Datanode read executor and gRPC client connection metrics", this);
   }
 
   public void unregister() {
@@ -77,14 +76,14 @@ public final class XceiverServerGrpcMetrics implements MetricsSource {
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    MetricsRecordBuilder builder = collector.addRecord(sourceName);
+    MetricsRecordBuilder builder = collector.addRecord(sourceName).setContext(OzoneConsts.OZONE);
     builder.addGauge(Interns.info("ActiveReadExecutorThreads",
-        "Number of active threads in the read executor"), readExecutor.getActiveCount())
+        "Number of active threads in the shared read executor"), readExecutor.getActiveCount())
         .addGauge(Interns.info("MaxReadExecutorThreads",
-            "Maximum number of threads in the read executor"), readExecutor.getMaximumPoolSize())
+            "Maximum number of threads in the shared read executor"), readExecutor.getMaximumPoolSize())
         .addGauge(Interns.info("ReadExecutorQueueLength",
-            "Number of requests waiting in the read executor queue"), readExecutor.getQueue().size())
+            "Number of requests waiting in the shared read executor queue"), readExecutor.getQueue().size())
         .addGauge(Interns.info("ActiveClientConnections",
-            "Number of active client connections"), activeClientConnections.get());
+            "Number of active gRPC client connections"), activeClientConnections.get());
   }
 }
