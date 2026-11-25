@@ -88,7 +88,7 @@ class TestWritableRatisContainerProvider {
   @BeforeEach
   void resetMetrics() {
     SCMPipelineMetrics.unRegister();
-    SCMPipelineMetrics.create();
+    when(pipelineManager.getMetrics()).thenReturn(SCMPipelineMetrics.create());
   }
 
   @AfterEach

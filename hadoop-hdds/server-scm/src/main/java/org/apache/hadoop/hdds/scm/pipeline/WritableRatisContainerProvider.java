@@ -45,7 +45,6 @@ public class WritableRatisContainerProvider
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
-  private final SCMPipelineMetrics metrics;
 
   public WritableRatisContainerProvider(
       PipelineManager pipelineManager,
@@ -54,7 +53,6 @@ public class WritableRatisContainerProvider
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
     this.pipelineChoosePolicy = pipelineChoosePolicy;
-    this.metrics = SCMPipelineMetrics.create();
   }
 
   @Override
@@ -147,7 +145,7 @@ public class WritableRatisContainerProvider
     LOG.error(
         "Unable to allocate a block for the size: {}, repConfig: {}, storageTier: {}.",
         size, repConfig, storageTier);
-    metrics.incTierPlacementFailure(storageTier, allocationFailure);
+    pipelineManager.getMetrics().incTierPlacementFailure(storageTier, allocationFailure);
     throw new IOException(
         "Unable to allocate a container to the block of size: " + size
             + ", replicationConfig: " + repConfig

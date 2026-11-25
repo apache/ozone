@@ -54,7 +54,8 @@ public final class SCMPipelineMetrics implements MetricsSource {
   private static final MetricsInfo REQUESTED_TIER = Interns.info("RequestedTier", "Requested allocation tier");
   private static final MetricsInfo REASON = Interns.info("Reason", "Tier allocation failure category");
   private static final MetricsInfo TIER_PLACEMENT_FAILURES = Interns.info("TierPlacementFailures",
-      "Failed RATIS/standalone tier allocations after retries; no_space includes storage-type eligibility failures");
+      "Failed RATIS/standalone tier allocations after retries; no_space includes storage-type eligibility failures; "
+          + "no_suitable_node includes pipeline limits");
 
   private MetricsRegistry registry;
   private static SCMPipelineMetrics instance;
@@ -143,7 +144,8 @@ public final class SCMPipelineMetrics implements MetricsSource {
    * Counts one unsuccessful RATIS/standalone tier allocation after all provider retries. A later allocation on a
    * fallback tier may still succeed. This does not count background pipeline creation or change aggregate counters.
    * Missing/empty tiers are UNKNOWN. Reasons use SCM result codes, never exception messages; no_space includes
-   * insufficient eligible storage of the requested type, not just full volumes. Unclassified failures are other.
+   * insufficient eligible storage of the requested type, not just full volumes; no_suitable_node includes pipeline
+   * limits. Unclassified failures are other.
    *
    * @param tier tier of this allocation attempt, including a fallback tier when it is attempted
    * @param failure last unsuccessful creation/wait operation, or null when no structured failure is available
