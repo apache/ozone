@@ -21,9 +21,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,13 +48,15 @@ public class DbVolume extends StorageVolume {
   /**
    * Records all HddsVolumes that put its db instance under this DbVolume.
    * Map: HddsVolume.StorageID -> DBStorePath
+   * Must be thread-safe, because HddsVolume.createDbStore can add entries
+   * while failVolume or shutdown iterate over them without a common lock.
    */
   private final Map<String, String> hddsDbStorePathMap;
 
   protected DbVolume(Builder b) throws IOException {
     super(b);
 
-    this.hddsDbStorePathMap = new HashMap<>();
+    this.hddsDbStorePathMap = new ConcurrentHashMap<>();
 
     if (!b.getFailedVolume()) {
       initialize();

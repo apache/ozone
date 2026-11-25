@@ -18,17 +18,29 @@
 package org.apache.hadoop.hdds.scm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.unix.DomainSocket;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
@@ -37,6 +49,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Test for short-circuit enabled XceiverClientManager.
@@ -102,6 +116,73 @@ public class TestXceiverClientManagerSC {
 
       XceiverClientSpi client3 = clientManager.acquireClientForReadData(container1.getPipeline(), false);
       assertTrue(client3 instanceof XceiverClientGrpc);
+    }
+  }
+
+  /**
+   * The client a read is expected to get. EC reads, both the single-replica pipeline that
+   * {@code ECBlockInputStream} builds and the full EC pipeline, stay on gRPC. A standalone pipeline with no replica
+   * index short-circuits.
+   */
+  private enum ReadClient {
+    EC_REPLICA(XceiverClientGrpc.class),
+    EC_PIPELINE(ECXceiverClientGrpc.class),
+    STANDALONE(XceiverClientShortCircuit.class);
+
+    private final Class<? extends XceiverClientSpi> clientType;
+
+    ReadClient(Class<? extends XceiverClientSpi> clientType) {
+      this.clientType = clientType;
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(ReadClient.class)
+  public void testReadClientType(ReadClient readClient) throws IOException {
+    try (XceiverClientManager clientManager = new XceiverClientManager(config,
+        config.getObject(ScmClientConfig.class), null)) {
+      XceiverClientSpi client = clientManager.acquireClientForReadData(pipeline(readClient), true);
+      assertInstanceOf(readClient.clientType, client);
+      clientManager.releaseClient(client, true);
+    }
+  }
+
+  private static Pipeline pipeline(ReadClient readClient) {
+    DatanodeDetails dn = cluster.getHddsDatanodes().get(0).getDatanodeDetails();
+    switch (readClient) {
+    case EC_REPLICA:
+      // same pipeline as ECBlockInputStream creates to read one replica of an EC block group
+      return Pipeline.newBuilder()
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+          .setNodes(Collections.singletonList(dn))
+          .setId(dn.getID())
+          .setReplicaIndexes(Collections.singletonMap(dn, 1))
+          .setState(Pipeline.PipelineState.CLOSED)
+          .build();
+    case EC_PIPELINE:
+      List<DatanodeDetails> nodes = new ArrayList<>();
+      Map<DatanodeDetails, Integer> replicaIndexes = new HashMap<>();
+      for (HddsDatanodeService datanode : cluster.getHddsDatanodes()) {
+        DatanodeDetails node = datanode.getDatanodeDetails();
+        nodes.add(node);
+        replicaIndexes.put(node, nodes.size());
+      }
+      return Pipeline.newBuilder()
+          .setReplicationConfig(new ECReplicationConfig(2, 1))
+          .setNodes(nodes)
+          .setId(PipelineID.randomId())
+          .setReplicaIndexes(replicaIndexes)
+          .setState(Pipeline.PipelineState.CLOSED)
+          .build();
+    case STANDALONE:
+      return Pipeline.newBuilder()
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+          .setNodes(Collections.singletonList(dn))
+          .setId(PipelineID.randomId())
+          .setState(Pipeline.PipelineState.CLOSED)
+          .build();
+    default:
+      throw new IllegalStateException("Unexpected read client " + readClient);
     }
   }
 }

@@ -661,7 +661,7 @@ public interface OzoneManagerProtocol
 
   /**
    * Returns list of parts of a multipart upload key.
-   * @param volumeName
+   * @param volumeName volume name
    * @param bucketName
    * @param keyName
    * @param uploadID
@@ -674,7 +674,7 @@ public interface OzoneManagerProtocol
       int maxParts)  throws IOException;
 
   /**
-   * List in-flight uploads.
+   * List in-flight uploads in the given volume.
    * withPagination is for backward compatible as older listMultipartUploads does
    * not support pagination.
    */

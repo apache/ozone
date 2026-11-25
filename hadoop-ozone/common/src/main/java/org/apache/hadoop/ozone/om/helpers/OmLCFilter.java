@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validateTrashP
 import jakarta.annotation.Nullable;
 import java.util.Collections;
 import net.jcip.annotations.Immutable;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilter;
@@ -42,6 +41,7 @@ public final class OmLCFilter {
   private final boolean directoryStylePrefix;
   private final String tagKey;
   private final String tagValue;
+  private final boolean tagSet;
   private final OmLifecycleRuleAndOperator andOperator;
 
   private OmLCFilter() {
@@ -58,6 +58,7 @@ public final class OmLCFilter {
     this.andOperator = builder.andOperator;
     this.tagKey = builder.tagKey;
     this.tagValue = builder.tagValue;
+    this.tagSet = builder.tagSet;
   }
 
   /**
@@ -76,6 +77,10 @@ public final class OmLCFilter {
    * @throws OMException if the filter is invalid.
    */
   public void valid(BucketLayout layout) throws OMException {
+    if (tagSet && (tagKey == null || tagValue == null)) {
+      throw new OMException("A Tag must have a Key and a Value.", OMException.ResultCodes.INVALID_REQUEST);
+    }
+
     boolean hasPrefix = prefix != null;
     boolean hasTag = hasTag();
     boolean hasAndOperator = andOperator != null;
@@ -114,9 +119,9 @@ public final class OmLCFilter {
   }
 
   @Nullable
-  public Pair<String, String> getTag() {
+  public Tag getTag() {
     if (hasTag()) {
-      return Pair.of(tagKey, tagValue);
+      return new Tag(tagKey, tagValue);
     }
     return null;
   }
@@ -210,6 +215,7 @@ public final class OmLCFilter {
     private String prefix = null;
     private String tagKey = null;
     private String tagValue = null;
+    private boolean tagSet = false;
     private OmLifecycleRuleAndOperator andOperator = null;
 
     public Builder setPrefix(String lcPrefix) {
@@ -220,6 +226,7 @@ public final class OmLCFilter {
     public Builder setTag(String key, String value) {
       this.tagKey = key;
       this.tagValue = value;
+      this.tagSet = true;
       return this;
     }
 
@@ -230,6 +237,27 @@ public final class OmLCFilter {
 
     public OmLCFilter build() {
       return new OmLCFilter(this);
+    }
+  }
+
+  /**
+   * A tag key paired with its tag value, used as the tag condition of a lifecycle rule filter.
+   */
+  public static final class Tag {
+    private final String key;
+    private final String value;
+
+    public Tag(String key, String value) {
+      this.key = key;
+      this.value = value;
+    }
+
+    public String getKey() {
+      return key;
+    }
+
+    public String getValue() {
+      return value;
     }
   }
 }

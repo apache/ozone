@@ -290,6 +290,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
@@ -518,6 +519,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
   private final boolean isS3STSEnabled;
+  private final int s3StsMinDurationSeconds;
   private ExitManager exitManager;
   /** Test-only hook to fail a checkpoint-install DB backup part way through. */
   private FaultInjector checkpointBackupInjector;
@@ -768,6 +770,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isS3STSEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY,
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
+    // Invalid AssumeRole min duration with STS feature flag off must not break startup
+    this.s3StsMinDurationSeconds = isS3STSEnabled ? S3STSUtils.getMinDurationSeconds(conf) :
+        S3STSUtils.MIN_DURATION_SECONDS;
 
     metrics = OMMetrics.create(conf);
     omSnapshotIntMetrics = OmSnapshotInternalMetrics.create(getOMServiceId(),
@@ -1215,6 +1220,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isS3STSEnabled() {
     return isS3STSEnabled;
+  }
+
+  /**
+   * Returns the minimum valid AssumeRole {@code DurationSeconds}, including any test-only override.
+   */
+  public int getS3StsMinDurationSeconds() {
+    return s3StsMinDurationSeconds;
   }
 
   /**
@@ -4065,9 +4077,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put("newLeaderId", newLeaderId);
     try {
       final RaftServer.Division division = omRatisServer.getServerDivision();
+      final RaftPeerId curLeader = omRatisServer.getLeaderId();
       final RaftPeerId targetPeerId;
       if (newLeaderId.isEmpty()) {
-        final RaftPeerId curLeader = omRatisServer.getLeaderId();
         targetPeerId = division.getGroup().getPeers().stream()
             .map(RaftPeer::getId)
             .filter(id -> !id.equals(curLeader))
@@ -4075,6 +4087,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .orElseThrow(() -> new IOException("Cannot find a new leader to transfer leadership."));
       } else {
         targetPeerId = RaftPeerId.valueOf(newLeaderId);
+      }
+
+      if (targetPeerId.equals(curLeader)) {
+        LOG.info("Target {} is already the leader. Skipping leadership transfer.", targetPeerId);
+        return;
       }
 
       final GrpcTlsConfig tlsConfig =
@@ -4533,8 +4550,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmMultipartUploadListParts listParts(final String volumeName,
       final String bucketName, String keyName, String uploadID,
       int partNumberMarker, int maxParts)  throws IOException {
+    return listParts(volumeName, bucketName, keyName, uploadID, partNumberMarker, maxParts, false);
+  }
 
-    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+  public OmMultipartUploadListParts listParts(String volumeName, String bucketName, String keyName, String uploadID,
+      int partNumberMarker, int maxParts, boolean assumeS3Context) throws IOException {
+    String resolvedVolumeName = assumeS3Context ? getS3VolumeContext(true).getOmVolumeArgs().getVolume() : volumeName;
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(resolvedVolumeName, bucketName));
     final String realVolumeName = bucket.realVolume();
     final String realBucketName = bucket.realBucket();
 
@@ -4573,8 +4595,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String bucketName,
       String prefix, String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination)
       throws IOException {
+    return listMultipartUploads(volumeName, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads,
+        withPagination, false);
+  }
 
-    final ResolvedBucket bucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OmMultipartUploadList listMultipartUploads(String volumeName, String bucketName, String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads, boolean withPagination, boolean assumeS3Context)
+      throws IOException {
+    String resolvedVolumeName = assumeS3Context ? getS3VolumeContext(true).getOmVolumeArgs().getVolume() : volumeName;
+    final ResolvedBucket bucket = resolveBucketLink(Pair.of(resolvedVolumeName, bucketName));
     final String realVolumeName = bucket.realVolume();
     final String realBucketName = bucket.realBucket();
 
