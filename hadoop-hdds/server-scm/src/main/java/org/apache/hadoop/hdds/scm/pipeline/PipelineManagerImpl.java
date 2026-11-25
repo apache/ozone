@@ -224,8 +224,8 @@ public class PipelineManagerImpl implements PipelineManager {
       throws IOException {
     checkIfPipelineCreationIsAllowed(replicationConfig);
 
-    final Span span = TracingUtil.createInternalSpan("PipelineManagerImpl.createPipeline");
     TracingUtil.executeInNewSpan("PipelineManagerImpl.acquireWriteLock", () -> acquireWriteLock());
+    final Span span = TracingUtil.createInternalSpan("PipelineManagerImpl.createPipeline");
     final Pipeline pipeline;
     try (Scope ignored = span.makeCurrent()) {
       try {
