@@ -1462,6 +1462,7 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream createKey(
       String volumeName, String bucketName, String keyName, CreateKeyOptions options) throws IOException {
     Objects.requireNonNull(options, "options == null");
+    checkStoragePolicySupport(options.getStoragePolicy());
     String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
         bucketName, keyName, options.getSize(), options.getReplicationConfig(), options.getMetadata(),
@@ -1503,16 +1504,27 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return createKeyIfNotExists(volumeName, bucketName, keyName,
+        toCreateKeyOptions(size, replicationConfig, metadata, tags, derivedKeyPiggyBacking));
+  }
+
+  @Override
+  public OzoneOutputStream createKeyIfNotExists(String volumeName,
+      String bucketName, String keyName, CreateKeyOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
     if (!OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(omVersion)) {
       throw new IOException(
           "OzoneManager does not support atomic key creation.");
     }
+    checkStoragePolicySupport(options.getStoragePolicy());
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
-        bucketName, keyName, size, replicationConfig, metadata, tags);
+        bucketName, keyName, options.getSize(), options.getReplicationConfig(), options.getMetadata(),
+        options.getTags());
     builder.setExpectedDataGeneration(
         OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
-    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
-    return openOutputStream(builder.build(), size);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(options.isDerivedKeyPiggyBacking()));
+    builder.setStoragePolicy(options.getStoragePolicy());
+    return openOutputStream(builder.build(), options.getSize());
   }
 
   @Override
@@ -1530,15 +1542,26 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size, String expectedETag,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return rewriteKeyIfMatch(volumeName, bucketName, keyName, expectedETag,
+        toCreateKeyOptions(size, replicationConfig, metadata, tags, derivedKeyPiggyBacking));
+  }
+
+  @Override
+  public OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName, String keyName,
+      String expectedETag, CreateKeyOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
     if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(omVersion)) {
       throw new IOException(
           "OzoneManager does not support conditional key rewrite.");
     }
+    checkStoragePolicySupport(options.getStoragePolicy());
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
-        bucketName, keyName, size, replicationConfig, metadata, tags);
+        bucketName, keyName, options.getSize(), options.getReplicationConfig(), options.getMetadata(),
+        options.getTags());
     builder.setExpectedETag(expectedETag);
-    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
-    return openOutputStream(builder.build(), size);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(options.isDerivedKeyPiggyBacking()));
+    builder.setStoragePolicy(options.getStoragePolicy());
+    return openOutputStream(builder.build(), options.getSize());
   }
 
   @Override
@@ -1546,11 +1569,39 @@ public class RpcClient implements ClientProtocol {
   public OzoneOutputStream createKeyIfNoneMatch(String volumeName, String bucketName, String keyName, long size,
       String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
       boolean derivedKeyPiggyBacking) throws IOException {
+    return createKeyIfNoneMatch(volumeName, bucketName, keyName, excludedETag,
+        toCreateKeyOptions(size, replicationConfig, metadata, tags, derivedKeyPiggyBacking));
+  }
+
+  @Override
+  public OzoneOutputStream createKeyIfNoneMatch(String volumeName, String bucketName, String keyName,
+      String excludedETag, CreateKeyOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
     checkIfNoneMatchETagSupport();
-    OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName, bucketName, keyName, size, replicationConfig,
-        metadata, tags);
-    builder.setExcludedETag(excludedETag).setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
-    return openOutputStream(builder.build(), size);
+    checkStoragePolicySupport(options.getStoragePolicy());
+    OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName, bucketName, keyName, options.getSize(),
+        options.getReplicationConfig(), options.getMetadata(), options.getTags());
+    builder.setExcludedETag(excludedETag).setDerivedKeyPiggyBacking(options.isDerivedKeyPiggyBacking());
+    builder.setStoragePolicy(options.getStoragePolicy());
+    return openOutputStream(builder.build(), options.getSize());
+  }
+
+  private static CreateKeyOptions toCreateKeyOptions(long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags, boolean derivedKeyPiggyBacking) {
+    return CreateKeyOptions.builder()
+        .setSize(size)
+        .setReplicationConfig(replicationConfig)
+        .setMetadata(metadata)
+        .setTags(tags)
+        .setDerivedKeyPiggyBacking(derivedKeyPiggyBacking)
+        .build();
+  }
+
+  /** Rejects a key storage policy before sending it to an OM that would ignore it. */
+  private void checkStoragePolicySupport(StoragePolicy storagePolicy) throws IOException {
+    if (storagePolicy != null && !OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(omVersion)) {
+      throw new IOException("OzoneManager does not support storage policy");
+    }
   }
 
   @Override

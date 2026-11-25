@@ -56,13 +56,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -95,8 +93,11 @@ import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -108,9 +109,11 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -434,8 +437,7 @@ class TestObjectPut {
       assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> objectEndpoint.put(BUCKET_NAME, KEY_NAME, body));
       assertThat(body.available()).isEqualTo(payload.length);
       verify(protocol).getOmVersion();
-      verify(protocol, never()).createKey(anyString(), anyString(), anyString(), anyLong(), any(), anyMap(), anyMap(),
-          anyBoolean());
+      verify(protocol, never()).createKey(anyString(), anyString(), anyString(), any(CreateKeyOptions.class));
       streaming.verifyNoInteractions();
       assertKeyWasNotCommitted();
     }
@@ -1144,6 +1146,109 @@ class TestObjectPut {
     assertEquals(
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
         bucket.getKey(KEY_NAME).getReplicationConfig());
+    assertNull(bucket.getKey(KEY_NAME).getStoragePolicy());
+  }
+
+  static Stream<Arguments> storageClassesForPut() {
+    ReplicationConfig ratisOne = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+    ReplicationConfig ratisThree = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+    ReplicationConfig ec = new ECReplicationConfig(3, 2);
+    return Stream.of(
+        Arguments.of("STANDARD", ratisThree, null),
+        Arguments.of("REDUCED_REDUNDANCY", ratisOne, null),
+        Arguments.of("STANDARD_IA", ec, null),
+        Arguments.of("GLACIER", ratisThree, OzoneStoragePolicy.COLD),
+        Arguments.of("DEEP_ARCHIVE", ec, OzoneStoragePolicy.COLD));
+  }
+
+  /** The storage class header sets both the key's replication and the storage policy sent to OM. */
+  @ParameterizedTest
+  @MethodSource("storageClassesForPut")
+  void testPutObjectWithStorageClass(String storageClass, ReplicationConfig replication, StoragePolicy policy)
+      throws Exception {
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(storageClass);
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertEquals(replication, keyDetails.getReplicationConfig());
+    assertEquals(policy, keyDetails.getStoragePolicy());
+  }
+
+  /** A gateway storage policy setting for STANDARD is sent with the write. */
+  @Test
+  void testPutObjectWithConfiguredStandardStoragePolicy() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(S3GatewayConfigKeys.OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY, "HOT");
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(objectEndpoint.getClient())
+        .setConfig(conf)
+        .setHeaders(headers)
+        .setSignatureInfo(signatureInfo())
+        .build();
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
+
+    assertSucceeds(() -> put(endpoint, BUCKET_NAME, KEY_NAME, CONTENT));
+
+    assertEquals(OzoneStoragePolicy.HOT, bucket.getKey(KEY_NAME).getStoragePolicy());
+  }
+
+  /** Each conditional write path carries the storage policy. */
+  @ParameterizedTest
+  @ValueSource(strings = {"create-if-absent", "if-none-match", "if-match"})
+  void testConditionalPutObjectWithStorageClass(String condition) throws Exception {
+    if (!condition.equals("create-if-absent")) {
+      assertSucceeds(() -> putObject(CONTENT));
+    }
+    String etag = condition.equals("create-if-absent")
+        ? null : bucket.getKey(KEY_NAME).getMetadata().get(OzoneConsts.ETAG);
+    switch (condition) {
+    case "create-if-absent":
+      when(headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER)).thenReturn("*");
+      break;
+    case "if-none-match":
+      when(headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER)).thenReturn("\"other-etag\"");
+      break;
+    default:
+      when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn("\"" + etag + "\"");
+      break;
+    }
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("GLACIER");
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    assertEquals(OzoneStoragePolicy.COLD, bucket.getKey(KEY_NAME).getStoragePolicy());
+  }
+
+  /** With streaming enabled, a write that sets a storage policy uses the normal path so the policy is kept. */
+  @Test
+  void testStreamingPutObjectWithStorageClassUsesNormalPath() throws Exception {
+    doReturn(true).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("GLACIER");
+
+    try (MockedStatic<ObjectEndpointStreaming> streaming = mockStatic(ObjectEndpointStreaming.class)) {
+      assertSucceeds(() -> putObject(CONTENT));
+      streaming.verifyNoInteractions();
+    }
+
+    assertEquals(OzoneStoragePolicy.COLD, assertKeyContent(bucket, KEY_NAME, CONTENT).getStoragePolicy());
+  }
+
+  /** Copy uses the request's storage class, not the source key's storage policy. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testCopyObjectWithStorageClass(boolean withHeader) throws Exception {
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("GLACIER");
+    assertSucceeds(() -> putObject(CONTENT));
+    assertEquals(OzoneStoragePolicy.COLD, bucket.getKey(KEY_NAME).getStoragePolicy());
+
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(withHeader ? "GLACIER" : null);
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+
+    assertEquals(withHeader ? OzoneStoragePolicy.COLD : null, destBucket.getKey(DEST_KEY).getStoragePolicy());
   }
 
   @Test

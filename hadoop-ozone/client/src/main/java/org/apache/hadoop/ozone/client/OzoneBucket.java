@@ -680,6 +680,46 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Creates a key only if it does not exist (S3 If-None-Match: * semantics).
+   *
+   * @param keyName Name of the key
+   * @param options Size, replication config, metadata, tags, derived key piggybacking and storage policy of the key
+   * @return OzoneOutputStream to which the data has to be written.
+   */
+  public OzoneOutputStream createKeyIfNotExists(String keyName, CreateKeyOptions options) throws IOException {
+    Objects.requireNonNull(options, "options == null");
+    return proxy.createKeyIfNotExists(volumeName, name, keyName, options);
+  }
+
+  /**
+   * Creates a key if its current ETag differs from {@code excludedETag}, or if the key is absent.
+   *
+   * @param keyName Name of the key
+   * @param excludedETag The ETag value the existing key must not have
+   * @param options Size, replication config, metadata, tags, derived key piggybacking and storage policy of the key
+   * @return OzoneOutputStream to which the data has to be written.
+   */
+  public OzoneOutputStream createKeyIfNoneMatch(String keyName, String excludedETag, CreateKeyOptions options)
+      throws IOException {
+    Objects.requireNonNull(options, "options == null");
+    return proxy.createKeyIfNoneMatch(volumeName, name, keyName, excludedETag, options);
+  }
+
+  /**
+   * Rewrites a key only if its ETag matches {@code expectedETag} (S3 If-Match semantics).
+   *
+   * @param keyName Name of the key
+   * @param expectedETag The ETag value the existing key must have
+   * @param options Size, replication config, metadata, tags, derived key piggybacking and storage policy of the key
+   * @return OzoneOutputStream to which the data has to be written.
+   */
+  public OzoneOutputStream rewriteKeyIfMatch(String keyName, String expectedETag, CreateKeyOptions options)
+      throws IOException {
+    Objects.requireNonNull(options, "options == null");
+    return proxy.rewriteKeyIfMatch(volumeName, name, keyName, expectedETag, options);
+  }
+
+  /**
    * Creates a new key in the bucket, with default replication type RATIS and
    * with replication factor THREE.
    *

@@ -255,6 +255,24 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
+  public OzoneOutputStream createKeyIfNotExists(String volumeName, String bucketName, String keyName,
+      CreateKeyOptions options) throws IOException {
+    return delegate.createKeyIfNotExists(volumeName, bucketName, keyName, options);
+  }
+
+  @Override
+  public OzoneOutputStream createKeyIfNoneMatch(String volumeName, String bucketName, String keyName,
+      String excludedETag, CreateKeyOptions options) throws IOException {
+    return delegate.createKeyIfNoneMatch(volumeName, bucketName, keyName, excludedETag, options);
+  }
+
+  @Override
+  public OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName, String keyName,
+      String expectedETag, CreateKeyOptions options) throws IOException {
+    return delegate.rewriteKeyIfMatch(volumeName, bucketName, keyName, expectedETag, options);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName, long size,
       long existingKeyGeneration, ReplicationConfig replicationConfig, Map<String, String> metadata)
       throws IOException {

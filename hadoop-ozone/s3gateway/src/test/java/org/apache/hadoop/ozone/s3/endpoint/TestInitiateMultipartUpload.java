@@ -17,15 +17,21 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
+import java.util.Collections;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -68,6 +74,26 @@ public class TestInitiateMultipartUpload {
     client.getObjectStore().getS3Bucket(bucket)
         .setReplicationConfig(new ECReplicationConfig("rs-3-2-1024K"));
     initiateMultipartUpload(rest, bucket, key);
+  }
+
+  /** The storage policy is chosen at initiate and kept on completion, even though parts do not send the header. */
+  @Test
+  public void testInitiateMultipartUploadWithStorageClass() throws Exception {
+    String bucket = OzoneConsts.S3_BUCKET;
+    String key = OzoneConsts.KEY;
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket(bucket);
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("GLACIER");
+    ObjectEndpoint rest = getObjectEndpoint(client, headers);
+
+    String uploadID = initiateMultipartUpload(rest, bucket, key);
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(null);
+    CompleteMultipartUploadRequest.Part part = uploadPart(rest, bucket, key, 1, uploadID, "content");
+    completeMultipartUpload(rest, bucket, key, uploadID, Collections.singletonList(part));
+
+    assertEquals(OzoneStoragePolicy.COLD, client.getObjectStore().getS3Bucket(bucket).getKey(key).getStoragePolicy());
   }
 
   @Nonnull
