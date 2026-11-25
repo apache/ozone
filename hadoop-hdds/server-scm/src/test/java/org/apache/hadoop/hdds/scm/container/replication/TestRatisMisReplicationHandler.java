@@ -30,6 +30,7 @@ import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -118,6 +119,29 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
         any(), any(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD));
     verify(getReplicationManager()).sendThrottledReplicationCommand(
         any(), anyList(), any(), eq(0), eq(StorageType.SSD));
+  }
+
+  @Test
+  public void testMisReplicationDoesNotFallBackWhenSsdUnavailable() throws IOException {
+    setContainerForTest(TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(LifeCycleState.CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build());
+    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicas(
+        Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
+    PlacementPolicy placementPolicy = mockPlacementPolicy();
+    when(placementPolicy.chooseDatanodes(any(), any(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD)))
+        .thenThrow(new SCMException("No suitable SSD target", SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE));
+
+    assertThrows(SCMException.class, () -> testMisReplication(
+        replicas, placementPolicy, Collections.emptyList(), 0, 1, 0));
+
+    verify(placementPolicy).chooseDatanodes(any(), any(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD));
+    verify(placementPolicy, never()).chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong(),
+        eq(StorageType.DISK));
+    verify(getReplicationManager(), never()).sendThrottledReplicationCommand(any(), anyList(), any(), anyInt(), any());
   }
 
   @ParameterizedTest

@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -156,12 +157,21 @@ public abstract class MisReplicationHandler implements
 
     int requiredNodes = replicasToBeReplicated.size();
 
-    List<DatanodeDetails> targetDatanodes = ReplicationManagerUtil
-        .getTargetDatanodes(containerPlacement, requiredNodes,
+    StorageType targetStorageType = container.getReplicationType() == HddsProtos.ReplicationType.RATIS
+        ? ReplicationManagerUtil.getTargetStorageType(container) : StorageType.DEFAULT;
+    List<DatanodeDetails> targetDatanodes;
+    try {
+      targetDatanodes = ReplicationManagerUtil.getTargetDatanodes(containerPlacement, requiredNodes,
             excludedAndUsedNodes.getUsedNodes(),
             excludedAndUsedNodes.getExcludedNodes(), currentContainerSize,
-            container, container.getReplicationType() == HddsProtos.ReplicationType.RATIS
-                ? ReplicationManagerUtil.getTargetStorageType(container) : StorageType.DEFAULT);
+            container, targetStorageType);
+    } catch (SCMException e) {
+      if (requiredNodes > 0) {
+        LOG.debug("Unable to correct mis-replication for container {}: no suitable target found for storage type {}.",
+            container.getContainerID(), targetStorageType);
+      }
+      throw e;
+    }
     if (!targetDatanodes.isEmpty()) {
       // When no other rack has a usable node, placement can fall back to a rack that already has a replica.
       // Copying there doesn't help: the container is still mis-replicated, the extra copy gets deleted, and the
