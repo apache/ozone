@@ -57,7 +57,6 @@ import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -69,6 +68,7 @@ import org.apache.hadoop.ozone.audit.DNAction;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.helpers.ReadBlockContext;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -79,6 +79,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.CheckedConsumer;
@@ -874,7 +876,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void streamDataReadOnly(ContainerCommandRequestProto msg,
       StreamObserver<ContainerCommandResponseProto> streamObserver,
-      RandomAccessFileChannel blockFile, DispatcherContext dispatcherContext) {
+      ReadBlockContext readBlockContext, DispatcherContext dispatcherContext) {
     Objects.requireNonNull(msg, "msg == null");
     Type cmdType = msg.getCmdType();
     String traceID = msg.getTraceID();
@@ -916,7 +918,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
       }
       perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
-      responseProto = handler.readBlock(msg, container, blockFile, streamObserver);
+      responseProto = handler.readBlock(msg, container, readBlockContext, streamObserver);
       long oPLatencyMS = Time.monotonicNow() - startTime;
       metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
       if (responseProto == null) {
@@ -930,6 +932,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       perf.appendOpLatencyMs(oPLatencyMS);
       performanceAudit(action, msg, dispatcherContext, perf, oPLatencyMS);
 
+    } catch (StatusRuntimeException sre) {
+      // The client cancelled the call or its connection dropped: not a container failure.
+      if (sre.getStatus().getCode() != Status.Code.CANCELLED) {
+        throw sre;
+      }
+      LOG.debug("Streaming {} for container {} ended early: {}", cmdType, msg.getContainerID(), sre.getStatus());
     } catch (StorageContainerException sce) {
       audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
       streamObserver.onNext(ContainerUtils.logAndReturnError(LOG, sce, msg));

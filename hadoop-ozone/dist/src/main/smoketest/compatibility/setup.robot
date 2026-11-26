@@ -26,3 +26,10 @@ ${SNAPSHOT_DIFF_SUBMIT_VERSION}   2.2.0
 ${SNAPSHOT_DIFF_ORDERED_VERSION}   2.3.0
 ${HSYNC_VERSION}      2.0.0
 ${TESTFILE}           ${TEST_DATA_DIR}/small
+
+*** Keywords ***
+Setup Suite
+    Setup Batch
+
+Teardown Suite
+    Teardown Batch

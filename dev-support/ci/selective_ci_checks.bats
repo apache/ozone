@@ -17,21 +17,12 @@
 # This script confirms that selective_ci_checks.sh works correctly
 # against some known commits.
 #
-# Prerequisites:
-#
-# 1. Install bats-core, see:
-#    https://bats-core.readthedocs.io/en/stable/installation.html
-#
-# 2. Clone libraries into dev-support/ci:
-#    cd dev-support/ci
-#    git clone https://github.com/bats-core/bats-assert
-#    git clone https://github.com/bats-core/bats-support
-#
 # Usage:
-#    bats dev-support/ci/selective_ci_checks.bats
+#     hadoop-ozone/dev-support/checks/bats.sh dev-support/ci/selective_ci_checks.bats
 
-load bats-support/load.bash
-load bats-assert/load.bash
+: ${TOOLS_DIR:="${BATS_ROOT}/../.."}
+load ${TOOLS_DIR}/bats/bats-support/load.bash
+load ${TOOLS_DIR}/bats/bats-assert/load.bash
 
 @test "checkstyle and bats" {
   run dev-support/ci/selective_ci_checks.sh 11b098430
@@ -334,7 +325,7 @@ load bats-assert/load.bash
 @test "CI lib change" {
   run dev-support/ci/selective_ci_checks.sh ceb79acaa
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","pyunit","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -345,7 +336,7 @@ load bats-assert/load.bash
 @test "CI workflow change" {
   run dev-support/ci/selective_ci_checks.sh 90a8d7c01
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","pyunit","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -368,7 +359,7 @@ load bats-assert/load.bash
 @test "CI workflow change (check.yml)" {
   run dev-support/ci/selective_ci_checks.sh 1468af02067ec75b255f605816c32f8bf4dfaabf
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","pyunit","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -379,7 +370,7 @@ load bats-assert/load.bash
 @test "CI workflow change (ci.yaml)" {
   run dev-support/ci/selective_ci_checks.sh 90fd5f2adc
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","errorprone","findbugs","pmd","pyunit","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -483,5 +474,16 @@ load bats-assert/load.bash
   assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false
   assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=false
+}
+
+@test "python helper change" {
+  run dev-support/ci/selective_ci_checks.sh c917a6e60d
+
+  assert_output -p 'basic-checks=["rat","pyunit"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
 }

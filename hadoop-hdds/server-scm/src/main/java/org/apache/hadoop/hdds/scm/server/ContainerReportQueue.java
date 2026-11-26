@@ -71,6 +71,9 @@ public class ContainerReportQueue
     synchronized (this) {
       // 1. check if no previous report available, else add the report
       if (!dataMap.containsKey(uuidString)) {
+        if (remainingCapacity() == 0) {
+          return false;
+        }
         addReport(val, uuidString);
         return true;
       }
@@ -95,6 +98,9 @@ public class ContainerReportQueue
         }
       }
 
+      if (remainingCapacity() == 0) {
+        return false;
+      }
       dataList.add(val);
       ++capacity;
       if (!isReportRemoved) {
@@ -164,15 +170,14 @@ public class ContainerReportQueue
 
   public boolean addValue(@Nonnull ContainerReport value) {
     synchronized (this) {
-      if (remainingCapacity() == 0) {
-        return false;
-      }
-
       if (SCMDatanodeHeartbeatDispatcher.ContainerReportType.FCR
           == value.getType()) {
         return addContainerReport(value);
       } else if (SCMDatanodeHeartbeatDispatcher.ContainerReportType.ICR
           == value.getType()) {
+        if (remainingCapacity() == 0) {
+          return false;
+        }
         return addIncrementalReport(value);
       }
       return false;
@@ -183,11 +188,10 @@ public class ContainerReportQueue
   public boolean add(@Nonnull ContainerReport value) {
     Objects.requireNonNull(value);
     synchronized (this) {
-      if (remainingCapacity() == 0) {
+      if (!addValue(value)) {
         throw new IllegalStateException("capacity not available");
       }
-
-      return addValue(value);
+      return true;
     }
   }
 

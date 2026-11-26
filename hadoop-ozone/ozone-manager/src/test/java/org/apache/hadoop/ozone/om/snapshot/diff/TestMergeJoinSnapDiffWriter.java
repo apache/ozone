@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.MODIFY
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.RENAME;
 import static org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter.writeReport;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntryCodec;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -46,6 +47,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -53,6 +56,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -270,6 +274,42 @@ class TestMergeJoinSnapDiffWriter {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRenameIntoDeletedDirectoryReportsDeleteOfSource(boolean ordering) throws Exception {
+    byte[] sig = signature("s");
+    try (SnapDiffJobStore store = newStore(true)) {
+      // From: file "a" and directories "b" and "c" under the bucket, file "a" under "c",
+      // and file 302 whose parent 400 has no edge.
+      // To: those files are moved under "b". "b" and "c" are deleted before their children
+      // are purged, so neither has a to edge. File 302's source path cannot be resolved.
+      store.putFromEdge(BUCKET_OBJECT_ID, 300L, nameBytes("b"));
+      store.putOldList(300L, entry(BUCKET_OBJECT_ID, "b", true, sig));
+      store.putOldList(301L, entry(BUCKET_OBJECT_ID, "a", false, sig));
+      store.putNewList(301L, entry(300L, "a", false, sig));
+      store.putOldList(302L, entry(400L, "c", false, sig));
+      store.putNewList(302L, entry(300L, "c", false, sig));
+      store.putFromEdge(BUCKET_OBJECT_ID, 310L, nameBytes("c"));
+      store.putOldList(310L, entry(BUCKET_OBJECT_ID, "c", true, sig));
+      store.putOldList(311L, entry(310L, "a", false, sig));
+      store.putNewList(311L, entry(300L, "a", false, sig));
+      store.flushWrites();
+
+      List<DiffReportEntry> entries = runWriteReportWithManager(store, BUCKET_OBJECT_ID, true,
+          mockManagerWithRealDeleteRetention(), ordering);
+      assertThat(entries).containsExactlyInAnyOrder(
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "b"),
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "a"),
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c"),
+          SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c/a"));
+      if (ordering) {
+        assertThat(entries).containsSubsequence(
+            SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c/a"),
+            SnapshotDiffReportOzone.getDiffReportEntry(DELETE, "c"));
+      }
+    }
+  }
+
   @Test
   void testDependencyOrderingUsesBatchedReportLookup() throws Exception {
     byte[] sig = signature("s");
@@ -311,6 +351,48 @@ class TestMergeJoinSnapDiffWriter {
       List<DiffReportEntry> entries = store.readReportEntriesForTest();
       assertEquals(2, entries.size());
       verify(store, times(1)).putDependencyNode(anyInt(), any());
+      verify(store, never()).putOrderedReportEntries(anyList());
+    }
+  }
+
+  @Test
+  void testDependencyOrderingFallsBackOnCycle() throws Exception {
+    byte[] sig = signature("s");
+    SnapDiffJobStore store = spy(newStore(true));
+    try (SnapDiffJobStore ignored = store) {
+      // Files a and b swap names: each RENAME frees the path the other one takes.
+      store.putNewList(301L, entry(BUCKET_OBJECT_ID, "b", false, sig));
+      store.putOldList(301L, entry(BUCKET_OBJECT_ID, "a", false, sig));
+      store.putNewList(302L, entry(BUCKET_OBJECT_ID, "a", false, sig));
+      store.putOldList(302L, entry(BUCKET_OBJECT_ID, "b", false, sig));
+      store.flushWrites();
+
+      AtomicReference<Double> progress = new AtomicReference<>(0.0);
+      Pair<Long, String> reportMeta = writeReport(mockManagerPassthroughDeletes(), store,
+          BUCKET_OBJECT_ID, true, true, progress::set);
+      assertEquals(1.0, progress.get());
+      // Successful write with unordered outcome is what SnapshotDiffManager marks DONE with.
+      assertEquals(2L, reportMeta.getKey().longValue());
+      assertFalse(store.isReportDependencyOrdered());
+
+      List<DiffReportEntry> entries = store.readReportEntriesForTest();
+      assertThat(entries).extracting(DiffReportEntry::getType).containsExactly(RENAME, RENAME);
+      assertEquals("a", new String(entries.get(0).getSourcePath(), StandardCharsets.UTF_8));
+      assertEquals("b", new String(entries.get(0).getTargetPath(), StandardCharsets.UTF_8));
+      assertEquals("b", new String(entries.get(1).getSourcePath(), StandardCharsets.UTF_8));
+      assertEquals("a", new String(entries.get(1).getTargetPath(), StandardCharsets.UTF_8));
+
+      try (SnapDiffJobStore unorderedStore = newStore(true)) {
+        unorderedStore.putNewList(301L, entry(BUCKET_OBJECT_ID, "b", false, sig));
+        unorderedStore.putOldList(301L, entry(BUCKET_OBJECT_ID, "a", false, sig));
+        unorderedStore.putNewList(302L, entry(BUCKET_OBJECT_ID, "a", false, sig));
+        unorderedStore.putOldList(302L, entry(BUCKET_OBJECT_ID, "b", false, sig));
+        unorderedStore.flushWrites();
+        List<DiffReportEntry> explicitUnordered =
+            runWriteReport(unorderedStore, BUCKET_OBJECT_ID, true, false);
+        assertEquals(explicitUnordered, entries);
+      }
+
       verify(store, never()).putOrderedReportEntries(anyList());
     }
   }

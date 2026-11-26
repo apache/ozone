@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -42,6 +43,7 @@ public class TestReconDBProvider {
   private Path temporaryFolder;
 
   private Injector injector;
+  private ReconDBProvider reconDBProvider;
 
   @BeforeEach
   public void setUp() throws IOException {
@@ -57,10 +59,16 @@ public class TestReconDBProvider {
     });
   }
 
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+  }
+
   @Test
   public void testGet() throws Exception {
-    ReconDBProvider reconDBProvider = injector.getInstance(
-        ReconDBProvider.class);
+    reconDBProvider = injector.getInstance(ReconDBProvider.class);
     assertNotNull(reconDBProvider.getDbStore());
   }
 

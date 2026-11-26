@@ -89,8 +89,8 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,7 +103,7 @@ import org.junit.jupiter.params.provider.CsvSource;
  * This test verifies all the S3 multipart client apis - prefix layout.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATests.TestCase {
+public abstract class TestOzoneClientMultipartUploadWithFSO implements ClusterForTests.TestCase {
 
   private ObjectStore store;
   private MiniOzoneCluster cluster;

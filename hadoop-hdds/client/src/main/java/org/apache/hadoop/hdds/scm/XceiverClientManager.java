@@ -23,14 +23,13 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_REPLICA_FOUND;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,29 +109,14 @@ public class XceiverClientManager extends XceiverClientCreator {
     // at most one thread, which exits when idle
     this.closeExecutor = new ThreadPoolExecutor(0, 1, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true).setNameFormat("XceiverClientManager-close-%d").build());
-    this.clientCache = CacheBuilder.newBuilder()
+    this.clientCache = Caffeine.newBuilder()
         .recordStats()
         .expireAfterAccess(staleThresholdMs, MILLISECONDS)
         .maximumSize(clientConf.getMaxSize())
-        .removalListener(
-            new RemovalListener<String, XceiverClientSpi>() {
-            @Override
-            public void onRemoval(
-                RemovalNotification<String, XceiverClientSpi>
-                  removalNotification) {
-              synchronized (clientCache) {
-                // Mark the entry as evicted
-                XceiverClientSpi info = removalNotification.getValue();
-                if (info.setEvicted()) {
-                  if (clientsToClose == null) {
-                    closeAsync(info);
-                  } else {
-                    clientsToClose.add(info);
-                  }
-                }
-              }
-            }
-          }).build();
+        // run the maintenance and the removal listener on the calling thread, so that close() collects the clients
+        .executor(Runnable::run)
+        .<String, XceiverClientSpi>removalListener((key, info, cause) -> onRemoval(info))
+        .build();
     cleanupExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder()
         .setNameFormat("XceiverClientManager-cleanup-%d").setDaemon(true).build());
     if (staleThresholdMs > 0) {
@@ -141,6 +125,19 @@ public class XceiverClientManager extends XceiverClientCreator {
 
     cacheMetrics = CacheMetrics.create(clientCache, this);
     this.localDNCache = new ConcurrentHashMap<>();
+  }
+
+  private void onRemoval(XceiverClientSpi info) {
+    synchronized (clientCache) {
+      // Mark the entry as evicted
+      if (info != null && info.setEvicted()) {
+        if (clientsToClose == null) {
+          closeAsync(info);
+        } else {
+          clientsToClose.add(info);
+        }
+      }
+    }
   }
 
   private void cleanUpCache() {
@@ -164,7 +161,8 @@ public class XceiverClientManager extends XceiverClientCreator {
    * the cached otherwise create a new one.
    *
    * @param pipeline the container pipeline for the client connection
-   * @param allowShortCircuit create a short-circuit read client or not if applicable
+   * @param allowShortCircuit create a short-circuit read client or not if applicable;
+   *     ignored for EC pipelines and EC replica reads, which always use a gRPC client
    * @return XceiverClientSpi connected to a container
    * @throws IOException if a XceiverClientSpi cannot be acquired
    */
@@ -250,11 +248,22 @@ public class XceiverClientManager extends XceiverClientCreator {
     try {
       // create different client different pipeline node based on network topology
       String key = getPipelineCacheKey(pipeline, topologyAware, allowShortCircuit);
-      return clientCache.get(key, () -> newClient(pipeline, localDNCache.get(key)));
+      return clientCache.get(key, k -> {
+        try {
+          return newClient(pipeline, localDNCache.get(k));
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      });
     } catch (Exception e) {
       throw new IOException(
           "Exception getting XceiverClient: " + e, e);
     }
+  }
+
+  private static boolean isECReplica(Pipeline pipeline) {
+    return pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
+        && pipeline.getReplicaIndexes().values().stream().anyMatch(index -> index > 0);
   }
 
   private String getPipelineCacheKey(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit) {
@@ -264,7 +273,9 @@ public class XceiverClientManager extends XceiverClientCreator {
     DatanodeDetails localDN = null;
     boolean shortCircuitPipeline = false;
 
-    if ((!isEC) && allowShortCircuit && isShortCircuitEnabled()) {
+    // Short-circuit reads are not supported for EC keys. EC key reads use a single-node STAND_ALONE pipeline per
+    // replica, which is recognized by its non-zero replica index.
+    if (allowShortCircuit && !isEC && isShortCircuitEnabled() && !isECReplica(pipeline)) {
       int port = 0;
       InetSocketAddress localAddr = null;
       for (DatanodeDetails dn : pipeline.getNodes()) {
@@ -279,7 +290,7 @@ public class XceiverClientManager extends XceiverClientCreator {
       }
       if (localAddr != null) {
         // Find a local DN and short circuit read is enabled
-        key.append('@').append(localAddr.getHostName()).append(':').append(port);
+        key.append('@').append(localAddr.getHostString()).append(':').append(port);
         shortCircuitPipeline = true;
       }
     }
@@ -357,10 +368,6 @@ public class XceiverClientManager extends XceiverClientCreator {
     }
     localDNCache.clear();
     cacheMetrics.unregister();
-
-    if (metrics != null) {
-      metrics.unRegister();
-    }
   }
 
   /**
@@ -385,7 +392,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   }
 
   /**
-   * Get xceiver client metric.
+   * Get xceiver client metrics shared by all managers for the lifetime of the JVM.
    */
   public static synchronized XceiverClientMetrics getXceiverClientMetrics() {
     if (metrics == null) {
@@ -393,15 +400,6 @@ public class XceiverClientManager extends XceiverClientCreator {
     }
 
     return metrics;
-  }
-
-  /**
-   * Reset xceiver client metric.
-   */
-  public static synchronized void resetXceiverClientMetrics() {
-    if (metrics != null) {
-      metrics.reset();
-    }
   }
 
   /**

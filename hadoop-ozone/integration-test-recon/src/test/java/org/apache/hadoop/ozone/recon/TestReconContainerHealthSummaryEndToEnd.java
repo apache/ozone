@@ -41,12 +41,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -76,7 +76,7 @@ import org.slf4j.LoggerFactory;
  * <ol>
  *   <li><b>Container State Summary</b> — per lifecycle-state counts (OPEN, CLOSING,
  *       QUASI_CLOSED, CLOSED) are identical between SCM and Recon after a full sync.</li>
- *   <li><b>Container Health Summary</b> — UNHEALTHY_CONTAINERS derby table counts in
+ *   <li><b>Container Health Summary</b> — UNHEALTHY_CONTAINERS SQL table counts in
  *       Recon match exactly the health states classified by SCM's ReplicationManager
  *       after both process the same container replica state.</li>
  * </ol>
@@ -312,7 +312,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
 
   /**
    * Validates that Container Health Summary counts match exactly between SCM's
-   * {@link ReplicationManagerReport} and Recon's UNHEALTHY_CONTAINERS derby
+   * {@link ReplicationManagerReport} and Recon's UNHEALTHY_CONTAINERS SQL
    * table after both process the same injected container states.
    *
    * <p>The test also explicitly validates the lifecycle-state boundary that
@@ -361,7 +361,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
     ReplicationManagerReport scmReport =
         scm.getReplicationManager().getContainerReport();
 
-    // Run Recon RM (writes to UNHEALTHY_CONTAINERS derby table).
+    // Run Recon RM (writes to UNHEALTHY_CONTAINERS SQL table).
     reconScm.getReplicationManager().processAll();
     ReconHealthRecords records = loadReconHealthRecords(reconCm);
 
@@ -789,7 +789,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
    *       (default). The container was never created on any datanode.</li>
    *   <li>{@code EmptyContainerHandler} case 3: CLOSED + numberOfKeys==0 +
    *       replicas.isEmpty() → {@code report.incrementAndSample(EMPTY)} →
-   *       {@code containerInfo.setHealthState(EMPTY)}, chain stops.</li>
+   *       {@code containerInfo.setSimplifiedHealthStateForReporting(EMPTY)}, chain stops.</li>
    *   <li>The container WOULD be MISSING (0 replicas for RF1) if not for
    *       {@code EmptyContainerHandler} case 3 firing first for CLOSED containers.</li>
    *   <li>Recon: also classifies as EMPTY → {@code storeHealthStatesToDatabase()} skips
@@ -845,30 +845,30 @@ public class TestReconContainerHealthSummaryEndToEnd {
       HealthSummarySetup setup,
       ReconHealthRecords records) throws Exception {
     assertStateMatch(scmCm, setup.underReplicatedIds, records.underRep,
-        ContainerHealthState.UNDER_REPLICATED, "UNDER_REPLICATED",
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED, "UNDER_REPLICATED",
         "UNDER_REPLICATED count must match between SCM RM report and Recon "
             + "UNHEALTHY_CONTAINERS");
     assertStateMatch(scmCm, setup.overReplicatedIds, records.overRep,
-        ContainerHealthState.OVER_REPLICATED, "OVER_REPLICATED",
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED, "OVER_REPLICATED",
         "OVER_REPLICATED count must match between SCM RM report and Recon "
             + "UNHEALTHY_CONTAINERS");
     assertStateMatch(scmCm, setup.missingIds, records.missing,
-        ContainerHealthState.MISSING, "MISSING",
+        SimplifiedContainerHealthStateForReporting.MISSING, "MISSING",
         "MISSING count must match between SCM RM report and Recon "
             + "UNHEALTHY_CONTAINERS");
 
-    assertAllClassifiedBySCM(scmCm, setup.emptyOnlyIds, ContainerHealthState.EMPTY,
+    assertAllClassifiedBySCM(scmCm, setup.emptyOnlyIds, SimplifiedContainerHealthStateForReporting.EMPTY,
         "EMPTY");
     assertNoneInRecon(records.emptyMissing, setup.emptyOnlyIds,
         "CLOSED containers with 0 keys and 0 replicas must NOT be stored as "
             + "EMPTY_MISSING");
     assertEquals(setup.emptyOnlyIds.size(),
-        countMatchingHealthState(scmCm, setup.emptyOnlyIds, ContainerHealthState.EMPTY),
+        countMatchingHealthState(scmCm, setup.emptyOnlyIds, SimplifiedContainerHealthStateForReporting.EMPTY),
         "SCM must classify every CLOSED + 0-key + 0-replica emptyOnly "
             + "container as EMPTY");
 
     assertAllClassifiedBySCM(scmCm, setup.emptyMissingIds,
-        ContainerHealthState.MISSING,
+        SimplifiedContainerHealthStateForReporting.MISSING,
         "MISSING (CLOSING + 0 replicas → SCM RM emits getStat(MISSING)++)");
     assertAllEmptyContent(scmCm, setup.emptyMissingIds);
     assertAllClassifiedByRecon(records.emptyMissing, setup.emptyMissingIds,
@@ -879,13 +879,13 @@ public class TestReconContainerHealthSummaryEndToEnd {
             + "replicas, getStat(MISSING)++ in SCM) and EMPTY "
             + "(numberOfKeys=0) must be stored as EMPTY_MISSING in Recon");
     assertEquals((long) (setup.missingIds.size() + setup.emptyMissingIds.size()),
-        countMatchingHealthState(scmCm, setup.missingIds, ContainerHealthState.MISSING)
+        countMatchingHealthState(scmCm, setup.missingIds, SimplifiedContainerHealthStateForReporting.MISSING)
             + countMatchingHealthState(scmCm, setup.emptyMissingIds,
-            ContainerHealthState.MISSING),
+            SimplifiedContainerHealthStateForReporting.MISSING),
         "SCM getStat(MISSING) must equal the combined MISSING + "
             + "EMPTY_MISSING count");
 
-    assertEquals(0L, scmReport.getStat(ContainerHealthState.MIS_REPLICATED),
+    assertEquals(0L, scmReport.getStat(SimplifiedContainerHealthStateForReporting.MIS_REPLICATED),
         "MIS_REPLICATED SCM RM count should be 0 when not induced");
     assertEquals(0, records.misRep.size(),
         "MIS_REPLICATED Recon count should be 0 when not induced");
@@ -895,7 +895,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
       ContainerManager scmCm,
       List<Long> ids,
       List<UnhealthyContainerRecord> records,
-      ContainerHealthState expected,
+      SimplifiedContainerHealthStateForReporting expected,
       String label,
       String message) throws Exception {
     assertAllClassifiedBySCM(scmCm, ids, expected, label);
@@ -906,13 +906,13 @@ public class TestReconContainerHealthSummaryEndToEnd {
 
   /**
    * Asserts that every container ID in {@code ids} has the expected
-   * {@link ContainerHealthState} set on SCM's {@link ContainerInfo} object
+   * {@link SimplifiedContainerHealthStateForReporting} set on SCM's {@link ContainerInfo} object
    * after SCM's {@code ReplicationManager.processAll()} has run.
    */
   private void assertAllClassifiedBySCM(
       ContainerManager scmCm,
       List<Long> ids,
-      ContainerHealthState expected,
+      SimplifiedContainerHealthStateForReporting expected,
       String label) throws Exception {
     for (long id : ids) {
       ContainerInfo container = scmCm.getContainer(ContainerID.valueOf(id));
@@ -921,7 +921,7 @@ public class TestReconContainerHealthSummaryEndToEnd {
       // healthState value on ContainerInfo.
       cluster.getStorageContainerManager().getReplicationManager()
           .checkContainerStatus(container, new ReplicationManagerReport(MAX_RESULT));
-      ContainerHealthState actual = container.getHealthState();
+      SimplifiedContainerHealthStateForReporting actual = container.getSimplifiedHealthStateForReporting();
       assertEquals(expected, actual,
           String.format(
               "SCM must classify container %d as %s but got %s",
@@ -1026,16 +1026,16 @@ public class TestReconContainerHealthSummaryEndToEnd {
     LOG.info("Container Health Summary (SCM RM Report vs Recon UNHEALTHY_CONTAINERS)");
     LOG.info("========================================================================");
     LOG.info("UNDER_REPLICATED: SCM={}, Recon={}",
-        scmReport.getStat(ContainerHealthState.UNDER_REPLICATED),
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED),
         reconUnderRep.size());
     LOG.info("MIS_REPLICATED:   SCM={}, Recon={} [not induced]",
-        scmReport.getStat(ContainerHealthState.MIS_REPLICATED),
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.MIS_REPLICATED),
         reconMisRep.size());
     LOG.info("OVER_REPLICATED:  SCM={}, Recon={}",
-        scmReport.getStat(ContainerHealthState.OVER_REPLICATED),
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.OVER_REPLICATED),
         reconOverRep.size());
     LOG.info("MISSING:          SCM={}, Recon MISSING={} + EMPTY_MISSING={}",
-        scmReport.getStat(ContainerHealthState.MISSING),
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.MISSING),
         reconMissing.size(), reconEmptyMissing.size());
   }
 
@@ -1059,46 +1059,46 @@ public class TestReconContainerHealthSummaryEndToEnd {
     LOG.info("Container Health Summary (SCM RM Report vs Recon UNHEALTHY_CONTAINERS)");
     LOG.info("========================");
     LOG.info("HEALTHY:                             SCM={} (not stored in UNHEALTHY_CONTAINERS)",
-        scmReport.getStat(ContainerHealthState.HEALTHY));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.HEALTHY));
     LOG.info("UNDER_REPLICATED:                    SCM={}, Recon={}",
-        scmReport.getStat(ContainerHealthState.UNDER_REPLICATED),
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED),
         records.underRep.size());
     LOG.info("MIS_REPLICATED:                      SCM={}, Recon={}"
             + " [not induced — rack-aware topology required]",
-        scmReport.getStat(ContainerHealthState.MIS_REPLICATED),
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.MIS_REPLICATED),
         records.misRep.size());
     LOG.info("OVER_REPLICATED:                     SCM={}, Recon={}",
-        scmReport.getStat(ContainerHealthState.OVER_REPLICATED),
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.OVER_REPLICATED),
         records.overRep.size());
     LOG.info("MISSING:                             SCM={}, Recon MISSING={},"
             + " Recon EMPTY_MISSING={} [SCM MISSING includes both MISSING + EMPTY_MISSING"
             + " containers; Recon differentiates via numberOfKeys]",
-        scmReport.getStat(ContainerHealthState.MISSING),
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.MISSING),
         records.missing.size(), records.emptyMissing.size());
     LOG.info("UNHEALTHY:                           SCM={}",
-        scmReport.getStat(ContainerHealthState.UNHEALTHY));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.UNHEALTHY));
     LOG.info("EMPTY:                               SCM={}"
             + " [CLOSED+0-key+0-replica containers; EmptyContainerHandler fires first;"
             + " NOT stored in Recon UNHEALTHY_CONTAINERS — contrast to EMPTY_MISSING]",
-        scmReport.getStat(ContainerHealthState.EMPTY));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.EMPTY));
     LOG.info("OPEN_UNHEALTHY:                      SCM={}",
-        scmReport.getStat(ContainerHealthState.OPEN_UNHEALTHY));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.OPEN_UNHEALTHY));
     LOG.info("QUASI_CLOSED_STUCK:                  SCM={}",
-        scmReport.getStat(ContainerHealthState.QUASI_CLOSED_STUCK));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK));
     LOG.info("OPEN_WITHOUT_PIPELINE:               SCM={}",
-        scmReport.getStat(ContainerHealthState.OPEN_WITHOUT_PIPELINE));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.OPEN_WITHOUT_PIPELINE));
     LOG.info("UNHEALTHY_UNDER_REPLICATED:          SCM={}",
-        scmReport.getStat(ContainerHealthState.UNHEALTHY_UNDER_REPLICATED));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED));
     LOG.info("UNHEALTHY_OVER_REPLICATED:           SCM={}",
-        scmReport.getStat(ContainerHealthState.UNHEALTHY_OVER_REPLICATED));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.UNHEALTHY_OVER_REPLICATED));
     LOG.info("MISSING_UNDER_REPLICATED:            SCM={}",
-        scmReport.getStat(ContainerHealthState.MISSING_UNDER_REPLICATED));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED));
     LOG.info("QUASI_CLOSED_STUCK_UNDER_REPLICATED: SCM={}",
-        scmReport.getStat(ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_UNDER_REPLICATED));
     LOG.info("QUASI_CLOSED_STUCK_OVER_REPLICATED:  SCM={}",
-        scmReport.getStat(ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_OVER_REPLICATED));
     LOG.info("QUASI_CLOSED_STUCK_MISSING:          SCM={}",
-        scmReport.getStat(ContainerHealthState.QUASI_CLOSED_STUCK_MISSING));
+        scmReport.getStat(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_MISSING));
     LOG.info("NEGATIVE_SIZE:                       Recon={}"
             + " (Recon-only; no SCM RM equivalent)",
         records.negSize.size());
@@ -1155,10 +1155,10 @@ public class TestReconContainerHealthSummaryEndToEnd {
   private long countMatchingHealthState(
       ContainerManager scmCm,
       List<Long> ids,
-      ContainerHealthState expected) throws Exception {
+      SimplifiedContainerHealthStateForReporting expected) throws Exception {
     long count = 0;
     for (long id : ids) {
-      if (scmCm.getContainer(ContainerID.valueOf(id)).getHealthState() == expected) {
+      if (scmCm.getContainer(ContainerID.valueOf(id)).getSimplifiedHealthStateForReporting() == expected) {
         count++;
       }
     }

@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.freon.OmBucketTestUtils.ParameterBuilder;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test for OmBucketReadWriteKeyOps.
  */
-public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase {
+public abstract class TestOmBucketReadWriteKeyOps implements ClusterForTests.TestCase {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmBucketReadWriteKeyOps.class);
