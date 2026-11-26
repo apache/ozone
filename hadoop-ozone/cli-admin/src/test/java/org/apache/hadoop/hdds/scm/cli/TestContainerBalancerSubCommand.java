@@ -830,7 +830,90 @@ class TestContainerBalancerSubCommand {
 
     assertThat(out.get())
         .contains("Failed to move containers                          3")
-        .contains("Failed container moves                             (no breakdown available)");
+        .contains("Failed container moves                             (no breakdown available)")
+        .doesNotContain("Storage type:");
+  }
+
+  @Test
+  void testContainerBalancerStatusVerboseHistoryShowsStorageTypes() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    ContainerBalancerConfiguration config = getContainerBalancerConfiguration();
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto first =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
+            .setIterationNumber(1)
+            .setIterationResult("ITERATION_COMPLETED")
+            .setIterationDuration(120L)
+            .addStorageTypeStatusInfo(storageTypeStatus(HddsProtos.StorageTypeProto.SSD, 2, "ssd-source", "ssd-target"))
+            .build();
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto second =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
+            .setIterationNumber(2)
+            .setIterationResult("ITERATION_COMPLETED")
+            .setIterationDuration(60L)
+            .addStorageTypeStatusInfo(storageTypeStatus(HddsProtos.StorageTypeProto.DISK, 4, "disk-source",
+                "disk-target"))
+            .addStorageTypeStatusInfo(
+                StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto.newBuilder()
+                    .setContainerMovesScheduled(1).build())
+            .build();
+    long stoppedAt = OffsetDateTime.now().toEpochSecond();
+    ContainerBalancerStatusInfoProto statusInfo = ContainerBalancerStatusInfoProto.newBuilder()
+        .setStartedAt(stoppedAt - 600)
+        .setStoppedAt(stoppedAt)
+        .setStopReason("USER_REQUESTED")
+        .setConfiguration(config.toProtobufBuilder().setShouldRun(false))
+        .addIterationsStatusInfo(first)
+        .addIterationsStatusInfo(second)
+        .build();
+    when(scmClient.getContainerBalancerStatusInfo())
+        .thenReturn(ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setIsRunning(false)
+            .setContainerBalancerStatusInfo(statusInfo)
+            .build());
+    CommandLine cmd = new CommandLine(statusCmd);
+    verbose.set(true);
+    cmd.parseArgs("--history");
+
+    statusCmd.execute(scmClient);
+
+    String output = out.get();
+    int historyStart = output.indexOf("Completed iteration history:");
+    String lastIteration = output.substring(output.indexOf("Last iteration info:"), historyStart);
+    String history = output.substring(historyStart);
+    assertThat(lastIteration)
+        .contains("Storage type: DISK")
+        .contains("Storage type: UNKNOWN")
+        .contains("disk-source -> 4 GB")
+        .contains("disk-target <- 4 GB")
+        .doesNotContain("Storage type: SSD");
+    assertThat(history)
+        .contains("Storage type: SSD")
+        .contains("Size scheduled to move                           2 GB")
+        .contains("Scheduled to move containers                     3")
+        .contains("Unique datanodes involved                        2")
+        .contains("Unbalanced datanodes                             5")
+        .contains("ssd-source -> 2 GB")
+        .contains("ssd-target <- 2 GB");
+  }
+
+  private static StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto
+      storageTypeStatus(HddsProtos.StorageTypeProto type, long gigabytes, String source, String target) {
+    long bytes = gigabytes * OzoneConsts.GB;
+    return StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto.newBuilder()
+        .setStorageType(type)
+        .setSizeScheduledForMove(bytes)
+        .setDataSizeMoved(bytes)
+        .setContainerMovesScheduled(3)
+        .setContainerMovesCompleted(2)
+        .setContainerMovesFailed(1)
+        .setNumDatanodesInvolved(2)
+        .setNumDatanodesUnbalanced(5)
+        .setDataSizeUnbalanced(bytes)
+        .addSizeLeavingNodes(StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
+            .setUuid(source).setDataVolume(bytes).build())
+        .addSizeEnteringNodes(StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
+            .setUuid(target).setDataVolume(bytes).build())
+        .build();
   }
 
   @Test

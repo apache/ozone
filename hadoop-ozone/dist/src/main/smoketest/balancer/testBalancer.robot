@@ -91,12 +91,14 @@ Verify Balancer Iteration
 Verify Balancer Iteration History
     [arguments]       ${output}
     Should Contain                  ${output}             Completed iteration history:
-    Should Contain X Times          ${output}             Size scheduled to move                    1      collapse_spaces=True
-    Should Contain X Times          ${output}             Moved data size                           1      collapse_spaces=True
-    Should Contain X Times          ${output}             Scheduled to move containers              1      collapse_spaces=True
-    Should Contain X Times          ${output}             Already moved containers                  1      collapse_spaces=True
-    Should Contain X Times          ${output}             Failed to move containers 0               1      collapse_spaces=True
-    Should Contain X Times          ${output}             Failed to move containers by timeout 0    1      collapse_spaces=True
+    # Each storage type section repeats these labels for that type, so only count the overall values.
+    ${overall} =    Remove String Using Regexp    ${output}    (?m)^Storage type: .*(?:\n {2}.*)*
+    Should Contain X Times          ${overall}            Size scheduled to move                    1      collapse_spaces=True
+    Should Contain X Times          ${overall}            Moved data size                           1      collapse_spaces=True
+    Should Contain X Times          ${overall}            Scheduled to move containers              1      collapse_spaces=True
+    Should Contain X Times          ${overall}            Already moved containers                  1      collapse_spaces=True
+    Should Contain X Times          ${overall}            Failed to move containers 0               1      collapse_spaces=True
+    Should Contain X Times          ${overall}            Failed to move containers by timeout 0    1      collapse_spaces=True
     Should Contain                  ${output}             Iteration result ITERATION_COMPLETED             collapse_spaces=True
 
 Run Balancer Status
