@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,14 +34,25 @@ public class ContainerBalancerTaskIterationStatusInfo {
   private final IterationInfo iterationInfo;
   private final ContainerMoveInfo containerMoveInfo;
   private final DataMoveInfo dataMoveInfo;
+  private final List<StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto>
+      storageTypeStatusInfo;
 
   public ContainerBalancerTaskIterationStatusInfo(
       IterationInfo iterationInfo,
       ContainerMoveInfo containerMoveInfo,
       DataMoveInfo dataMoveInfo) {
+    this(iterationInfo, containerMoveInfo, dataMoveInfo, Collections.emptyList());
+  }
+
+  public ContainerBalancerTaskIterationStatusInfo(
+      IterationInfo iterationInfo,
+      ContainerMoveInfo containerMoveInfo,
+      DataMoveInfo dataMoveInfo,
+      List<StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto> storageTypeStatusInfo) {
     this.iterationInfo = iterationInfo;
     this.containerMoveInfo = containerMoveInfo;
     this.dataMoveInfo = dataMoveInfo;
+    this.storageTypeStatusInfo = Collections.unmodifiableList(new ArrayList<>(storageTypeStatusInfo));
   }
 
   /**
@@ -139,6 +152,16 @@ public class ContainerBalancerTaskIterationStatusInfo {
   }
 
   /**
+   * Get the results of this iteration for each storage type. The list is a snapshot, so it does not change
+   * when the metrics of a later iteration change.
+   * @return per storage type status, empty when the balancer did not report storage types
+   */
+  public List<StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto>
+      getStorageTypeStatusInfo() {
+    return storageTypeStatusInfo;
+  }
+
+  /**
    * Converts an instance into the protobuf compatible object.
    * @return proto representation
    */
@@ -160,6 +183,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
             mapToProtoNodeTransferInfo(getSizeLeavingNodes())
         )
         .addAllContainerMoveFailures(mapToProtoFailures(getFailures()))
+        .addAllStorageTypeStatusInfo(storageTypeStatusInfo)
         .build();
   }
 

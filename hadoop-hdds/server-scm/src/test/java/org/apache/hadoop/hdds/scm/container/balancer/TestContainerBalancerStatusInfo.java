@@ -26,12 +26,17 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.math3.util.ArithmeticUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -215,6 +220,55 @@ class TestContainerBalancerStatusInfo {
     Long enteringDataSum = getTotalMovedData(iteration.getSizeEnteringNodes());
     Long leavingDataSum = getTotalMovedData(iteration.getSizeLeavingNodes());
     assertEquals(enteringDataSum, leavingDataSum);
+    verifyStorageTypeStatusMatchesOverall(iteration);
+  }
+
+  /**
+   * The mock cluster has a single storage type (DISK), so the report of that type must equal the overall report of the
+   * iteration. The iteration is finished, so this also shows that the report is frozen and does not follow the metrics
+   * of a later iteration.
+   */
+  private void verifyStorageTypeStatusMatchesOverall(ContainerBalancerTaskIterationStatusInfo iteration) {
+    assertEquals(1, iteration.getStorageTypeStatusInfo().size());
+    ContainerBalancerStorageTypeStatusInfoProto typed = iteration.getStorageTypeStatusInfo().get(0);
+    assertEquals(HddsProtos.StorageTypeProto.DISK, typed.getStorageType());
+    assertEquals(iteration.getContainerMovesScheduled(), typed.getContainerMovesScheduled());
+    assertEquals(iteration.getContainerMovesCompleted(), typed.getContainerMovesCompleted());
+    assertEquals(iteration.getContainerMovesFailed(), typed.getContainerMovesFailed());
+    assertEquals(iteration.getContainerMovesTimeout(), typed.getContainerMovesTimeout());
+    assertEquals(iteration.getSizeScheduledForMove(), typed.getSizeScheduledForMove());
+    assertEquals(iteration.getDataSizeMoved(), typed.getDataSizeMoved());
+    assertEquals(iteration.getSizeEnteringNodes().size(), typed.getSizeEnteringNodesCount());
+    assertEquals(iteration.getSizeLeavingNodes().size(), typed.getSizeLeavingNodesCount());
+    Set<DatanodeID> involved = new HashSet<>(iteration.getSizeEnteringNodes().keySet());
+    involved.addAll(iteration.getSizeLeavingNodes().keySet());
+    assertEquals(involved.size(), typed.getNumDatanodesInvolved());
+  }
+
+  @Test
+  void testStorageTypeStatusIsPartOfTheProto() {
+    MockedSCM mockedScm = new MockedSCM(new MockCluster(20, OzoneConsts.GB));
+    ContainerBalancerConfiguration config = new OzoneConfiguration().getObject(ContainerBalancerConfiguration.class);
+    config.setIterations(2);
+    config.setBalancingInterval(0);
+    config.setMaxSizeToMovePerIteration(50 * OzoneConsts.GB);
+
+    ContainerBalancerTask task = mockedScm.startBalancerTask(config);
+
+    for (ContainerBalancerTaskIterationStatusInfo iteration : task.getCurrentIterationsStatistic()) {
+      assertEquals(iteration.getStorageTypeStatusInfo(), iteration.toProto().getStorageTypeStatusInfoList());
+    }
+  }
+
+  @Test
+  void testStatusWithoutStorageTypesHasNone() {
+    ContainerBalancerTaskIterationStatusInfo iteration = new ContainerBalancerTaskIterationStatusInfo(
+        new IterationInfo(1, "ITERATION_COMPLETED", 1), new ContainerMoveInfo(
+            ContainerBalancerMetrics.create(), new ContainerMoveFailureTracker()),
+        new DataMoveInfo(0, 0, Collections.emptyMap(), Collections.emptyMap()));
+
+    assertTrue(iteration.getStorageTypeStatusInfo().isEmpty());
+    assertEquals(0, iteration.toProto().getStorageTypeStatusInfoCount());
   }
 
   private void verifyStartedEmptyIteration(

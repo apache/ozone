@@ -34,9 +34,11 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerMoveFailureDetailProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeFailureCountProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeTransferInfoProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import picocli.CommandLine;
@@ -249,7 +251,8 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %s%n" +
                     "%s" +
                     "%-50s %n%s" +
-                    "%-50s %n%s",
+                    "%-50s %n%s" +
+                    "%s",
             "Key", "Value",
             "Iteration number", iterationNumber == 0 ? "-" : iterationNumber,
             "Iteration duration", getPrettyDuration(Duration.ofSeconds(iterationDuration)),
@@ -263,7 +266,52 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             "Failed to move containers by timeout", containerMovesTimeout,
             failures,
             "Entered data to nodes", enteringDataNodeList,
-            "Exited data from nodes", leavingDataNodeList);
+            "Exited data from nodes", leavingDataNodeList,
+            formatStorageTypeStatusInfo(iterationStatusInfo.getStorageTypeStatusInfoList()));
+  }
+
+  /**
+   * Formats the results of an iteration for each storage type. An empty list, as in a response from an SCM that does
+   * not report storage types, gives no output.
+   */
+  private String formatStorageTypeStatusInfo(List<ContainerBalancerStorageTypeStatusInfoProto> storageTypes) {
+    StringBuilder builder = new StringBuilder();
+    for (ContainerBalancerStorageTypeStatusInfoProto info : storageTypes) {
+      builder.append(String.format("%-50s %n"
+              + "  %-48s %s%n"
+              + "  %-48s %s%n"
+              + "  %-48s %d%n"
+              + "  %-48s %d%n"
+              + "  %-48s %d%n"
+              + "  %-48s %d%n"
+              + "  %-48s %d%n"
+              + "  %-48s %d%n"
+              + "  %-48s %s%n",
+              "Storage type: " + (info.hasStorageType() ? info.getStorageType().name() : "UNKNOWN"),
+              "Size scheduled to move", byteDesc(info.getSizeScheduledForMove()),
+              "Moved data size", byteDesc(info.getDataSizeMoved()),
+              "Scheduled to move containers", info.getContainerMovesScheduled(),
+              "Already moved containers", info.getContainerMovesCompleted(),
+              "Failed to move containers", info.getContainerMovesFailed(),
+              "Failed to move containers by timeout", info.getContainerMovesTimeout(),
+              "Unique datanodes involved", info.getNumDatanodesInvolved(),
+              "Unbalanced datanodes", info.getNumDatanodesUnbalanced(),
+              "Imbalance data size", byteDesc(info.getDataSizeUnbalanced())))
+          .append(formatNodeTraffic("Entered data to nodes", " <- ", info.getSizeEnteringNodesList()))
+          .append(formatNodeTraffic("Exited data from nodes", " -> ", info.getSizeLeavingNodesList()));
+    }
+    return builder.toString();
+  }
+
+  private static String formatNodeTraffic(String title, String arrow, List<NodeTransferInfoProto> nodes) {
+    StringBuilder builder = new StringBuilder(String.format("  %-48s %n", title));
+    if (nodes.isEmpty()) {
+      return builder.append(String.format("    -%n")).toString();
+    }
+    for (NodeTransferInfoProto node : nodes) {
+      builder.append(String.format("    %s%s%s%n", node.getUuid(), arrow, byteDesc(node.getDataVolume())));
+    }
+    return builder.toString();
   }
 
   private String formatFailures(long containerMovesFailed, List<ContainerMoveFailureDetailProto> failures) {

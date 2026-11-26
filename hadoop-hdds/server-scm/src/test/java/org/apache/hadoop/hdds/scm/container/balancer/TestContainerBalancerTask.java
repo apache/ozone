@@ -67,6 +67,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
@@ -92,6 +93,9 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.metrics2.AbstractMetric;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.metrics2.impl.MetricsRecordImpl;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
@@ -1167,6 +1171,15 @@ public class TestContainerBalancerTask {
     verify(moveManager, atLeast(1)).move(any(ContainerID.class),
         any(DatanodeDetails.class), any(DatanodeDetails.class));
     verify(moveManager, org.mockito.Mockito.never()).move(any(), any(), any(), any());
+    // Usage that is not reported by storage type gives results that are reported under the unknown type.
+    List<ContainerBalancerStorageTypeStatusInfoProto> reported =
+        containerBalancerTask.getCurrentIterationsStatistic().get(0).getStorageTypeStatusInfo();
+    assertEquals(1, reported.size());
+    assertThat(reported.get(0).hasStorageType()).isFalse();
+    assertEquals(containerBalancerTask.getMetrics().getNumContainerMovesScheduledInLatestIteration(),
+        reported.get(0).getContainerMovesScheduled());
+    assertEquals(containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration(),
+        reported.get(0).getContainerMovesCompleted());
   }
 
   @Test
@@ -1197,6 +1210,218 @@ public class TestContainerBalancerTask {
     startBalancer(balancerConfiguration);
     assertThat(order).hasSize(7).containsOnly(StorageType.SSD);
     assertThat(containerBalancerTask.getContainerToSourceMap()).hasSize(7);
+  }
+
+  /** A result that arrives while another storage type has its turn is still counted under the type that moved. */
+  @ParameterizedTest
+  @EnumSource(value = MoveManager.MoveResult.class,
+      names = {"COMPLETED", "REPLICATION_NOT_HEALTHY_AFTER_MOVE"})
+  public void testMoveResultsKeepScheduledStorageTypeAfterSwitchingTurns(MoveManager.MoveResult lateResult)
+      throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80, 80);
+    DatanodeUsageInfo target = storageTypeNode(20, 20);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, STORAGE_UNIT);
+    addStorageTypeContainer(source, 1001, StorageType.DISK, STORAGE_UNIT);
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, new ArrayList<>());
+    CompletableFuture<MoveManager.MoveResult> ssdMove = new CompletableFuture<>();
+    doAnswer(invocation -> {
+      if (invocation.<StorageType>getArgument(3) == StorageType.SSD) {
+        return ssdMove;
+      }
+      // The SSD move finishes while DISK has its turn.
+      ssdMove.complete(lateResult);
+      return CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
+    }).when(moveManager).move(any(), any(), any(), any());
+
+    startBalancer(balancerConfiguration);
+
+    boolean completed = lateResult == MoveManager.MoveResult.COMPLETED;
+    ContainerBalancerStorageTypeStatusInfoProto ssd = typeStatus(0, StorageType.SSD);
+    assertEquals(1, ssd.getContainerMovesScheduled());
+    assertEquals(completed ? 1 : 0, ssd.getContainerMovesCompleted());
+    assertEquals(completed ? 0 : 1, ssd.getContainerMovesFailed());
+    assertEquals(completed ? STORAGE_UNIT : 0, ssd.getDataSizeMoved());
+    ContainerBalancerStorageTypeStatusInfoProto disk = typeStatus(0, StorageType.DISK);
+    assertEquals(1, disk.getContainerMovesScheduled());
+    assertEquals(1, disk.getContainerMovesCompleted());
+    assertEquals(0, disk.getContainerMovesFailed());
+    ContainerBalancerMetrics overall = containerBalancerTask.getMetrics();
+    assertEquals(completed ? 2 : 1, overall.getNumContainerMovesCompletedInLatestIteration());
+    assertEquals(completed ? 0 : 1, overall.getNumContainerMovesFailedInLatestIteration());
+  }
+
+  /** A move that timed out stays a timeout when it completes after its iteration has ended. */
+  @Test
+  public void testTimedOutMoveIsNotCountedAgainWhenItCompletesLater() throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80);
+    DatanodeUsageInfo target = storageTypeNode(20);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, STORAGE_UNIT);
+    balancerConfiguration.setMoveTimeout(300);
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, new ArrayList<>());
+    CompletableFuture<MoveManager.MoveResult> move = new CompletableFuture<>();
+    doAnswer(invocation -> move).when(moveManager).move(any(), any(), any(), any());
+
+    startBalancer(balancerConfiguration);
+    move.complete(MoveManager.MoveResult.COMPLETED);
+
+    ContainerBalancerStorageTypeStatusInfoProto ssd = typeStatus(0, StorageType.SSD);
+    assertEquals(1, ssd.getContainerMovesScheduled());
+    assertEquals(1, ssd.getContainerMovesTimeout());
+    assertEquals(0, ssd.getContainerMovesCompleted());
+    assertEquals(0, ssd.getDataSizeMoved());
+    ContainerBalancerMetrics overall = containerBalancerTask.getMetrics();
+    assertEquals(1, overall.getNumContainerMovesTimeoutInLatestIteration());
+    assertEquals(0, overall.getNumContainerMovesCompletedInLatestIteration());
+    assertEquals(0, overall.getDataSizeMovedInLatestIteration());
+    assertEquals(1, overall.getNumContainerMovesTimeout());
+    assertEquals(0, overall.getNumContainerMovesCompleted());
+  }
+
+  /**
+   * A move that is still running when the iteration ends, and is not cancelled, must not change any count when it
+   * completes later. The wait for the moves is interrupted here, so that the iteration ends without cancelling them.
+   */
+  @Test
+  public void testMoveCompletingAfterItsIterationEndedIsNotCounted() throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80);
+    DatanodeUsageInfo target = storageTypeNode(20);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, STORAGE_UNIT);
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, new ArrayList<>());
+    CompletableFuture<MoveManager.MoveResult> move = new CompletableFuture<>();
+    doAnswer(invocation -> {
+      Thread.currentThread().interrupt();
+      return move;
+    }).when(moveManager).move(any(), any(), any(), any());
+
+    startBalancer(balancerConfiguration);
+    assertThat(Thread.interrupted()).isTrue();
+    assertFalse(move.isDone());
+    move.complete(MoveManager.MoveResult.COMPLETED);
+
+    ContainerBalancerStorageTypeStatusInfoProto ssd = typeStatus(0, StorageType.SSD);
+    assertEquals(1, ssd.getContainerMovesScheduled());
+    assertEquals(0, ssd.getContainerMovesCompleted());
+    assertEquals(0, ssd.getDataSizeMoved());
+    ContainerBalancerMetrics overall = containerBalancerTask.getMetrics();
+    assertEquals(0, overall.getNumContainerMovesCompletedInLatestIteration());
+    assertEquals(0, overall.getDataSizeMovedInLatestIteration());
+    assertEquals(0, overall.getNumContainerMovesCompleted());
+  }
+
+  /** A move of the first iteration that completes during the second one does not change the second iteration. */
+  @Test
+  public void testResultOfEarlierIterationDoesNotChangeLaterIteration() throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80);
+    DatanodeUsageInfo target = storageTypeNode(20);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, STORAGE_UNIT);
+    balancerConfiguration.setMoveTimeout(300);
+    balancerConfiguration.setBalancingInterval(0);
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, new ArrayList<>());
+    balancerConfiguration.setIterations(2);
+    CompletableFuture<MoveManager.MoveResult> firstIterationMove = new CompletableFuture<>();
+    AtomicInteger moves = new AtomicInteger();
+    doAnswer(invocation -> {
+      if (moves.incrementAndGet() == 1) {
+        return firstIterationMove;
+      }
+      firstIterationMove.complete(MoveManager.MoveResult.COMPLETED);
+      return CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
+    }).when(moveManager).move(any(), any(), any(), any());
+
+    startBalancer(balancerConfiguration);
+
+    assertEquals(2, moves.get());
+    ContainerBalancerStorageTypeStatusInfoProto first = typeStatus(0, StorageType.SSD);
+    assertEquals(1, first.getContainerMovesTimeout());
+    assertEquals(0, first.getContainerMovesCompleted());
+    ContainerBalancerStorageTypeStatusInfoProto second = typeStatus(1, StorageType.SSD);
+    assertEquals(1, second.getContainerMovesScheduled());
+    assertEquals(1, second.getContainerMovesCompleted());
+    assertEquals(0, second.getContainerMovesTimeout());
+    assertEquals(STORAGE_UNIT, second.getDataSizeMoved());
+    ContainerBalancerMetrics overall = containerBalancerTask.getMetrics();
+    assertEquals(1, overall.getNumContainerMovesCompleted());
+    assertEquals(1, overall.getNumContainerMovesTimeout());
+    assertEquals(1, overall.getNumContainerMovesCompletedInLatestIteration());
+    assertEquals(STORAGE_UNIT, overall.getDataSizeMovedInLatestIteration());
+  }
+
+  /** The counts of the storage types add up to the overall counts, but a datanode is counted once overall. */
+  @Test
+  public void testStorageTypeCountsAddUpToOverallCounts() throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80, 80, 80);
+    DatanodeUsageInfo target = storageTypeNode(20, 20, 20);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, STORAGE_UNIT);
+    addStorageTypeContainer(source, 1001, StorageType.DISK, STORAGE_UNIT);
+    addStorageTypeContainer(source, 1002, StorageType.ARCHIVE, STORAGE_UNIT);
+    balancerConfiguration.setMoveTimeout(300);
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, new ArrayList<>());
+    doAnswer(invocation -> {
+      switch (invocation.<StorageType>getArgument(3)) {
+      case SSD:
+        return CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
+      case DISK:
+        return CompletableFuture.completedFuture(MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE);
+      default:
+        return new CompletableFuture<MoveManager.MoveResult>();
+      }
+    }).when(moveManager).move(any(), any(), any(), any());
+
+    startBalancer(balancerConfiguration);
+
+    ContainerBalancerStorageTypeStatusInfoProto ssd = typeStatus(0, StorageType.SSD);
+    ContainerBalancerStorageTypeStatusInfoProto disk = typeStatus(0, StorageType.DISK);
+    ContainerBalancerStorageTypeStatusInfoProto archive = typeStatus(0, StorageType.ARCHIVE);
+    assertEquals(1, ssd.getContainerMovesCompleted());
+    assertEquals(1, disk.getContainerMovesFailed());
+    assertEquals(1, archive.getContainerMovesTimeout());
+
+    ContainerBalancerMetrics overall = containerBalancerTask.getMetrics();
+    List<ContainerBalancerStorageTypeStatusInfoProto> all = Arrays.asList(ssd, disk, archive);
+    assertEquals(overall.getNumContainerMovesScheduledInLatestIteration(),
+        all.stream().mapToLong(ContainerBalancerStorageTypeStatusInfoProto::getContainerMovesScheduled).sum());
+    assertEquals(overall.getNumContainerMovesCompletedInLatestIteration(),
+        all.stream().mapToLong(ContainerBalancerStorageTypeStatusInfoProto::getContainerMovesCompleted).sum());
+    assertEquals(overall.getNumContainerMovesFailedInLatestIteration(),
+        all.stream().mapToLong(ContainerBalancerStorageTypeStatusInfoProto::getContainerMovesFailed).sum());
+    assertEquals(overall.getNumContainerMovesTimeoutInLatestIteration(),
+        all.stream().mapToLong(ContainerBalancerStorageTypeStatusInfoProto::getContainerMovesTimeout).sum());
+    assertEquals(overall.getDataSizeMovedInLatestIteration(),
+        all.stream().mapToLong(ContainerBalancerStorageTypeStatusInfoProto::getDataSizeMoved).sum());
+    // One source and one target datanode took part. SSD and ARCHIVE moved data between them; the DISK move failed.
+    assertEquals(2, overall.getNumDatanodesInvolvedInLatestIteration());
+    assertEquals(2, ssd.getNumDatanodesInvolved());
+    assertEquals(0, disk.getNumDatanodesInvolved());
+    assertEquals(2, archive.getNumDatanodesInvolved());
+    assertEquals(2, ssd.getNumDatanodesUnbalanced());
+
+    // The finished iteration is added to the exported totals of each storage type.
+    assertEquals(1, exportedMetric(StorageType.SSD, "NumContainerMovesCompleted"));
+    assertEquals(STORAGE_UNIT, exportedMetric(StorageType.SSD, "DataSizeMovedBytes"));
+    assertEquals(1, exportedMetric(StorageType.DISK, "NumContainerMovesFailed"));
+    assertEquals(1, exportedMetric(StorageType.ARCHIVE, "NumContainerMovesTimeout"));
+  }
+
+  private long exportedMetric(StorageType type, String name) {
+    MetricsCollectorImpl collector = new MetricsCollectorImpl();
+    containerBalancerTask.getMetrics().storageTypeMetrics().getMetrics(collector, true);
+    for (MetricsRecordImpl record : collector.getRecords()) {
+      if (record.tags().stream().anyMatch(tag -> tag.name().equals("StorageType") && tag.value().equals(type.name()))) {
+        for (AbstractMetric metric : record.metrics()) {
+          if (metric.name().equals(name)) {
+            return metric.value().longValue();
+          }
+        }
+        throw new AssertionError("No metric " + name);
+      }
+    }
+    throw new AssertionError("No metrics of " + type);
+  }
+
+  private ContainerBalancerStorageTypeStatusInfoProto typeStatus(int iteration, StorageType type) {
+    return containerBalancerTask.getCurrentIterationsStatistic().get(iteration).getStorageTypeStatusInfo().stream()
+        .filter(status -> status.hasStorageType() && status.getStorageType().name().equals(type.name()))
+        .findFirst().orElseThrow(() -> new AssertionError("No status of " + type + " in iteration " + iteration));
   }
 
   private DatanodeUsageInfo storageTypeNode(long... usedPercentages) {

@@ -57,6 +57,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerStorageTypeMetrics.Outcome;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerStorageTypeMetrics.TypeMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -115,6 +117,8 @@ public class ContainerBalancerTask implements Runnable {
   private FindSourceStrategy findSourceStrategy;
   private Map<ContainerMoveSelection, CompletableFuture<MoveManager.MoveResult>>
       moveSelectionToFutureMap;
+  // Counts each move of the current iteration once, under the storage type that scheduled it.
+  private final Map<ContainerMoveSelection, MoveAccount> moveAccounts = new ConcurrentHashMap<>();
   private IterationResult iterationResult;
   private int nextIterationIndex;
   private int currentIterationIndex;
@@ -367,7 +371,8 @@ public class ContainerBalancerTask implements Runnable {
 
     DataMoveInfo dataMoveInfo =
         getDataMoveInfo(sizeEnteringDataToNodes, sizeLeavingDataFromNodes);
-    return new ContainerBalancerTaskIterationStatusInfo(iterationInfo, containerMoveInfo, dataMoveInfo);
+    return new ContainerBalancerTaskIterationStatusInfo(iterationInfo, containerMoveInfo, dataMoveInfo,
+        metrics.storageTypeMetrics().statusInfo());
   }
 
   private DataMoveInfo getDataMoveInfo(Map<DatanodeID, Long> sizeEnteringDataToNodes,
@@ -580,6 +585,7 @@ public class ContainerBalancerTask implements Runnable {
           storageTypeStates.add(new StorageTypeBalancingState(type, snapshot.getLowerLimit(), snapshot.getUpperLimit(),
               datanodeUsageInfos, snapshot.getSourceDatanodes(), snapshot.getTargetDatanodes())));
     }
+    initializeStorageTypeMetrics(analysis);
     Set<DatanodeDetails> sources = new HashSet<>();
     Set<DatanodeDetails> targets = new HashSet<>();
     storageTypeStates.forEach(state -> {
@@ -632,6 +638,26 @@ public class ContainerBalancerTask implements Runnable {
         nodeManager, replicationManager, containerManager, findSourceStrategy,
         containerToSourceMap, excludeContainersNotFound);
     return true;
+  }
+
+  /** Opens every storage type of this iteration for results. Usage not reported by type is the unknown type. */
+  private void initializeStorageTypeMetrics(ContainerBalancerClusterSnapshot analysis) {
+    ContainerBalancerStorageTypeMetrics typeMetrics = metrics.storageTypeMetrics();
+    if (analysis.getStorageTypeSnapshots().isEmpty()) {
+      typeMetrics.forType(null).initialize(
+          countUnique(analysis.getSourceDatanodes(), analysis.getTargetDatanodes()),
+          Math.max(analysis.getTotalOverUtilizedBytes(), analysis.getTotalUnderUtilizedBytes()));
+      return;
+    }
+    analysis.getStorageTypeSnapshots().forEach((type, snapshot) -> typeMetrics.forType(type).initialize(
+        countUnique(snapshot.getSourceDatanodes(), snapshot.getTargetDatanodes()),
+        Math.max(snapshot.getTotalOverUtilizedBytes(), snapshot.getTotalUnderUtilizedBytes())));
+  }
+
+  private static long countUnique(Set<String> sources, Set<String> targets) {
+    Set<String> unbalanced = new HashSet<>(sources);
+    unbalanced.addAll(targets);
+    return unbalanced.size();
   }
 
   private boolean isValidSCMState() {
@@ -774,7 +800,7 @@ public class ContainerBalancerTask implements Runnable {
 
     if (moveContainer(source, moveSelection, storageType)) {
       // consider move successful for now, and update selection criteria
-      updateTargetsAndSelectionCriteria(moveSelection, source);
+      updateTargetsAndSelectionCriteria(moveSelection, source, storageType);
     }
     return true;
   }
@@ -800,6 +826,8 @@ public class ContainerBalancerTask implements Runnable {
     } else {
       checkIterationMoveResults();
     }
+    // Results that arrive after this point belong to a finished iteration and are not counted.
+    metrics.storageTypeMetrics().finishIteration();
   }
 
   /**
@@ -880,6 +908,11 @@ public class ContainerBalancerTask implements Runnable {
           entry = iterator.next();
       if (!entry.getValue().isDone()) {
         ContainerMoveSelection moveSelection = entry.getKey();
+        MoveAccount account = moveAccounts.get(moveSelection);
+        if (account != null && !account.count(Outcome.TIMEOUT)) {
+          // The move finished while the timeout was handled, and its callback has counted the result.
+          continue;
+        }
         ContainerID containerID = moveSelection.getContainerID();
         DatanodeDetails source = containerToSourceMap.get(containerID);
         DatanodeDetails target = moveSelection.getTargetNode();
@@ -1018,23 +1051,37 @@ public class ContainerBalancerTask implements Runnable {
           : moveManager.move(containerID, source, moveSelection.getTargetNode(), storageType);
 
       metrics.incrementNumContainerMovesScheduledInLatestIteration(1);
+      TypeMetrics typeMetrics = metrics.storageTypeMetrics().forType(storageType);
+      typeMetrics.recordScheduled();
+      MoveAccount account = new MoveAccount(typeMetrics, typeMetrics.generation(), containerInfo.getUsedBytes());
+      moveAccounts.put(moveSelection, account);
 
       future = future.whenComplete((result, ex) -> {
-        metrics.incrementCurrentIterationContainerMoveMetric(result, 1);
         moveSelectionToFutureMap.remove(moveSelection);
+        // Count the result once, and only while the iteration that scheduled the move is still open. A move that
+        // already timed out, or that finishes after its iteration ended, must not change any totals.
+        boolean counted = account.count(ex != null
+            ? (isCancellationCause(ex) ? Outcome.NONE : Outcome.FAILED) : Outcome.of(result));
+        if (counted) {
+          metrics.incrementCurrentIterationContainerMoveMetric(result, 1);
+        }
         if (ex != null) {
           if (!isCancellationCause(ex)) {
             LOG.info("Container move for container {} from source {} to " +
                     "target {} failed with exceptions.",
                 containerID, source,
                 moveSelection.getTargetNode(), ex);
-            metrics.incrementNumContainerMovesFailedInLatestIteration(1);
-            moveFailureTracker.recordFailure(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR,
-                source, moveSelection.getTargetNode());
+            if (counted) {
+              metrics.incrementNumContainerMovesFailedInLatestIteration(1);
+              moveFailureTracker.recordFailure(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR,
+                  source, moveSelection.getTargetNode());
+            }
           }
         } else {
           if (result == MoveManager.MoveResult.COMPLETED) {
-            metrics.incrementDataSizeMovedInLatestIteration(containerInfo.getUsedBytes());
+            if (counted) {
+              metrics.incrementDataSizeMovedInLatestIteration(containerInfo.getUsedBytes());
+            }
             LOG.debug("Container move completed for container {} from " +
                     "source {} to target {}", containerID, source,
                 moveSelection.getTargetNode());
@@ -1044,7 +1091,9 @@ public class ContainerBalancerTask implements Runnable {
                     " {} failed: {}",
                 moveSelection.getContainerID(), source,
                 moveSelection.getTargetNode(), result);
-            moveFailureTracker.recordFailure(result, source, moveSelection.getTargetNode());
+            if (counted) {
+              moveFailureTracker.recordFailure(result, source, moveSelection.getTargetNode());
+            }
           }
         }
       });
@@ -1055,20 +1104,17 @@ public class ContainerBalancerTask implements Runnable {
       findSourceStrategy.addBackSourceDataNode(source);
       // exclude the permanently missing container across balancer iterations.
       selectionCriteria.addToExcludeNotFoundContainers(moveSelection.getContainerID());
-      metrics.incrementNumContainerMovesFailedInLatestIteration(1);
-      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_CONTAINER_NOT_FOUND,
+      recordPreMoveFailure(storageType, ContainerMoveFailureReason.PRE_MOVE_CONTAINER_NOT_FOUND,
           source, moveSelection.getTargetNode());
       return false;
     } catch (NodeNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
-      metrics.incrementNumContainerMovesFailedInLatestIteration(1);
-      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_NODE_NOT_FOUND,
+      recordPreMoveFailure(storageType, ContainerMoveFailureReason.PRE_MOVE_NODE_NOT_FOUND,
           source, moveSelection.getTargetNode());
       return false;
     } catch (ContainerReplicaNotFoundException e) {
       LOG.warn("Container move failed for container {}", containerID, e);
-      metrics.incrementNumContainerMovesFailedInLatestIteration(1);
-      moveFailureTracker.recordFailure(ContainerMoveFailureReason.PRE_MOVE_REPLICA_NOT_FOUND,
+      recordPreMoveFailure(storageType, ContainerMoveFailureReason.PRE_MOVE_REPLICA_NOT_FOUND,
           source, moveSelection.getTargetNode());
       // add source back to queue for replica not found only
       // the container is not excluded as it is a replica related failure
@@ -1112,14 +1158,24 @@ public class ContainerBalancerTask implements Runnable {
     }
   }
 
+  /** Counts a move that failed before it was scheduled, overall and for its storage type. */
+  private void recordPreMoveFailure(StorageType storageType, ContainerMoveFailureReason reason,
+      DatanodeDetails source, DatanodeDetails target) {
+    metrics.incrementNumContainerMovesFailedInLatestIteration(1);
+    TypeMetrics typeMetrics = metrics.storageTypeMetrics().forType(storageType);
+    typeMetrics.recordResult(Outcome.FAILED, 0, typeMetrics.generation());
+    moveFailureTracker.recordFailure(reason, source, target);
+  }
+
   /**
    * Update targets, sources, and selection criteria after a move.
    *
    * @param moveSelection latest selected target datanode and container
    * @param source        the source datanode
+   * @param storageType   storage type of the move
    */
   private void updateTargetsAndSelectionCriteria(
-      ContainerMoveSelection moveSelection, DatanodeDetails source) {
+      ContainerMoveSelection moveSelection, DatanodeDetails source, StorageType storageType) {
     ContainerID containerID = moveSelection.getContainerID();
     DatanodeDetails target = moveSelection.getTargetNode();
 
@@ -1132,7 +1188,7 @@ public class ContainerBalancerTask implements Runnable {
       countDatanodesInvolvedPerIteration += 1;
     }
 
-    incSizeSelectedForMoving(source, moveSelection);
+    incSizeSelectedForMoving(source, moveSelection, storageType);
     containerToSourceMap.put(containerID, source);
     containerToTargetMap.put(containerID, target);
     selectedTargets.add(target);
@@ -1201,9 +1257,10 @@ public class ContainerBalancerTask implements Runnable {
    *
    * @param source        source datanode
    * @param moveSelection selected target datanode and container
+   * @param storageType   storage type of the move
    */
   private void incSizeSelectedForMoving(DatanodeDetails source,
-                                        ContainerMoveSelection moveSelection) {
+                                        ContainerMoveSelection moveSelection, StorageType storageType) {
     DatanodeDetails target = moveSelection.getTargetNode();
     ContainerInfo container;
     try {
@@ -1218,6 +1275,7 @@ public class ContainerBalancerTask implements Runnable {
     }
     long size = container.getUsedBytes();
     sizeScheduledForMoveInLatestIteration += size;
+    metrics.storageTypeMetrics().forType(storageType).recordTraffic(source.getID(), target.getID(), size);
 
     // update sizeLeavingNode map with the recent moveSelection
     findSourceStrategy.increaseSizeLeaving(source, size);
@@ -1240,6 +1298,8 @@ public class ContainerBalancerTask implements Runnable {
     this.selectedTargets.clear();
     this.countDatanodesInvolvedPerIteration = 0;
     this.sizeScheduledForMoveInLatestIteration = 0;
+    this.moveAccounts.clear();
+    metrics.storageTypeMetrics().startIteration();
     metrics.resetDataSizeMovedGBInLatestIteration();
     metrics.resetDataSizeMovedInLatestIteration();
     metrics.resetNumContainerMovesScheduledInLatestIteration();
@@ -1278,6 +1338,30 @@ public class ContainerBalancerTask implements Runnable {
           targets.add(node.getDatanodeDetails());
         }
       }
+    }
+  }
+
+  /** Counts the result of one move at most once, for the storage type and iteration that scheduled it. */
+  static final class MoveAccount {
+    private final TypeMetrics typeMetrics;
+    private final long generation;
+    private final long bytes;
+    private final AtomicBoolean counted = new AtomicBoolean();
+
+    MoveAccount(TypeMetrics typeMetrics, long generation, long bytes) {
+      this.typeMetrics = typeMetrics;
+      this.generation = generation;
+      this.bytes = bytes;
+    }
+
+    /**
+     * Counts the outcome of the move.
+     *
+     * @return true if this call counted it. False if the move was already counted, for example as a timeout, or if
+     *     its iteration is over, so that the result must not change any totals.
+     */
+    boolean count(Outcome outcome) {
+      return counted.compareAndSet(false, true) && typeMetrics.recordResult(outcome, bytes, generation);
     }
   }
 

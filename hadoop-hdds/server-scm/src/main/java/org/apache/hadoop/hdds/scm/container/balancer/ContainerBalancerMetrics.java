@@ -33,6 +33,7 @@ public final class ContainerBalancerMetrics {
       ContainerBalancerMetrics.class.getSimpleName();
 
   private final MetricsSystem ms;
+  private final ContainerBalancerStorageTypeMetrics storageTypeMetrics = new ContainerBalancerStorageTypeMetrics();
 
   @Metric("Number of iterations that stopped scheduling moves after reaching maxSizeToMovePerIteration")
   private MutableCounterLong numIterationsReachedMaxSizeToMoveLimit;
@@ -101,12 +102,20 @@ public final class ContainerBalancerMetrics {
    */
   public static ContainerBalancerMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(NAME, "Container Balancer Metrics",
+    ContainerBalancerMetrics metrics = ms.register(NAME, "Container Balancer Metrics",
         new ContainerBalancerMetrics(ms));
+    ms.register(ContainerBalancerStorageTypeMetrics.NAME, "Container Balancer Metrics for each storage type",
+        metrics.storageTypeMetrics);
+    return metrics;
   }
 
   private ContainerBalancerMetrics(MetricsSystem ms) {
     this.ms = ms;
+  }
+
+  /** Results of the balancer for each storage type, next to the overall values of this class. */
+  ContainerBalancerStorageTypeMetrics storageTypeMetrics() {
+    return storageTypeMetrics;
   }
 
   /**
@@ -194,34 +203,15 @@ public final class ContainerBalancerMetrics {
 
   public void incrementCurrentIterationContainerMoveMetric(
       MoveManager.MoveResult result, long valueToAdd) {
-    if (result == null) {
-      return;
-    }
-    switch (result) {
+    // TODO: Add metrics for other errors that need to be tracked.
+    switch (ContainerBalancerStorageTypeMetrics.Outcome.of(result)) {
     case COMPLETED:
       this.numContainerMovesCompletedInLatestIteration.incr(valueToAdd);
       break;
-    case REPLICATION_FAIL_TIME_OUT:
-    case DELETION_FAIL_TIME_OUT:
+    case TIMEOUT:
       this.numContainerMovesTimeoutInLatestIteration.incr(valueToAdd);
       break;
-    // TODO: Add metrics for other errors that need to be tracked.
-    case FAIL_LEADER_NOT_READY:
-    case REPLICATION_FAIL_INFLIGHT_REPLICATION:
-    case REPLICATION_FAIL_NOT_EXIST_IN_SOURCE:
-    case REPLICATION_FAIL_STORAGE_TYPE_MISMATCH:
-    case REPLICATION_FAIL_EXIST_IN_TARGET:
-    case REPLICATION_FAIL_CONTAINER_NOT_CLOSED:
-    case REPLICATION_FAIL_INFLIGHT_DELETION:
-    case REPLICATION_FAIL_NODE_NOT_IN_SERVICE:
-    case DELETION_FAIL_NODE_NOT_IN_SERVICE:
-    case REPLICATION_FAIL_NODE_UNHEALTHY:
-    case DELETION_FAIL_NODE_UNHEALTHY:
-    case DELETE_FAIL_POLICY:
-    case REPLICATION_NOT_HEALTHY_BEFORE_MOVE:
-    case REPLICATION_NOT_HEALTHY_AFTER_MOVE:
-    case FAIL_CONTAINER_ALREADY_BEING_MOVED:
-    case FAIL_UNEXPECTED_ERROR:
+    case FAILED:
       incrementNumContainerMovesFailedInLatestIteration(valueToAdd);
       break;
     default:
