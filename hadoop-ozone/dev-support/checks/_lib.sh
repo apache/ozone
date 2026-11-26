@@ -99,5 +99,19 @@ create_aws_dir() {
 get_version() {
   local dep="$1"
   shift
-  MVNW_VERBOSE=false ./mvnw --non-recursive --quiet help:evaluate -Dexpression="${dep}.version" -DforceStdout -Dscan=false "$@"
+
+  local tempfile=$(mktemp)
+  local -i rc=0
+
+  local opts="--batch-mode --non-recursive --show-version -Dscan=false help:evaluate"
+
+  if ./mvnw --offline $opts -Dexpression="${dep}.version" -Doutput="${tempfile}" "$@" >&2 \
+    || ./mvnw $opts -Dexpression="${dep}.version" -Doutput="${tempfile}" "$@" >&2; then
+    cat "${tempfile}"
+  else
+    rc=1
+  fi
+
+  rm -f "${tempfile}"
+  return ${rc}
 }

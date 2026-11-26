@@ -19,7 +19,13 @@ on:
     branches-ignore:
       # ignore pull requests targeted at these branches,
       # the list must match base-branches in fork-ci-status.yaml
+      # and should match on.pull_request.branches in fork-ci-ping.yaml
       - master
+      # feature branches
+      - HDDS-11233
+      - HDDS-11541
+      - HDDS-15728
+      - HDDS-15945-worm
   push:
     branches-ignore:
       # only master, builds on schedule
@@ -45,6 +51,7 @@ on:
       - '!.github/actions/setup-java-with-cache/**'
       - '!.github/workflows/check.yml'
       - '!.github/workflows/ci.yml'
+      - '!.github/workflows/populate-cache.yml'
       - '!.github/workflows/post-commit.yml'
       - '!.github/workflows/generate-config-doc.yml'
       - '!.github/workflows/update-ozone-site-config-doc.yml'
@@ -55,7 +62,14 @@ concurrency:
 permissions:
   contents: read
 jobs:
+  cache:
+    uses: $/.github/workflows/populate-cache.yml
+    if: github.event_name != 'pull_request'
+
   CI:
+    needs:
+      - cache
+    if: ${{ !cancelled() }} # even if cache is skipped or fails
     uses: $/.github/workflows/ci.yml
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}

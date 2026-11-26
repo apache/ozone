@@ -161,7 +161,8 @@ public class XceiverClientManager extends XceiverClientCreator {
    * the cached otherwise create a new one.
    *
    * @param pipeline the container pipeline for the client connection
-   * @param allowShortCircuit create a short-circuit read client or not if applicable
+   * @param allowShortCircuit create a short-circuit read client or not if applicable;
+   *     ignored for EC pipelines and EC replica reads, which always use a gRPC client
    * @return XceiverClientSpi connected to a container
    * @throws IOException if a XceiverClientSpi cannot be acquired
    */
@@ -260,6 +261,11 @@ public class XceiverClientManager extends XceiverClientCreator {
     }
   }
 
+  private static boolean isECReplica(Pipeline pipeline) {
+    return pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
+        && pipeline.getReplicaIndexes().values().stream().anyMatch(index -> index > 0);
+  }
+
   private String getPipelineCacheKey(Pipeline pipeline, boolean topologyAware, boolean allowShortCircuit) {
     StringBuilder key = new StringBuilder()
         .append(pipeline.getId().getId()).append('-').append(pipeline.getType());
@@ -267,7 +273,9 @@ public class XceiverClientManager extends XceiverClientCreator {
     DatanodeDetails localDN = null;
     boolean shortCircuitPipeline = false;
 
-    if ((!isEC) && allowShortCircuit && isShortCircuitEnabled()) {
+    // Short-circuit reads are not supported for EC keys. EC key reads use a single-node STAND_ALONE pipeline per
+    // replica, which is recognized by its non-zero replica index.
+    if (allowShortCircuit && !isEC && isShortCircuitEnabled() && !isECReplica(pipeline)) {
       int port = 0;
       InetSocketAddress localAddr = null;
       for (DatanodeDetails dn : pipeline.getNodes()) {
@@ -282,7 +290,7 @@ public class XceiverClientManager extends XceiverClientCreator {
       }
       if (localAddr != null) {
         // Find a local DN and short circuit read is enabled
-        key.append('@').append(localAddr.getHostName()).append(':').append(port);
+        key.append('@').append(localAddr.getHostString()).append(':').append(port);
         shortCircuitPipeline = true;
       }
     }
@@ -392,15 +400,6 @@ public class XceiverClientManager extends XceiverClientCreator {
     }
 
     return metrics;
-  }
-
-  /**
-   * Reset xceiver client metric.
-   */
-  public static synchronized void resetXceiverClientMetrics() {
-    if (metrics != null) {
-      metrics.reset();
-    }
   }
 
   /**

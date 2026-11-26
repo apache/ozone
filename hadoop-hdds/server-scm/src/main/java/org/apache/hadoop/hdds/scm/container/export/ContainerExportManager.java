@@ -39,9 +39,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
@@ -50,7 +50,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Manages asynchronous container ID export jobs on the SCM leader.
  *
- * <p>Health filters read {@link org.apache.hadoop.hdds.scm.container.ContainerInfo#getHealthState()}
+ * <p>Health filters read
+ * {@link org.apache.hadoop.hdds.scm.container.ContainerInfo#getSimplifiedHealthStateForReporting()}
  * as last written by Replication Manager; they are not recomputed during export and may be stale
  * if RM has not yet evaluated a container.
  *
@@ -140,8 +141,9 @@ public class ContainerExportManager {
    * @throws SCMException with {@link SCMException.ResultCodes#SCM_NOT_LEADER} if this SCM is not the ready leader
    * @throws IOException if another export is already running or the export worker is shut down
    */
-  public ExportJob submitJob(ContainerID start, LifeCycleState lifeCycleState, ContainerHealthState healthState,
-      long maxRows, int requestBatchSize, int requestPartSize) throws IOException {
+  public ExportJob submitJob(ContainerID start, LifeCycleState lifeCycleState,
+      SimplifiedContainerHealthStateForReporting healthState, long maxRows, int requestBatchSize, int requestPartSize)
+      throws IOException {
     final ExportSizing sizing = new ExportSizing(maxRows, requestBatchSize, requestPartSize,
         defaultSizing.getBatchSize(), defaultSizing.getPartSize());
 

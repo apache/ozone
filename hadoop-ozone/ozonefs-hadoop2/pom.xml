@@ -195,6 +195,7 @@
             </goals>
             <phase>process-sources</phase>
             <configuration>
+              <skip>${maven-replacer-plugin.skip}</skip>
               <basedir>${project.basedir}/target/generated-sources</basedir>
               <includes>
                 <include>**/*.java</include>

@@ -57,6 +57,8 @@ on:
         default: '25'
         required: true
 env:
+  # JAVA_VERSION, MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
+  JAVA_VERSION: 25
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   TEST_CLASS: ${{ github.event.inputs.test-class}}
@@ -65,7 +67,6 @@ env:
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
   RATIS_REPO: ${{ github.event.inputs.ratis-repo }}
   RATIS_VERSION: ${{ github.event.inputs.ratis-ref }}
-  JAVA_VERSION: ${{ github.event.inputs.java-version }}
   SPLITS: ${{ github.event.inputs.splits }}
   SUBMODULE: ${{ github.event.inputs.submodule }}
   # Surefire 3.0.0-M4 is used because newer versions do not reliably kill the fork on timeout

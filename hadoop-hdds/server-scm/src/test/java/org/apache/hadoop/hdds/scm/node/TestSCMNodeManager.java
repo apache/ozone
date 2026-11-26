@@ -820,6 +820,19 @@ public class TestSCMNodeManager {
       assertEquals(1, nodeManager.getDatanodeFinalizationCounts()
               .getNumFinalizedDatanodes(),
           "Restored apparent version should restore finalized count");
+
+      // Report a datanode still running old software whose apparent version matches its software version.
+      nodeManager.processVersionReport(node,
+          toVersionProto(HDDSLayoutFeature.INITIAL_VERSION, HDDSLayoutFeature.INITIAL_VERSION));
+      NodeManager.DatanodeFinalizationCounts counts = nodeManager.getDatanodeFinalizationCounts();
+      assertEquals(1, counts.getTotalHealthyDatanodes());
+      assertEquals(0, counts.getNumFinalizedDatanodes(),
+          "Datanode on a software version lower than SCM's should not be counted as finalized");
+
+      // Upgrade the datanode to SCM's software version and finalize it.
+      nodeManager.processVersionReport(node, defaultVersionProto());
+      assertEquals(1, nodeManager.getDatanodeFinalizationCounts().getNumFinalizedDatanodes(),
+          "Datanode on SCM's software version with matching apparent version should be counted as finalized");
     }
   }
 

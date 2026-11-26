@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.s3.security;
 
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -123,6 +124,7 @@ public class TestS3AssumeRoleRequest {
 
     final OzoneConfiguration configuration = new OzoneConfiguration();
     when(ozoneManager.getConfiguration()).thenReturn(configuration);
+    when(ozoneManager.getS3StsMinDurationSeconds()).thenReturn(900);
     when(ozoneManager.isS3MultiTenancyEnabled()).thenReturn(false);
 
     final SecretKeySignerClient secretKeyClient = mock(SecretKeySignerClient.class);
@@ -246,6 +248,47 @@ public class TestS3AssumeRoleRequest {
     verify(accessAuthorizer).generateAssumeRoleSessionPolicy(
         any(org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.class));
     assertMarkForAuditCalled(requestWithCredentials);
+  }
+
+  @Test
+  public void testValidDurationWithTestMinOverride() throws IOException {
+    when(ozoneManager.getS3StsMinDurationSeconds()).thenReturn(5);
+
+    final OMRequest omRequest = baseOmRequestBuilder()
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(5)
+                .setRequestId(REQUEST_ID)
+        ).build();
+
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+
+    assertLeaderGeneratedAssumeRoleFields(preExecutedRequest, 5);
+  }
+
+  @Test
+  public void testInvalidDurationBelowTestMinOverride() {
+    when(ozoneManager.getS3StsMinDurationSeconds()).thenReturn(5);
+
+    final OMRequest omRequest = baseOmRequestBuilder()
+        .setAssumeRoleRequest(
+            AssumeRoleRequest.newBuilder()
+                .setRoleArn(ROLE_ARN_1)
+                .setRoleSessionName(SESSION_NAME)
+                .setDurationSeconds(4)
+                .setRequestId(REQUEST_ID)
+        ).build();
+
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMException exception = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+
+    assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
+    assertEquals(
+        "Invalid Value: DurationSeconds must be a number between 5 and 43200 seconds", exception.getMessage());
+    assertMarkForAuditCalled(request);
   }
 
   @Test

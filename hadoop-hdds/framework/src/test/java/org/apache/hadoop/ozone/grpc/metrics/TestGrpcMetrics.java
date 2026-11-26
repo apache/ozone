@@ -30,11 +30,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.metrics2.AbstractMetric;
+import org.apache.hadoop.metrics2.MetricType;
 import org.apache.hadoop.metrics2.MetricsRecord;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.lib.MetricsAnnotations;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.ratis.thirdparty.io.grpc.Attributes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -117,6 +119,35 @@ public class TestGrpcMetrics {
     assertEquals(GrpcMetrics.class.getSimpleName(), tagRecord.name());
     assertThat(tagRecord.tags()).anyMatch(tag ->
         tag.name().equals("LatestRequestType") && tag.value().equals("CreateKey"));
+  }
+
+  @Test
+  public void testOpenClientConnectionsAreGauge() {
+    MetricsCollectorImpl collector = new MetricsCollectorImpl();
+    source.getMetrics(collector, true);
+
+    MetricsRecord record = collector.getRecords().get(0);
+    for (AbstractMetric metric : record.metrics()) {
+      if (metric.name().equals("NumOpenClientConnections")) {
+        assertEquals(MetricType.GAUGE, metric.type());
+        return;
+      }
+    }
+    throw new AssertionError("NumOpenClientConnections metric not found");
+  }
+
+  @Test
+  public void testTransportTerminatedBeforeReadyDoesNotDecrementConnections() {
+    GrpcMetricsServerTransportFilter filter = new GrpcMetricsServerTransportFilter(metrics);
+
+    filter.transportTerminated(null);
+    assertEquals(0L, metrics.getNumActiveClientConnections());
+
+    Attributes attributes = filter.transportReady(Attributes.EMPTY);
+    assertEquals(1L, metrics.getNumActiveClientConnections());
+
+    filter.transportTerminated(attributes);
+    assertEquals(0L, metrics.getNumActiveClientConnections());
   }
 
   @Test
