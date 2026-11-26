@@ -28,6 +28,7 @@ import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.apache.ratis.util.Preconditions.assertInstanceOf;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -248,6 +249,44 @@ public class TestPipelineManagerImpl {
     assertTrue(pipelineManager2.containsPipeline(pipeline3.getId()));
 
     pipelineManager2.close();
+  }
+
+  @Test
+  public void testBuildECPipelineWithStorageTier() throws Exception {
+    // All datanodes only have SSD volumes.
+    for (DatanodeDetails dn : nodeManager.getNodes(NodeStatus.inServiceHealthy())) {
+      nodeManager.setStorageTypeForNode(dn.getID(), StorageType.SSD);
+    }
+    ECReplicationConfig ecConfig = new ECReplicationConfig(3, 2);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      Pipeline built = pipelineManager.buildECPipeline(
+          ecConfig, Collections.emptyList(), Collections.emptyList(), StorageTier.SSD);
+      assertThat(built.getSupportedStorageTier()).isEqualTo(StorageTier.SSD);
+
+      pipelineManager.addEcPipeline(built);
+      assertThat(pipelineManager.getPipelines(ecConfig, Pipeline.PipelineState.ALLOCATED, StorageTier.SSD))
+          .containsExactly(built);
+
+      // No datanode has the other storage types, so no pipeline can be built for them.
+      for (StorageTier otherTier : Arrays.asList(StorageTier.DISK, StorageTier.ARCHIVE)) {
+        assertThatThrownBy(() -> pipelineManager.buildECPipeline(
+            ecConfig, Collections.emptyList(), Collections.emptyList(), otherTier))
+            .isInstanceOf(SCMException.class);
+      }
+    }
+  }
+
+  @Test
+  public void testBuildECPipelineWithoutStorageTierUsesDefaultTier() throws Exception {
+    StorageTier defaultTier = StorageTier.getDefaultTier();
+    for (DatanodeDetails dn : nodeManager.getNodes(NodeStatus.inServiceHealthy())) {
+      nodeManager.setStorageTypeForNode(dn.getID(), defaultTier.getUniformStorageType());
+    }
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      Pipeline built = pipelineManager.buildECPipeline(
+          new ECReplicationConfig(3, 2), Collections.emptyList(), Collections.emptyList());
+      assertThat(built.getSupportedStorageTier()).isEqualTo(defaultTier);
+    }
   }
 
   @Test

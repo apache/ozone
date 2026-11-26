@@ -39,6 +39,7 @@ import static org.mockito.Mockito.verify;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -47,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -136,21 +138,28 @@ public class TestWritableECContainerProvider {
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
 
-    doAnswer(call -> {
-      Pipeline pipeline = (Pipeline)call.getArguments()[2];
-      ContainerInfo container = createContainer(pipeline,
-          repConfig, System.nanoTime());
-      pipelineManager.addContainerToPipeline(
-          pipeline.getId(), container.containerID());
-      containers.put(container.containerID(), container);
-      return container;
-    }).when(containerManager).getMatchingContainer(anyLong(),
-        anyString(), any(Pipeline.class), any(), any(StorageTier.class));
+    // Like SCM, a new container takes the tier of the pipeline it is allocated in.
+    stubContainerAllocation(Pipeline::getSupportedStorageTier);
 
     doAnswer(call ->
         containers.get((ContainerID)call.getArguments()[0]))
         .when(containerManager).getContainer(any(ContainerID.class));
 
+  }
+
+  /**
+   * Makes the mocked ContainerManager create a container in the requested pipeline,
+   * with the storage tier given by {@code containerTier}.
+   */
+  private void stubContainerAllocation(Function<Pipeline, StorageTier> containerTier) {
+    doAnswer(call -> {
+      Pipeline pipeline = (Pipeline)call.getArguments()[2];
+      ContainerInfo container = createContainer(pipeline, repConfig, System.nanoTime(), containerTier.apply(pipeline));
+      pipelineManager.addContainerToPipeline(pipeline.getId(), container.containerID());
+      containers.put(container.containerID(), container);
+      return container;
+    }).when(containerManager).getMatchingContainer(anyLong(), anyString(), any(Pipeline.class), any(),
+        any(StorageTier.class));
   }
 
   private WritableContainerProvider<ECReplicationConfig> createSubject(
@@ -207,10 +216,15 @@ public class TestWritableECContainerProvider {
 
   private Set<ContainerInfo> assertDistinctContainers(int n)
       throws IOException {
+    return assertDistinctContainers(n, StorageTier.getDefaultTier());
+  }
+
+  private Set<ContainerInfo> assertDistinctContainers(int n, StorageTier storageTier)
+      throws IOException {
     Set<ContainerInfo> allocatedContainers = new HashSet<>();
     for (int i = 0; i < n; i++) {
       ContainerInfo container =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+          provider.getContainer(1, repConfig, OWNER, new ExcludeList(), storageTier);
       assertThat(allocatedContainers)
           .withFailMessage("Provided existing container for request " + i)
           .doesNotContain(container);
@@ -221,13 +235,24 @@ public class TestWritableECContainerProvider {
 
   private void assertReusesExisting(Set<ContainerInfo> existing, int n)
       throws IOException {
+    assertReusesExisting(existing, n, StorageTier.getDefaultTier());
+  }
+
+  private void assertReusesExisting(Set<ContainerInfo> existing, int n, StorageTier storageTier)
+      throws IOException {
     for (int i = 0; i < 3 * n; i++) {
       ContainerInfo container =
-          provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.getDefaultTier());
+          provider.getContainer(1, repConfig, OWNER, new ExcludeList(), storageTier);
       assertThat(existing)
           .withFailMessage("Provided new container for request " + i)
           .contains(container);
     }
+  }
+
+  private void assertPipelineTier(ContainerInfo container, StorageTier expectedTier)
+      throws IOException {
+    assertThat(pipelineManager.getPipeline(container.getPipelineID()).getSupportedStorageTier())
+        .isEqualTo(expectedTier);
   }
 
   @ParameterizedTest
@@ -560,8 +585,92 @@ public class TestWritableECContainerProvider {
         Collections.emptyList(), StorageTier.getDefaultTier());
   }
 
+  /**
+   * A new pipeline gets a container of the requested tier, and the pipeline carries that tier too.
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testNewContainerAndPipelineHaveRequestedTier(PipelineChoosePolicy policy) throws IOException {
+    provider = createSubject(policy);
+    for (StorageTier tier : Arrays.asList(StorageTier.SSD, StorageTier.DISK, StorageTier.ARCHIVE)) {
+      ContainerInfo container = provider.getContainer(1, repConfig, OWNER, new ExcludeList(), tier);
+      assertThat(container.getStorageTier()).isEqualTo(tier);
+      assertPipelineTier(container, tier);
+    }
+  }
+
+  /**
+   * Once the pipeline limit is reached for a tier, further requests for that tier reuse its existing containers.
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testExistingContainerIsReusedForSameTier(PipelineChoosePolicy policy) throws IOException {
+    provider = createSubject(policy);
+    int pipelineLimit = providerConf.getMinimumPipelines();
+    Set<ContainerInfo> allocated = assertDistinctContainers(pipelineLimit, StorageTier.SSD);
+    assertReusesExisting(allocated, pipelineLimit, StorageTier.SSD);
+  }
+
+  /**
+   * Pipelines of two tiers are counted separately: reaching the limit for one tier does not stop the other
+   * tier from creating its own pipelines, and each tier then reuses only its own containers.
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testEachTierGetsItsOwnPipelinesAndReusesOnlyThose(PipelineChoosePolicy policy) throws IOException {
+    provider = createSubject(policy);
+    int pipelineLimit = providerConf.getMinimumPipelines();
+    Set<ContainerInfo> ssd = assertDistinctContainers(pipelineLimit, StorageTier.SSD);
+    Set<ContainerInfo> disk = assertDistinctContainers(pipelineLimit, StorageTier.DISK);
+
+    assertThat(disk).doesNotContainAnyElementsOf(ssd);
+    for (ContainerInfo container : disk) {
+      assertPipelineTier(container, StorageTier.DISK);
+    }
+    assertReusesExisting(ssd, pipelineLimit, StorageTier.SSD);
+    assertReusesExisting(disk, pipelineLimit, StorageTier.DISK);
+  }
+
+  /**
+   * A request for one tier never gets a container of another tier, even when those containers have space.
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testContainerOfOtherTierIsNeverReused(PipelineChoosePolicy policy) throws IOException {
+    provider = createSubject(policy);
+    int pipelineLimit = providerConf.getMinimumPipelines();
+    assertDistinctContainers(pipelineLimit, StorageTier.SSD);
+
+    for (int i = 0; i < 3 * pipelineLimit; i++) {
+      ContainerInfo container = provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.DISK);
+      assertThat(container.getStorageTier()).isEqualTo(StorageTier.DISK);
+      assertPipelineTier(container, StorageTier.DISK);
+    }
+  }
+
+  /**
+   * A container created before storage tiers existed has no tier. It must not be reused for any tier;
+   * its pipeline is closed instead, and a new container is allocated.
+   */
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testContainerWithoutTierIsNotReused(PipelineChoosePolicy policy) throws IOException {
+    // Limit of one pipeline, so the second request has to look at the existing pipeline.
+    providerConf.setMinimumPipelines(1);
+    nodeManager.setNumHealthyVolumes(0);
+    stubContainerAllocation(pipeline -> null);
+    provider = createSubject(policy);
+
+    ContainerInfo legacy = provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.SSD);
+    assertThat(legacy.getStorageTier()).isNull();
+
+    ContainerInfo next = provider.getContainer(1, repConfig, OWNER, new ExcludeList(), StorageTier.SSD);
+    assertThat(next.containerID()).isNotEqualTo(legacy.containerID());
+    assertThat(pipelineManager.getPipeline(legacy.getPipelineID()).getPipelineState()).isEqualTo(CLOSED);
+  }
+
   private ContainerInfo createContainer(Pipeline pipeline,
-      ReplicationConfig repConf, long containerID) {
+      ReplicationConfig repConf, long containerID, StorageTier storageTier) {
     return new ContainerInfo.Builder()
         .setContainerID(containerID)
         .setOwner(OWNER)
@@ -572,6 +681,7 @@ public class TestWritableECContainerProvider {
         .setUsedBytes(0)
         .setSequenceId(0)
         .setDeleteTransactionId(0)
+        .setStorageTier(storageTier)
         .build();
   }
 

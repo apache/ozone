@@ -177,20 +177,20 @@ public class PipelineManagerImpl implements PipelineManager {
    * @param replicationConfig
    * @param excludedNodes
    * @param favoredNodes
+   * @param storageTier
    * @return The created pipeline.
    * @throws IOException
    */
   @Override
   public Pipeline buildECPipeline(ReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, StorageTier storageTier)
       throws IOException {
     if (replicationConfig.getReplicationType() != ReplicationType.EC) {
       throw new IllegalArgumentException("Replication type must be EC");
     }
-    // TODO StoragePolicy Support EC
     checkIfPipelineCreationIsAllowed(replicationConfig);
     return pipelineFactory.create(replicationConfig, excludedNodes,
-        favoredNodes, StorageTier.getDefaultTier());
+        favoredNodes, storageTier);
   }
 
   /**

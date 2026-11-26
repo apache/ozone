@@ -85,6 +85,19 @@ class StorageTierUtilTest {
             setOf(StorageType.SSD, StorageType.DISK),
             setOf(StorageType.SSD, StorageType.DISK)),
         2, setOf(StorageTier.SSD, StorageTier.DISK));
+
+    // EC "RS-6-3-1024K": 9 nodes with different volumes, only ARCHIVE is on every node
+    assertStorageTiers(createDnStorageTypes(
+            setOf(StorageType.SSD, StorageType.DISK, StorageType.ARCHIVE),
+            setOf(StorageType.SSD, StorageType.ARCHIVE),
+            setOf(StorageType.ARCHIVE, StorageType.SSD),
+            setOf(StorageType.ARCHIVE, StorageType.DISK),
+            setOf(StorageType.DISK, StorageType.ARCHIVE),
+            setOf(StorageType.ARCHIVE, StorageType.DISK),
+            setOf(StorageType.DISK, StorageType.ARCHIVE),
+            setOf(StorageType.ARCHIVE),
+            setOf(StorageType.ARCHIVE)),
+        1, setOf(StorageTier.ARCHIVE));
   }
 
   @Test
@@ -125,6 +138,19 @@ class StorageTierUtilTest {
             setOf(StorageType.PROVIDED),
             setOf(StorageType.PROVIDED),
             setOf(StorageType.PROVIDED)),
+        0, new HashSet<>());
+
+    // EC "RS-6-3-1024K": 9 nodes with different volumes, but no storage type is on every node
+    assertStorageTiers(createDnStorageTypes(
+            setOf(StorageType.SSD, StorageType.DISK, StorageType.ARCHIVE),
+            setOf(StorageType.SSD, StorageType.DISK),
+            setOf(StorageType.ARCHIVE, StorageType.SSD),
+            setOf(StorageType.ARCHIVE, StorageType.DISK),
+            setOf(StorageType.ARCHIVE, StorageType.DISK),
+            setOf(StorageType.ARCHIVE, StorageType.DISK),
+            setOf(StorageType.ARCHIVE, StorageType.DISK),
+            setOf(StorageType.ARCHIVE),
+            setOf(StorageType.ARCHIVE)),
         0, new HashSet<>());
   }
 

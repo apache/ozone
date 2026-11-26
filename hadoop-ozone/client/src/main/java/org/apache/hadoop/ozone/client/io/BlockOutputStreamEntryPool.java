@@ -184,7 +184,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    * assigned to it. Returns null when the tier is absent or spans more than one
    * storage type, which leaves the datanode free to pick any volume.
    */
-  private static StorageType getStorageType(OmKeyLocationInfo subKeyInfo) {
+  static StorageType getStorageType(OmKeyLocationInfo subKeyInfo) {
     StorageTier storageTier = subKeyInfo.getStorageTier();
     if (storageTier == null || !storageTier.isUniform()) {
       return null;

@@ -232,7 +232,8 @@ public class ECReconstructionCoordinator implements Closeable {
             repConfig, replicaIndex),
         BufferPool.empty(), ozoneClientConfig,
         blockLocationInfo.getToken(), clientMetrics, streamBufferArgs, ecReconstructWriteExecutor,
-        false);
+        // TODO(HDDS-16676) StoragePolicy reconstruction: pass the storage type of the container being reconstructed
+        null, false);
   }
 
   @VisibleForTesting
