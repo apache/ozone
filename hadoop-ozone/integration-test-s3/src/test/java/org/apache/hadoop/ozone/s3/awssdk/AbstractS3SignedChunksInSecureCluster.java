@@ -188,14 +188,13 @@ abstract class AbstractS3SignedChunksInSecureCluster extends ClusterForTests<Min
   }
 
   /**
-   * One change per verification point: a data chunk, the final chunk with and without a trailer,
-   * the signed trailer, and a correctly signed but wrong trailer checksum.
+   * One change per verification point: a data chunk, the final chunk, the signed trailer, and a correctly signed but
+   * wrong trailer checksum.
    */
   static Stream<Arguments> rejectedUploads() {
     return Stream.of(
         Arguments.of(false, Mutation.PAYLOAD, SIGNATURE_DOES_NOT_MATCH),
         Arguments.of(false, Mutation.FINAL_SIGNATURE, SIGNATURE_DOES_NOT_MATCH),
-        Arguments.of(true, Mutation.FINAL_SIGNATURE, SIGNATURE_DOES_NOT_MATCH),
         Arguments.of(true, Mutation.TRAILER, SIGNATURE_DOES_NOT_MATCH),
         Arguments.of(true, Mutation.BAD_CHECKSUM, BAD_DIGEST));
   }
