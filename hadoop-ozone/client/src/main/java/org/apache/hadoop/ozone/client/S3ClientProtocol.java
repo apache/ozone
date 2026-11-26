@@ -37,7 +37,10 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -207,7 +210,7 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public OzoneBucket getBucketDetails(String volumeName, String bucketName) throws IOException {
-    return delegate.getBucketDetails(volumeName, bucketName);
+    return delegate.getBucketDetails(resolveVolumeName(volumeName), bucketName);
   }
 
   @Override
@@ -246,12 +249,9 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
-  public OzoneOutputStream createKey(
-      String volumeName, String bucketName, String keyName, long size,
-      ReplicationConfig replicationConfig,
-      Map<String, String> metadata, Map<String, String> tags,
-      StoragePolicy storagePolicy) throws IOException {
-    return delegate.createKey(volumeName, bucketName, keyName, size, replicationConfig, metadata, tags, storagePolicy);
+  public OzoneOutputStream createKey(String volumeName, String bucketName, String keyName,
+      CreateKeyOptions options) throws IOException {
+    return delegate.createKey(volumeName, bucketName, keyName, options);
   }
 
   @Override
@@ -385,13 +385,13 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public void deleteKey(String volumeName, String bucketName, String keyName, boolean recursive) throws IOException {
-    delegate.deleteKey(volumeName, bucketName, keyName, recursive);
+    delegate.deleteKey(resolveVolumeName(volumeName), bucketName, keyName, recursive);
   }
 
   @Override
   public void deleteKey(String volumeName, String bucketName, String keyName, boolean recursive, String expectedETag)
       throws IOException {
-    delegate.deleteKey(volumeName, bucketName, keyName, recursive, expectedETag);
+    delegate.deleteKey(resolveVolumeName(volumeName), bucketName, keyName, recursive, expectedETag);
   }
 
   @Override
@@ -408,6 +408,12 @@ final class S3ClientProtocol implements ClientProtocol {
   @Override
   public void renameKey(String volumeName, String bucketName, String fromKeyName, String toKeyName) throws IOException {
     delegate.renameKey(volumeName, bucketName, fromKeyName, toKeyName);
+  }
+
+  @Override
+  public void renameKey(String volumeName, String bucketName, String fromKeyName, String toKeyName,
+      boolean requireFileSystemOptimized) throws IOException {
+    delegate.renameKey(volumeName, bucketName, fromKeyName, toKeyName, requireFileSystemOptimized);
   }
 
   @Override
@@ -458,6 +464,12 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName, String bucketName, String keyName,
+      MultipartUploadOptions options) throws IOException {
+    return delegate.initiateMultipartUpload(volumeName, bucketName, keyName, options);
+  }
+
+  @Override
   public OzoneOutputStream createMultipartKey(String volumeName, String bucketName, String keyName, long size,
       int partNumber, String uploadID) throws IOException {
     return delegate.createMultipartKey(volumeName, bucketName, keyName, size, partNumber, uploadID);
@@ -494,24 +506,20 @@ final class S3ClientProtocol implements ClientProtocol {
   @Override
   public void abortMultipartUpload(String volumeName, String bucketName, String keyName, String uploadID)
       throws IOException {
-    delegate.abortMultipartUpload(volumeName, bucketName, keyName, uploadID);
-  }
-
-  @Override
-  public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
-    delegate.abortS3MultipartUpload(bucketName, keyName, uploadID);
+    delegate.abortMultipartUpload(resolveVolumeName(volumeName), bucketName, keyName, uploadID);
   }
 
   @Override
   public OzoneMultipartUploadPartListParts listParts(String volumeName, String bucketName, String keyName,
       String uploadID, int partNumberMarker, int maxParts) throws IOException {
-    return delegate.listParts(volumeName, bucketName, keyName, uploadID, partNumberMarker, maxParts);
+    return delegate.listParts(resolveVolumeName(volumeName), bucketName, keyName, uploadID, partNumberMarker, maxParts);
   }
 
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumename, String bucketName, String prefix,
       String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
-    return delegate.listMultipartUploads(volumename, bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
+    return delegate.listMultipartUploads(
+        resolveVolumeName(volumename), bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
   }
 
   @Override
@@ -663,6 +671,12 @@ final class S3ClientProtocol implements ClientProtocol {
   public OzoneOutputStream createFile(String volumeName, String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, boolean overWrite, boolean recursive) throws IOException {
     return delegate.createFile(volumeName, bucketName, keyName, size, replicationConfig, overWrite, recursive);
+  }
+
+  @Override
+  public OzoneOutputStream createFile(String volumeName, String bucketName, String keyName,
+      CreateFileOptions options) throws IOException {
+    return delegate.createFile(volumeName, bucketName, keyName, options);
   }
 
   @Override
@@ -864,9 +878,10 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public SubmitSnapshotDiffResponse submitSnapshotDiff(String volumeName, String bucketName, String fromSnapshot,
-      String toSnapshot, boolean forceFullDiff, boolean disableNativeDiff) throws IOException {
+      String toSnapshot, boolean forceFullDiff, boolean disableNativeDiff, boolean orderedReport)
+      throws IOException {
     return delegate.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot, forceFullDiff,
-        disableNativeDiff);
+        disableNativeDiff, orderedReport);
   }
 
   @Override
@@ -904,8 +919,18 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
-  public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
-    return delegate.getObjectTagging(volumeName, bucketName, keyName);
+  public Map<String, String> getObjectTagging(
+      String volumeName, String bucketName, String keyName) throws IOException {
+    return delegate.getObjectTagging(
+        resolveVolumeName(volumeName), bucketName, keyName);
+  }
+
+  private String resolveVolumeName(String volumeName) throws IOException {
+    if (volumeName != null || OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION
+        .isSupportedBy(delegate.getOmVersion())) {
+      return volumeName;
+    }
+    return delegate.getS3VolumeContext().getOmVolumeArgs().getVolume();
   }
 
   @Override
@@ -916,7 +941,7 @@ final class S3ClientProtocol implements ClientProtocol {
 
   @Override
   public void deleteObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
-    delegate.deleteObjectTagging(volumeName, bucketName, keyName);
+    delegate.deleteObjectTagging(resolveVolumeName(volumeName), bucketName, keyName);
   }
 
   @Override

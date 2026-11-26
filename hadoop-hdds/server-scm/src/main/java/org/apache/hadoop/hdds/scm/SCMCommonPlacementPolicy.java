@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,7 +33,6 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -387,10 +387,27 @@ public abstract class SCMCommonPlacementPolicy implements
   public List<DatanodeDetails> getResultSet(
       int nodesRequired, List<DatanodeDetails> healthyNodes)
       throws SCMException {
+    return getResultSet(nodesRequired, healthyNodes, null);
+  }
+
+  /**
+   * Picks the required number of nodes, comparing candidates on the given
+   * storage type where the policy ranks nodes by usage.
+   *
+   * @param storageType storage type the container will be placed on, or null to
+   *                    compare nodes on their overall usage. The healthy node
+   *                    list is already filtered to this storage type by
+   *                    {@link #chooseDatanodesInternal}; this only affects how
+   *                    the remaining candidates are ranked against each other.
+   */
+  public List<DatanodeDetails> getResultSet(
+      int nodesRequired, List<DatanodeDetails> healthyNodes,
+      @Nullable StorageType storageType)
+      throws SCMException {
     List<DatanodeDetails> results = new ArrayList<>();
     for (int x = 0; x < nodesRequired; x++) {
       // invoke the choose function defined in the derived classes.
-      DatanodeDetails nodeId = chooseNode(healthyNodes);
+      DatanodeDetails nodeId = chooseNode(healthyNodes, storageType);
       if (nodeId != null) {
         removePeers(nodeId, healthyNodes);
         results.add(nodeId);
@@ -417,6 +434,22 @@ public abstract class SCMCommonPlacementPolicy implements
    */
   public abstract DatanodeDetails chooseNode(
       List<DatanodeDetails> healthyNodes);
+
+  /**
+   * Choose a datanode according to the policy. The default implementation ignores the storage type and delegates to
+   * {@link #chooseNode(List)}.
+   *
+   * Policies that rank nodes by usage should override this to compare on {@code storageType}.
+   *
+   * @param healthyNodes - Set of healthy nodes we can choose from.
+   * @param storageType  - storage type to compare node usage on, or null to
+   *                     compare overall usage.
+   * @return DatanodeDetails
+   */
+  public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes,
+      @Nullable StorageType storageType) {
+    return chooseNode(healthyNodes);
+  }
 
   /**
    * Default implementation to return the number of racks containers should span
@@ -498,33 +531,36 @@ public abstract class SCMCommonPlacementPolicy implements
         return invalidPlacement;
       }
     }
-    List<Integer> currentRackCount = new ArrayList<>(dns.stream()
-        .map(dn -> {
-          Node rack = getPlacementGroup(dn);
-          if (rack == null) {
-            try {
-              NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
-              if (nodeStatus.isDead() && nodeStatus.isMaintenance()) {
-                LOG.debug("Using rack [{}] for dead and in-maintenance dn {}.", dn.getNetworkLocation(), dn);
-                return dn.getNetworkLocation();
-              }
-              return null;
-            } catch (NodeNotFoundException e) {
-              LOG.debug("Could not get NodeStatus for dn {}.", dn, e);
-              return null;
-            }
+    Map<String, Integer> rackCounts = new HashMap<>();
+    for (DatanodeDetails dn : dns) {
+      Node rack = getPlacementGroup(dn);
+      String rackPath;
+      if (rack == null) {
+        try {
+          NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
+          if (!nodeStatus.isDead() || !nodeStatus.isMaintenance()) {
+            continue;
           }
-          /*
-          data-centre/rack1/dn1. Here, data-centre/rack1 is the network location of dn1 and data-centre/rack1 is also
-          the network full path of rack1.
-          */
-          return rack.getNetworkFullPath();
-        })
-        .filter(Objects::nonNull)
-        .collect(Collectors.groupingBy(
-            Function.identity(),
-            Collectors.reducing(0, e -> 1, Integer::sum)))
-        .values());
+          rackPath = dn.getNetworkLocation();
+          LOG.debug("Using rack [{}] for dead and in-maintenance dn {}.",
+              rackPath, dn);
+        } catch (NodeNotFoundException e) {
+          LOG.debug("Could not get NodeStatus for dn {}.", dn, e);
+          continue;
+        }
+      } else {
+        /*
+        data-centre/rack1/dn1. Here, data-centre/rack1 is the network location of dn1 and data-centre/rack1 is also
+        the network full path of rack1.
+        */
+        rackPath = rack.getNetworkFullPath();
+      }
+      if (rackPath != null) {
+        Integer count = rackCounts.get(rackPath);
+        rackCounts.put(rackPath, count == null ? 1 : count + 1);
+      }
+    }
+    List<Integer> currentRackCount = new ArrayList<>(rackCounts.values());
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }

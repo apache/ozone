@@ -223,8 +223,8 @@ public class KeyOutputStream extends OutputStream
   @Override
   public void write(byte[] b, int off, int len)
       throws IOException {
+    getRequestSemaphore().acquire();
     try {
-      getRequestSemaphore().acquire();
       checkNotClosed();
       if (b == null) {
         throw new NullPointerException();
@@ -504,8 +504,8 @@ public class KeyOutputStream extends OutputStream
 
   @Override
   public void flush() throws IOException {
+    getRequestSemaphore().acquire();
     try {
-      getRequestSemaphore().acquire();
       checkNotClosed();
       handleFlushOrClose(StreamAction.FLUSH);
     } finally {
@@ -521,9 +521,8 @@ public class KeyOutputStream extends OutputStream
 
   @Override
   public void hsync() throws IOException {
+    getRequestSemaphore().acquire();
     try {
-      getRequestSemaphore().acquire();
-
       if (replication.getReplicationType() != ReplicationType.RATIS) {
         throw new UnsupportedOperationException(
             "Replication type is not " + ReplicationType.RATIS);
@@ -651,6 +650,11 @@ public class KeyOutputStream extends OutputStream
       }
       for (CheckedRunnable<IOException> preCommit : preCommits) {
         preCommit.run();
+      }
+      // Do not commit when the thread is interrupted.
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedIOException(
+            "Commit of key " + blockOutputStreamEntryPool.getKeyName() + " aborted: thread interrupted");
       }
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {

@@ -42,10 +42,10 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -243,12 +243,12 @@ public class TestContainerReportSuppressOptions {
       }
 
       // Determine health state based on container properties
-      ContainerHealthState healthState;
+      SimplifiedContainerHealthStateForReporting healthState;
       if (container.getNumberOfKeys() == 0) {
-        healthState = ContainerHealthState.EMPTY;
+        healthState = SimplifiedContainerHealthStateForReporting.EMPTY;
         report.incrementAndSample(healthState, container);
       } else {
-        healthState = ContainerHealthState.MISSING;
+        healthState = SimplifiedContainerHealthStateForReporting.MISSING;
         report.incrementAndSample(healthState, container);
       }
 

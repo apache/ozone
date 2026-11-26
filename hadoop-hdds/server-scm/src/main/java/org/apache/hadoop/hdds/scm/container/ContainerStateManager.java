@@ -112,7 +112,7 @@ public interface ContainerStateManager extends SCMHandler {
    * @param count the size limit
    * @return a list of {@link ContainerID};
    */
-  List<ContainerID> getContainerIDs(LifeCycleState state, ContainerHealthState healthState,
+  List<ContainerID> getContainerIDs(LifeCycleState state, SimplifiedContainerHealthStateForReporting healthState,
        ContainerID start, int count);
 
   /**
@@ -198,6 +198,14 @@ public interface ContainerStateManager extends SCMHandler {
   @Replicate
   void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID id, LifeCycleState targetState)
       throws IOException;
+
+  /**
+   * Kept to apply Raft log entries written by SCM 2.0 and 2.1.
+   * Same as {@link #transitionDeletingOrDeletedToTargetState} with CLOSED.
+   */
+  @Deprecated
+  @Replicate
+  void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID id) throws IOException;
 
   /**
    *

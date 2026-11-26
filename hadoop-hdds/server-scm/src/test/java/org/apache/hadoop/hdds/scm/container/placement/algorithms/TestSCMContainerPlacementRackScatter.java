@@ -45,6 +45,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -822,7 +823,7 @@ public class TestSCMContainerPlacementRackScatter {
         policy.chooseDatanodes(usedDns, excludedDns,
             null, 3, 0, 5, StorageType.DEFAULT));
     assertThat(exception.getMessage())
-        .matches("^No enough datanodes to choose.*");
+        .matches("^Not enough datanodes to choose.*");
     assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
         exception.getResult());
   }
@@ -968,6 +969,35 @@ public class TestSCMContainerPlacementRackScatter {
         new ArrayList<>(), new ArrayList<>(), null, 1, 0, 0);
 
     assertEquals(Collections.singletonList(datanodes.get(0)), chosen);
+  }
+
+  @Test
+  void chooseExtraNodesFromRandomRacksWhenMoreNodesThanRacks() throws SCMException {
+    // 8 racks with 2 datanodes each, choosing 14 nodes as for rs-10-4
+    setup(16, 2);
+    int nodesRequired = 14;
+    Set<Node> racksWithTwoNodes = new HashSet<>();
+    Set<Node> racksAtFirstExtraPosition = new HashSet<>();
+    for (int i = 0; i < 200; i++) {
+      List<DatanodeDetails> chosen = policy.chooseDatanodes(
+          new ArrayList<>(), new ArrayList<>(), null, nodesRequired, 0, 0);
+      assertEquals(nodesRequired, chosen.size());
+      assertTrue(policy.validateContainerPlacement(chosen, nodesRequired).isPolicySatisfied());
+
+      Map<Node, Long> nodesPerRack = chosen.stream()
+          .collect(Collectors.groupingBy(dn -> cluster.getAncestor(dn, 1), Collectors.counting()));
+      assertEquals(8, nodesPerRack.size());
+      assertThat(nodesPerRack.values()).allMatch(count -> count <= 2);
+      nodesPerRack.forEach((rack, count) -> {
+        if (count == 2) {
+          racksWithTwoNodes.add(rack);
+        }
+      });
+      // The first 8 nodes take one rack each, the rest go to racks that already have a node.
+      racksAtFirstExtraPosition.add(cluster.getAncestor(chosen.get(8), 1));
+    }
+    assertEquals(8, racksWithTwoNodes.size());
+    assertEquals(8, racksAtFirstExtraPosition.size());
   }
 
   private int getRackSize(List<DatanodeDetails>... datanodeDetails) {

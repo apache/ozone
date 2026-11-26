@@ -89,7 +89,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -138,6 +137,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -158,7 +158,7 @@ public class TestKeyManagerImpl {
   @TempDir
   private static File dir;
   private static PrefixManager prefixManager;
-  private static KeyManagerImpl keyManager;
+  private static KeyManager keyManager;
   private static StorageContainerManager scm;
   private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
   private static StorageContainerLocationInternalInterface mockScmContainerClient;
@@ -218,7 +218,7 @@ public class TestKeyManagerImpl {
         mockScmContainerClient);
     om = omTestManagers.getOzoneManager();
     metadataManager = omTestManagers.getMetadataManager();
-    keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
+    keyManager = omTestManagers.getKeyManager();
     prefixManager = omTestManagers.getPrefixManager();
     writeClient = omTestManagers.getWriteClient();
     rpcClient = omTestManagers.getRpcClient();

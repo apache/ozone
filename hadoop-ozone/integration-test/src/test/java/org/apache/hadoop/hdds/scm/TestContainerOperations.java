@@ -59,8 +59,8 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.ozone.test.ClusterForTests;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
  * from cblock clients.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestContainerOperations implements NonHATests.TestCase {
+public abstract class TestContainerOperations implements ClusterForTests.TestCase {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestContainerOperations.class);
   private static final int CONTAINER_LIST_LIMIT = 1;
@@ -184,6 +184,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     for (HddsProtos.DatanodeUsageInfoProto info : usageInfoList) {
       assertTrue(info.getNode().getPortsList().stream()
           .anyMatch(port -> REPLICATION.name().equals(port.getName())));
+      assertStorageTypeUsageMatchesTotals(info);
     }
 
     usageInfoList =
@@ -192,7 +193,18 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     for (HddsProtos.DatanodeUsageInfoProto info : usageInfoList) {
       assertTrue(info.getNode().getPortsList().stream()
           .anyMatch(port -> REPLICATION.name().equals(port.getName())));
+      assertStorageTypeUsageMatchesTotals(info);
     }
+  }
+
+  private static void assertStorageTypeUsageMatchesTotals(HddsProtos.DatanodeUsageInfoProto info) {
+    assertThat(info.getStorageTypeUsageList()).isNotEmpty();
+    assertEquals(info.getCapacity(), info.getStorageTypeUsageList().stream()
+        .mapToLong(HddsProtos.StorageTypeUsageInfoProto::getCapacity).sum());
+    assertEquals(info.getUsed(), info.getStorageTypeUsageList().stream()
+        .mapToLong(HddsProtos.StorageTypeUsageInfoProto::getUsed).sum());
+    assertEquals(info.getRemaining(), info.getStorageTypeUsageList().stream()
+        .mapToLong(HddsProtos.StorageTypeUsageInfoProto::getRemaining).sum());
   }
 
   @Test

@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.s3sts.S3STSConfigKeys.OZONE_S3G_STS_HTTP_E
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 
 /**
  * HTTP server for the S3 Gateway STS endpoint.
@@ -42,6 +43,8 @@ public class S3STSHttpServer extends BaseHttpServer {
   S3STSHttpServer(MutableConfigurationSource conf, String name) throws IOException {
     super(conf, name);
     if (isEnabled()) {
+      // Fail fast if the test override property is invalid
+      S3STSUtils.getMinDurationSeconds(conf);
       WeldCdiIntegration.enable(getWebAppContext());
     }
   }

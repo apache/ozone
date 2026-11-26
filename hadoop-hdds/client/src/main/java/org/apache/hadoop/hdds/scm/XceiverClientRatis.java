@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.Time;
@@ -56,6 +57,7 @@ import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftException;
@@ -213,9 +215,12 @@ public final class XceiverClientRatis extends XceiverClientSpi {
           RatisHelper.toRaftPeerId(pipeline.getClosestNode()));
     }
 
+    // StreamInitWithPutBlock streams commit PutBlock on stream close, so they must not be forwarded to the Raft log.
+    final boolean skipSendForward = BlockDataStreamOutput.isPutBlockWithoutRaft(
+        ozoneConfiguration.getObject(OzoneClientConfig.class), getPipeline());
     if (!client.compareAndSet(null,
         RatisHelper.newRaftClient(rpcType, getPipeline(), retryPolicy,
-            tlsConfig, ozoneConfiguration))) {
+            tlsConfig, ozoneConfiguration, skipSendForward))) {
       throw new IllegalStateException("Client is already connected.");
     }
   }
@@ -313,7 +318,9 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     }).exceptionally(e -> {
       LOG.warn("{} way commit failed on pipeline {}", watchType, pipeline, e);
       final boolean isGroupMismatch = HddsClientUtils.containsException(e, GroupMismatchException.class) != null;
-      if (!isGroupMismatch && watchType == ReplicationLevel.ALL_COMMITTED) {
+      // a closed client cannot send the MAJORITY_COMMITTED watch below
+      final boolean isClosed = HddsClientUtils.containsException(e, AlreadyClosedException.class) != null;
+      if (!isGroupMismatch && !isClosed && watchType == ReplicationLevel.ALL_COMMITTED) {
         final Throwable nre = HddsClientUtils.containsException(e, NotReplicatedException.class);
         if (nre instanceof NotReplicatedException) {
           // If NotReplicatedException is thrown from the Datanode leader
@@ -322,13 +329,23 @@ public final class XceiverClientRatis extends XceiverClientSpi {
           final Collection<CommitInfoProto> commitInfoProtoList = ((NotReplicatedException) nre).getCommitInfos();
           replyFuture.complete(handleFailedAllCommit(index, commitInfoProtoList));
         } else {
-          getClient().async().watch(index, ReplicationLevel.MAJORITY_COMMITTED)
-              .thenApply(reply -> handleFailedAllCommit(index, reply.getCommitInfos()))
-              .whenComplete(JavaUtils.asBiConsumer(replyFuture));
+          try {
+            getClient().async().watch(index, ReplicationLevel.MAJORITY_COMMITTED)
+                .thenApply(reply -> handleFailedAllCommit(index, reply.getCommitInfos()))
+                .whenComplete(JavaUtils.asBiConsumer(replyFuture));
+          } catch (RuntimeException fallbackFailure) {
+            // e.g. the client was closed meanwhile; an exception thrown here would leave replyFuture incomplete
+            e.addSuppressed(fallbackFailure);
+            replyFuture.completeExceptionally(e);
+          }
         }
       } else {
         replyFuture.completeExceptionally(e);
       }
+      return null;
+    }).exceptionally(t -> {
+      // anything thrown by the handler above would otherwise leave replyFuture incomplete
+      replyFuture.completeExceptionally(t);
       return null;
     });
     return replyFuture;

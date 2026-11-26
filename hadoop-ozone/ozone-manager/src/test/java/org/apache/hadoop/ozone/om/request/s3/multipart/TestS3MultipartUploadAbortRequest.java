@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -69,6 +70,13 @@ public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
     OMException e = assertThrows(OMException.class,
         () -> getS3MultipartUploadAbortReq(omRequest).preExecute(ozoneManager));
     assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+  }
+
+  @Test
+  public void testPreExecutePermissionDeniedIsAudited() throws IOException {
+    OMRequest omRequest = OMRequestTestUtils.createAbortMPURequest(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    assertPreExecuteAclDenialIsAudited(getS3MultipartUploadAbortReq(omRequest), OMAction.ABORT_MULTIPART_UPLOAD);
   }
 
   @ParameterizedTest

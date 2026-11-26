@@ -20,12 +20,14 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,13 +39,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -59,6 +67,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests S3 Multipart Upload Complete request.
@@ -85,6 +97,14 @@ public class TestS3MultipartUploadCompleteRequest
     OMException e = assertThrows(OMException.class,
         () -> getS3MultipartUploadCompleteReq(omRequest).preExecute(ozoneManager));
     assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+  }
+
+  @Test
+  public void testPreExecutePermissionDeniedIsAudited() throws IOException {
+    OMRequest omRequest = OMRequestTestUtils.createCompleteMPURequest(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+        Collections.emptyList());
+    assertPreExecuteAclDenialIsAudited(getS3MultipartUploadCompleteReq(omRequest), OMAction.COMPLETE_MULTIPART_UPLOAD);
   }
 
   @Test
@@ -387,12 +407,150 @@ public class TestS3MultipartUploadCompleteRequest
         .doesNotContain(sharedBlock.getBlockID().getContainerBlockID());
   }
 
+  static Stream<Arguments> storagePolicyOfCompletedKey() {
+    return Stream.of(
+        // key already exists, its policy (null = none), policy of the multipart key (null = none)
+        Arguments.of(false, null, OzoneStoragePolicy.COLD),
+        Arguments.of(true, OzoneStoragePolicy.HOT, OzoneStoragePolicy.COLD),
+        Arguments.of(true, OzoneStoragePolicy.COLD, OzoneStoragePolicy.HOT),
+        Arguments.of(true, null, OzoneStoragePolicy.COLD),
+        // multipart key initiated without a policy: the overwritten key must not keep its old one
+        Arguments.of(true, OzoneStoragePolicy.HOT, null),
+        Arguments.of(false, null, null));
+  }
+
+  /**
+   * The completed key takes the storage policy of the multipart key, whether it is a new key or it overwrites an
+   * existing key with a different policy: the old blocks are replaced, so the old policy must not be kept.
+   */
+  @ParameterizedTest
+  @MethodSource("storagePolicyOfCompletedKey")
+  public void testCompletedKeyTakesMultipartKeyStoragePolicy(boolean keyExists, StoragePolicy existingKeyPolicy,
+      StoragePolicy multipartKeyPolicy) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    // Initiate with the wanted policy (none = as logged by an OM that did not set it).
+    OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName, bucketName, keyName);
+    OzoneManagerProtocolProtos.MultipartInfoInitiateRequest initiate =
+        initiateMPURequest.getInitiateMultiPartUploadRequest();
+    OzoneManagerProtocolProtos.KeyArgs.Builder initiateArgs = initiate.getKeyArgs().toBuilder();
+    if (multipartKeyPolicy == null) {
+      initiateArgs.clearStoragePolicy();
+    } else {
+      initiateArgs.setStoragePolicy(OzoneStoragePolicy.toProto(multipartKeyPolicy));
+    }
+    initiateMPURequest = initiateMPURequest.toBuilder()
+        .setInitiateMultiPartUploadRequest(initiate.toBuilder().setKeyArgs(initiateArgs)).build();
+    OMClientResponse omClientResponse = getS3InitiateMultipartUploadReq(initiateMPURequest)
+        .validateAndUpdateCache(ozoneManager, 1L);
+    String multipartUploadID = omClientResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    long clientID = Time.now();
+    OMRequest commitMultipartRequest = doPreExecuteCommitMPU(volumeName,
+        bucketName, keyName, clientID, multipartUploadID, 1);
+    S3MultipartUploadCommitPartRequest commitPartRequest = getS3MultipartUploadCommitReq(commitMultipartRequest);
+    addKeyToTable(volumeName, bucketName, keyName, clientID);
+    commitPartRequest.validateAndUpdateCache(ozoneManager, 2L);
+
+    if (keyExists) {
+      addCommittedKeyToTable(volumeName, bucketName, keyName, Collections.emptyList());
+      Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(getBucketLayout());
+      String dbKey = getOzoneDBKey(volumeName, bucketName, keyName);
+      keyTable.put(dbKey, keyTable.get(dbKey).toBuilder().setStoragePolicy(existingKeyPolicy).build());
+    }
+
+    String eTag = commitPartRequest.getOmRequest().getCommitMultiPartUploadRequest().getKeyArgs()
+        .getMetadataList().stream()
+        .filter(keyValue -> keyValue.getKey().equals(OzoneConsts.ETAG))
+        .findFirst().get().getValue();
+    List<Part> partList = Collections.singletonList(
+        Part.newBuilder().setETag(eTag).setPartName(eTag).setPartNumber(1).build());
+    S3MultipartUploadCompleteRequest completeRequest = getS3MultipartUploadCompleteReq(
+        doPreExecuteCompleteMPU(volumeName, bucketName, keyName, multipartUploadID, partList));
+    omClientResponse = completeRequest.validateAndUpdateCache(ozoneManager, 3L);
+    assertThat(omClientResponse.getOMResponse().getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    OmKeyInfo completedKeyInfo = omMetadataManager.getKeyTable(completeRequest.getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName));
+    assertThat(completedKeyInfo).isNotNull();
+    assertThat(completedKeyInfo.getStoragePolicy()).isEqualTo(multipartKeyPolicy);
+  }
+
   private static KeyLocation createKeyLocation(long containerID, long localID) {
     return KeyLocation.newBuilder()
         .setBlockID(HddsProtos.BlockID.newBuilder()
             .setContainerBlockID(HddsProtos.ContainerBlockID.newBuilder()
                 .setContainerID(containerID).setLocalID(localID).build()))
         .setOffset(0).setLength(100).setCreateVersion(0).build();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"true, false", "true, true", "false, false"})
+  public void testCompletedKeyBlocksCarryPartIv(boolean hasPartIv, boolean splitPartsTable) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    if (splitPartsTable) {
+      finalizeMpuPartsTableSplit();
+    }
+
+    OMClientResponse omClientResponse = getS3InitiateMultipartUploadReq(
+        doPreExecuteInitiateMPU(volumeName, bucketName, keyName)).validateAndUpdateCache(ozoneManager, 1L);
+    String multipartUploadID = omClientResponse.getOMResponse()
+        .getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    long clientID = Time.now();
+    // A part IV sent by the client is not used.
+    KeyLocation keyLocation = createKeyLocation(1000L, 100L).toBuilder()
+        .setPartIv(ByteString.copyFrom(new byte[16])).build();
+    S3MultipartUploadCommitPartRequest commitPartRequest = getS3MultipartUploadCommitReq(doPreExecuteCommitMPU(
+        volumeName, bucketName, keyName, clientID, multipartUploadID, 1, Collections.singletonList(keyLocation)));
+    addKeyToTable(volumeName, bucketName, keyName, clientID,
+        Collections.singletonList(OmKeyLocationInfo.getFromProtobuf(keyLocation)));
+
+    // The part's open key holds the IV OM generated when the part was created.
+    byte[] partIv = new byte[16];
+    Arrays.fill(partIv, (byte) 7);
+    if (hasPartIv) {
+      String openKey = commitPartRequest.getOpenKey(volumeName, bucketName, keyName, omMetadataManager, clientID);
+      Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+      openKeyTable.addCacheEntry(new CacheKey<>(openKey),
+          CacheValue.get(1L, openKeyTable.get(openKey).toBuilder().setPartIv(partIv).build()));
+    }
+    commitPartRequest.validateAndUpdateCache(ozoneManager, 2L);
+
+    String eTag = commitPartRequest.getOmRequest().getCommitMultiPartUploadRequest().getKeyArgs().getMetadataList()
+        .stream().filter(keyValue -> keyValue.getKey().equals(OzoneConsts.ETAG)).findFirst().get().getValue();
+    S3MultipartUploadCompleteRequest completeRequest = getS3MultipartUploadCompleteReq(doPreExecuteCompleteMPU(
+        volumeName, bucketName, keyName, multipartUploadID,
+        Collections.singletonList(Part.newBuilder().setETag(eTag).setPartName(eTag).setPartNumber(1).build())));
+    omClientResponse = completeRequest.validateAndUpdateCache(ozoneManager, 3L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omClientResponse.getOMResponse().getStatus());
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    OmKeyInfo completedKeyInfo = omMetadataManager.getKeyTable(completeRequest.getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName));
+    assertNotNull(completedKeyInfo);
+    assertThat(completedKeyInfo.getLatestVersionLocations().createLocationList()).hasSize(1).allSatisfy(location -> {
+      assertEquals(1, location.getPartNumber());
+      if (hasPartIv) {
+        assertArrayEquals(partIv, location.getPartIv());
+      } else {
+        assertNull(location.getPartIv());
+      }
+    });
   }
 
   @Test
@@ -531,6 +689,47 @@ public class TestS3MultipartUploadCompleteRequest
 
     assertEquals(OzoneManagerProtocolProtos.Status
         .INVALID_PART_ORDER, omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testETagComputedFromCompletedPartsOnly() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OMClientResponse initiateResponse = getS3InitiateMultipartUploadReq(
+        doPreExecuteInitiateMPU(volumeName, bucketName, keyName)).validateAndUpdateCache(ozoneManager, 1L);
+    String uploadID = initiateResponse.getOMResponse().getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    Map<Integer, String> partETags = new HashMap<>();
+    long trxnLogIndex = 2L;
+    for (int partNumber = 1; partNumber <= 3; partNumber++) {
+      long clientID = Time.now() + partNumber;
+      OMRequest commit = doPreExecuteCommitMPU(volumeName, bucketName, keyName, clientID, uploadID, partNumber);
+      addKeyToTable(volumeName, bucketName, keyName, clientID);
+      getS3MultipartUploadCommitReq(commit).validateAndUpdateCache(ozoneManager, trxnLogIndex++);
+      partETags.put(partNumber, commit.getCommitMultiPartUploadRequest().getKeyArgs().getMetadataList().stream()
+          .filter(kv -> kv.getKey().equals(OzoneConsts.ETAG)).findFirst().get().getValue());
+    }
+
+    // Complete with parts 1 and 3 only; part 2 is uploaded but not part of the object.
+    List<Part> parts = Arrays.asList(
+        Part.newBuilder().setETag(partETags.get(1)).setPartName(partETags.get(1)).setPartNumber(1).build(),
+        Part.newBuilder().setETag(partETags.get(3)).setPartName(partETags.get(3)).setPartNumber(3).build());
+    OMClientResponse completeResponse = getS3MultipartUploadCompleteReq(
+        doPreExecuteCompleteMPU(volumeName, bucketName, keyName, uploadID, parts))
+        .validateAndUpdateCache(ozoneManager, trxnLogIndex);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, completeResponse.getOMResponse().getStatus());
+
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    completeResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    String expectedETag = DigestUtils.md5Hex(partETags.get(1) + partETags.get(3)) + "-2";
+    assertEquals(expectedETag, completeResponse.getOMResponse().getCompleteMultiPartUploadResponse().getHash());
+    assertEquals(expectedETag, omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName)).getMetadata().get(OzoneConsts.ETAG));
   }
 
   @Test

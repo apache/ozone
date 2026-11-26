@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -28,7 +29,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -161,10 +164,16 @@ public class S3InitiateMultipartUploadRequestWithFSO
                   bucketInfo.getDefaultReplicationConfig() :
                   null, ozoneManager);
 
+      // Absent when the request was logged before STORAGE_POLICY_SUPPORT was finalized, or by an OM that did not
+      // set it; stays null then.
+      final StoragePolicy storagePolicy = keyArgs.hasStoragePolicy()
+          ? OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()) : null;
+
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
           .setCreationTime(keyArgs.getModificationTime())
           .setReplicationConfig(replicationConfig)
+          .setStoragePolicy(storagePolicy)
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
           .setParentID(pathInfoFSO.getLastKnownParentId())
@@ -192,8 +201,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setParentObjectID(pathInfoFSO.getLastKnownParentId())
           .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
           .addAllTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
+          .setStoragePolicy(storagePolicy)
           .build();
-      
+
       // validate and update namespace for missing parent directory
       if (null != missingParentInfos) {
         checkBucketQuotaInNamespace(bucketInfo, missingParentInfos.size());
@@ -262,6 +272,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
     if (omDirectoryResult == DIRECTORY_EXISTS) {
       throw new OMException("Can not write to directory: " + keyName,
               OMException.ResultCodes.NOT_A_FILE);
+    } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
+      throw new OMException("Can not create file: " + keyName + " as there is already file in the given path",
+          OMException.ResultCodes.NOT_A_FILE);
     }
   }
 }

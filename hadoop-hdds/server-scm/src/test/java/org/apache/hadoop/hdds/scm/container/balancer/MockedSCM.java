@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -242,7 +243,7 @@ public final class MockedSCM {
         .when(moveManager.move(
             any(ContainerID.class),
             any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
+            any(DatanodeDetails.class), any(StorageType.class)))
         .thenReturn(CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
     return moveManager;
   }

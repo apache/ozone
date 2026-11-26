@@ -82,13 +82,8 @@ public interface ReconUpgradeAction extends UpgradeAction<DataSource> {
    * Logs and returns without throwing if the queue attempt does not succeed.
    */
   static void queueNSSummaryRebuildIfNeeded(Logger log) {
-    Injector injector = ReconGuiceServletContextListener.getGlobalInjector();
-    if (injector == null) {
-      throw new IllegalStateException(
-          "Guice injector not initialized. NSSummary rebuild cannot proceed during upgrade.");
-    }
-
-    ReconTaskController reconTaskController = injector.getInstance(ReconTaskController.class);
+    String purpose = "NSSummary rebuild";
+    ReconTaskController reconTaskController = getReconTaskController(purpose);
 
 
     log.info("Triggering asynchronous NSSummary tree rebuild.");
@@ -96,12 +91,33 @@ public interface ReconUpgradeAction extends UpgradeAction<DataSource> {
       log.info("NSSummary rebuild already in progress, skipping duplicate upgrade queue.");
       return;
     }
+    queueTaskReinitialization(reconTaskController, purpose, log);
+  }
+
+  /**
+   * Returns the {@link ReconTaskController} from the global Guice injector.
+   * Throws {@link IllegalStateException} naming {@code purpose} if the injector is not initialized.
+   */
+  static ReconTaskController getReconTaskController(String purpose) {
+    Injector injector = ReconGuiceServletContextListener.getGlobalInjector();
+    if (injector == null) {
+      throw new IllegalStateException(
+          "Guice injector not initialized. " + purpose + " cannot proceed during upgrade.");
+    }
+    return injector.getInstance(ReconTaskController.class);
+  }
+
+  /**
+   * Queues a reinitialization of the Recon tasks.
+   * Logs and returns without throwing if the queue attempt does not succeed.
+   */
+  static void queueTaskReinitialization(ReconTaskController reconTaskController, String purpose, Logger log) {
     ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
     if (result != ReconTaskController.ReInitializationResult.SUCCESS) {
       log.error(
-          "Failed to queue reinitialization event for NSSummary rebuild (result: {}). "
-              + "Will be retried as part of syncDataFromOM scheduler task.", result);
+          "Failed to queue reinitialization event for {} (result: {}). "
+              + "Will be retried as part of syncDataFromOM scheduler task.", purpose, result);
     }
   }
 }

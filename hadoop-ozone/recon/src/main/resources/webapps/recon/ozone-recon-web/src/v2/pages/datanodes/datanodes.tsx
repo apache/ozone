@@ -193,14 +193,6 @@ const Datanodes: React.FC<{}> = () => {
 
   const autoReload = useAutoReload(loadData);
 
-  useEffect(() => {
-    autoReload.startPolling();
-
-    return (() => {
-      autoReload.stopPolling();
-    });
-  }, []);
-
   function handleSelectionChange(rows: React.Key[]) {
     setSelectedRows(rows);
   }

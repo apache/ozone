@@ -39,7 +39,10 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -227,7 +230,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void deleteBucket(String volumeName, String bucketName)
       throws IOException {
-
+    objectStoreStub.getVolume(volumeName).deleteBucket(bucketName);
   }
 
   @Override
@@ -239,7 +242,10 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public OzoneBucket getBucketDetails(String volumeName, String bucketName)
       throws IOException {
-    return null;
+    if (volumeName == null) {
+      return objectStoreStub.getS3Volume().getBucket(bucketName);
+    }
+    return objectStoreStub.getVolume(volumeName).getBucket(bucketName);
   }
 
   @Override
@@ -287,6 +293,12 @@ public class ClientProtocolStub implements ClientProtocol {
       boolean derivedKeyPiggyBacking) throws IOException {
     return getBucket(volumeName, bucketName)
         .createKey(keyName, size, replicationConfig, metadata, tags, derivedKeyPiggyBacking);
+  }
+
+  @Override
+  public OzoneOutputStream createKey(String volumeName, String bucketName, String keyName,
+      CreateKeyOptions options) throws IOException {
+    return getBucket(volumeName, bucketName).createKey(keyName, options);
   }
 
   @Override
@@ -388,6 +400,9 @@ public class ClientProtocolStub implements ClientProtocol {
 
   private OzoneBucket getBucket(String volumeName, String bucketName)
       throws IOException {
+    if (volumeName == null) {
+      return objectStoreStub.getS3Bucket(bucketName);
+    }
     return objectStoreStub.getVolume(volumeName).getBucket(bucketName);
   }
 
@@ -423,6 +438,11 @@ public class ClientProtocolStub implements ClientProtocol {
                         String fromKeyName, String toKeyName)
       throws IOException {
 
+  }
+
+  @Override
+  public void renameKey(String volumeName, String bucketName, String fromKeyName, String toKeyName,
+      boolean requireFileSystemOptimized) throws IOException {
   }
 
   @Override
@@ -484,6 +504,14 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName,
+         String bucketName, String keyName, MultipartUploadOptions options)
+      throws IOException {
+    return getBucket(volumeName, bucketName)
+        .initiateMultipartUpload(keyName, options);
+  }
+
+  @Override
   public OzoneOutputStream createMultipartKey(String volumeName,
                                               String bucketName, String keyName,
                                               long size, int partNumber,
@@ -520,11 +548,6 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
-    objectStoreStub.getS3Volume().getBucket(bucketName).abortMultipartUpload(keyName, uploadID);
-  }
-
-  @Override
   @SuppressWarnings("checkstyle:ParameterNumber")
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
       String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
@@ -548,8 +571,9 @@ public class ClientProtocolStub implements ClientProtocol {
                                                      int partNumberMarker,
                                                      int maxParts)
       throws IOException {
-    return getBucket(volumeName, bucketName)
-        .listParts(keyName, uploadID, partNumberMarker, maxParts);
+    OzoneBucket bucket = volumeName == null
+        ? objectStoreStub.getS3Volume().getBucket(bucketName) : getBucket(volumeName, bucketName);
+    return bucket.listParts(keyName, uploadID, partNumberMarker, maxParts);
   }
 
   @Override
@@ -728,6 +752,13 @@ public class ClientProtocolStub implements ClientProtocol {
                                       String keyName, long size,
                                       ReplicationConfig replicationConfig,
                                       boolean overWrite, boolean recursive)
+      throws IOException {
+    return null;
+  }
+
+  @Override
+  public OzoneOutputStream createFile(String volumeName, String bucketName,
+      String keyName, CreateFileOptions options)
       throws IOException {
     return null;
   }
@@ -985,7 +1016,8 @@ public class ClientProtocolStub implements ClientProtocol {
                                                        String fromSnapshot,
                                                        String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     return null;
   }
@@ -1027,8 +1059,12 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
-    return getBucket(volumeName, bucketName).getObjectTagging(keyName);
+  public Map<String, String> getObjectTagging(
+      String volumeName, String bucketName, String keyName) throws IOException {
+    OzoneBucket bucket = volumeName == null
+        ? objectStoreStub.getS3Volume().getBucket(bucketName)
+        : getBucket(volumeName, bucketName);
+    return bucket.getObjectTagging(keyName);
   }
 
   @Override

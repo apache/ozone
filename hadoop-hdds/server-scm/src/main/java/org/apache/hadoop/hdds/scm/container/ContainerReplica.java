@@ -150,6 +150,19 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return volumeStorageType;
   }
 
+  /**
+   * Returns the recorded replica type, or its reported volume type when the recorded type is absent.
+   * A null result means neither type is known. Callers must check {@link #hasConflictingStorageTypes()} separately.
+   */
+  public StorageType getTargetStorageTypeForCopy() {
+    return storageType != null ? storageType : volumeStorageType;
+  }
+
+  /** True when the recorded type and the reported volume type are both known and differ. */
+  public boolean hasConflictingStorageTypes() {
+    return storageType != null && volumeStorageType != null && storageType != volumeStorageType;
+  }
+
   @Override
   public int hashCode() {
     return new HashCodeBuilder(61, 71)

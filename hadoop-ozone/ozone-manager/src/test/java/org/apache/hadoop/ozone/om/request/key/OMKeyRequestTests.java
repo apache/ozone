@@ -18,10 +18,16 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyString;
@@ -29,9 +35,11 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +68,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -75,7 +84,9 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ScmClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -96,6 +107,7 @@ import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.slf4j.event.Level;
 
@@ -303,6 +315,41 @@ public class OMKeyRequestTests {
 
   public BucketLayout getBucketLayout() {
     return BucketLayout.DEFAULT;
+  }
+
+  /**
+   * Deny the ACL check in preExecute of the given request and verify that the rejection is audited.
+   * @return the audit message of the rejection
+   */
+  protected AuditMessage assertPreExecuteAclDenialIsAudited(OMClientRequest request, OMAction action)
+      throws IOException {
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    OmMetadataReader omMetadataReader = (OmMetadataReader) ozoneManager.getOmMetadataReader().get();
+    when(omMetadataReader.checkAcls(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any()))
+        .thenThrow(new OMException("denied", PERMISSION_DENIED));
+    request.setUGI(UserGroupInformation.getCurrentUser());
+
+    OMException e = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+    assertEquals(PERMISSION_DENIED, e.getResult());
+
+    // OMExecutionFlow writes the audit builder of a request whose preExecute failed.
+    OMAuditLogger.log(request.getAuditBuilder());
+    ArgumentCaptor<AuditMessage> captor = ArgumentCaptor.forClass(AuditMessage.class);
+    verify(auditLogger).logWrite(captor.capture());
+    AuditMessage message = captor.getValue();
+    assertEquals(action.getAction(), message.getOp());
+    assertThat(message.getFormattedMessage()).contains("ret=FAILURE");
+    assertSame(e, message.getThrowable());
+    return message;
+  }
+
+  /**
+   * Make the requested volume and bucket a link to the given source volume and bucket.
+   */
+  protected void resolveRequestedBucketAsLinkTo(String sourceVolume, String sourceBucket) throws IOException {
+    when(ozoneManager.resolveBucketLink(any(KeyArgs.class), any(OMClientRequest.class)))
+        .thenReturn(new ResolvedBucket(volumeName, bucketName, sourceVolume, sourceBucket, "owner",
+            BucketLayout.OBJECT_STORE));
   }
 
   @AfterEach

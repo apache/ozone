@@ -245,7 +245,6 @@ public class RDBStore implements DBStore {
       metrics = null;
     }
 
-    RDBMetrics.unRegister();
     IOUtils.close(LOG, checkPointManager);
     if (rocksDBCheckpointDiffer != null) {
       RocksDBCheckpointDifferHolder
