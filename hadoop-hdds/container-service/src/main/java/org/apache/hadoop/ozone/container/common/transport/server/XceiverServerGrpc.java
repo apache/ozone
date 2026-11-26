@@ -27,6 +27,7 @@ import java.net.BindException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -149,7 +150,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .workerEventLoopGroup(eventLoopGroup)
         .channelType(channelType)
         .withOption(ChannelOption.SO_BACKLOG, dnConf.getGrpcSoBacklog())
-        .executor(metrics.timedExecutor())
+        .executor(timedExecutor(readExecutors, metrics))
         // If a client does not send an actual functional business RPC for 15 minutes,
         // the server kicks them off with a GOAWAY frame.
         .maxConnectionIdle(15, TimeUnit.MINUTES)
@@ -185,6 +186,20 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     server = nettyServerBuilder.build();
     storageContainer = dispatcher;
     metrics.register();
+  }
+
+  /**
+   * Wraps the read executor so that each gRPC task records how long it waited before a thread ran it.
+   */
+  @VisibleForTesting
+  static Executor timedExecutor(Executor readExecutor, XceiverServerGrpcMetrics metrics) {
+    return task -> {
+      final long submitNanos = System.nanoTime();
+      readExecutor.execute(() -> {
+        metrics.addReadExecutorQueueTime(System.nanoTime() - submitNanos);
+        task.run();
+      });
+    };
   }
 
   @VisibleForTesting

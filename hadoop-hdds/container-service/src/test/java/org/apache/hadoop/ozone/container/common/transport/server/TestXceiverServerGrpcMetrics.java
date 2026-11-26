@@ -106,7 +106,7 @@ class TestXceiverServerGrpcMetrics {
     ThreadPoolExecutor readExecutor = new ThreadPoolExecutor(1, 1, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
     XceiverServerGrpcMetrics metrics = new XceiverServerGrpcMetrics(readExecutor, "test-datanode");
     try {
-      Executor executor = metrics.timedExecutor();
+      Executor executor = XceiverServerGrpc.timedExecutor(readExecutor, metrics);
       CountDownLatch done = new CountDownLatch(2);
       executor.execute(done::countDown);
       executor.execute(done::countDown);

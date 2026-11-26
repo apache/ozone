@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.transport.server;
 
 import java.util.List;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -74,19 +73,6 @@ public final class XceiverServerGrpcMetrics implements MetricsSource {
   public void unregister() {
     DefaultMetricsSystem.instance().unregisterSource(sourceName);
     MetricUtil.stop(readExecutorQueueTimeQuantiles);
-  }
-
-  /**
-   * Wraps the read executor so that each task records how long it waited before a thread ran it.
-   */
-  Executor timedExecutor() {
-    return task -> {
-      final long submitNanos = System.nanoTime();
-      readExecutor.execute(() -> {
-        addReadExecutorQueueTime(System.nanoTime() - submitNanos);
-        task.run();
-      });
-    };
   }
 
   void addReadExecutorQueueTime(long nanos) {
