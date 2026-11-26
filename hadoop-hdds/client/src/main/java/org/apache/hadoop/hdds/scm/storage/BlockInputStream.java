@@ -203,6 +203,16 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
   }
 
+  /**
+   * Use the block length from the datanode if the block is under construction,
+   * since the length from OM may be stale (e.g. the last block of an hsync-ed file).
+   */
+  public synchronized void updateBlockLength() throws IOException {
+    if (blockInfo.isUnderConstruction()) {
+      initialize();
+    }
+  }
+
   private synchronized void refreshBlockInfo(IOException cause) throws IOException {
     refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
   }

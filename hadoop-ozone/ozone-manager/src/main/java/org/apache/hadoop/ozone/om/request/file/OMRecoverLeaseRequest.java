@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_CLOSED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RecoverLease;
@@ -50,7 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -253,21 +253,6 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     keyInfo.setKeyName(keyName);
     openKeyInfo.setKeyName(keyName);
 
-    OmKeyLocationInfoGroup keyLatestVersionLocations = keyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.createLocationList();
-    OmKeyLocationInfoGroup openKeyLatestVersionLocations = openKeyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.createLocationList();
-
-    if (!keyLocationInfoList.isEmpty()) {
-      updateBlockInfo(ozoneManager, keyLocationInfoList.get(keyLocationInfoList.size() - 1));
-    }
-    if (openKeyLocationInfoList.size() > 1) {
-      updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 1));
-      updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 2));
-    } else if (!openKeyLocationInfoList.isEmpty()) {
-      updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(0));
-    }
-
     RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
     ClientVersion clientVersion = ClientVersion.deserialize(getOmRequest().getVersion());
     rb.setKeyInfo(keyInfo.getNetworkProtobuf(clientVersion, true));
@@ -275,19 +260,71 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     return rb.build();
   }
 
+  /**
+   * Adds the block token and the current pipeline to the blocks that the recovering client has to contact:
+   * the last block of the file and the last two blocks of the open file.
+   * Only the reply to the client needs them, so this runs on the leader after the request has been applied:
+   * applying the request must not depend on SCM.
+   */
+  @Override
+  public OMResponse postExecute(OzoneManager ozoneManager, OMResponse omResponse) throws IOException {
+    final OMResponse response = super.postExecute(ozoneManager, omResponse);
+    if (!response.hasRecoverLeaseResponse()) {
+      return response;
+    }
+    final RecoverLeaseResponse recoverLeaseResponse = response.getRecoverLeaseResponse();
+    if (!recoverLeaseResponse.hasKeyInfo() || !recoverLeaseResponse.hasOpenKeyInfo()) {
+      return response;
+    }
+    final OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo());
+    final OmKeyInfo openFileKeyInfo = OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getOpenKeyInfo());
+
+    final List<OmKeyLocationInfo> keyLocationInfoList = keyInfo.getLatestVersionLocations().createLocationList();
+    final List<OmKeyLocationInfo> openKeyLocationInfoList =
+        openFileKeyInfo.getLatestVersionLocations().createLocationList();
+
+    try {
+      if (!keyLocationInfoList.isEmpty()) {
+        updateBlockInfo(ozoneManager, keyLocationInfoList.get(keyLocationInfoList.size() - 1));
+      }
+      if (openKeyLocationInfoList.size() > 1) {
+        updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 1));
+        updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 2));
+      } else if (!openKeyLocationInfoList.isEmpty()) {
+        updateBlockInfo(ozoneManager, openKeyLocationInfoList.get(0));
+      }
+    } catch (IOException ex) {
+      // The request was applied successfully, so nothing else logs that the client gets an error instead.
+      LOG.warn(
+          "Failed to add block info to the RecoverLease response. Volume:{}, Bucket:{}, Key:{}", volumeName, bucketName,
+          keyName, ex);
+      throw ex;
+    }
+
+    final ClientVersion clientVersion = ClientVersion.deserialize(getOmRequest().getVersion());
+    return response.toBuilder().setRecoverLeaseResponse(RecoverLeaseResponse.newBuilder()
+        .setKeyInfo(keyInfo.getNetworkProtobuf(clientVersion, true))
+        .setOpenKeyInfo(openFileKeyInfo.getNetworkProtobuf(clientVersion, true))).build();
+  }
+
   private void updateBlockInfo(OzoneManager ozoneManager, OmKeyLocationInfo blockInfo) throws IOException {
     if (blockInfo != null) {
       // set token to last block if enabled
       if (ozoneManager.isGrpcBlockTokenEnabled()) {
-        String remoteUser = getRemoteUser().getShortUserName();
-        OzoneBlockTokenSecretManager secretManager = ozoneManager.getBlockTokenSecretManager();
+        final String remoteUser = getRemoteUser().getShortUserName();
+        final OzoneBlockTokenSecretManager secretManager = ozoneManager.getBlockTokenSecretManager();
         blockInfo.setToken(secretManager.generateToken(remoteUser, blockInfo.getBlockID(),
             EnumSet.of(READ, WRITE), blockInfo.getLength()));
       }
       // refresh last block pipeline
-      ContainerWithPipeline containerWithPipeline =
-          ozoneManager.getScmClient().getContainerClient().getContainerWithPipeline(blockInfo.getContainerID());
-      blockInfo.setPipeline(containerWithPipeline.getPipeline());
+      try {
+        final ContainerWithPipeline containerWithPipeline =
+            ozoneManager.getScmClient().getContainerClient().getContainerWithPipeline(blockInfo.getContainerID());
+        blockInfo.setPipeline(containerWithPipeline.getPipeline());
+      } catch (IOException e) {
+        // SCM fails with IOException. Map it to a retriable client error instead of INTERNAL_ERROR
+        throw new OMException(e.getMessage(), e, SCM_GET_PIPELINE_EXCEPTION);
+      }
     }
   }
 

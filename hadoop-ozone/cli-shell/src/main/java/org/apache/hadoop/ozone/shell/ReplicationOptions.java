@@ -84,6 +84,11 @@ public abstract class ReplicationOptions {
 
   // Option is defined in subclasses
   protected void setType(String type) {
+    if (type == null) {
+      this.type = null;
+      return;
+    }
+
     try {
       ReplicationType replicationType = ReplicationType.valueOf(type);
       if (replicationType == ReplicationType.CHAINED

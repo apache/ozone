@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -129,6 +130,50 @@ public class TestMultipartInputStream {
       assertArrayEquals(Arrays.copyOfRange(partData, staleLength, partData.length), buffer.array());
       assertEquals(partData.length, multipartStream.getLength());
       verify(part, never()).seek(anyLong());
+    }
+  }
+
+  @Test
+  public void testSeekBeyondStaleLengthOfUnderConstructionBlock() throws Exception {
+    int staleLength = 512;
+    int actualLength = 1024;
+    BlockInputStream part = mock(BlockInputStream.class);
+    AtomicLong partLength = new AtomicLong(staleLength);
+    when(part.getLength()).thenAnswer(invocation -> partLength.get());
+    doAnswer(invocation -> {
+      partLength.set(actualLength);
+      return null;
+    }).when(part).updateBlockLength();
+    try (MultipartInputStream multipartStream = new MultipartInputStream("test-key", Collections.singletonList(part))) {
+      multipartStream.seek(staleLength + 1);
+      assertEquals(actualLength, multipartStream.getLength());
+      verify(part).seek(staleLength + 1);
+    }
+  }
+
+  @Test
+  public void testSeekGetsBlockDataOnlyForTheBlockItReads() throws Exception {
+    byte[] part0Data = generateRandomData(PART_SIZE);
+    byte[] part1Data = generateRandomData(PART_SIZE);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(false);
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    Function<BlockID, BlockLocationInfo> refreshFunction = mock(Function.class);
+    Checksum checksum = new Checksum(ChecksumType.NONE, 1024);
+
+    BlockInputStream part0 = spy(createBlockStream(new BlockID(new ContainerBlockID(1, 1)),
+        part0Data, pipeline, refreshFunction, clientConfig, checksum));
+    BlockInputStream part1 = spy(createBlockStream(new BlockID(new ContainerBlockID(1, 2)),
+        part1Data, pipeline, refreshFunction, clientConfig, checksum));
+    try (MultipartInputStream multipartStream = new MultipartInputStream("test-key", Arrays.asList(part0, part1))) {
+      int offsetInPart1 = 10;
+      multipartStream.seek(PART_SIZE + offsetInPart1);
+      byte[] buffer = new byte[16];
+      assertEquals(buffer.length, multipartStream.read(buffer, 0, buffer.length));
+      assertArrayEquals(Arrays.copyOfRange(part1Data, offsetInPart1, offsetInPart1 + buffer.length), buffer);
+      verify(part0, never()).getBlockData();
+      verify(part1).getBlockData();
     }
   }
 

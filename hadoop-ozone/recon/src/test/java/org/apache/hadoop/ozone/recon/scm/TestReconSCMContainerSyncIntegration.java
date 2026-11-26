@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.DELETE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
@@ -52,8 +53,10 @@ import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
@@ -187,6 +190,20 @@ public class TestReconSCMContainerSyncIntegration
    * Seeds Recon with {@code count} OPEN containers and then transitions each
    * one to CLOSING so that Pass 1 can exercise the CLOSING→CLOSED correction.
    */
+  private void addReplica(ContainerID containerID, ContainerReplicaProto.State state) throws Exception {
+    addReplica(containerID, state, 0L);
+  }
+
+  private void addReplica(ContainerID containerID, ContainerReplicaProto.State state, long sequenceId)
+      throws Exception {
+    getContainerManager().updateContainerReplica(containerID, ContainerReplica.newBuilder()
+        .setContainerID(containerID)
+        .setContainerState(state)
+        .setDatanodeDetails(randomDatanodeDetails())
+        .setSequenceId(sequenceId)
+        .build());
+  }
+
   private void seedReconAsClosing(long startId, int count) throws Exception {
     seedRecon(startId, count, OPEN);
     ReconContainerManager cm = getContainerManager();
@@ -543,10 +560,11 @@ public class TestReconSCMContainerSyncIntegration
 
     @Test
     void doesNotOverwriteContainerAlreadyClosedInRecon() throws Exception {
-      // Container already CLOSED in Recon but still in SCM's QUASI_CLOSED list.
-      // Pass 3 must not revert the container to QUASI_CLOSED (no downgrade).
+      // CLOSED in Recon from a CLOSED replica SCM has not processed yet, so SCM still lists it
+      // QUASI_CLOSED. The sync must not move it back.
       seedRecon(30, 1, CLOSED);
       ContainerID cid = ContainerID.valueOf(30L);
+      addReplica(cid, ContainerReplicaProto.State.CLOSED);
 
       when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(1L);
       when(mockScm.getListOfContainerIDs(
@@ -555,6 +573,67 @@ public class TestReconSCMContainerSyncIntegration
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
       assertEquals(CLOSED, getContainerManager().getContainer(cid).getState());
+    }
+
+    @Test
+    void followsScmToQuasiClosedWhenClosedReplicaHasOlderSequence() throws Exception {
+      // Recon has the container CLOSED at sequence 100. It has one stale CLOSED replica at sequence
+      // 90 and one UNHEALTHY replica. SCM already moved the container to QUASI_CLOSED. The stale
+      // CLOSED replica must not block the correction; Recon should follow SCM to QUASI_CLOSED.
+      ContainerID cid = ContainerID.valueOf(31L);
+      ContainerInfo info = new ContainerInfo.Builder()
+          .setContainerID(31L)
+          .setState(CLOSED)
+          .setSequenceId(100L)
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+          .setOwner("test")
+          .build();
+      getContainerManager().addNewContainer(new ContainerWithPipeline(info, null));
+      addReplica(cid, ContainerReplicaProto.State.CLOSED, 90L);
+      addReplica(cid, ContainerReplicaProto.State.UNHEALTHY, 90L);
+
+      when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(1L);
+      when(mockScm.getListOfContainerIDs(
+          eq(ContainerID.valueOf(1L)), eq(1), eq(QUASI_CLOSED)))
+          .thenReturn(Collections.singletonList(cid));
+
+      assertTrue(syncHelper.syncWithSCMContainerInfo());
+      assertThat(getContainerManager().getContainer(cid).getState()).isEqualTo(QUASI_CLOSED);
+      assertThat(getContainerManager().getContainerReplicas(cid)).hasSize(2);
+    }
+
+    @Test
+    void followsScmBackToQuasiClosedWhenReconHasNoClosedReplica() throws Exception {
+      // SCM moved the CLOSED container through DELETING and back to QUASI_CLOSED after a datanode
+      // reported a non-empty UNHEALTHY replica. Recon still has CLOSED and no CLOSED replica.
+      seedRecon(32, 1, CLOSED);
+      ContainerID cid = ContainerID.valueOf(32L);
+      addReplica(cid, ContainerReplicaProto.State.UNHEALTHY);
+
+      when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(1L);
+      when(mockScm.getListOfContainerIDs(
+          eq(ContainerID.valueOf(1L)), eq(1), eq(QUASI_CLOSED)))
+          .thenReturn(Collections.singletonList(cid));
+
+      assertTrue(syncHelper.syncWithSCMContainerInfo());
+      assertThat(getContainerManager().getContainer(cid).getState()).isEqualTo(QUASI_CLOSED);
+      assertThat(getContainerManager().getContainerReplicas(cid)).hasSize(1);
+    }
+
+    @Test
+    void finishesQuasiClosedMoveStoppedInDeleting() throws Exception {
+      // The CLOSED to QUASI_CLOSED move stopped after DELETE. SCM still lists the container
+      // QUASI_CLOSED, so the next sync must finish the move.
+      seedRecon(33, 1, DELETING);
+      ContainerID cid = ContainerID.valueOf(33L);
+
+      when(mockScm.getContainerCount(QUASI_CLOSED)).thenReturn(1L);
+      when(mockScm.getListOfContainerIDs(
+          eq(ContainerID.valueOf(1L)), eq(1), eq(QUASI_CLOSED)))
+          .thenReturn(Collections.singletonList(cid));
+
+      assertTrue(syncHelper.syncWithSCMContainerInfo());
+      assertEquals(QUASI_CLOSED, getContainerManager().getContainer(cid).getState());
     }
 
     @Test

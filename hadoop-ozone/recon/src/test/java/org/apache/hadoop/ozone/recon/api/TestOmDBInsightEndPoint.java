@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.BucketPendingDeletion;
@@ -211,6 +212,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   private static final long EMPTY_OBS_BUCKET_OBJECT_ID = 40L;
   private static final long EMPTY_FSO_BUCKET_OBJECT_ID = 41L;
+
+  private static final long DIR_SEVEN_OBJECT_ID = 42L;
 
   private static final long KEY_ONE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TWO_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
@@ -818,8 +821,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         (DIR_FOUR + OM_KEY_PREFIX + DIR_SEVEN + OM_KEY_PREFIX),
         LEGACY_BUCKET,
         VOLUME_ONE,
-        DIR_FOUR,
-        DIR_FOUR_OBJECT_ID,
+        DIR_SEVEN,
+        DIR_SEVEN_OBJECT_ID,
         PARENT_OBJECT_ID_ZERO,
         LEGACY_BUCKET_OBJECT_ID,
         VOLUME_ONE_OBJECT_ID,
@@ -1087,6 +1090,46 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
     assertEquals("sampleVol/bucketOne/key_three",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(1).getPath());
+  }
+
+  @Test
+  public void testGetOpenKeyInfoExcludesMultipartOpenKeys() throws Exception {
+    String obsUploadId = OMMultipartUploadUtils.getMultipartUploadId();
+    String fsoUploadId = OMMultipartUploadUtils.getMultipartUploadId();
+    reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_a/" + obsUploadId, getMultipartOpenKeyInfo("sampleVol", "bucketOne", "key_a"));
+    reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
+        .put("/sampleVol/bucketOne/key_b", getOmKeyInfo("sampleVol", "bucketOne", "key_b", true));
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put("/sampleVol/bucketTwo/key_c/" + fsoUploadId, getMultipartOpenKeyInfo("sampleVol", "bucketTwo", "key_c"));
+    reconOMMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put("/sampleVol/bucketTwo/key_d", getOmKeyInfo("sampleVol", "bucketTwo", "key_d", true));
+
+    KeyInsightInfoResponse keyInsightInfoResp = (KeyInsightInfoResponse)
+        omdbInsightEndpoint.getOpenKeyInfo(-1, "", "", true, true).getEntity();
+    assertEquals(1, keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    assertEquals("/sampleVol/bucketOne/key_b", keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getKey());
+    assertEquals(1, keyInsightInfoResp.getFsoKeyInfoList().size());
+    assertEquals("/sampleVol/bucketTwo/key_d", keyInsightInfoResp.getFsoKeyInfoList().get(0).getKey());
+
+    // Skipped multipart open keys do not count towards the limit.
+    keyInsightInfoResp = (KeyInsightInfoResponse)
+        omdbInsightEndpoint.getOpenKeyInfo(1, "", "", false, true).getEntity();
+    assertEquals(1, keyInsightInfoResp.getNonFSOKeyInfoList().size());
+    assertEquals("/sampleVol/bucketOne/key_b", keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getKey());
+  }
+
+  private OmKeyInfo getMultipartOpenKeyInfo(String volumeName, String bucketName, String keyName) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFile(true)
+        .setObjectID(generateUniqueRandomLong())
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setDataSize(0L)
+        .setOmKeyLocationInfos(Collections.singletonList(new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
+        .build();
   }
 
   @Test

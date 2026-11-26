@@ -42,13 +42,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.SimpleMockNodeManager;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
@@ -448,10 +448,11 @@ public class TestDatanodeAdminMonitor {
   }
 
   @ParameterizedTest
-  @EnumSource(value = ContainerHealthState.class, names = {"UNDER_REPLICATED", "UNHEALTHY_UNDER_REPLICATED",
-      "MISSING_UNDER_REPLICATED", "QUASI_CLOSED_STUCK_UNDER_REPLICATED"})
-  public void testDecommissionWaitsForUnderReplicatedHealthStates(ContainerHealthState healthState)
-      throws NodeNotFoundException, ContainerNotFoundException {
+  @EnumSource(value = SimplifiedContainerHealthStateForReporting.class,
+      names = {"UNDER_REPLICATED", "UNHEALTHY_UNDER_REPLICATED",
+          "MISSING_UNDER_REPLICATED", "QUASI_CLOSED_STUCK_UNDER_REPLICATED"})
+  public void testDecommissionWaitsForUnderReplicatedHealthStates(
+      SimplifiedContainerHealthStateForReporting healthState) throws NodeNotFoundException, ContainerNotFoundException {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn, NodeStatus.valueOf(DECOMMISSIONING, HddsProtos.NodeState.HEALTHY));
     nodeManager.setContainers(dn, generateContainers(1));

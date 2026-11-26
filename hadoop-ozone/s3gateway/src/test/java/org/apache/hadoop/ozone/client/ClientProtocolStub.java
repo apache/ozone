@@ -525,11 +525,6 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
-    objectStoreStub.getS3Volume().getBucket(bucketName).abortMultipartUpload(keyName, uploadID);
-  }
-
-  @Override
   @SuppressWarnings("checkstyle:ParameterNumber")
   public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
       String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
@@ -553,8 +548,9 @@ public class ClientProtocolStub implements ClientProtocol {
                                                      int partNumberMarker,
                                                      int maxParts)
       throws IOException {
-    return getBucket(volumeName, bucketName)
-        .listParts(keyName, uploadID, partNumberMarker, maxParts);
+    OzoneBucket bucket = volumeName == null
+        ? objectStoreStub.getS3Volume().getBucket(bucketName) : getBucket(volumeName, bucketName);
+    return bucket.listParts(keyName, uploadID, partNumberMarker, maxParts);
   }
 
   @Override

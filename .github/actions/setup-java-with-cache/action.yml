@@ -19,8 +19,8 @@ description: Setup Java and restore Maven cache of Ozone's dependencies
 inputs:
   java-version:
     description: >
-      Java version to set up.
-    required: true
+      Java version to set up.  Defaults to $JAVA_VERSION, which is required for the cache key.
+    default: ''
 
   only-exact-hit:
     description: >
@@ -47,24 +47,60 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Setup Java ${{ inputs.java-version }}
+    - name: Verify JAVA_VERSION
+      shell: bash
+      run: |
+        : "${JAVA_VERSION:?Please set JAVA_VERSION}"
+
+    - name: Setup Java ${{ env.java_version }}
       id: setup-java
       uses: actions/setup-java@v6
       with:
         distribution: 'temurin'
-        java-version: ${{ inputs.java-version }}
+        java-version: ${{ env.java_version }}
+        show-download-progress: true
+      env:
+        java_version: ${{ inputs.java-version || env.JAVA_VERSION }}
 
+    # Cache key always uses JAVA_VERSION, because only one cache is built in populate-cache
     - name: Calculate cache key
       id: cache-key
       shell: bash
-      run: |
-        echo "value=maven-repo-${{ hashFiles('**/pom.xml', '.mvn/extensions.xml') }}" >> "$GITHUB_OUTPUT"
+      run: >
+        echo "value=maven-repo-${{ hashFiles(
+            '**/pom.xml',
+            '.mvn/extensions.xml',
+            'dev-support/ci/populate-cache.sh'
+        ) }}-$JAVA_VERSION" >> "$GITHUB_OUTPUT"
 
     - name: Remove any leftover Maven repo
       id: cleanup
       shell: bash
       run: |
-        rm -frv ~/.m2/repository
+        rm -frv ~/.m2/repository ~/.m2/wrapper
+
+    - name: Restore Maven Wrapper
+      id: restore-wrapper
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/.m2/wrapper
+        key: maven-wrapper-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties') }}
+
+    # Maven Wrapper is required, small, simple to get,
+    # so download and store it instead of relying on populate-cache.
+    # It also simplifies the action's outputs
+    - name: Get Maven Wrapper
+      if: steps.restore-wrapper.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        ./mvnw --version
+
+    - name: Save Maven Wrapper
+      if: steps.restore-wrapper.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.m2/wrapper
+        key: ${{ steps.restore-wrapper.outputs.cache-primary-key }}
 
     - name: Restore cache with exact key
       id: exact-cache

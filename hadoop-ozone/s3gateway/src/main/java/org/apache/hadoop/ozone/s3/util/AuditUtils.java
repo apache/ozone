@@ -21,13 +21,19 @@ import static org.apache.hadoop.ozone.s3.ClientIpFilter.CLIENT_IP_HEADER;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.ws.rs.container.ContainerRequestContext;
 
 /**
  * Common utilities for operation auditing purposes.
  */
 public final class AuditUtils {
+  /** Lower-case names of the SigV4 and SigV2 presigned-request query parameters that carry credentials. */
+  private static final Set<String> CREDENTIAL_QUERY_PARAMETERS = Set.of(
+      "x-amz-signature", "x-amz-credential", "x-amz-security-token", "signature", "awsaccesskeyid");
+
   private AuditUtils() {
   }
 
@@ -41,7 +47,9 @@ public final class AuditUtils {
       }
       for (Map.Entry<String, List<String>> entry :
           context.getUriInfo().getQueryParameters().entrySet()) {
-        res.put(entry.getKey(), entry.getValue().toString());
+        if (!CREDENTIAL_QUERY_PARAMETERS.contains(entry.getKey().toLowerCase(Locale.ROOT))) {
+          res.put(entry.getKey(), entry.getValue().toString());
+        }
       }
     }
     return res;

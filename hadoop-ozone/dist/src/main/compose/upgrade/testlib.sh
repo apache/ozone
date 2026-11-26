@@ -82,18 +82,18 @@ callback() {
 #     versions and docker compose cluster.
 ## @param The directory with a load.sh file that can be sourced to load the
 #     docker compose cluster to run the test in.
-## @param The directory of the upgrade type to run.
+## @param The execution mode of the upgrade: rolling or non-rolling.
 ## @param The version of Ozone to upgrade from.
 ## @param The version of Ozone to upgrade to.
 run_test() {
   local compose_cluster="$1"
-  local upgrade_type="$2"
+  export EXECUTION_MODE="$2"
   export OZONE_UPGRADE_FROM="$3"
   export OZONE_UPGRADE_TO="$4"
 
-  local test_dir="$_upgrade_dir/upgrades/$upgrade_type"
+  local test_dir="$_upgrade_dir/upgrades/upgrade"
   local callback_dir="$test_dir"/callbacks
-  local execution_dir="$test_dir"/execution/"$compose_cluster-$upgrade_type-${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}"
+  local execution_dir="$test_dir"/execution/"$compose_cluster-$EXECUTION_MODE-${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}"
   local compose_dir="$_upgrade_dir"/compose/"$compose_cluster"
   # Export variables needed by test, since it is run in a subshell.
   export OZONE_UPGRADE_CALLBACK="$callback_dir"/"$OZONE_UPGRADE_TO"/callback.sh

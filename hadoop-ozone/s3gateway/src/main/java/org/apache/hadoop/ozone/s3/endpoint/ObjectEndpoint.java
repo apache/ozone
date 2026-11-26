@@ -31,8 +31,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CopyDirective;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
@@ -475,22 +473,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       responseBuilder.header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
       addEntityTagHeader(responseBuilder, keyDetails);
-
-      MultivaluedMap<String, String> queryParams =
-          getContext().getUriInfo().getQueryParameters();
-
-      // Content-Type comes from the stored object, not the request header;
-      // response-content-type still overrides it.
-      String contentType = queryParams.getFirst("response-content-type");
-      if (contentType == null) {
-        contentType = contentTypeOf(keyDetails);
-      }
-      responseBuilder.header(HttpHeaders.CONTENT_TYPE, contentType);
-
-      for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
-        addStoredObjectHeader(responseBuilder, keyDetails, queryParams, entry.getKey(),
-            entry.getValue());
-      }
+      addStoredObjectHeaders(responseBuilder, keyDetails);
 
       addLastModifiedDate(responseBuilder, keyDetails);
       addTagCountIfAny(responseBuilder, keyDetails);
@@ -581,6 +564,15 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   private void addStoredObjectHeaders(ResponseBuilder responseBuilder, OzoneKey key) {
     MultivaluedMap<String, String> queryParams =
         getContext().getUriInfo().getQueryParameters();
+
+    // Content-Type comes from the stored object, not the request header;
+    // response-content-type still overrides it.
+    String contentType = queryParams.getFirst("response-content-type");
+    if (contentType == null) {
+      contentType = contentTypeOf(key);
+    }
+    responseBuilder.header(HttpHeaders.CONTENT_TYPE, contentType);
+
     for (Map.Entry<String, String> entry : overrideQueryParameter.entrySet()) {
       addStoredObjectHeader(responseBuilder, key, queryParams, entry.getKey(),
           entry.getValue());
@@ -722,8 +714,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           .header(HttpHeaders.CONTENT_LENGTH, endOffset - startOffset + 1)
           .header(CONTENT_RANGE_HEADER, contentRangeVal);
     }
-    response.header(HttpHeaders.CONTENT_TYPE, contentTypeOf(key))
-        .header(STORAGE_CLASS_HEADER, s3StorageType.toString())
+    response.header(STORAGE_CLASS_HEADER, s3StorageType.toString())
         .header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
     addEntityTagHeader(response, key);
     addStoredObjectHeaders(response, key);
@@ -1031,17 +1022,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         } else {
           length = sourceKeyDetails.getDataSize();
         }
-        Long sourceKeyModificationTime = sourceKeyDetails
-            .getModificationTime().toEpochMilli();
-        String copySourceIfModifiedSince =
-            getHeaders().getHeaderString(COPY_SOURCE_IF_MODIFIED_SINCE);
-        String copySourceIfUnmodifiedSince =
-            getHeaders().getHeaderString(COPY_SOURCE_IF_UNMODIFIED_SINCE);
-        if (!S3ConditionalRequest.checkCopySourceModificationTime(
-            sourceKeyModificationTime,
-            copySourceIfModifiedSince, copySourceIfUnmodifiedSince)) {
-          throw newError(PRECOND_FAILED, sourceBucket + "/" + sourceKey);
-        }
+        S3ConditionalRequest.evaluatePreconditions(getHeaders(), sourceBucket + "/" + sourceKey,
+            sourceKeyDetails, S3ConditionalRequest.PreconditionContext.COPY_SOURCE);
 
         final MessageDigest md5Digest = getMD5DigestInstance();
         try (OzoneInputStream sourceObject = sourceKeyDetails.getContent();

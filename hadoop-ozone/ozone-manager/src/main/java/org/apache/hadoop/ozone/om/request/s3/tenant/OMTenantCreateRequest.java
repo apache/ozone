@@ -292,6 +292,12 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         }
       }
 
+      // Check tenant existence in tenantStateTable
+      if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {
+        LOG.debug("tenant: '{}' already exists", tenantId);
+        throw new OMException("Tenant already exists", TENANT_ALREADY_EXISTS);
+      }
+
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           USER_LOCK, owner));
       acquiredUserLock = getOmLockDetails().isLockAcquired();
@@ -338,12 +344,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
       // Audit
       auditMap = volumeBuilder.toAuditMap();
-
-      // Check tenant existence in tenantStateTable
-      if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {
-        LOG.debug("tenant: '{}' already exists", tenantId);
-        throw new OMException("Tenant already exists", TENANT_ALREADY_EXISTS);
-      }
 
       // Create tenant
       // Add to tenantStateTable. Redundant assignment for clarity

@@ -23,9 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.Collections;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -47,12 +47,13 @@ public class TestContainerCheckRequest {
         .setReport(report)
         .build();
 
-    assertEquals(ContainerHealthState.HEALTHY, request.getHealthState());
-    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(SimplifiedContainerHealthStateForReporting.HEALTHY, request.getSimplifiedHealthStateForReporting());
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
 
-    request.setHealthState(ContainerHealthState.UNDER_REPLICATED);
+    request.setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED);
 
-    assertEquals(ContainerHealthState.UNDER_REPLICATED, request.getHealthState());
-    assertEquals(1, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED,
+        request.getSimplifiedHealthStateForReporting());
+    assertEquals(1, report.getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
   }
 }

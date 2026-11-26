@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -45,6 +46,9 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -135,6 +139,19 @@ public abstract class OMClientRequest implements RequestAuditor {
 
     omRequest = requestBuilder.build();
     return omRequest;
+  }
+
+  /**
+   * Perform post-execute steps on an OMResponse.
+   *
+   * Called from the RPC context on the leader after the request has been applied successfully. When the response is
+   * served from the Ratis retry cache, this is called on a new request instance on which {@link #preExecute} has not
+   * run, and only if the command type is registered in {@code OMExecutionFlow.POST_EXECUTE_CMD_TYPES}.
+   *
+   * @return OMResponse that will be returned to the client.
+   */
+  public OMResponse postExecute(OzoneManager ozoneManager, OMResponse omResponse) throws IOException {
+    return omResponse;
   }
 
   /**
@@ -638,5 +655,20 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   public void mergeOmLockDetails(OMLockDetails details) {
     omLockDetails.merge(details);
+  }
+
+  /**
+   * A scan task may submit its state after the bucket or lifecycle configuration it was scanning is deleted.
+   * Returns false in that case, so the scan state row is not saved to DB.
+   */
+  public static boolean isScanStateValid(OMMetadataManager metadataManager, OmLifecycleScanState state)
+      throws IOException {
+    String bucketKey = state.getBucketKey();
+    OmBucketInfo bucketInfo = metadataManager.getBucketTable().get(bucketKey);
+    if (bucketInfo == null || bucketInfo.getObjectID() != state.getBucketObjID()) {
+      return false;
+    }
+    OmLifecycleConfiguration lcc = metadataManager.getLifecycleConfigurationTable().get(bucketKey);
+    return lcc != null && lcc.getUpdateID() == state.getLifecycleConfigurationUpdateID();
   }
 }
