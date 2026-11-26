@@ -938,7 +938,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     if (keyName.startsWith(listPrefix)) {
       return true;
     }
-    return listPrefix.startsWith(keyName + "/");
+    return listPrefix.startsWith(OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
   }
 
   private ResourceType getResourceType(OmKeyArgs args) {

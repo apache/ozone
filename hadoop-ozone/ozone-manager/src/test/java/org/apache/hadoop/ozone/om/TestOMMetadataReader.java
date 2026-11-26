@@ -533,8 +533,10 @@ public class TestOMMetadataReader {
     assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
   }
 
-  @Test
-  public void testListStatusLightUsesListPrefixForAclWhenKeyNameIsAncestorOfListPrefix() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"user", "user/"})
+  public void testListStatusLightUsesListPrefixForAclWhenKeyNameIsAncestorOfListPrefix(String keyName)
+      throws Exception {
     setupStsS3Request();
 
     final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
@@ -544,7 +546,7 @@ public class TestOMMetadataReader {
     final OmKeyArgs args = new OmKeyArgs.Builder()
         .setVolumeName(VOLUME_NAME)
         .setBucketName(BUCKET_NAME)
-        .setKeyName("user")
+        .setKeyName(keyName)
         .setListPrefix("user/foo")
         .build();
 
@@ -566,8 +568,8 @@ public class TestOMMetadataReader {
     final OmKeyArgs args = new OmKeyArgs.Builder()
         .setVolumeName(VOLUME_NAME)
         .setBucketName(BUCKET_NAME)
-        .setKeyName(KEY_PREFIX)
-        .setListPrefix("other/")
+        .setKeyName("user/")
+        .setListPrefix("user-sibling/foo")
         .build();
 
     final OMException ex = assertThrows(
