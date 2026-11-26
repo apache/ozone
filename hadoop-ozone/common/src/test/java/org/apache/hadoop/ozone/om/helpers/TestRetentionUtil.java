@@ -69,6 +69,19 @@ class TestRetentionUtil {
   }
 
   @Test
+  void validatesDefaultEventHoldAgainstRetentionDuration() {
+    RetentionDuration thirtyDays = rule(RetentionTimeUnit.DAYS, 30);
+    RetentionUtil.validateBucketRetention(new BucketRetention(RetentionMode.GOVERNANCE, thirtyDays, thirtyDays));
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateBucketRetention(
+        new BucketRetention(RetentionMode.GOVERNANCE, thirtyDays, rule(RetentionTimeUnit.DAYS, 31))));
+    RetentionDuration oneYear = rule(RetentionTimeUnit.YEARS, 1);
+    RetentionUtil.validateBucketRetention(
+        new BucketRetention(RetentionMode.GOVERNANCE, oneYear, rule(RetentionTimeUnit.DAYS, 365)));
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateBucketRetention(
+        new BucketRetention(RetentionMode.GOVERNANCE, oneYear, rule(RetentionTimeUnit.DAYS, 366))));
+  }
+
+  @Test
   void rejectsInvalidCalculationInputsAndOverflow() {
     assertThrows(IllegalArgumentException.class, () -> RetentionUtil.calculateRetainUntilDate(null, 0));
     assertThrows(IllegalArgumentException.class,
@@ -85,12 +98,26 @@ class TestRetentionUtil {
 
   @Test
   void validatesExpirationBoundary() {
-    RetentionUtil.validateObjectRetention(new ObjectRetention(RetentionMode.GOVERNANCE, 0, null), 100);
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateObjectRetention(
+        new ObjectRetention(RetentionMode.GOVERNANCE, 0, null), 100));
     RetentionUtil.validateObjectRetention(new ObjectRetention(RetentionMode.GOVERNANCE, 101, null), 100);
     for (long date : new long[]{100, 99, -1}) {
       assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateObjectRetention(
           new ObjectRetention(RetentionMode.GOVERNANCE, date, null), 100));
     }
+  }
+
+  @Test
+  void validatesExpirationWithActiveEventHold() {
+    long now = 100;
+    EventHold hold = new EventHold(true, rule(RetentionTimeUnit.DAYS, 30));
+    long minimumDate = now + 30 * 86_400_000L;
+    RetentionUtil.validateObjectRetention(new ObjectRetention(RetentionMode.GOVERNANCE, 0, hold), now);
+    RetentionUtil.validateObjectRetention(new ObjectRetention(RetentionMode.GOVERNANCE, minimumDate, hold), now);
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateObjectRetention(
+        new ObjectRetention(RetentionMode.GOVERNANCE, minimumDate - 1, hold), now));
+    RetentionUtil.validateObjectRetention(
+        new ObjectRetention(RetentionMode.GOVERNANCE, now + 1, new EventHold(false, hold.getDuration())), now);
   }
 
   private static RetentionDuration rule(RetentionTimeUnit unit, long duration) {

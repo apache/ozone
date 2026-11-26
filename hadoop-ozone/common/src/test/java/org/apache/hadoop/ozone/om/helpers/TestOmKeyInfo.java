@@ -97,6 +97,18 @@ public class TestOmKeyInfo {
   }
 
   @Test
+  void comparesObjectLockFieldsOnlyInEquals() {
+    OmKeyInfo original = createOmKeyInfo(RatisReplicationConfig.getInstance(THREE));
+    OmKeyInfo withRetention = original.toBuilder().setRetention(RETENTION).build();
+    OmKeyInfo withLegalHold = original.toBuilder().setLegalHold(true).build();
+
+    assertNotEquals(original, withRetention);
+    assertNotEquals(original, withLegalHold);
+    assertTrue(original.isKeyInfoSame(withRetention, false, false, false, false, true));
+    assertTrue(original.isKeyInfoSame(withLegalHold, false, false, false, false, true));
+  }
+
+  @Test
   public void getProtobufMessageEC() throws IOException {
     OmKeyInfo key = createOmKeyInfo(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));

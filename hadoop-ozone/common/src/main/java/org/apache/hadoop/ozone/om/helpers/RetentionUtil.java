@@ -20,32 +20,58 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionTimeUnit;
 
 /**
  * Validation and UTC date calculations for retention rules.
  */
 public final class RetentionUtil {
+  private static final long MAX_EVENT_HOLD_YEARS = 100;
+  private static final long DAYS_PER_YEAR = 365;
+  private static final long MAX_EVENT_HOLD_DAYS = MAX_EVENT_HOLD_YEARS * DAYS_PER_YEAR;
+
   private RetentionUtil() {
   }
 
   public static void validateBucketRetention(BucketRetention retention) {
-    if (retention.getDuration() != null) {
-      validateRule(retention.getDuration());
+    RetentionDuration duration = retention.getDuration();
+    RetentionDuration eventHold = retention.getDefaultEventHold();
+    if (duration != null) {
+      validateRule(duration);
     }
-    if (retention.getDefaultEventHold() != null) {
-      validateEventHoldRule(retention.getDefaultEventHold());
+    if (eventHold != null) {
+      validateEventHoldRule(eventHold);
+      if (duration != null && daysForComparison(eventHold) > daysForComparison(duration)) {
+        throw new IllegalArgumentException("Event hold duration must not exceed default retention duration");
+      }
     }
+  }
+
+  private static long daysForComparison(RetentionDuration rule) {
+    // Cap at the maximum event hold duration to avoid overflow for large defaults.
+    return rule.getTimeUnit() == RetentionTimeUnit.YEARS
+        ? Math.min(rule.getDuration(), MAX_EVENT_HOLD_YEARS) * DAYS_PER_YEAR
+        : Math.min(rule.getDuration(), MAX_EVENT_HOLD_DAYS);
   }
 
   /**
    * Validate retention submitted by a write request at the given time in epoch milliseconds.
    */
   public static void validateObjectRetention(ObjectRetention retention, long currentTime) {
-    if (retention.getRetentionDate() != 0) {
-      validateRetainUntilDate(retention.getRetentionDate(), currentTime);
+    long retentionDate = retention.getRetentionDate();
+    EventHold eventHold = retention.getEventHold();
+    if (retentionDate == 0 && eventHold == null) {
+      throw new IllegalArgumentException("Retention requires an expiration time or event hold");
     }
-    if (retention.getEventHold() != null) {
-      validateEventHoldRule(retention.getEventHold().getDuration());
+    if (retentionDate != 0) {
+      validateRetainUntilDate(retentionDate, currentTime);
+    }
+    if (eventHold != null) {
+      validateEventHoldRule(eventHold.getDuration());
+      if (eventHold.getEnabled() && retentionDate != 0
+          && retentionDate < calculateRetainUntilDate(eventHold.getDuration(), currentTime)) {
+        throw new IllegalArgumentException("Retention expiration must be at least the event hold duration from now");
+      }
     }
   }
 
@@ -59,12 +85,12 @@ public final class RetentionUtil {
     validateRule(rule);
     switch (rule.getTimeUnit()) {
     case DAYS:
-      if (rule.getDuration() <= 36_500) {
+      if (rule.getDuration() <= MAX_EVENT_HOLD_DAYS) {
         return;
       }
       break;
     case YEARS:
-      if (rule.getDuration() <= 100) {
+      if (rule.getDuration() <= MAX_EVENT_HOLD_YEARS) {
         return;
       }
       break;

@@ -1017,8 +1017,6 @@ public final class OmKeyInfo extends WithParentObjectId
         Objects.equals(getMetadata(), omKeyInfo.getMetadata()) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         Objects.equals(getTags(), omKeyInfo.getTags()) &&
-        Objects.equals(retention, omKeyInfo.retention) &&
-        legalHold == omKeyInfo.legalHold &&
         getObjectID() == omKeyInfo.getObjectID();
 
     if (isEqual && checkUpdateID) {
@@ -1055,7 +1053,9 @@ public final class OmKeyInfo extends WithParentObjectId
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    return isKeyInfoSame((OmKeyInfo) o, true, true, true, true, true);
+    OmKeyInfo that = (OmKeyInfo) o;
+    return legalHold == that.legalHold && Objects.equals(retention, that.retention)
+        && isKeyInfoSame(that, true, true, true, true, true);
   }
 
   @Override
