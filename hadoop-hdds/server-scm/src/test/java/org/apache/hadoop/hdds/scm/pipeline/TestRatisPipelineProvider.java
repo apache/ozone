@@ -43,9 +43,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -95,7 +93,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Test for {@link RatisPipelineProvider}.
  */
-public class TestRatisPipelineProvider {
+public class TestRatisPipelineProvider extends AbstractNCopyPipelineProviderTest {
 
   private static final HddsProtos.ReplicationType REPLICATION_TYPE =
       HddsProtos.ReplicationType.RATIS;
@@ -508,30 +506,6 @@ public class TestRatisPipelineProvider {
 
     assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
     assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
-  }
-
-  private DatanodeDetails createDatanodeDetails(boolean supportRatisStreaming) {
-    Random random = ThreadLocalRandom.current();
-    String ipAddress = random.nextInt(256)
-        + "." + random.nextInt(256)
-        + "." + random.nextInt(256)
-        + "." + random.nextInt(256);
-
-    DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
-        .setID(DatanodeID.randomID())
-        .setHostName("localhost" + "-" + ipAddress)
-        .setIpAddress(ipAddress)
-        .setNetworkLocation(null)
-        .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
-        .setPersistedOpStateExpiry(0);
-
-    for (DatanodeDetails.Port.Name name : DatanodeDetails.Port.Name.values()) {
-      if (!supportRatisStreaming && name == DatanodeDetails.Port.Name.RATIS_DATASTREAM) {
-        continue;
-      }
-      dn.addPort(DatanodeDetails.newPort(name, 0));
-    }
-    return dn.build();
   }
 
   @Test

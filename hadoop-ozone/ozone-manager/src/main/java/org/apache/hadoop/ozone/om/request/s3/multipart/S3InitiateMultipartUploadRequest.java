@@ -101,9 +101,16 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
-    final KeyArgs.Builder resolvedArgsBuilder = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
-        ozoneManager, ACLType.CREATE).toBuilder();
-
+    KeyArgs newKeyArgsProto = newKeyArgs.build();
+    final KeyArgs.Builder resolvedArgsBuilder;
+    try {
+      resolvedArgsBuilder = resolveBucketAndCheckKeyAcls(newKeyArgsProto, ozoneManager, ACLType.CREATE).toBuilder();
+    } catch (IOException ex) {
+      // The upload ID generated above is not audited, as no upload exists for a rejected request.
+      markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.INITIATE_MULTIPART_UPLOAD,
+          buildKeyArgsAuditMap(newKeyArgsProto), ex, getOmRequest().getUserInfo()));
+      throw ex;
+    }
     // Stamp the policy only once finalized: an OM without storage policy support does not persist the field,
     // so stamping it earlier would make old and new OMs apply this request differently.
     if (ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.STORAGE_POLICY_SUPPORT)) {

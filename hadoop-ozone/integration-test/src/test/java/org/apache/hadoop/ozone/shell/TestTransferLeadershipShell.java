@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.server.RaftServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Named;
@@ -95,10 +96,23 @@ public class TestTransferLeadershipShell {
     OzoneManager newLeader = omList.get(0);
     cluster.waitForClusterToBeReady();
     String[] args1 = {"om", "transfer", "-n", newLeader.getOMNodeId()};
-    ozoneAdmin.execute(args1);
-    Thread.sleep(3000);
+    assertEquals(ExitCode.OK, ozoneAdmin.execute(args1));
+    GenericTestUtils.waitFor(() -> newLeader.equals(cluster.getOMLeader()) && newLeader.isLeaderReady()
+        && newLeader.getOmRatisServer().getServerDivision().getGroup().getPeers().stream()
+            .allMatch(peer -> peer.getPriority() == RatisHelper.NEUTRAL_PRIORITY), 100, 30000);
     assertEquals(newLeader, cluster.getOMLeader());
     assertOMResetPriorities();
+
+    final RaftServer.Division division = newLeader.getOmRatisServer().getServerDivision();
+    final long term = division.getInfo().getCurrentTerm();
+    final long configurationIndex = division.getRaftConf().getLogEntryIndex();
+    for (int i = 0; i < 2; i++) {
+      assertEquals(ExitCode.OK, ozoneAdmin.execute(args1));
+      assertEquals(newLeader, cluster.getOMLeader());
+      assertEquals(term, division.getInfo().getCurrentTerm());
+      assertEquals(configurationIndex, division.getRaftConf().getLogEntryIndex());
+      assertOMResetPriorities();
+    }
 
     oldLeader = cluster.getOMLeader();
     String[] args3 = {"om", "transfer", "-r"};
@@ -112,6 +126,18 @@ public class TestTransferLeadershipShell {
     return Stream.of(
         Named.of("scmId", StorageContainerManager::getScmId),
         Named.of("nodeId", StorageContainerManager::getSCMNodeId));
+  }
+
+  @Test
+  public void testOmTransferToUnknownIdFails() throws Exception {
+    OzoneManager leader = cluster.getOMLeader();
+
+    String[] args = {"om", "transfer", "-n", "no-such-om"};
+    try (GenericTestUtils.SystemErrCapturer capture = new GenericTestUtils.SystemErrCapturer()) {
+      assertNotEquals(ExitCode.OK, ozoneAdmin.execute(args));
+      assertThat(capture.getOutput()).contains("Target no-such-om not found in group");
+    }
+    assertEquals(leader, cluster.getOMLeader());
   }
 
   @ParameterizedTest

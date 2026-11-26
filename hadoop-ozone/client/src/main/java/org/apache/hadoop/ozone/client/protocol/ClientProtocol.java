@@ -345,7 +345,7 @@ public interface ClientProtocol {
 
   /**
    * Returns {@link OzoneBucket}.
-   * @param volumeName Name of the Volume
+   * @param volumeName Name of the Volume, or null to resolve it from the S3 request context.
    * @param bucketName Name of the Bucket
    * @return {@link OzoneBucket}
    * @throws IOException
@@ -676,7 +676,7 @@ public interface ClientProtocol {
 
   /**
    * Deletes an existing key.
-   * @param volumeName Name of the Volume
+   * @param volumeName Name of the Volume, or null to resolve it from the S3 request context.
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param recursive recursive deletion of all sub path keys if true,
@@ -689,7 +689,7 @@ public interface ClientProtocol {
 
   /**
    * Deletes an existing key if the key's current ETag matches expectedETag.
-   * @param volumeName Name of the Volume
+   * @param volumeName Name of the Volume, or null to resolve it from the S3 request context.
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param recursive recursive deletion of all sub path keys if true,
@@ -735,6 +735,18 @@ public interface ClientProtocol {
    */
   void renameKey(String volumeName, String bucketName, String fromKeyName,
                  String toKeyName) throws IOException;
+
+  /**
+   * Renames an existing key within a bucket, like
+   * {@link #renameKey(String, String, String, String)}.
+   *
+   * @param requireFileSystemOptimized if true, OM rejects the rename with
+   *     NOT_SUPPORTED_OPERATION unless the resolved bucket layout is
+   *     FILE_SYSTEM_OPTIMIZED. An OM older than
+   *     OzoneManagerVersion.RENAME_KEY_REJECTS_NON_FSO ignores it.
+   */
+  void renameKey(String volumeName, String bucketName, String fromKeyName,
+      String toKeyName, boolean requireFileSystemOptimized) throws IOException;
 
   /**
    * Renames existing keys within a bucket.
@@ -939,12 +951,10 @@ public interface ClientProtocol {
   void abortMultipartUpload(String volumeName,
       String bucketName, String keyName, String uploadID) throws IOException;
 
-  /** Abort a multipart upload in S3 volume context. */
-  void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException;
-
   /**
    * Returns list of parts of a multipart upload key.
-   * @param volumeName
+   * Use an S3 client when passing null for compatibility with older OMs.
+   * @param volumeName volume name, or null to resolve the S3 volume context
    * @param bucketName
    * @param keyName
    * @param uploadID
@@ -958,7 +968,8 @@ public interface ClientProtocol {
       int maxParts)  throws IOException;
 
   /**
-   * Return with the inflight multipart uploads.
+   * Return with the inflight multipart uploads. A null volume name resolves the S3 volume context.
+   * Use an S3 client when passing null for compatibility with older OMs.
    */
   OzoneMultipartUploadList listMultipartUploads(String volumename,
       String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException;
@@ -1701,12 +1712,14 @@ public interface ClientProtocol {
    * @param toSnapshot The name of the ending snapshot
    * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @param disableNativeDiff request to force diff to perform diffs without native lib
+   * @param orderedReport when true, FSO diff reports apply dependency ordering
    * @return the result of submitting snapshot diff job.
    * @throws IOException in case of any exception while generating snapshot diff
    */
   SubmitSnapshotDiffResponse submitSnapshotDiff(String volumeName, String bucketName,
                                                 String fromSnapshot, String toSnapshot,
-                                                boolean forceFullDiff, boolean disableNativeDiff)
+                                                boolean forceFullDiff, boolean disableNativeDiff,
+                                                boolean orderedReport)
       throws IOException;
 
   /**
@@ -1788,7 +1801,7 @@ public interface ClientProtocol {
 
   /**
    * Gets the tags for an existing key.
-   * @param volumeName Volume name.
+   * @param volumeName Volume name, or null to resolve it from the S3 request context.
    * @param bucketName Bucket name.
    * @param keyName Key name.
    * @return tags for the specified key.
@@ -1811,7 +1824,7 @@ public interface ClientProtocol {
 
   /**
    * Removes all the tags from the specified key.
-   * @param volumeName Volume name.
+   * @param volumeName Volume name, or null to resolve it from the S3 request context.
    * @param bucketName Bucket name.
    * @param keyName Key name.
    * @throws IOException

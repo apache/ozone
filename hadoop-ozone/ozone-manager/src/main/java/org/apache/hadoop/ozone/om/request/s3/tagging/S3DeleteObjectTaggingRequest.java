@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,8 +77,17 @@ public class S3DeleteObjectTaggingRequest extends OMKeyRequest {
         keyArgs.toBuilder()
             .setKeyName(keyPath);
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
-        ozoneManager, ACLType.WRITE);
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, newKeyArgs.build());
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY, OzoneObj.StoreType.OZONE, ACLType.WRITE,
+            resolvedArgs.getVolumeName(), resolvedArgs.getBucketName(), keyPath);
+      } catch (IOException ex) {
+        markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.DELETE_OBJECT_TAGGING,
+            buildKeyArgsAuditMap(resolvedArgs), ex, getOmRequest().getUserInfo()));
+        throw ex;
+      }
+    }
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
         .setDeleteObjectTaggingRequest(

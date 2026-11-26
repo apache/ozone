@@ -161,7 +161,7 @@ public class SCMConnectionManager
         getScmRpcRetryCount(conf), getScmRpcRetryInterval(conf), TimeUnit.MILLISECONDS);
     StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
         StorageContainerDatanodeProtocolPB.class, version,
-        dialAddress, UserGroupInformation.getCurrentUser(), hadoopConfig,
+        dialAddress, UserGroupInformation.getLoginUser(), hadoopConfig,
         NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
         retryPolicy).getProxy();
     StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =

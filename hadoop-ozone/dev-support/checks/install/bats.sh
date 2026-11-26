@@ -14,16 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script installs bats.
+# This script installs bats with bats-support and bats-assert libraries.
 # Requires _install_tool from _lib.sh.  Use `source` for both scripts, because it modifies $PATH.
 
-: ${BATS_VERSION:="1.2.1"}
+: ${BATS_VERSION:="1.14.0"}
+: ${BATS_SUPPORT_VERSION:="0.3.0"}
+: ${BATS_ASSERT_VERSION:="2.2.4"}
 
 _install_bats() {
-  curl -LSs "https://github.com/bats-core/bats-core/archive/v${BATS_VERSION}.tar.gz" | tar -xz -f -
+  curl -LSs "https://github.com/bats-core/bats-core/archive/v${BATS_VERSION}.tar.gz" | tar -xz -f - \
+    && curl -LSs "https://github.com/bats-core/bats-support/archive/v${BATS_SUPPORT_VERSION}.tar.gz" | tar -xz -f - \
+    && curl -LSs "https://github.com/bats-core/bats-assert/archive/v${BATS_ASSERT_VERSION}.tar.gz" | tar -xz -f - \
+    && rm -f bats-assert bats-support \
+    && ln -s bats-support-${BATS_SUPPORT_VERSION} bats-support \
+    && ln -s bats-assert-${BATS_ASSERT_VERSION} bats-assert
 }
 
 _install_tool bats "bats-core-${BATS_VERSION}/bin"
-
-git clone https://github.com/bats-core/bats-assert dev-support/ci/bats-assert
-git clone https://github.com/bats-core/bats-support dev-support/ci/bats-support
