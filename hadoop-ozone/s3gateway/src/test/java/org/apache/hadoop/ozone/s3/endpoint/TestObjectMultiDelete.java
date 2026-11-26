@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
@@ -112,6 +113,22 @@ public class TestObjectMultiDelete {
     verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
     verify(endpoint.getClient().getObjectStore().getClientProxy())
         .deleteKeys("tenant-volume", "b1", asList("key1", "key2", "key3"), true);
+  }
+
+  @Test
+  public void multiDeleteAuditsExpectedOwnerBucketLookupFailure() throws Exception {
+    Map<String, String> auditParams = new HashMap<>();
+    BucketEndpoint endpoint = newEndpointFor(mock(OzoneBucket.class), auditParams);
+    when(endpoint.getClient().getObjectStore().getClientProxy().getBucketDetails(isNull(), anyString()))
+        .thenThrow(new OMException("Bucket not found", ResultCodes.BUCKET_NOT_FOUND));
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner");
+    endpoint.setHeaders(headers);
+    long failures = endpoint.getMetrics().getDeleteKeyFailure();
+
+    assertErrorResponse(NO_SUCH_BUCKET, () -> endpoint.multiDelete("b1", "", threeKeyRequest()));
+    assertEquals("[key1, key2, key3]", auditParams.get("failedDeletes"));
+    assertEquals(failures + 1, endpoint.getMetrics().getDeleteKeyFailure());
   }
 
   @Test

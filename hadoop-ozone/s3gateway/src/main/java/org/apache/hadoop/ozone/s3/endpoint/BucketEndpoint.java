@@ -387,14 +387,6 @@ public class BucketEndpoint extends BucketOperationHandler {
       throw newError(S3ErrorTable.NOT_IMPLEMENTED, bucketName);
     }
 
-    final OzoneBucket bucket;
-    try {
-      bucket = S3Owner.hasBucketOwnershipVerificationConditions(getHeaders()) ? context.getBucket(bucketName) : null;
-    } catch (OMException ex) {
-      throw newError(bucketName, ex);
-    } catch (IOException ex) {
-      throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-    }
     MultiDeleteResponse result = new MultiDeleteResponse();
     List<String> deleteKeys = new ArrayList<>();
     List<String> failedDeletes = new ArrayList<>();
@@ -406,8 +398,8 @@ public class BucketEndpoint extends BucketOperationHandler {
       }
       long startNanos = context.getStartNanos();
       try {
-        if (bucket != null) {
-          S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
+        if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
+          S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, context.getBucket(bucketName).getOwner());
         }
         undeletedKeyResultMap = getClientProtocol().deleteKeys(
             context.getCachedVolumeName(), bucketName, deleteKeys, true);
