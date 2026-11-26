@@ -188,9 +188,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
   private static final AtomicInteger OBJECT_ID_COUNTER = new AtomicInteger();
   private static final int KEY_COUNT = 2;
   private static final int EXPIRE_SECONDS = 2;
-  // Date-based expiration compares the key's modificationTime against the date, so tests that rename or
-  // update a key after it was scanned need a date that stays in the future for the whole test.
-  private static final int LONG_EXPIRE_SECONDS = 600;
   private static final int SERVICE_INTERVAL = 300;
   private static final int WAIT_CHECK_INTERVAL = 50;
 
@@ -362,7 +359,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       if (createPrefix) {
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       } else {
@@ -395,7 +392,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       
       if (createPrefix) {
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
@@ -458,7 +455,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       try {
         // create Lifecycle configuration
         ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-        ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+        ZonedDateTime date = now;
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
 
         // Resume the service
@@ -535,7 +532,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       if (createPrefix) {
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       } else {
@@ -588,7 +585,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       keyLifecycleService.suspend();
       createVolumeAndBucket(volumeName, bucketName, BucketLayout.OBJECT_STORE,
           UserGroupInformation.getCurrentUser().getShortUserName());
-      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC);
       createLifecyclePolicy(volumeName, bucketName, BucketLayout.OBJECT_STORE, "key", null, date.toString(), true);
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
 
@@ -637,7 +634,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(testKeyCount, keyList.size());
 
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       if (createPrefix) {
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       } else {
@@ -665,6 +662,70 @@ class TestKeyLifecycleService extends OzoneTestBase {
           .contains("KeyLifecycleService is suspended, disabled, leader not ready, or about to restart"));
       keyLifecycleService.resume();
       deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    /**
+     * A task evaluates objects against the lifecycle configuration read when it was scheduled, so it must stop
+     * sending requests once the configuration is deleted or updated while it runs.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testPolicyChangedDuringScan(boolean deletePolicy) throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(OBJECT_STORE);
+
+      keyLifecycleService.suspend();
+      List<OmKeyArgs> keyList = createKeys(volumeName, bucketName, OBJECT_STORE, KEY_COUNT, 1, "key", null);
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(OBJECT_STORE) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC);
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, "key", null, date.toString(), true);
+
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(
+          LoggerFactory.getLogger(KeyLifecycleService.class));
+      FaultInjectorImpl taskStart = new FaultInjectorImpl();
+      FaultInjectorImpl beforeDelete = new FaultInjectorImpl();
+      FaultInjectorImpl exceptionInjector = new FaultInjectorImpl();
+      installInjectors(taskStart, beforeDelete, exceptionInjector);
+      keyLifecycleService.resume();
+      taskStart.awaitPaused(10000);
+      // Hold the next task at its start, so it cannot run with the updated configuration
+      FaultInjectorImpl nextTaskStart = new FaultInjectorImpl();
+      installInjectors(nextTaskStart, beforeDelete, exceptionInjector);
+      taskStart.release();
+      // The expired keys are found, and the task waits before sending the deletion request
+      beforeDelete.awaitPaused(10000);
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      if (deletePolicy) {
+        deleteLifecyclePolicy(bucketKey);
+      } else {
+        OmLifecycleConfiguration policy = metadataManager.getLifecycleConfigurationTable().get(bucketKey);
+        putLifecyclePolicy(volumeName, bucketName, policy.toBuilder().setUpdateID(policy.getUpdateID() + 1).build(),
+            false);
+      }
+      beforeDelete.release();
+      if (deletePolicy) {
+        GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
+            WAIT_CHECK_INTERVAL, 10000);
+      } else {
+        // BackgroundService waits for the previous batch, so the next task reaching its start means the task is done
+        nextTaskStart.awaitPaused(10000);
+      }
+
+      assertThat(logCapturer.getOutput())
+          .contains("Lifecycle configuration of bucket " + bucketKey + " is deleted or updated, stopping task");
+      assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
+      assertEquals(KEY_COUNT, getKeyCount(OBJECT_STORE) - initialKeyCount);
+      // A scan state may be saved before the configuration changes, but the scan is never saved as finished
+      OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+      assertTrue(scanState == null || scanState.getScanEndTime() == null);
+      if (!deletePolicy) {
+        deleteLifecyclePolicy(bucketKey);
+        nextTaskStart.release();
+      }
     }
 
     @ParameterizedTest
@@ -708,7 +769,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       if (createPrefix) {
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       } else {
@@ -767,7 +828,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       OmLCFilter.Builder filter = bucketLayout == FILE_SYSTEM_OPTIMIZED ? getOmLCFilterBuilder("", null, null) :
           getOmLCFilterBuilder("key", null, null);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
@@ -817,7 +878,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       try {
         // create Lifecycle configuration
         ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-        ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+        ZonedDateTime date = now;
         if (createPrefix) {
           createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
         } else {
@@ -901,7 +962,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // Create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
 
       // Inject to cause resume case for FSO with nested directory
@@ -1031,7 +1092,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       awaitKeyCacheDrained(FILE_SYSTEM_OPTIMIZED, volumeName, bucketName);
       awaitDirCacheDrained(volumeName, bucketName);
 
-      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(LONG_EXPIRE_SECONDS);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC);
       OmLCFilter.Builder filter = getOmLCFilterBuilder("", null, null);
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, null, filter.build(), date.toString(), true);
 
@@ -1101,7 +1162,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       createDirectory(volumeName, bucketName, dirName);
       awaitDirCacheDrained(volumeName, bucketName);
 
-      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(LONG_EXPIRE_SECONDS);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC);
       OmLCFilter.Builder filter = getOmLCFilterBuilder("", null, null);
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, null, filter.build(), date.toString(), true);
 
@@ -1112,7 +1173,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
       installInjectors(taskStart, beforeDelete, new FaultInjectorImpl());
       keyLifecycleService.resume();
       taskStart.awaitPaused(10000);
-      deleteLifecyclePolicy(volumeName, bucketName);
       taskStart.release();
       // dir1 is evaluated as expired, and the scan waits before sending the deletion requests
       beforeDelete.awaitPaused(10000);
@@ -1137,6 +1197,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           bucketName + "/" + dirName + ", status: " + expectedStatus);
       assertEquals(0, getDeletedDirectoryCount() - initialDeletedDirCount);
       assertNotNull(getDirectory(volumeName, bucketName, dirName).getKeyInfo());
+      deleteLifecyclePolicy(volumeName, bucketName);
     }
 
     @ParameterizedTest
@@ -1157,7 +1218,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       int keyIndex = ThreadLocalRandom.current().nextInt(KEY_COUNT - 1);
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyList.get(keyIndex).getKeyName();
       if (createPrefix) {
@@ -1226,7 +1287,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // Create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED, prefix,
           null, date.toString(), true);
 
@@ -1305,7 +1366,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       String key3DbKey = metadataManager.getOzonePathKey(volumeId, bucketId, dir2Id, "key3");
 
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       OmLCFilter.Builder filter = getOmLCFilterBuilder(prefix, null, null);
       createLifecyclePolicy(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED, null,
           filter.build(), date.toString(), true);
@@ -1384,7 +1445,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       String cacheOnlyDbKey = metadataManager.getOzonePathKey(volumeId, bucketId, dir1Id, "key9");
       keyTable.addCacheEntry(new CacheKey<>(cacheOnlyDbKey), CacheValue.get(Long.MAX_VALUE, cacheOnlyKey));
 
-      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC);
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
 
       Field tableField = OmMetadataManagerImpl.class.getDeclaredField("lifecycleScanStateTable");
@@ -1445,7 +1506,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           metadataManager.getOzoneKey(volumeName, bucketName, "key2");
 
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       OmLCFilter.Builder filter = getOmLCFilterBuilder(prefix, null, null);
       createLifecyclePolicy(volumeName, bucketName, layout, null,
           filter.build(), date.toString(), true);
@@ -1497,7 +1558,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyArg.getKeyName();
       if (createPrefix) {
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
@@ -1531,7 +1592,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       OmLCFilter.Builder filter = getOmLCFilterBuilder(null, tag, null);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
 
@@ -1569,7 +1630,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       OmLCFilter.Builder filter = getOmLCFilterBuilder(null, tag, null);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
 
@@ -1597,7 +1658,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
       OmLifecycleRuleAndOperator andOperator = getOmLCAndOperatorBuilder(rulePrefix, tags).build();
       OmLCFilter.Builder filter = getOmLCFilterBuilder(null, null, andOperator);
@@ -1636,7 +1697,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
       OmLifecycleRuleAndOperator andOperator = getOmLCAndOperatorBuilder(rulePrefix, tags).build();
       OmLCFilter.Builder filter = getOmLCFilterBuilder(null, null, andOperator);
@@ -1664,7 +1725,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, "", null, date.toString(), true);
 
       GenericTestUtils.waitFor(() ->
@@ -1691,7 +1752,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       OmLCFilter.Builder filter = getOmLCFilterBuilder(null, null, null);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
 
@@ -1726,7 +1787,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
 
       if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
@@ -1762,7 +1823,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       if (createPrefix) {
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       } else {
@@ -1802,7 +1863,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       if (createPrefix) {
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, keyPrefix, null, date.toString(), true);
       } else {
@@ -1837,7 +1898,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       OmLifecycleRuleAndOperator andOperator = getOmLCAndOperatorBuilder(keyPrefix, tags).build();
       OmLCFilter.Builder filter = getOmLCFilterBuilder(null, null, andOperator);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
@@ -1869,7 +1930,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       OmLifecycleRuleAndOperator andOperator = getOmLCAndOperatorBuilder("/" + keyPrefix, tags).build();
       OmLCFilter.Builder filter = getOmLCFilterBuilder(null, null, andOperator);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
@@ -1900,7 +1961,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "dir1/dir2/dir3/" : keyPrefix;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
 
@@ -1931,7 +1992,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       OmLCFilter.Builder filter = getOmLCFilterBuilder(filterPrefix, null, null);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
 
@@ -1965,7 +2026,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "dir1/dir2/dir3/" : keyPrefix;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
 
@@ -2015,7 +2076,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       }
       assertNotNull(hsyncKey);
 
-      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, "dir1/", null, date.toString(), true);
 
       GenericTestUtils.waitFor(() ->
@@ -2117,7 +2178,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       if (createPrefix) {
         createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
             prefix, null, date.toString(), true);
@@ -2159,7 +2220,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       List<OmLCRule> ruleList = new ArrayList<>();
       String ruleID1 = String.valueOf(OBJECT_ID_COUNTER.getAndIncrement());
       String ruleID2 = String.valueOf(OBJECT_ID_COUNTER.getAndIncrement());
@@ -2235,7 +2296,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       List<OmLCRule> ruleList = new ArrayList<>();
       String ruleID1 = String.valueOf(OBJECT_ID_COUNTER.getAndIncrement());
       String ruleID2 = String.valueOf(OBJECT_ID_COUNTER.getAndIncrement());
@@ -2319,7 +2380,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, "dir1/dir2/dir4/", null, date.toString(), true);
 
       Thread.sleep(EXPIRE_SECONDS);
@@ -2351,7 +2412,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, "", null, date.toString(), false);
       Thread.sleep(EXPIRE_SECONDS);
       assertEquals(initialDeletedKeyCount, getDeletedKeyCount());
@@ -2377,7 +2438,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       List<OmLCRule> ruleList = new ArrayList<>();
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
       ruleList.add(new OmLCRule.Builder().setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
@@ -2421,7 +2482,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(LONG_EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       Thread.sleep(SERVICE_INTERVAL);
       KeyLifecycleService.getInjector(0).resume();
@@ -2504,7 +2565,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       List<OmLCRule> ruleList = new ArrayList<>();
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
       ruleList.add(new OmLCRule.Builder().setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
@@ -2592,7 +2653,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           WAIT_CHECK_INTERVAL, 1000);
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       List<OmLCRule> ruleList = new ArrayList<>();
       ruleList.add(new OmLCRule.Builder().setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
           .setEnabled(false).setPrefix(prefix)
@@ -2662,7 +2723,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
               LoggerFactory.getLogger(KeyLifecycleService.class));
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : keyPrefix;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
 
@@ -2722,7 +2783,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, "", null, date.toString(), true);
 
       try {
@@ -2800,7 +2861,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create a new policy to test rule with prefix ".Trash/" is ignored during lifecycle evaluation
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      final String expiredDate = now.plusSeconds(EXPIRE_SECONDS).toString();
+      final String expiredDate = now.toString();
       assertThrowsExactly(OMException.class, () -> createLifecyclePolicy(
           volumeName, bucketName, bucketLayout, TRASH_PREFIX + OM_KEY_PREFIX, null, expiredDate, true));
 
@@ -2811,7 +2872,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create a new policy to test rule with prefix ".Tras/" is ignored during lifecycle evaluation
       now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, ".Tras/", null, date.toString(), true);
 
       GenericTestUtils.LogCapturer log =
@@ -2824,7 +2885,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create new policy to test trash directory is skipped during lifecycle evaluation
       now = ZonedDateTime.now(ZoneOffset.UTC);
-      date = now.plusSeconds(EXPIRE_SECONDS);
+      date = now;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, "", null, date.toString(), true);
 
       GenericTestUtils.waitFor(
@@ -2836,25 +2897,25 @@ class TestKeyLifecycleService extends OzoneTestBase {
       return Stream.of(
           // dir3 and keys under dir3 deleted
           arguments("dir1/dir2/dir3/key", null, "dir1/dir2/", "dir1/dir2/dir3/", KEY_COUNT, 1, false),
-          // no dir, but keys under dir3 deleted
-          arguments("dir1/dir2/dir3/key", null, "dir1/dir2/", "dir1/dir2/dir3/", KEY_COUNT, 0, true),
+          // dir3 and keys under dir3 deleted, even though dir3 is modified after the date
+          arguments("dir1/dir2/dir3/key", null, "dir1/dir2/", "dir1/dir2/dir3/", KEY_COUNT, 1, true),
           // dir3 dir5, and all keys under dir3 and dir5 deleted
           arguments("dir1/dir2/dir3/key", "dir1/dir2/dir5/key", "dir1/dir2/", "dir1/dir2/dir3",
               KEY_COUNT * 2, 2, false),
-          // dir5, and all keys under dir3 and dir5 deleted
-          arguments("dir1/dir2/dir3/key", "dir1/dir2/dir5/key", "dir1/dir2/", "dir1/dir2/dir3", KEY_COUNT * 2, 1, true),
+          // dir3 dir5, and all keys under dir3 and dir5 deleted, even though dir3 is modified after the date
+          arguments("dir1/dir2/dir3/key", "dir1/dir2/dir5/key", "dir1/dir2/", "dir1/dir2/dir3", KEY_COUNT * 2, 2, true),
           // dir2 dir3 dir4 dir5, and all keys under dir3 and dir5 deleted
           arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "dir1/", "dir1/dir2/dir3", KEY_COUNT * 2, 4, false),
-          // dir4 dir5, and all keys under dir3 and dir5 deleted
-          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "dir1/", "dir1/dir2/dir3", KEY_COUNT * 2, 2, true),
+          // dir2 dir3 dir4 dir5, and all keys under dir3 and dir5 deleted, even though dir3 is modified after the date
+          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "dir1/", "dir1/dir2/dir3", KEY_COUNT * 2, 4, true),
           // dir1 - dir5, and all keys deleted
           arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "", "dir1/dir2/dir3", KEY_COUNT * 2, 5, false),
-          // dir4 dir5, and all keys deleted
-          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "", "dir1/dir2/dir3", KEY_COUNT * 2, 2, true),
+          // dir1 - dir5, and all keys deleted, even though dir3 is modified after the date
+          arguments("dir1/dir2/dir3/key", "dir1/dir4/dir5/key", "", "dir1/dir2/dir3", KEY_COUNT * 2, 5, true),
           // dir4 dir5, and all keys under dir5 deleted
           arguments("dir11/dir4/dir5/key", "dir1/dir2/dir3/key", "dir11/", "dir11/dir4/dir5", KEY_COUNT, 2, false),
-          // no dir, but all keys under dir11 deleted
-          arguments("dir11/dir4/dir5/key", "dir1/dir2/dir3/key", "dir11/", "dir11/dir4/dir5", KEY_COUNT, 0, true));
+          // dir4 dir5, and all keys under dir5 deleted, even though dir5 is modified after the date
+          arguments("dir11/dir4/dir5/key", "dir1/dir2/dir3/key", "dir11/", "dir11/dir4/dir5", KEY_COUNT, 2, true));
     }
 
     @ParameterizedTest
@@ -2926,12 +2987,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       }
       GenericTestUtils.waitFor(() -> getDeletedDirectoryCount() - initialDeletedDirCount == expectedDeletedDirCount,
           WAIT_CHECK_INTERVAL, 10000);
-      if (updateDirModificationTime) {
-        KeyInfoWithVolumeContext directory = getDirectory(volumeName, bucketName, dirName);
-        assertNotNull(directory);
-      } else {
-        assertThrows(OMException.class, () -> getDirectory(volumeName, bucketName, dirName));
-      }
+      assertThrows(OMException.class, () -> getDirectory(volumeName, bucketName, dirName));
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
@@ -2949,7 +3005,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       
       // Create and inject for test
       createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, KEY_COUNT, 1, prefix, null);
-      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC);
       installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
       Thread.sleep(SERVICE_INTERVAL + 100);
@@ -2998,7 +3054,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
 
       // Expire keys
-      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC);
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
 
       // With move.to.trash disabled, keys should be deleted directly (not renamed).
@@ -3032,20 +3088,23 @@ class TestKeyLifecycleService extends OzoneTestBase {
               () -> new TrashOzoneFileSystem(om));
       keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
 
+      OmLCRule.Builder ruleBuilder = new OmLCRule.Builder()
+          .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
+          .setPrefix("")
+          .setAction(new OmLCExpiration.Builder()
+              .setDate(ZonedDateTime.now(ZoneOffset.UTC).toString())
+              .build());
       OmLifecycleConfiguration policy = new OmLifecycleConfiguration.Builder()
           .setVolume(volumeName)
           .setBucket(bucketName)
           .setBucketLayout(FILE_SYSTEM_OPTIMIZED)
           .setBucketObjectID(bucketObjectID)
-          .setRules(Collections.singletonList(new OmLCRule.Builder()
-              .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
-              .setEnabled(true)
-              .setPrefix("")
-              .setAction(new OmLCExpiration.Builder()
-                  .setDate(ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS).toString())
-                  .build())
-              .build()))
+          .setRules(Collections.singletonList(ruleBuilder.setEnabled(true).build()))
           .build();
+      // The task stops if its configuration is not stored. The stored copy has its rule disabled, so the service
+      // doesn't schedule its own task for this bucket while this test runs the task directly.
+      putLifecyclePolicy(volumeName, bucketName, policy.toBuilder()
+          .setRules(Collections.singletonList(ruleBuilder.setEnabled(false).build())).build(), false);
 
       String expectedTrashRoot = new Path(TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner, CURRENT).toString();
       OzoneManager omSpy = spy(om);
@@ -3195,6 +3254,104 @@ class TestKeyLifecycleService extends OzoneTestBase {
           "MPU with prefix 'temp/' should be aborted");
 
       deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @Test
+    void testMultipartUploadScanResume() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+
+      keyLifecycleService.suspend();
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE, owner);
+      long initialMpuCount = getMultipartUploadCount(volumeName, bucketName);
+      int uploadCount = 3;
+      long oldCreationTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2);
+      List<String> dbKeys = new ArrayList<>();
+      for (int i = 0; i < uploadCount; i++) {
+        String keyName = "uploads/file" + i;
+        OmMultipartInfo mpuInfo = createTestMultipartUpload(volumeName, bucketName, keyName, owner);
+        updateMultipartUploadCreationTime(volumeName, bucketName, keyName, mpuInfo.getUploadID(), oldCreationTime);
+        dbKeys.add(metadataManager.getMultipartKey(volumeName, bucketName, keyName, mpuInfo.getUploadID()));
+      }
+      Collections.sort(dbKeys);
+      OmLCRule rule = new OmLCRule.Builder()
+          .setId("abort-mpu-uploads")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder().setPrefix("uploads/").build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder().setDaysAfterInitiation(1).build())
+          .build();
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, Collections.singletonList(rule));
+
+      // inject the resume state, pointing to the 2nd upload
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+      OmLifecycleConfiguration policy = metadataManager.getLifecycleConfiguration(volumeName, bucketName);
+      OmLifecycleScanState scanState = new OmLifecycleScanState.Builder()
+          .setBucketKey(bucketKey)
+          .setBucketObjID(metadataManager.getBucketTable().get(bucketKey).getObjectID())
+          .setLifecycleConfigurationUpdateID(policy.getUpdateID())
+          .setScanStartTime(System.currentTimeMillis())
+          .setLastScannedMpuKey(dbKeys.get(1))
+          .build();
+      metadataManager.getLifecycleScanStateTable().put(bucketKey, scanState);
+      metadataManager.getLifecycleScanStateTable().addCacheEntry(new CacheKey<>(bucketKey),
+          CacheValue.get(1L, scanState));
+
+      runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
+
+      // only the upload after the saved pointer is aborted
+      GenericTestUtils.waitFor(() -> getMultipartUploadCount(volumeName, bucketName) - initialMpuCount == 2,
+          WAIT_CHECK_INTERVAL, 10000);
+      assertNotNull(metadataManager.getMultipartInfoTable().get(dbKeys.get(0)));
+      assertNotNull(metadataManager.getMultipartInfoTable().get(dbKeys.get(1)));
+      assertNull(metadataManager.getMultipartInfoTable().get(dbKeys.get(2)));
+      OmLifecycleScanState savedState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+      assertEquals(dbKeys.get(2), savedState.getLastScannedMpuKey());
+      assertNotNull(savedState.getScanEndTime());
+    }
+
+    @Test
+    void testMultipartUploadScanPeriodicStateSave() throws Exception {
+      assumeTrue(maxKeysProcessedPerState == 1);
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String owner = UserGroupInformation.getCurrentUser().getShortUserName();
+
+      keyLifecycleService.suspend();
+      createVolumeAndBucket(volumeName, bucketName, OBJECT_STORE, owner);
+      int uploadCount = 3;
+      for (int i = 0; i < uploadCount; i++) {
+        String keyName = "keep/file" + i;
+        OmMultipartInfo mpuInfo = createTestMultipartUpload(volumeName, bucketName, keyName, owner);
+        awaitMultipartCacheDrained(
+            metadataManager.getMultipartKey(volumeName, bucketName, keyName, mpuInfo.getUploadID()));
+      }
+      // no upload matches the rule, so the state is saved periodically without any abort request
+      OmLCRule rule = new OmLCRule.Builder()
+          .setId("abort-mpu-uploads")
+          .setEnabled(true)
+          .setFilter(new OmLCFilter.Builder().setPrefix("uploads/").build())
+          .setAction(new OmLCAbortIncompleteMultipartUpload.Builder().setDaysAfterInitiation(1).build())
+          .build();
+      createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, Collections.singletonList(rule));
+      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+
+      Field tableField = OmMetadataManagerImpl.class.getDeclaredField("lifecycleScanStateTable");
+      tableField.setAccessible(true);
+      Table<String, OmLifecycleScanState> originalTable =
+          (Table<String, OmLifecycleScanState>) tableField.get(metadataManager);
+      Table<String, OmLifecycleScanState> spyTable = spy(originalTable);
+      tableField.set(metadataManager, spyTable);
+      try {
+        runSingleLifecycleScanAndDeleteConfiguration(volumeName, bucketName);
+        verify(spyTable, atLeast(uploadCount))
+            .addCacheEntry(argThat(k -> k.getCacheKey().equals(bucketKey)), any());
+        OmLifecycleScanState savedState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+        assertNotNull(savedState.getScanEndTime());
+        assertEquals(uploadCount, getMultipartUploadCount(volumeName, bucketName));
+      } finally {
+        tableField.set(metadataManager, originalTable);
+      }
     }
 
     @Test
@@ -3508,7 +3665,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
 
       FaultInjectorImpl injector = new FaultInjectorImpl();
       installInjectors(injector);
@@ -3564,7 +3721,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(LONG_EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, rulePrefix, null, date.toString(), true);
       Thread.sleep(SERVICE_INTERVAL);
       KeyLifecycleService.getInjector(0).resume();
@@ -3625,7 +3782,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       OMException omException;
       if (createPrefix) {
         omException = assertThrows(
@@ -3855,15 +4012,19 @@ class TestKeyLifecycleService extends OzoneTestBase {
     FaultInjectorImpl taskStart = new FaultInjectorImpl();
     FaultInjectorImpl firstDelete = new FaultInjectorImpl();
     // The third injector is only read for an injected exception, but the scan expects it to exist
-    installInjectors(taskStart, firstDelete, new FaultInjectorImpl());
+    FaultInjectorImpl exceptionInjector = new FaultInjectorImpl();
+    installInjectors(taskStart, firstDelete, exceptionInjector);
     keyLifecycleService.resume();
     // The in-flight list is filled at schedule time, so wait for the task to reach the injector
     taskStart.awaitPaused(10000);
-    if (deletePolicy) {
-      deleteLifecyclePolicy(volume, bucket);
-    }
+    FaultInjectorImpl nextTaskStart = new FaultInjectorImpl();
+    installInjectors(nextTaskStart, firstDelete, exceptionInjector);
     taskStart.release();
     firstDelete.release();
+    // BackgroundService waits for the previous batch, so the next task reaching its start means the scan is done
+    nextTaskStart.awaitPaused(10000);
+    deleteLifecyclePolicy(volume, bucket);
+    nextTaskStart.release();
     GenericTestUtils.waitFor(() -> keyLifecycleService.status().getRunningBucketsList().isEmpty(),
         WAIT_CHECK_INTERVAL, 10000);
   }
@@ -4214,7 +4375,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           () -> getKeyCount(OBJECT_STORE) - initialKeyCount == KEY_COUNT,
           WAIT_CHECK_INTERVAL, 1000);
 
-      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC);
       createLifecyclePolicy(volumeName, bucketName, OBJECT_STORE, "key", null, date.toString(), true);
 
       GenericTestUtils.waitFor(
@@ -4241,7 +4402,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       FileSystem fs = SecurityUtil.doAsLoginUser(
           (PrivilegedExceptionAction<FileSystem>) () -> new TrashOzoneFileSystem(om));
       keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
-      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC);
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
       GenericTestUtils.waitFor(
           () -> (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == KEY_COUNT,

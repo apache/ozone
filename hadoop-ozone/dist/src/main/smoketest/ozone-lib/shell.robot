@@ -26,6 +26,8 @@ Ozone Shell Batch
 
 Ozone Batch ${subcmd}
     [arguments]    @{commands}
+    ${len} =    Get Length    ${commands}
+    Return From Keyword If    ${len} == 0
     ${cmd} =    Catenate    SEPARATOR=' --execute '    @{commands}
     Run    ozone ${subcmd} --continue-batch-on-error --execute '${cmd}' &> ${TEMP_DIR}/batch.out
     ${output} =    Get File    ${TEMP_DIR}/batch.out
@@ -124,3 +126,17 @@ Verify EC Replication Config
                    Should Match Regexp      ${result}       ^(?m)${data}$
                    Should Match Regexp      ${result}       ^(?m)${parity}$
                    Should Match Regexp      ${result}       ^(?m)${chunksize}$
+
+Verify Empty Replication Config in ${file}
+    ${result} =    Execute    jq -r '.replicationConfig' ${file}
+    Should Be Equal    ${result}    null
+
+Verify Replica Replication Config in ${file}
+    [arguments]    @{params}
+    ${result} =    Execute    jq -r '.replicationConfig.replicationType, .replicationConfig.replicationFactor' ${file}
+                   Verify Replica Replication Config    ${result}   @{params}
+
+Verify EC Replication Config in ${file}
+    [arguments]    @{params}
+    ${result} =    Execute    jq -r '.replicationConfig.replicationType, .replicationConfig.codec, .replicationConfig.data, .replicationConfig.parity, .replicationConfig.ecChunkSize' ${file}
+                   Verify EC Replication Config     ${result}    @{params}

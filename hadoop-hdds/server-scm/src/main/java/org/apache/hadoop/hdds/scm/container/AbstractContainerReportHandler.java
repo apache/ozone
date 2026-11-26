@@ -137,8 +137,9 @@ abstract class AbstractContainerReportHandler {
     }
 
     if (isHealthy(replicaProto.getState())) {
-      if (containerInfo.getSequenceId() <
-          replicaProto.getBlockCommitSequenceId()) {
+      // The sequenceId of a CLOSED, DELETING or DELETED container must not change.
+      if ((containerInfo.isOpen() || containerInfo.getState() == LifeCycleState.QUASI_CLOSED)
+          && containerInfo.getSequenceId() < replicaProto.getBlockCommitSequenceId()) {
         containerInfo.updateSequenceId(
             replicaProto.getBlockCommitSequenceId());
       }

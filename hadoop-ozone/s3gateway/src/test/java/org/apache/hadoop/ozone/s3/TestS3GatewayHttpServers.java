@@ -17,9 +17,14 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import static org.apache.hadoop.ozone.om.helpers.S3STSUtils.OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -113,6 +118,49 @@ class TestS3GatewayHttpServers {
         "the STS server is expected to be disabled by default");
 
     assertDoesNotThrow(() -> new S3STSHttpServer(conf, "s3g-sts"));
+  }
+
+  @Test
+  void disabledStsServerIgnoresInvalidMinDurationConfig() {
+    final OzoneConfiguration conf = newConf();
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 0);
+
+    assertDoesNotThrow(
+        () -> {
+          try (S3STSHttpServer server = new S3STSHttpServer(conf, "s3g-sts")) {
+            assertNull(server.getHttpAddress());
+          }
+        });
+  }
+
+  @Test
+  void enabledStsServerRejectsInvalidMinDurationConfig() {
+    final OzoneConfiguration conf = newConf();
+    conf.setBoolean(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY, true);
+    conf.set(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ADDRESS_KEY, PortAllocator.localhostWithFreePort());
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 0);
+
+    assertThrows(
+        IllegalArgumentException.class, () -> {
+          try (S3STSHttpServer ignored = new S3STSHttpServer(conf, "s3g-sts")) {
+            fail("Expected invalid minimum duration configuration to be rejected");
+          }
+        });
+  }
+
+  @Test
+  void enabledStsServerAcceptsValidMinDurationConfig() {
+    final OzoneConfiguration conf = newConf();
+    conf.setBoolean(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY, true);
+    conf.set(S3STSConfigKeys.OZONE_S3G_STS_HTTP_ADDRESS_KEY, PortAllocator.localhostWithFreePort());
+    conf.setInt(OZONE_S3G_STS_TEST_MIN_DURATION_SECONDS_KEY, 10);
+
+    assertDoesNotThrow(
+        () -> {
+          try (S3STSHttpServer server = new S3STSHttpServer(conf, "s3g-sts")) {
+            assertNotNull(server.getHttpAddress());
+          }
+        });
   }
 
   /**

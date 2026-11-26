@@ -24,6 +24,7 @@ set +u
 source "$TEST_DIR/testlib.sh"
 
 export COMPOSE_FILE="$TEST_DIR/compose/non-ha/docker-compose.yaml"
+export CLIENT=scm
 export SECURITY_ENABLED=false
 
 create_data_dirs dn{1..5} om recon s3g scm

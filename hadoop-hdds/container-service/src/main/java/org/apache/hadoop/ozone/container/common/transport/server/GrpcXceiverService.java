@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
+import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
 import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
 import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
@@ -177,6 +178,12 @@ public class GrpcXceiverService extends
 
         requestLock.lock();
         try {
+          if (Context.current().isCancelled()) {
+            // The client deadline expired, or the call was cancelled, while the request waited for a thread.
+            // Nobody waits for the response, so do not spend disk I/O on it.
+            LOG.debug("Skip {} of a cancelled call", request.getCmdType());
+            return;
+          }
           if (request.getCmdType() == Type.ReadBlock) {
             dispatcher.streamDataReadOnly(request, responseObserver, readBlockContext, context);
           } else {

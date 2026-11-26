@@ -497,6 +497,21 @@ function check_needs_pmd() {
     start_end::group_end
 }
 
+function check_needs_pyunit() {
+    start_end::group_start "Check if pyunit is needed"
+    local pattern_array=(
+        "^dev-support/ci/.*\.py$"
+        "^hadoop-ozone/dev-support/checks/pyunit.sh"
+    )
+    filter_changed_files
+
+    if [[ ${match_count} != "0" ]]; then
+        add_basic_check pyunit
+    fi
+
+    start_end::group_end
+}
+
 # Counts other files which do not need to trigger any functional test
 # (i.e. no compose/integration/kubernetes)
 function get_count_misc_files() {
@@ -640,5 +655,6 @@ check_needs_checkstyle
 check_needs_errorprone
 check_needs_findbugs
 check_needs_pmd
+check_needs_pyunit
 calculate_test_types_to_run
 set_outputs

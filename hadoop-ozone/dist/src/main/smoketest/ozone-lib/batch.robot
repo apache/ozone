@@ -21,6 +21,11 @@ Resource            ../lib/os.robot
 Resource            ../ozone-lib/shell.robot
 
 
+*** Variables ***
+${BATCH_VERSION}     2.3.0
+${CLIENT_VERSION}    ${OZONE_CURRENT_VERSION}
+
+
 *** Keywords ***
 Setup Batch
     Init Batch
@@ -31,8 +36,11 @@ Setup Batch
 
 
 Teardown Batch
-    Execute Batch
-    Remove Directory    ${BATCH_OUTPUT_DIR}    recursive=True
+    TRY
+        Execute Batch
+    FINALLY
+        Remove Directory    ${BATCH_OUTPUT_DIR}    recursive=True
+    END
 
 
 Init Batch
@@ -69,11 +77,22 @@ Execute Later ozone ${subcmd}
     ${output_file} =    Get Next Filename    ${BATCH_OUTPUT_DIR}/out-ozone-${subcmd}
     ${cmd_with_redirection} =    Set Variable    ${command} > ${output_file}
 
-    ${debug_comment} =    Set Variable    \# ${test_name}
-    Append To List    ${BATCH_COMMANDS}    ${debug_comment}
-    Append To List    ${BATCH_COMMANDS}    ${cmd_with_redirection}
-    Set Suite Variable    ${BATCH_QUEUEING}    ${TRUE}
-    Set Suite Variable    ${BATCH_SUBCMD}    ${subcmd}
+    IF    '${CLIENT_VERSION}' < '${BATCH_VERSION}'
+        ${error_file} =    Get Next Filename    ${BATCH_OUTPUT_DIR}/err-ozone-${subcmd}
+        ${rc} =    Run and Return RC    ozone ${subcmd} ${cmd_with_redirection} 2> ${error_file}
+        Log    rc = ${rc}
+        Log Contents of ${output_file}
+        Log Contents of ${error_file}
+        IF    '${rc}' != '0'
+            ${output_file} =    Set Variable    ${error_file}
+        END
+    ELSE
+        ${debug_comment} =    Set Variable    \# ${test_name}
+        Append To List    ${BATCH_COMMANDS}    ${debug_comment}
+        Append To List    ${BATCH_COMMANDS}    ${cmd_with_redirection}
+        Set Suite Variable    ${BATCH_QUEUEING}    ${TRUE}
+        Set Suite Variable    ${BATCH_SUBCMD}    ${subcmd}
+    END
     Log    Output of test ${test_name} command ${command} redirected to ${output_file}
 
     RETURN    ${output_file}
@@ -89,6 +108,12 @@ Assert Later
     ELSE
         Run Keyword    @{assertion}
     END
+
+
+Execute Later and Expect No Output For ozone ${subcmd}
+    [arguments]    ${command}
+    ${file} =    Execute Later ozone ${subcmd}    ${command}
+    Assert Later    File ${file} Should    Be Equal    ${EMPTY}
 
 
 Execute Batch of Commands

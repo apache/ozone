@@ -477,7 +477,7 @@ Get S3 Credentials for Service Catalog Principal, Create Iceberg Buckets, and Up
     Set Global Variable           ${PERMANENT_ACCESS_KEY_ID}    ${accessKeyId}
     Set Global Variable           ${PERMANENT_SECRET_KEY}       ${secretKey}
 
-    # Long-lived 15-minute STS credential to test STS token expiration and proper error message
+    # Short-lived STS credential (stored until the expired-token S3 API test runs later in the suite)
     Assume Role And Store Expired STS Token Credentials         perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}
 
     # Create buckets as a different user so the permanent credential principal isn't the bucket owner.
@@ -743,11 +743,13 @@ Assume Role Should Fail For Too Short Role Session Name
 
 Assume Role Should Fail For Invalid Duration
     # AWS CLI rejects out-of-range DurationSeconds before the request is sent, so use curl.
-    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=43201  expected_message=must be a number between 900 and 43200 seconds
+    # The minimum is 5 seconds (not the AWS default of 900) because ozonesecure-ha sets ozone.s3g.sts.test.min.duration.seconds=5.
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=4  expected_message=DurationSeconds must be a number between 5 and 43200 seconds
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=43201  expected_message=DurationSeconds must be a number between 5 and 43200 seconds
     # Check duration that overflows integer as well
-    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=43200100000  expected_message=must be a number between 900 and 43200 seconds
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=43200100000  expected_message=DurationSeconds must be a number between 5 and 43200 seconds
     # Whitespace-only DurationSeconds must be rejected
-    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=${SPACE}${SPACE}${SPACE}${SPACE}${SPACE}  expected_message=must be a number between 900 and 43200 seconds
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=${SPACE}${SPACE}${SPACE}${SPACE}${SPACE}  expected_message=DurationSeconds must be a number between 5 and 43200 seconds
 
 Assume Role With ExternalId Should Fail As UnsupportedOperation
     Assume Role Should Fail       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=UnsupportedOperation  expected_http_code=501  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  extra_cli_args=--external-id test-external-id
@@ -1622,11 +1624,9 @@ Get Caller Identity Rejects Invalid Version
     Get Caller Identity Should Fail                             InvalidAction    api_version=2020-01-01
 
 Expired STS temporary credentials must return ExpiredToken on S3 APIs
-    # Increase timeout to account for 15 minute STS token expiration plus the time to execute the api calls
-    [Timeout]                     25 minutes
     ${dummy_mpu_upload_id} =      Set Variable                  dummyExpiredStsMpuUploadId01
 
-    Wait Until Expired STS Token Expiration Elapsed
+    Expired STS Token Credentials Should Be Available
     Configure Expired STS Token S3 Profile
 
     Execute S3api Expect Expired Token                          list-buckets --output json
