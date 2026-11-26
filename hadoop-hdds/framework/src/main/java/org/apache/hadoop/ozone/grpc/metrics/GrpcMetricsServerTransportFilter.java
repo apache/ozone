@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.grpc.metrics;
 
-import io.grpc.Attributes;
-import io.grpc.ServerTransportFilter;
+import org.apache.ratis.thirdparty.io.grpc.Attributes;
+import org.apache.ratis.thirdparty.io.grpc.ServerTransportFilter;
 
 /**
  * Transport filter class for tracking active client connections.
@@ -41,7 +41,9 @@ public class GrpcMetricsServerTransportFilter extends ServerTransportFilter {
 
   @Override
   public void transportTerminated(Attributes transportAttrs) {
-    grpcMetrics.decrNumOpenClientConnections();
+    if (transportAttrs != null) {
+      grpcMetrics.decrNumOpenClientConnections();
+    }
     super.transportTerminated(transportAttrs);
   }
 }

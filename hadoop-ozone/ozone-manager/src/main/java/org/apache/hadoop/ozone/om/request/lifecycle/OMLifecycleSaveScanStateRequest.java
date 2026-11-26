@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.ozone.om.request.lifecycle;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND;
+
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
@@ -64,8 +67,17 @@ public class OMLifecycleSaveScanStateRequest extends OMClientRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
 
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    try {
+      if (!isScanStateValid(metadataManager, state)) {
+        throw new OMException("Bucket or Lifecycle Configuration no longer exists", LIFECYCLE_CONFIGURATION_NOT_FOUND);
+      }
+    } catch (IOException e) {
+      return new OMLifecycleSaveScanStateResponse(createErrorOMResponse(omResponse, e), null);
+    }
+
     // Update cache
-    ozoneManager.getMetadataManager().getLifecycleScanStateTable()
+    metadataManager.getLifecycleScanStateTable()
         .addCacheEntry(new CacheKey<>(state.getBucketKey()),
             CacheValue.get(context.getIndex(), state));
 

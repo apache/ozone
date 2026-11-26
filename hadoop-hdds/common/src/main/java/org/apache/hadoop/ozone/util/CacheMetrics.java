@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.util;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheStats;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -64,13 +64,13 @@ public final class CacheMetrics implements MetricsSource {
     CacheStats stats = cache.stats();
 
     recordBuilder
-        .addGauge(CacheMetricsInfo.Size, cache.size())
+        .addGauge(CacheMetricsInfo.Size, cache.estimatedSize())
         .addGauge(CacheMetricsInfo.HitCount, stats.hitCount())
         .addGauge(CacheMetricsInfo.HitRate, stats.hitRate())
         .addGauge(CacheMetricsInfo.MissCount, stats.missCount())
         .addGauge(CacheMetricsInfo.MissRate, stats.missRate())
         .addGauge(CacheMetricsInfo.LoadExceptionCount,
-            stats.loadExceptionCount())
+            stats.loadFailureCount())
         .addGauge(CacheMetricsInfo.LoadSuccessCount,
             stats.loadSuccessCount())
         .addGauge(CacheMetricsInfo.EvictionCount,

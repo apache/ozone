@@ -19,26 +19,21 @@ package org.apache.hadoop.hdds.utils;
 
 import static org.apache.hadoop.hdds.utils.RocksDBStoreMetrics.ROCKSDB_CONTEXT_PREFIX;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.metrics2.MetricsTag;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Util class for
  * {@link org.apache.hadoop.hdds.server.http.PrometheusMetricsSink}.
  */
 public final class PrometheusMetricsSinkUtil {
-  private static final Logger LOG = LoggerFactory.getLogger(PrometheusMetricsSinkUtil.class);
 
   private static final Pattern SPLIT_PATTERN =
       Pattern.compile("(?<!(^|[A-Z_]))(?=[A-Z])|(?<!^)(?=[A-Z][a-z])");
@@ -48,12 +43,9 @@ public final class PrometheusMetricsSinkUtil {
   private static final int NORMALIZED_NAME_CACHE_MAX_SIZE = 100_000;
 
   // Original metric name -> Normalized Prometheus metric name
-  private static final CacheLoader<String, String> NORMALIZED_NAME_CACHE_LOADER =
-      CacheLoader.from(PrometheusMetricsSinkUtil::normalizeImpl);
-  private static final com.google.common.cache.LoadingCache<String, String> NORMALIZED_NAME_CACHE =
-      CacheBuilder.newBuilder()
-          .maximumSize(NORMALIZED_NAME_CACHE_MAX_SIZE)
-          .build(NORMALIZED_NAME_CACHE_LOADER);
+  private static final LoadingCache<String, String> NORMALIZED_NAME_CACHE = Caffeine.newBuilder()
+      .maximumSize(NORMALIZED_NAME_CACHE_MAX_SIZE)
+      .build(PrometheusMetricsSinkUtil::normalizeImpl);
 
   /**
    * Never constructed.
@@ -131,15 +123,8 @@ public final class PrometheusMetricsSinkUtil {
    * @return Prometheus normalized name.
    */
   private static String normalizeName(String baseName) {
-    try {
-      return NORMALIZED_NAME_CACHE.get(baseName);
-    } catch (ExecutionException | UncheckedExecutionException e) {
-      // This should not happen since normalization function do not throw any exception
-      // Nevertheless, we can fall back to uncached implementation if it somehow happens.
-      LOG.warn("Exception encountered when loading metric with base name {} from cache, " +
-          "fall back to uncached normalization implementation", baseName, e);
-      return normalizeImpl(baseName);
-    }
+    // the normalization function throws no checked exception, so the load is not wrapped in one
+    return NORMALIZED_NAME_CACHE.get(baseName);
   }
 
   /**

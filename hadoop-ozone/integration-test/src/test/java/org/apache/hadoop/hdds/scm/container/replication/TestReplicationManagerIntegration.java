@@ -33,14 +33,11 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachHealthState;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
 import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachPersistedOpState;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -59,13 +56,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -133,9 +130,7 @@ class TestReplicationManagerIntegration {
         1, SECONDS);
     conf.setTimeDuration(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, SECONDS);
-    conf.set(OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
-    conf.set(OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
-    conf.set(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
+    OzoneTestUtils.setFastPipelineScrub(conf);
 
     replicationConf = conf.getObject(ReplicationManagerConfiguration.class);
     replicationConf.setInterval(Duration.ofSeconds(1));
@@ -313,9 +308,9 @@ class TestReplicationManagerIntegration {
     assertEquals(HEALTHY_REPLICA_NUM + 1, containerManager.getContainerReplicas(containerId).size());
     ReplicationManagerReport report = new ReplicationManagerReport(replicationConf.getContainerSampleLimit());
     replicationManager.checkContainerStatus(containerInfo, report);
-    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ContainerHealthState.MIS_REPLICATED));
-    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.MIS_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
   }
 
   @Test
@@ -360,9 +355,9 @@ class TestReplicationManagerIntegration {
     assertEquals(HEALTHY_REPLICA_NUM + 2, containerManager.getContainerReplicas(containerId).size());
     ReplicationManagerReport report = new ReplicationManagerReport(replicationConf.getContainerSampleLimit());
     replicationManager.checkContainerStatus(containerInfo, report);
-    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ContainerHealthState.MIS_REPLICATED));
-    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.MIS_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
   }
 
   /**

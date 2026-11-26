@@ -21,8 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import java.io.File;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,7 +32,12 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.debug.OzoneDebug;
+import org.apache.ozone.test.GenericTestUtils.PrintStreamCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemErrCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,8 +56,8 @@ public class TestAnalyzeSubcommand {
 
   private ContainerAnalyzeTestHelper testHelper;
   private CommandLine cmd;
-  private StringWriter outWriter;
-  private StringWriter errWriter;
+  private PrintStreamCapturer outWriter;
+  private PrintStreamCapturer errWriter;
 
   @BeforeEach
   public void setup() {
@@ -63,10 +66,13 @@ public class TestAnalyzeSubcommand {
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
 
     cmd = new OzoneDebug().getCmd();
-    outWriter = new StringWriter();
-    errWriter = new StringWriter();
-    cmd.setOut(new PrintWriter(outWriter));
-    cmd.setErr(new PrintWriter(errWriter));
+    outWriter = new SystemOutCapturer();
+    errWriter = new SystemErrCapturer();
+  }
+
+  @AfterEach
+  void close() {
+    IOUtils.closeQuietly(outWriter, errWriter);
   }
 
   @Test

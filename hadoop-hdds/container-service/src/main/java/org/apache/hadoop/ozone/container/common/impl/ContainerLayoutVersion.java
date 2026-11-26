@@ -64,6 +64,13 @@ public enum ContainerLayoutVersion {
   }
 
   /**
+   * @return list of supported versions.
+   */
+  public static List<ContainerLayoutVersion> getSupportedVersions() {
+    return ImmutableList.of(FILE_PER_BLOCK);
+  }
+
+  /**
    * @return list of all versions.
    */
   public static List<ContainerLayoutVersion> getAllVersions() {

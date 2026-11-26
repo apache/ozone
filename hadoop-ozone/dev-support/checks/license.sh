@@ -45,8 +45,8 @@ DEFAULT_SRC="target/generated-sources/license/THIRD-PARTY.txt"
 src="${1:-${DEFAULT_SRC}}"
 
 if [[ ! -e ${src} ]]; then
-  MAVEN_OPTIONS="-B -fae -DskipDocs -DskipRecon --no-transfer-progress ${MAVEN_OPTIONS:-}"
-  mvn ${MAVEN_OPTIONS} license:aggregate-add-third-party | tee "${REPORT_DIR}/output.log"
+  MAVEN_OPTIONS="-B -fae -DskipRecon ${MAVEN_OPTIONS:-}"
+  ./mvnw ${MAVEN_OPTIONS} license:aggregate-add-third-party | tee "${REPORT_DIR}/output.log"
   src="${DEFAULT_SRC}"
 fi
 

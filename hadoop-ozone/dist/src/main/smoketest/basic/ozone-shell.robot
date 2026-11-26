@@ -18,17 +18,27 @@ Documentation       Test ozone shell CLI usage
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ozone-shell-lib.robot
-Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+Resource            ../ozone-lib/batch.robot
 Test Timeout        10 minutes
-Suite Setup         Run Keywords    Generate prefix
-...                 AND             Get Security Enabled From Config
+Suite Setup         Setup Suite
+Suite Teardown      Teardown Suite
+
+*** Keywords ***
+Setup Suite
+    Get Security Enabled From Config
+    Generate prefix
+    Setup Batch
+    Kinit test user
+
+Teardown Suite
+    Teardown Batch
 
 *** Test Cases ***
-RpcClient with port
-   Test ozone shell       o3://            om:9862     ${prefix}-with-host
-
 RpcClient with execution errors
    Test ozone shell errors    o3://        om:9862     ${prefix}-with-errors
+
+RpcClient with port
+   Test ozone shell       o3://            om:9862     ${prefix}-with-host
 
 RpcClient volume acls
    Test Volume Acls       o3://            om:9862     ${prefix}-acls
@@ -39,10 +49,6 @@ RpcClient bucket acls
 RpcClient key acls
     Test Key Acls         o3://            om:9862     ${prefix}-acls
 
-# depends on being run between key and prefix tests
-Test native authorizer
-    Test native authorizer    o3://    om:9862    ${prefix}-acls
-
 RpcClient prefix acls
     Test Prefix Acls      o3://            om:9862     ${prefix}-acls
 
@@ -51,3 +57,7 @@ RpcClient without host
 
 RpcClient Delete key
    Test Delete key with Trash       o3://            om:9862      ${prefix}-with-del
+
+Test native authorizer with other user
+    Skip If   '${SECURITY_ENABLED}' != 'true'    only if security is enabled
+    Test native authorizer    o3://    om:9862    ${prefix}-testuser2

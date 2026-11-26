@@ -18,18 +18,27 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import static java.util.Collections.emptyList;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_REPORT_MAX_LIMIT;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
+import static org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask.HDDS_IPC_MAXIMUM_DATA_LENGTH;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.UnsafeByteOperations;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.OptionalLong;
@@ -42,9 +51,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -52,15 +64,19 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.util.EnumCounters;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext.CommandStatusReportSelection;
 import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -397,6 +413,270 @@ public class TestHeartbeatEndpointTask {
   }
 
   @Test
+  public void testHeartbeatCapsReports() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT, 2);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine, "");
+
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
+        .forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto) invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .build());
+
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    // Queue more ICRs than the per-heartbeat limit.
+    for (int i = 0; i < 5; i++) {
+      context.addIncrementalReport(
+          IncrementalContainerReportProto.getDefaultInstance());
+    }
+
+    endpointTask.call();
+
+    // Only the capped number of ICRs is sent in this heartbeat.
+    SCMHeartbeatRequestProto heartbeat = argument.getValue();
+    assertEquals(2, heartbeat.getIncrementalContainerReportCount());
+    // The remainder stays queued for the next regular heartbeat.
+    assertEquals(3, context.getIncrementalReportQueueSize().get(TEST_SCM_ENDPOINT));
+    verify(datanodeStateMachine, never()).setNextHB(anyLong());
+
+    // Subsequent regular heartbeats drain the rest.
+    endpointTask.call();
+    endpointTask.call();
+    assertEquals(1, argument.getValue().getIncrementalContainerReportCount());
+    assertEquals(0, context.getIncrementalReportQueueSize().get(TEST_SCM_ENDPOINT));
+    verify(datanodeStateMachine, never()).setNextHB(anyLong());
+  }
+
+  @Test
+  public void testCommandStatusReportsReserveCountCapacity() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT, 20);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanodeStateMachine, "");
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(((SCMHeartbeatRequestProto) invocation.getArgument(0))
+                    .getDatanodeDetails().getUuid())
+                .build());
+
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(conf, context, scm);
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    for (int i = 0; i < 20; i++) {
+      context.addIncrementalReport(
+          IncrementalContainerReportProto.getDefaultInstance());
+    }
+    for (int i = 0; i < 3; i++) {
+      context.addIncrementalReport(newCommandStatusReport(i, 128));
+    }
+
+    endpointTask.call();
+
+    assertEquals(18, argument.getValue().getIncrementalContainerReportCount());
+    assertEquals(2, argument.getValue().getCommandStatusReportsCount());
+    assertEquals(3,
+        context.getIncrementalReportQueueSize().get(TEST_SCM_ENDPOINT));
+  }
+
+  @Test
+  public void testCommandStatusLargerThanSafeHeartbeatIsDeferred()
+      throws Exception {
+    CommandStatusReportsProto report = newCommandStatusReport(1, 4096);
+    long reportBytes = commandStatusReportWireSize(report);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    int ipcMaximumDataLength =
+        (int) Math.floor((reportBytes - 1) / 0.9D);
+    conf.setInt(HDDS_IPC_MAXIMUM_DATA_LENGTH, ipcMaximumDataLength);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanodeStateMachine, "");
+
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(((SCMHeartbeatRequestProto) invocation.getArgument(0))
+                    .getDatanodeDetails().getUuid())
+                .build());
+
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(conf, context, scm);
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    context.addIncrementalReport(report);
+
+    endpointTask.call();
+
+    assertEquals(0, argument.getValue().getCommandStatusReportsCount());
+    assertEquals(1,
+        context.getIncrementalReportQueueSize().get(TEST_SCM_ENDPOINT));
+  }
+
+  @Test
+  public void testExistingHeartbeatContentReducesCommandStatusBudget() throws Exception {
+    IncrementalContainerReportProto icr =
+        IncrementalContainerReportProto.newBuilder()
+            .addReport(ContainerReplicaProto.newBuilder()
+                .setContainerID(1)
+                .setState(ContainerReplicaProto.State.CLOSED)
+                .setOriginNodeId(String.join("", Collections.nCopies(1024, "x")))
+                .build())
+            .build();
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+
+    OzoneConfiguration baselineConf = new OzoneConfiguration();
+    StateContext baselineContext = new StateContext(baselineConf,
+        DatanodeStates.RUNNING, datanodeStateMachine, "");
+    StorageContainerDatanodeProtocolClientSideTranslatorPB baselineScm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> baselineArgument =
+        ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+    when(baselineScm.sendHeartbeat(baselineArgument.capture()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto) invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .build());
+    HeartbeatEndpointTask baselineTask = getHeartbeatEndpointTask(
+        baselineConf, baselineContext, baselineScm);
+    baselineContext.addEndpoint(TEST_SCM_ENDPOINT);
+    baselineContext.addIncrementalReport(icr);
+    baselineTask.call();
+    long nonCommandHeartbeatBytes =
+        baselineArgument.getValue().getSerializedSize();
+
+    CommandStatusReportsProto first = newCommandStatusReport(1, 128);
+    CommandStatusReportsProto second = newCommandStatusReport(2, 128);
+    long reportBytes = commandStatusReportWireSize(first);
+    long targetSafeSize = nonCommandHeartbeatBytes + reportBytes;
+    int ipcMaximumDataLength =
+        (int) Math.ceil(targetSafeSize / 0.9D);
+    long safeHeartbeatSize =
+        (long) Math.floor(ipcMaximumDataLength * 0.9D);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(HDDS_IPC_MAXIMUM_DATA_LENGTH, ipcMaximumDataLength);
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine, "");
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument =
+        ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto) invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .build());
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    context.addIncrementalReport(icr);
+    context.addIncrementalReport(first);
+    context.addIncrementalReport(second);
+
+    endpointTask.call();
+
+    assertEquals(1, argument.getValue().getCommandStatusReportsCount());
+    assertTrue(argument.getValue().getSerializedSize() <= safeHeartbeatSize);
+    assertEquals(1,
+        context.getIncrementalReportQueueSize().get(TEST_SCM_ENDPOINT));
+  }
+
+  @Test
+  public void testFailedHeartbeatRestoresCommandStatusReports() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    CommandStatusReportsProto first = newCommandStatusReport(1, 128);
+    CommandStatusReportsProto second = newCommandStatusReport(2, 128);
+    long reportBytes = commandStatusReportWireSize(first);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine, "");
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    when(scm.sendHeartbeat(any())).thenThrow(new IOException("failure"));
+
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    context.addIncrementalReport(first);
+    context.addIncrementalReport(second);
+
+    endpointTask.call();
+
+    CommandStatusReportSelection selection = context.getCommandStatusReports(
+        TEST_SCM_ENDPOINT, 10, reportBytes * 2, Long.MAX_VALUE);
+    assertEquals(Arrays.asList(first, second), selection.getReports());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, -1})
+  public void testHeartbeatClampsNonPositiveReportLimit(int configuredLimit)
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(HDDS_HEARTBEAT_REPORT_MAX_LIMIT, configuredLimit);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine, "");
+
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
+        .forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto) invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .build());
+
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    for (int i = 0; i < 3; i++) {
+      context.addIncrementalReport(
+          IncrementalContainerReportProto.getDefaultInstance());
+    }
+
+    // A non-positive configured limit is clamped to 1, so the heartbeat makes
+    // progress (one ICR) rather than sending nothing (0) or throwing (-1).
+    endpointTask.call();
+    assertEquals(1, argument.getValue().getIncrementalContainerReportCount());
+    assertEquals(2, context.getIncrementalReportQueueSize().get(TEST_SCM_ENDPOINT));
+  }
+
+  @Test
   public void testDatanodeCurrentVersionPassThrough() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
@@ -515,12 +795,9 @@ public class TestHeartbeatEndpointTask {
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .build();
-    DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
-    when(versionManager.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(versionManager.getApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
-    when(versionManager.getVersionForClient()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
     DatanodeStateMachine mockDSM = mock(DatanodeStateMachine.class);
     when(mockDSM.getDatanodeDetails()).thenReturn(datanodeDetails);
+    DatanodeVersionManager versionManager = ContainerTestUtils.mockDnVersionManager();
     when(mockDSM.getVersionManager()).thenReturn(versionManager);
     return mockDSM;
   }
@@ -531,5 +808,23 @@ public class TestHeartbeatEndpointTask {
         .setAction(ContainerAction.Action.CLOSE)
         .setReason(ContainerAction.Reason.CONTAINER_FULL);
     return builder.build();
+  }
+
+  private static CommandStatusReportsProto newCommandStatusReport(
+      long commandId, int messageSize) {
+    return CommandStatusReportsProto.newBuilder()
+        .addCmdStatus(CommandStatus.newBuilder()
+            .setCmdId(commandId)
+            .setStatus(CommandStatus.Status.EXECUTED)
+            .setType(SCMCommandProto.Type.deleteBlocksCommand)
+            .setMsg(String.join("", Collections.nCopies(messageSize, "x")))
+            .build())
+        .build();
+  }
+
+  private static long commandStatusReportWireSize(
+      CommandStatusReportsProto report) {
+    return CodedOutputStream.computeMessageSize(
+        SCMHeartbeatRequestProto.COMMANDSTATUSREPORTS_FIELD_NUMBER, report);
   }
 }

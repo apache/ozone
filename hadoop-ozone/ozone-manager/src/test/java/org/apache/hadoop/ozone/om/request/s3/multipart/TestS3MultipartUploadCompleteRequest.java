@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -605,6 +606,47 @@ public class TestS3MultipartUploadCompleteRequest
 
     assertEquals(OzoneManagerProtocolProtos.Status
         .INVALID_PART_ORDER, omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testETagComputedFromCompletedPartsOnly() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OMClientResponse initiateResponse = getS3InitiateMultipartUploadReq(
+        doPreExecuteInitiateMPU(volumeName, bucketName, keyName)).validateAndUpdateCache(ozoneManager, 1L);
+    String uploadID = initiateResponse.getOMResponse().getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    Map<Integer, String> partETags = new HashMap<>();
+    long trxnLogIndex = 2L;
+    for (int partNumber = 1; partNumber <= 3; partNumber++) {
+      long clientID = Time.now() + partNumber;
+      OMRequest commit = doPreExecuteCommitMPU(volumeName, bucketName, keyName, clientID, uploadID, partNumber);
+      addKeyToTable(volumeName, bucketName, keyName, clientID);
+      getS3MultipartUploadCommitReq(commit).validateAndUpdateCache(ozoneManager, trxnLogIndex++);
+      partETags.put(partNumber, commit.getCommitMultiPartUploadRequest().getKeyArgs().getMetadataList().stream()
+          .filter(kv -> kv.getKey().equals(OzoneConsts.ETAG)).findFirst().get().getValue());
+    }
+
+    // Complete with parts 1 and 3 only; part 2 is uploaded but not part of the object.
+    List<Part> parts = Arrays.asList(
+        Part.newBuilder().setETag(partETags.get(1)).setPartName(partETags.get(1)).setPartNumber(1).build(),
+        Part.newBuilder().setETag(partETags.get(3)).setPartName(partETags.get(3)).setPartNumber(3).build());
+    OMClientResponse completeResponse = getS3MultipartUploadCompleteReq(
+        doPreExecuteCompleteMPU(volumeName, bucketName, keyName, uploadID, parts))
+        .validateAndUpdateCache(ozoneManager, trxnLogIndex);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, completeResponse.getOMResponse().getStatus());
+
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    completeResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    String expectedETag = DigestUtils.md5Hex(partETags.get(1) + partETags.get(3)) + "-2";
+    assertEquals(expectedETag, completeResponse.getOMResponse().getCompleteMultiPartUploadResponse().getHash());
+    assertEquals(expectedETag, omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName)).getMetadata().get(OzoneConsts.ETAG));
   }
 
   @Test

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UPDATE_ID_NOT_MATCH;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
@@ -174,6 +175,12 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
     OmKeyInfo omKeyInfo = keyStatus.getKeyInfo();
     validateIfMatchETag(keyArgs, omKeyInfo);
+    DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
+    if (deleteKeyRequest.hasUpdateID() && omKeyInfo.getUpdateID() != deleteKeyRequest.getUpdateID()) {
+      throw new OMException("UpdateID does not match. Key: " + keyName +
+          ", Expected UpdateID: " + omKeyInfo.getUpdateID() +
+          ", Given UpdateID: " + deleteKeyRequest.getUpdateID(), UPDATE_ID_NOT_MATCH);
+    }
     // New key format for the fileTable & dirTable.
     // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
     // keyName field stores only the leaf node name, which is 'file1'.

@@ -32,6 +32,17 @@ public interface FinalizationStateManager extends SCMHandler {
   @Replicate
   void finalizeUpgrade() throws IOException;
 
+  // The methods below apply the Raft log entries written by the finalization of pre-ZDU versions, which an SCM may
+  // still replay after the upgrade. This version does not write them.
+  @Deprecated
+  void addFinalizingMark() throws IOException;
+
+  @Deprecated
+  void finalizeLayoutFeature(Integer layoutVersion) throws IOException;
+
+  @Deprecated
+  void removeFinalizingMark() throws IOException;
+
   /**
    * Called on snapshot installation.
    */

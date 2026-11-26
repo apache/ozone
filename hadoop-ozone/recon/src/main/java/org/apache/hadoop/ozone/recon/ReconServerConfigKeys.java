@@ -144,6 +144,13 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.scm.snapshot.enabled";
   public static final boolean OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT = true;
 
+  public static final String OZONE_RECON_SCM_SNAPSHOT_CONNECTION_TIMEOUT =
+      "ozone.recon.scm.snapshot.connection.timeout";
+  public static final String OZONE_RECON_SCM_SNAPSHOT_CONNECTION_TIMEOUT_DEFAULT = "60s";
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_READ_TIMEOUT = "ozone.recon.scm.snapshot.read.timeout";
+  public static final String OZONE_RECON_SCM_SNAPSHOT_READ_TIMEOUT_DEFAULT = "10m";
+
   public static final String OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD =
       "ozone.recon.nssummary.flush.db.max.threshold";
 
@@ -306,7 +313,8 @@ public final class  ReconServerConfigKeys {
   public static final int OZONE_RECON_UNHEALTHY_CONTAINER_FETCH_SIZE_DEFAULT = 10_000;
 
   /**
-   * Max export jobs that can sit in the queue (waiting + executing) at once.
+   * Maximum number of export jobs waiting in the queue at once, not counting
+   * the job that is executing.
    * Submissions beyond this limit are rejected with HTTP 429.
    * Kept small because export is single-threaded and the unhealthy-container
    * states it can be invoked for are bounded (~5).

@@ -231,6 +231,11 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
         .get(omMetadataManager.getVolumeKey(volumeName));
     assertEquals(-1, volArgsVerify.getQuotaInBytes());
     assertEquals(-1, volArgsVerify.getQuotaInNamespace());
+    OmVolumeArgs persistedVolArgs = omMetadataManager.getVolumeTable()
+        .getSkipCache(omMetadataManager.getVolumeKey(volumeName));
+    assertEquals(-1, persistedVolArgs.getQuotaInBytes());
+    assertEquals(-1, persistedVolArgs.getQuotaInNamespace());
+    assertNull(omMetadataManager.getVolumeTable().getSkipCache(volumeName));
   }
 
   @Test
