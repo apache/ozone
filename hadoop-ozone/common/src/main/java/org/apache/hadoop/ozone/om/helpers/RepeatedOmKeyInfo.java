@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -37,8 +36,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Repeate
  * admin wants to confirm if a given key is deleted from deletedTable metadata.
  */
 public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
-  private static final Codec<RepeatedOmKeyInfo> CODEC_TRUE = newCodec(true);
-  private static final Codec<RepeatedOmKeyInfo> CODEC_FALSE = newCodec(false);
+  
+  private static final Codec<RepeatedOmKeyInfo> CODEC_TRUE = newCodec(true, true);
+  private static final Codec<RepeatedOmKeyInfo> CODEC_FALSE = newCodec(false, true);
+
+  // Codecs for deletedTable - exclude fields only used in openKeyTable
+  private static final Codec<RepeatedOmKeyInfo> CODEC_DELETED_TABLE_TRUE = newCodec(true, false);
+  private static final Codec<RepeatedOmKeyInfo> CODEC_DELETED_TABLE_FALSE = newCodec(false, false);
 
   private final List<OmKeyInfo> omKeyInfoList;
   /**
@@ -51,16 +55,34 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
    */
   private final long bucketId;
 
-  private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline) {
+  private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline, boolean isOpenKey) {
     return new DelegatedCodec<>(
         Proto2Codec.get(RepeatedKeyInfo.getDefaultInstance()),
         RepeatedOmKeyInfo::getFromProto,
-        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION),
+        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT, isOpenKey),
         RepeatedOmKeyInfo.class);
   }
 
-  public static Codec<RepeatedOmKeyInfo> getCodec(boolean ignorePipeline) {
+  /**
+   * Gets the codec for openKeyTable. This codec includes fields only used in
+   * openKeyTable during serialization.
+   *
+   * @param ignorePipeline whether to ignore pipeline info
+   * @return the codec for openKeyTable
+   */
+  public static Codec<RepeatedOmKeyInfo> getOpenKeyTableCodec(boolean ignorePipeline) {
     return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
+  }
+
+  /**
+   * Gets the codec for deletedTable. This codec excludes fields only used in
+   * openKeyTable during serialization, as deleted keys are committed keys.
+   *
+   * @param ignorePipeline whether to ignore pipeline info
+   * @return the codec for deletedTable
+   */
+  public static Codec<RepeatedOmKeyInfo> getDeletedTableCodec(boolean ignorePipeline) {
+    return ignorePipeline ? CODEC_DELETED_TABLE_TRUE : CODEC_DELETED_TABLE_FALSE;
   }
 
   public RepeatedOmKeyInfo(long bucketId) {
@@ -88,10 +110,9 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   }
 
   /**
-   * Returns a pair of long values representing the replicated size and
-   * unreplicated size of all the keys in the list.
+   * Returns the unreplicated size and replicated size of all the keys in the list.
    */
-  public ImmutablePair<Long, Long> getTotalSize() {
+  public TotalSize getTotalSize() {
     long replicatedSize = 0;
     long unreplicatedSize = 0;
 
@@ -101,7 +122,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
       }
       unreplicatedSize += omKeyInfo.getDataSize();
     }
-    return new ImmutablePair<>(unreplicatedSize, replicatedSize);
+    return new TotalSize(unreplicatedSize, replicatedSize);
   }
 
   // HDDS-7041. Return a new ArrayList to avoid ConcurrentModifyException
@@ -128,10 +149,19 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   /**
    * @param compact true for persistence, false for network transmit
    */
-  public RepeatedKeyInfo getProto(boolean compact, int clientVersion) {
+  public RepeatedKeyInfo getProto(boolean compact, ClientVersion clientVersion) {
+    return getProto(compact, clientVersion, true);
+  }
+
+  /**
+   * @param compact true for persistence, false for network transmit
+   * @param clientVersion the client version
+   * @param isOpenKey true for openKeyTable, false for keyTable/deletedTable
+   */
+  public RepeatedKeyInfo getProto(boolean compact, ClientVersion clientVersion, boolean isOpenKey) {
     List<KeyInfo> list = new ArrayList<>();
     for (OmKeyInfo k : cloneOmKeyInfoList()) {
-      list.add(k.getProtobuf(compact, clientVersion));
+      list.add(k.getProtobuf(compact, clientVersion, isOpenKey));
     }
 
     RepeatedKeyInfo.Builder builder = RepeatedKeyInfo.newBuilder()
@@ -177,5 +207,27 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   @Override
   public RepeatedOmKeyInfo copyObject() {
     return new RepeatedOmKeyInfo(new ArrayList<>(omKeyInfoList), bucketId);
+  }
+
+  /**
+   * The unreplicated size of all the keys paired with their replicated size,
+   * used to account for the space held by keys pending deletion.
+   */
+  public static final class TotalSize {
+    private final long unreplicatedSize;
+    private final long replicatedSize;
+
+    public TotalSize(long unreplicatedSize, long replicatedSize) {
+      this.unreplicatedSize = unreplicatedSize;
+      this.replicatedSize = replicatedSize;
+    }
+
+    public long getUnreplicatedSize() {
+      return unreplicatedSize;
+    }
+
+    public long getReplicatedSize() {
+      return replicatedSize;
+    }
   }
 }

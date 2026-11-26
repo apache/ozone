@@ -56,7 +56,6 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -86,6 +85,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -205,13 +205,7 @@ public final class TestBlockTokens {
         EXPIRY_DURATION_IN_MS);
     assertTrue(secretKey.isExpired());
     // verify that the read is denied because of the expired secret key.
-    readData(keyInfo, k -> {
-      try {
-        return getTestKeyInfo();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    });
+    readData(keyInfo, k -> getTestKeyInfo());
   }
 
   @Test
@@ -219,7 +213,7 @@ public final class TestBlockTokens {
     OmKeyInfo keyInfo = getTestKeyInfo();
     // replace block token secret key id with wrong id.
     for (OmKeyLocationInfoGroup v : keyInfo.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo l : v.getLocationList()) {
+      for (OmKeyLocationInfo l : v.createLocationList()) {
         Token<OzoneBlockTokenIdentifier> token = l.getToken();
         OzoneBlockTokenIdentifier tokenId = token.decodeIdentifier();
         tokenId.setSecretKeyId(UUID.randomUUID());
@@ -243,7 +237,7 @@ public final class TestBlockTokens {
     OmKeyInfo keyInfo = getTestKeyInfo();
     // replace block token secret key id with wrong id.
     for (OmKeyLocationInfoGroup v : keyInfo.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo l : v.getLocationList()) {
+      for (OmKeyLocationInfo l : v.createLocationList()) {
         Token<OzoneBlockTokenIdentifier> token = l.getToken();
         byte[] randomPassword = RandomUtils.secure().randomBytes(100);
         Token<OzoneBlockTokenIdentifier> override = new Token<>(
@@ -263,7 +257,7 @@ public final class TestBlockTokens {
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
     OmKeyLocationInfo locationInfo =
-        keyInfo.getKeyLocationVersions().get(0).getLocationList().get(0);
+        keyInfo.getKeyLocationVersions().get(0).createLocationList().get(0);
     Token<OzoneBlockTokenIdentifier> token = locationInfo.getToken();
     return token.decodeIdentifier().getSecretKeyId();
   }
@@ -283,7 +277,7 @@ public final class TestBlockTokens {
   }
 
   private void readData(OmKeyInfo keyInfo,
-      Function<OmKeyInfo, OmKeyInfo> retryFunc) throws IOException {
+      CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunc) throws IOException {
     XceiverClientFactory xceiverClientManager =
         ((RpcClient) client.getProxy()).getXceiverClientManager();
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);

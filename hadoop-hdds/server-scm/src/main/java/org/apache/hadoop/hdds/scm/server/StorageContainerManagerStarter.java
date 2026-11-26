@@ -146,8 +146,8 @@ public class StorageContainerManagerStarter extends GenericCli implements Callab
    * is set and print the startup banner message.
    */
   private void commonInit() {
+    TracingUtil.installMdcContextStorage();
     conf = getOzoneConf();
-    TracingUtil.initTracing("StorageContainerManager", conf);
 
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -52,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.log4j.Logger;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
@@ -64,7 +64,7 @@ import org.junit.jupiter.api.TestMethodOrder;
  * @see TestOzoneManagerHAFollowerReadWithAllRunning
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneManagerHAFollowerRead {
+public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends OzoneManagerHAFollowerReadTests {
 
   /**
    * After restarting OMs we need to wait
@@ -91,13 +91,21 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
    */
   @Test
   void oneOMDown() throws Exception {
-    changeFollowerReadInitialProxy(1);
+    OzoneManager currentLeader = getCluster().getOMLeader();
+    OzoneManager stoppedOM = getCluster().getOzoneManagersList().stream()
+        .filter(om -> om != currentLeader).findFirst().get();
+    changeFollowerReadInitialProxy(stoppedOM.getOMNodeId());
 
-    getCluster().stopOzoneManager(1);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
+    getCluster().stopOzoneManager(stoppedOM.getOMNodeId());
+    waitForLeaderToBeReady();
 
     createVolumeTest(true);
     createKeyTest(true);
+
+    OzoneManager newLeader = getCluster().transferOMLeadershipToAnotherNode(currentLeader);
+    assertNotEquals(currentLeader, newLeader);
+    assertNotEquals(stoppedOM, newLeader);
+    assertTrue(newLeader.isRunning());
   }
 
   /**
@@ -109,10 +117,13 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
 
     getCluster().stopOzoneManager(1);
     getCluster().stopOzoneManager(2);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
+    // Write requests will fail with OMNotLeaderException
     createVolumeTest(false);
     createKeyTest(false);
+
+    // Read requests will fail with either ReadIndexException or ReadException
+    listVolumes(false);
   }
 
   @Test
@@ -141,7 +152,7 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
 
     HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider =
         OmTestUtil.getFailoverProxyProvider(getObjectStore());
-    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
         OmTestUtil.getFollowerReadFailoverProxyProvider(getObjectStore());
 
     // The omFailoverProxyProvider will point to the current leader OM node.
@@ -153,7 +164,7 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
     // Stop one of the ozone manager, to see when the OM leader changes
     // multipart upload is happening successfully or not.
     getCluster().stopOzoneManager(leaderOMNodeId);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
+    waitForLeaderToBeReady();
 
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
 
@@ -209,18 +220,20 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
     ObjectStore objectStore = getObjectStore();
     HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider =
         OmTestUtil.getFailoverProxyProvider(objectStore);
-    String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     createVolumeTest(true);
+    String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     // On stopping the current OM Proxy, the next connection attempt should
     // failover to a another OM proxy.
     getCluster().stopOzoneManager(firstProxyNodeId);
-    Thread.sleep(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT * 4);
+    waitForLeaderToBeReady();
 
     // Next request to the proxy provider should result in a failover
     createVolumeTest(true);
-    Thread.sleep(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
+    GenericTestUtils.waitFor(
+        () -> !firstProxyNodeId.equals(omFailoverProxyProvider.getCurrentProxyOMNodeId()),
+        100, (int) (OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT * 5));
 
     // Get the new OM Proxy NodeId
     String newProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -233,7 +246,7 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
   @Test
   void testFollowerReadOmProxyProviderFailoverOnConnectionFailure() throws Exception {
     ObjectStore objectStore = getObjectStore();
-    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
         OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
     String firstProxyNodeId = followerReadFailoverProxyProvider.getCurrentProxy().getNodeId();
 
@@ -242,6 +255,7 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
     // On stopping the current OM Proxy, the next connection attempt should
     // failover to another OM proxy.
     getCluster().stopOzoneManager(firstProxyNodeId);
+    waitForLeaderToBeReady();
 
     // Next request to the proxy provider should result in a failover
     objectStore.getClientProxy().listVolumes(null, null, 1000);
@@ -252,13 +266,13 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
     // Verify that a failover occurred. the new proxy nodeId should be
     // different from the old proxy nodeId.
     assertNotEquals(firstProxyNodeId, newProxyNodeId);
-    assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
+    assertTrue(followerReadFailoverProxyProvider.isOmServiceSupportsFollowerRead());
   }
 
   @Test
   void testFollowerReadSkipsStoppedFollower() throws Exception {
     ObjectStore objectStore = getObjectStore();
-    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
         OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
 
     String leaderOMNodeId = getCluster().getOMLeader().getOMNodeId();
@@ -272,7 +286,6 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
 
     String stoppedFollowerNodeId = followerOmNodeIds.get(0);
     getCluster().stopOzoneManager(stoppedFollowerNodeId);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
     followerReadFailoverProxyProvider.changeInitialProxyForTest(stoppedFollowerNodeId);
     objectStore.getClientProxy().listVolumes(null, null, 10);
@@ -296,7 +309,7 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     getCluster().stopOzoneManager(leaderOMNodeId);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
+    waitForLeaderToBeReady();
     createKeyTest(true); // failover should happen to new node
 
     long numTimesTriedToSameNode = omFailoverProxyProvider.getWaitTime()
@@ -308,6 +321,7 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
   }
 
   @Test
+  @Order(Integer.MAX_VALUE)
   void testOMRetryProxy() {
     int maxFailoverAttempts = getOzoneClientFailoverMaxAttempts();
     // Stop all the OMs.
@@ -332,13 +346,13 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
 
   private void changeFollowerReadInitialProxy(int omIndex) {
     // Change the initial proxy to the OM to be stopped to test follower read failover
-    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
         OmTestUtil.getFollowerReadFailoverProxyProvider(getObjectStore());
     followerReadFailoverProxyProvider.changeInitialProxyForTest(getCluster().getOzoneManager(omIndex).getOMNodeId());
   }
 
   private void changeFollowerReadInitialProxy(String omNodeId) {
-    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
         OmTestUtil.getFollowerReadFailoverProxyProvider(getObjectStore());
     followerReadFailoverProxyProvider.changeInitialProxyForTest(omNodeId);
   }

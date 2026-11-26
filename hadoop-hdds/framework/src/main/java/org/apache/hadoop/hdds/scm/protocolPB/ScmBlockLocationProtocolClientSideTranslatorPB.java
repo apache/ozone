@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProt
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import io.opentelemetry.api.trace.Span;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,9 +45,11 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Allo
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.FinalizeUpgradeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.QueryUpgradeStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SortDatanodesRequestProto;
@@ -65,7 +68,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -125,7 +128,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   private SCMBlockLocationRequest.Builder createSCMBlockRequest(Type cmdType) {
     return SCMBlockLocationRequest.newBuilder()
         .setCmdType(cmdType)
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setTraceID(TracingUtil.exportCurrentSpan());
   }
 
@@ -150,7 +153,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       throws SCMException {
     if (resp.getStatus() != OK) {
       throw new SCMException(resp.getMessage(),
-          SCMException.ResultCodes.values()[resp.getStatus().ordinal()]);
+          SCMException.ResultCodes.valueOf(resp.getStatus().name()));
     }
     return resp;
   }
@@ -225,7 +228,14 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
         wrappedResponse.getAllocateScmBlockResponse();
 
     List<AllocatedBlock> blocks = new ArrayList<>(response.getBlocksCount());
+    Span traceSpan = TracingUtil.getActiveSpan();
+    int blockIndex = 0;
     for (AllocateBlockResponse resp : response.getBlocksList()) {
+      if (traceSpan.isRecording()) {
+        traceSpan.setAttribute("blockAllocated" + blockIndex,
+            resp.getContainerBlockID().toString());
+      }
+      blockIndex++;
       AllocatedBlock.Builder builder = new AllocatedBlock.Builder()
           .setContainerBlockID(
               ContainerBlockID.getFromProtobuf(resp.getContainerBlockID()))
@@ -389,6 +399,38 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
 
     return (InnerNode) setParent(
         InnerNodeImpl.fromProtobuf(resp.getClusterTree()));
+  }
+
+  @Override
+  public void finalizeUpgrade() throws IOException {
+    finalizeUpgrade(false);
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    finalizeUpgrade(true);
+  }
+
+  private void finalizeUpgrade(boolean force) throws IOException {
+    FinalizeUpgradeRequestProto request = FinalizeUpgradeRequestProto.newBuilder()
+        .setForce(force)
+        .build();
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(Type.FinalizeUpgrade)
+        .setFinalizeUpgradeRequest(request)
+        .build();
+    handleError(submitRequest(wrapper));
+  }
+
+  @Override
+  public HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException {
+    QueryUpgradeStatusRequestProto request =
+        QueryUpgradeStatusRequestProto.newBuilder().build();
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(Type.QueryUpgradeStatus)
+        .setQueryUpgradeStatusRequest(request)
+        .build();
+    final SCMBlockLocationResponse wrappedResponse =
+        handleError(submitRequest(wrapper));
+    return wrappedResponse.getQueryUpgradeStatusResponse().getStatus();
   }
 
   /**

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.diskbalancer;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -44,6 +45,13 @@ public class DiskBalancerServiceTestImpl extends DiskBalancerService {
       throws IOException {
     super(container, serviceInterval, SERVICE_TIMEOUT_IN_MILLISECONDS,
         TimeUnit.MILLISECONDS, threadCount, conf);
+  }
+
+  public DiskBalancerServiceTestImpl(OzoneContainer container,
+      int serviceInterval, ConfigurationSource conf, int threadCount,
+      Clock clock) throws IOException {
+    super(container, serviceInterval, SERVICE_TIMEOUT_IN_MILLISECONDS,
+        TimeUnit.MILLISECONDS, threadCount, conf, clock);
   }
 
   public void runBalanceTasks() {

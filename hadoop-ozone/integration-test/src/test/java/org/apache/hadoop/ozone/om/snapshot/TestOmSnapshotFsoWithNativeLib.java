@@ -26,8 +26,8 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  * Test OmSnapshot for FSO bucket type when native lib is enabled.
  */
 @EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
-class TestOmSnapshotFsoWithNativeLib extends TestOmSnapshot {
+class TestOmSnapshotFsoWithNativeLib extends OmSnapshotTests {
   TestOmSnapshotFsoWithNativeLib() throws Exception {
-    super(FILE_SYSTEM_OPTIMIZED, false, false, false, false);
+    super(FILE_SYSTEM_OPTIMIZED, false, false, false, false, false);
   }
 }

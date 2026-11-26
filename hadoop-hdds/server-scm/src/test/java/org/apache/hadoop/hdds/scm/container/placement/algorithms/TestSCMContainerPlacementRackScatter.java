@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +43,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -55,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -180,7 +184,8 @@ public class TestSCMContainerPlacementRackScatter {
     cluster.add(datanodeDetails);
     DatanodeInfo datanodeInfo = new DatanodeInfo(
         datanodeDetails, NodeStatus.inServiceHealthy(),
-        UpgradeUtils.defaultLayoutVersionProto());
+        UpgradeUtils.defaultVersionProto(),
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
     StorageReportProto storage1 = HddsTestUtils.createStorageReport(
         datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
@@ -248,6 +253,26 @@ public class TestSCMContainerPlacementRackScatter {
     }
     when(nodeManager.getClusterNetworkTopologyMap())
         .thenReturn(cluster);
+    when(nodeManager.hasAvailableSpace(any(DatanodeInfo.class))).thenAnswer(invocation -> {
+      DatanodeInfo di = invocation.getArgument(0);
+      return di.getStorageReports().stream().anyMatch(r -> r.getRemaining() > 1L);
+    });
+    when(nodeManager.getNodeStat(any(DatanodeDetails.class))).thenAnswer(invocation -> {
+      DatanodeDetails dd = invocation.getArgument(0);
+      DatanodeInfo di = dnInfos.stream()
+          .filter(d -> d.getID().equals(dd.getID()))
+          .findFirst().orElse(null);
+      if (di == null) {
+        return null;
+      }
+      long capacity = di.getStorageReports().stream()
+          .mapToLong(StorageReportProto::getCapacity).sum();
+      long used = di.getStorageReports().stream()
+          .mapToLong(StorageReportProto::getScmUsed).sum();
+      long remaining = di.getStorageReports().stream()
+          .mapToLong(StorageReportProto::getRemaining).sum();
+      return new SCMNodeMetric(capacity, used, remaining, 0, remaining, 0);
+    });
 
     // create placement policy instances
     policy = new SCMContainerPlacementRackScatter(
@@ -490,7 +515,8 @@ public class TestSCMContainerPlacementRackScatter {
           hostname + i, null);
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto());
+          UpgradeUtils.defaultVersionProto(),
+          HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
           dnInfo.getID(), "/data1-" + dnInfo.getID(),
@@ -761,7 +787,7 @@ public class TestSCMContainerPlacementRackScatter {
         policy.chooseDatanodes(usedDns, excludedDns,
             null, 3, 0, 5));
     assertThat(exception.getMessage())
-        .matches("^No enough datanodes to choose.*");
+        .matches("^Not enough datanodes to choose.*");
     assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
         exception.getResult());
   }
@@ -891,6 +917,51 @@ public class TestSCMContainerPlacementRackScatter {
         policy.chooseDatanodes(usedDns, excludedDns,
             null, 1, 0, 5);
     assertEquals(1, chosenNodes.size());
+  }
+
+  @Test
+  public void chooseNodeWithinRackPrefersLessUtilizedWhenEnabled() throws SCMException {
+    setup(2, 2);
+    conf.setBoolean(OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED, true);
+    policy = new SCMContainerPlacementRackScatter(nodeManager, conf, cluster, true, metrics);
+    when(nodeManager.getNodeStat(datanodes.get(0)))
+        .thenReturn(new SCMNodeMetric(100L, 10L, 90L, 0L, 0L, 0L));
+    when(nodeManager.getNodeStat(datanodes.get(1)))
+        .thenReturn(new SCMNodeMetric(100L, 90L, 10L, 0L, 0L, 0L));
+
+    List<DatanodeDetails> chosen = policy.chooseDatanodes(
+        new ArrayList<>(), new ArrayList<>(), null, 1, 0, 0);
+
+    assertEquals(Collections.singletonList(datanodes.get(0)), chosen);
+  }
+
+  @Test
+  void chooseExtraNodesFromRandomRacksWhenMoreNodesThanRacks() throws SCMException {
+    // 8 racks with 2 datanodes each, choosing 14 nodes as for rs-10-4
+    setup(16, 2);
+    int nodesRequired = 14;
+    Set<Node> racksWithTwoNodes = new HashSet<>();
+    Set<Node> racksAtFirstExtraPosition = new HashSet<>();
+    for (int i = 0; i < 200; i++) {
+      List<DatanodeDetails> chosen = policy.chooseDatanodes(
+          new ArrayList<>(), new ArrayList<>(), null, nodesRequired, 0, 0);
+      assertEquals(nodesRequired, chosen.size());
+      assertTrue(policy.validateContainerPlacement(chosen, nodesRequired).isPolicySatisfied());
+
+      Map<Node, Long> nodesPerRack = chosen.stream()
+          .collect(Collectors.groupingBy(dn -> cluster.getAncestor(dn, 1), Collectors.counting()));
+      assertEquals(8, nodesPerRack.size());
+      assertThat(nodesPerRack.values()).allMatch(count -> count <= 2);
+      nodesPerRack.forEach((rack, count) -> {
+        if (count == 2) {
+          racksWithTwoNodes.add(rack);
+        }
+      });
+      // The first 8 nodes take one rack each, the rest go to racks that already have a node.
+      racksAtFirstExtraPosition.add(cluster.getAncestor(chosen.get(8), 1));
+    }
+    assertEquals(8, racksWithTwoNodes.size());
+    assertEquals(8, racksAtFirstExtraPosition.size());
   }
 
   private int getRackSize(List<DatanodeDetails>... datanodeDetails) {

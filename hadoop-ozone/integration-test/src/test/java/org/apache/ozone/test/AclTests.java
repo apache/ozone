@@ -17,6 +17,7 @@
 
 package org.apache.ozone.test;
 
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -25,6 +26,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
@@ -40,6 +43,16 @@ public abstract class AclTests extends ClusterForTests<MiniOzoneCluster> {
   public static final UserGroupInformation ADMIN_UGI =
       UserGroupInformation.createUserForTesting(ADMIN_USER, new String[] {ADMIN_GROUP});
 
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
+  }
+
   @Override
   protected MiniOzoneCluster.Builder newClusterBuilder() {
     return super.newClusterBuilder()
@@ -49,7 +62,9 @@ public abstract class AclTests extends ClusterForTests<MiniOzoneCluster> {
   @Override
   protected OzoneConfiguration createOzoneConfig() {
     loginAdmin();
+    // Enable test security mode to allow ACL checks without Kerberos
     OzoneConfiguration conf = super.createOzoneConfig();
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);

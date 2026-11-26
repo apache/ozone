@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMHAMetrics;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -48,14 +48,14 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.HATests;
+import org.apache.ozone.test.HACluster;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.junit.jupiter.api.Test;
 
 /**
  * Tests for SCM HA.
  */
-public abstract class TestStorageContainerManagerHAWithAllRunning implements HATests.TestCase {
+public abstract class TestStorageContainerManagerHAWithAllRunning implements HACluster.TestCase {
 
   private static final int OM_COUNT = 3;
   private static final int SCM_COUNT = 3;
@@ -126,7 +126,7 @@ public abstract class TestStorageContainerManagerHAWithAllRunning implements HAT
 
       byte[] bytes = value.getBytes(UTF_8);
       RatisReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
-      TestDataUtil.createKey(bucket, keyName, replication, bytes);
+      DataTestUtil.createKey(bucket, keyName, replication, bytes);
 
       OzoneKey key = bucket.getKey(keyName);
       assertEquals(keyName, key.getName());

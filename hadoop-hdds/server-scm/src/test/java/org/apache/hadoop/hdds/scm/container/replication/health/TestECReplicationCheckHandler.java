@@ -42,7 +42,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -51,6 +50,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.NodeOperationalStateAndIndex;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -133,7 +134,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
   }
 
   @Test
@@ -162,16 +163,16 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     // Still under replicated until the pending complete
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
   }
 
   @Test
   public void testUnderReplicatedDueToOutOfService() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(DECOMMISSIONING, 4),
-        Pair.of(DECOMMISSIONED, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(DECOMMISSIONING, 4),
+        new NodeOperationalStateAndIndex(DECOMMISSIONED, 5));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -189,16 +190,16 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     // Still under replicated until the pending complete
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
   }
 
   @Test
   public void testUnderReplicatedDueToOutOfServiceFixedWithPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(DECOMMISSIONING, 4),
-        Pair.of(IN_SERVICE, 4), Pair.of(DECOMMISSIONED, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(DECOMMISSIONING, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(DECOMMISSIONED, 5));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 5, null, Long.MAX_VALUE, 0));
@@ -221,15 +222,15 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     // Still under replicated until the pending complete
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
   }
 
   @Test
   public void testUnderReplicatedDueToOutOfServiceAndMissingReplica() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(DECOMMISSIONING, 4), Pair.of(DECOMMISSIONED, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(DECOMMISSIONING, 4), new NodeOperationalStateAndIndex(DECOMMISSIONED, 5));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 3, null, Long.MAX_VALUE, 0));
@@ -250,14 +251,14 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
   }
 
   @Test
   public void testUnderReplicatedAndUnrecoverable() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -276,20 +277,20 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MISSING));
+        SimplifiedContainerHealthStateForReporting.MISSING));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNHEALTHY));
+        SimplifiedContainerHealthStateForReporting.UNHEALTHY));
   }
 
   @Test
   public void testUnderReplicatedAndUnhealthy() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
-    replicas.addAll(createReplicas(UNHEALTHY, Pair.of(IN_SERVICE, 3),
-        Pair.of(IN_SERVICE, 4)));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2));
+    replicas.addAll(createReplicas(UNHEALTHY, new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 4)));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -309,11 +310,11 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.MISSING));
+        SimplifiedContainerHealthStateForReporting.MISSING));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNHEALTHY));
+        SimplifiedContainerHealthStateForReporting.UNHEALTHY));
   }
 
   @Test
@@ -330,7 +331,7 @@ public class TestECReplicationCheckHandler {
       HddsProtos.NodeOperationalState offlineState) {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(offlineState, 2));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(offlineState, 2));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -347,13 +348,15 @@ public class TestECReplicationCheckHandler {
     assertFalse(result.offlineIndexesOkAfterPending());
 
     assertTrue(healthCheck.handle(request));
-    // Unrecoverable so not added to the queue
+    // Unrecoverable with offline indexes = combination state
+    // Could be MISSING_UNDER_REPLICATED or UNHEALTHY_UNDER_REPLICATED depending on isMissing()
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
-    assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MISSING));
+    // Check that one of the combination states is set
+    int missingUnder = (int) report.getStat(SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED);
+    int unhealthyUnder = (int) report.getStat(SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED);
+    assertEquals(1, missingUnder + unhealthyUnder, 
+        "Expected one combination state to be set");
   }
 
   @Test
@@ -370,7 +373,7 @@ public class TestECReplicationCheckHandler {
       HddsProtos.NodeOperationalState offlineState) {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(offlineState, 2));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(offlineState, 2));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
@@ -392,14 +395,12 @@ public class TestECReplicationCheckHandler {
     assertTrue(result.offlineIndexesOkAfterPending());
 
     assertTrue(healthCheck.handle(request));
-    // Unrecoverable, but there are offline indexes which need replicated. As there is a pending
-    // add on the offline index, it is not added to the queue.
+    // Unrecoverable with offline indexes = MISSING_UNDER_REPLICATED combination
+    // As there is a pending add on the offline index, it is not added to the queue.
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MISSING));
+        SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED));
   }
 
   /**
@@ -439,7 +440,7 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
   }
 
   /**
@@ -478,10 +479,10 @@ public class TestECReplicationCheckHandler {
   public void testOverReplicatedContainer() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5), new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 2));
 
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
@@ -498,17 +499,17 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(1, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
   }
 
   @Test
   public void testOverReplicatedContainerFixedByPending() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5), new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 2));
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
@@ -531,17 +532,17 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
   }
 
   @Test
   public void testOverReplicatedContainerDueToMaintenance() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5),
-        Pair.of(IN_MAINTENANCE, 1), Pair.of(IN_MAINTENANCE, 2));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5), new NodeOperationalStateAndIndex(IN_MAINTENANCE, 1),
+        new NodeOperationalStateAndIndex(IN_MAINTENANCE, 2));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -555,16 +556,16 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
   }
 
   @Test
   public void testOverAndUnderReplicated() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -580,9 +581,9 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
   }
 
   @Test
@@ -595,8 +596,8 @@ public class TestECReplicationCheckHandler {
         new ContainerPlacementStatusDefault(4, 5, 9));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -611,11 +612,11 @@ public class TestECReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.MIS_REPLICATED));
   }
 
   @Test
@@ -630,9 +631,9 @@ public class TestECReplicationCheckHandler {
         new ContainerPlacementStatusDefault(4, 5, 9));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5), Pair.of(IN_SERVICE, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -647,20 +648,20 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(1, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.MIS_REPLICATED));
   }
 
   @Test
   public void testUnhealthyReplicaWithOtherCopyAndPendingDelete() {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5));
 
     ContainerReplica unhealthyReplica = ReplicationTestUtil
         .createContainerReplica(container.containerID(), 1, IN_SERVICE,
@@ -684,9 +685,9 @@ public class TestECReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
   }
 
 }

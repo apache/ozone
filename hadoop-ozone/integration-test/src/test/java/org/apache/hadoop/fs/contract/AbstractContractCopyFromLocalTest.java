@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.fs.contract;
 
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -79,7 +79,7 @@ public abstract class AbstractContractCopyFromLocalTest extends
   public void testCopyFileNoOverwrite() throws Throwable {
     file = createTempFile("hello");
     copyFromLocal(file, true);
-    intercept(PathExistsException.class,
+    assertThrows(PathExistsException.class,
         () -> copyFromLocal(file, false));
   }
 
@@ -99,7 +99,7 @@ public abstract class AbstractContractCopyFromLocalTest extends
     file = createTempFile("test");
     FileUtils.deleteQuietly(file);
     // first upload to create
-    intercept(FileNotFoundException.class, "",
+    assertThrows(FileNotFoundException.class,
         () -> copyFromLocal(file, true));
   }
 
@@ -194,7 +194,7 @@ public abstract class AbstractContractCopyFromLocalTest extends
 
     Path dest = path(source.getName()).getParent();
     fs.copyFromLocalFile(sourcePath, dest);
-    intercept(PathExistsException.class,
+    assertThrows(PathExistsException.class,
         () -> fs.copyFromLocalFile(false, false,
             sourcePath, dest));
 
@@ -279,7 +279,7 @@ public abstract class AbstractContractCopyFromLocalTest extends
     Path destination = copyFromLocal(f, false);
     Path sourcePath = new Path(source.toURI());
 
-    intercept(FileAlreadyExistsException.class,
+    assertThrows(FileAlreadyExistsException.class,
         () -> getFileSystem().copyFromLocalFile(false, true,
             sourcePath, destination));
   }

@@ -27,7 +27,8 @@ BASE_DIR="$(pwd -P)"
 REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/${CHECK}"}
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-MAVEN_OPTIONS='-V -B -DskipTests -DskipDocs --no-transfer-progress'
+MAVEN_OPTIONS='-V -B -DskipTests'
+MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Pcoverage"
@@ -36,7 +37,7 @@ else
 fi
 
 export MAVEN_OPTS="-Xmx4096m ${MAVEN_OPTS:-}"
-mvn ${MAVEN_OPTIONS} clean "$@" | tee output.log
+./mvnw ${MAVEN_OPTIONS} clean "$@" | tee output.log
 rc=$?
 
 mkdir -p "$REPORT_DIR" # after `mvn clean`

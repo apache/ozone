@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.client;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -33,12 +35,16 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -56,6 +62,8 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -77,10 +85,14 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   private Map<String, MultipartInfoStub> keyToMultipartUpload = new HashMap<>();
 
+  private final Map<String, String> bucketTags = new HashMap<>();
+
   private Map<String, Map<Integer, Part>> partList = new HashMap<>();
 
   private ArrayList<OzoneAcl> aclList = new ArrayList<>();
   private ReplicationConfig replicationConfig;
+  private Map<String, OzoneLifecycleConfiguration> lifecyclesMap = new HashMap<>();
+  private byte[] derivedKey;
 
   public static Builder newBuilder() {
     return new Builder();
@@ -104,7 +116,29 @@ public final class OzoneBucketStub extends OzoneBucket {
       return new OzoneBucketStub(this);
     }
   }
-  
+
+  boolean isEmpty() {
+    return keyDetails.isEmpty();
+  }
+
+  public void setDerivedKey(byte[] key) {
+    derivedKey = key == null ? null : key.clone();
+  }
+
+  private OzoneOutputStream addDerivedKey(OzoneOutputStream output, boolean requested) {
+    if (requested && derivedKey != null) {
+      output.setDerivedKey(ByteBuffer.wrap(derivedKey.clone()));
+    }
+    return output;
+  }
+
+  private OzoneDataStreamOutput addDerivedKey(OzoneDataStreamOutput output, boolean requested) {
+    if (requested && derivedKey != null) {
+      output.setDerivedKey(ByteBuffer.wrap(derivedKey.clone()));
+    }
+    return output;
+  }
+
   @Override
   public OzoneOutputStream createKey(String key, long size) throws IOException {
     return createKey(key, size,
@@ -140,24 +174,33 @@ public final class OzoneBucketStub extends OzoneBucket {
         new KeyMetadataAwareOutputStream(metadata) {
           @Override
           public void close() throws IOException {
-            keyContents.put(key, toByteArray());
+            super.close();
+            byte[] bytes = toByteArray();
+            keyContents.put(key, bytes);
+            final long mtime = getModificationTime();
             keyDetails.put(key, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
                 key,
                 size,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
-                new ArrayList<>(), finalReplicationCon, getMetadata(), null,
+                mtime,
+                mtime,
+                new ArrayList<>(), finalReplicationCon, getMetadata(), fileEncryptionInfo(),
                 () -> readKey(key), true,
                 UserGroupInformation.getCurrentUser().getShortUserName(),
                 tags
             ));
-            super.close();
           }
         };
 
     return new OzoneOutputStream(keyOutputStream, null);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKey(String key, long size, ReplicationConfig rConfig,
+      Map<String, String> metadata, Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createKey(key, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
   }
 
   @Override
@@ -174,22 +217,95 @@ public final class OzoneBucketStub extends OzoneBucket {
         new KeyMetadataAwareOutputStream(metadata) {
           @Override
           public void close() throws IOException {
-            keyContents.put(keyName, toByteArray());
+            super.close();
+            byte[] bytes = toByteArray();
+            keyContents.put(keyName, bytes);
+            final long mtime = getModificationTime();
             keyDetails.put(keyName, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
                 keyName,
                 size,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
-                new ArrayList<>(), finalReplicationCon, metadata, null,
+                mtime,
+                mtime,
+                new ArrayList<>(), finalReplicationCon, metadata, fileEncryptionInfo(),
                 () -> readKey(keyName), true, null, null
             ));
-            super.close();
           }
         };
 
     return new OzoneOutputStream(byteArrayOutputStream, null);
+  }
+
+  @Override
+  public OzoneOutputStream createKeyIfNotExists(String keyName, long size,
+      ReplicationConfig rConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    if (keyDetails.containsKey(keyName)) {
+      throw new OMException("Key already exists",
+          ResultCodes.KEY_ALREADY_EXISTS);
+    }
+    return createKey(keyName, size, rConfig, metadata, tags);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKeyIfNotExists(String keyName, long size, ReplicationConfig rConfig,
+      Map<String, String> metadata, Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createKeyIfNotExists(keyName, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  public OzoneOutputStream createKeyIfNoneMatch(String keyName, long size, String excludedETag,
+      ReplicationConfig rConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    validateIfNoneMatch(keyName, excludedETag);
+    return addDerivedKey(createKey(keyName, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  public OzoneDataStreamOutput createStreamKeyIfNoneMatch(String keyName, long size, String excludedETag,
+      ReplicationConfig rConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    validateIfNoneMatch(keyName, excludedETag);
+    return addDerivedKey(createStreamKey(keyName, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  private void validateIfNoneMatch(String keyName, String excludedETag) throws OMException {
+    OzoneKeyDetails existing = keyDetails.get(keyName);
+    if (excludedETag != null && existing != null && existing.isEtagEquals(excludedETag)) {
+      throw new OMException("ETag matches If-None-Match", ResultCodes.KEY_ALREADY_EXISTS);
+    }
+  }
+
+  @Override
+  public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size,
+      String expectedETag, ReplicationConfig rConfig,
+      Map<String, String> metadata, Map<String, String> tags)
+      throws IOException {
+    OzoneKeyDetails existing = keyDetails.get(keyName);
+    if (existing == null) {
+      throw new OMException("Key not found for If-Match",
+          ResultCodes.KEY_NOT_FOUND);
+    }
+    if (!existing.hasEtag()) {
+      throw new OMException("Key does not have an ETag",
+          ResultCodes.ETAG_NOT_AVAILABLE);
+    }
+    if (!existing.isEtagEquals(expectedETag)) {
+      throw new OMException("ETag mismatch",
+          ResultCodes.ETAG_MISMATCH);
+    }
+    return createKey(keyName, size, rConfig, metadata, tags);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size, String expectedETag,
+      ReplicationConfig rConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(rewriteKeyIfMatch(keyName, size, expectedETag, rConfig, metadata, tags),
+        derivedKeyPiggyBacking);
   }
 
   @Override
@@ -217,15 +333,16 @@ public final class OzoneBucketStub extends OzoneBucket {
             Map<String, String> objectMetadata = keyMetadata == null ?
                 new HashMap<>() : keyMetadata;
 
+            final long mtime = getModificationTime();
             keyDetails.put(key, new OzoneKeyDetails(
                 getVolumeName(),
                 getName(),
                 key,
                 size,
-                System.currentTimeMillis(),
-                System.currentTimeMillis(),
-                new ArrayList<>(), rConfig, objectMetadata, null,
-                null, false,
+                mtime,
+                mtime,
+                new ArrayList<>(), rConfig, objectMetadata, fileEncryptionInfo(),
+                () -> readKey(key), false,
                 UserGroupInformation.getCurrentUser().getShortUserName(),
                 tags
             ));
@@ -248,6 +365,69 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createStreamKey(key, size, rConfig, keyMetadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createStreamKeyIfNotExists(key, size, rConfig, keyMetadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(rewriteStreamKeyIfMatch(key, size, expectedETag, rConfig, keyMetadata, tags),
+        derivedKeyPiggyBacking);
+  }
+
+  @Override
+  public OzoneDataStreamOutput createMultipartStreamKey(String key, long size,
+      int partNumber, String uploadID, boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createMultipartStreamKey(key, size, partNumber, uploadID), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig rConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags) throws IOException {
+    if (keyDetails.containsKey(key)) {
+      throw new OMException("Key already exists",
+          ResultCodes.KEY_ALREADY_EXISTS);
+    }
+    return createStreamKey(key, size, rConfig, keyMetadata, tags);
+  }
+
+  @Override
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig rConfig,
+      Map<String, String> keyMetadata, Map<String, String> tags)
+      throws IOException {
+    OzoneKeyDetails existing = keyDetails.get(key);
+    if (existing == null) {
+      throw new OMException("Key not found for If-Match",
+          ResultCodes.KEY_NOT_FOUND);
+    }
+    if (!existing.hasEtag()) {
+      throw new OMException("Key does not have an ETag",
+          ResultCodes.ETAG_NOT_AVAILABLE);
+    }
+    if (!existing.isEtagEquals(expectedETag)) {
+      throw new OMException("ETag mismatch",
+          ResultCodes.ETAG_MISMATCH);
+    }
+    return createStreamKey(key, size, rConfig, keyMetadata, tags);
+  }
+
+  @Override
   public OzoneDataStreamOutput createMultipartStreamKey(String key,
                                                         long size,
                                                         int partNumber,
@@ -257,6 +437,12 @@ public final class OzoneBucketStub extends OzoneBucket {
     if (multipartInfo == null || !multipartInfo.getUploadId().equals(uploadID)) {
       throw new OMException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
     } else {
+      if (isECMultipartUpload(multipartInfo)) {
+        OzoneOutputStream outputStream =
+            createMultipartKey(key, size, partNumber, uploadID);
+        return new OzoneDataStreamOutputStub(outputStream, key + size);
+      }
+
       ByteBufferStreamOutput byteBufferStreamOutput =
           new KeyMetadataAwareByteBufferStreamOutput(new HashMap<>()) {
             private final ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
@@ -271,7 +457,7 @@ public final class OzoneBucketStub extends OzoneBucket {
               buffer.get(bytes);
 
               Part part = new Part(key + size, bytes,
-                  getMetadata().get(ETAG));
+                  getMetadata().get(ETAG), getModificationTime());
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -295,6 +481,12 @@ public final class OzoneBucketStub extends OzoneBucket {
     }
   }
 
+  private boolean isECMultipartUpload(MultipartInfoStub multipartInfo) {
+    ReplicationConfig config = multipartInfo.getReplicationConfig();
+    return config != null &&
+        config.getReplicationType() == HddsProtos.ReplicationType.EC;
+  }
+
   @Override
   public OzoneInputStream readKey(String key) throws IOException {
     return new OzoneInputStream(new ByteArrayInputStream(keyContents.get(key)));
@@ -311,22 +503,91 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OzoneKey headObject(String key) throws IOException {
-    if (keyDetails.containsKey(key)) {
-      OzoneKeyDetails ozoneKeyDetails = keyDetails.get(key);
-      return new OzoneKey(ozoneKeyDetails.getVolumeName(),
-          ozoneKeyDetails.getBucketName(),
-          ozoneKeyDetails.getName(),
-          ozoneKeyDetails.getDataSize(),
-          ozoneKeyDetails.getCreationTime().toEpochMilli(),
-          ozoneKeyDetails.getModificationTime().toEpochMilli(),
-          ozoneKeyDetails.getReplicationConfig(),
-          ozoneKeyDetails.getMetadata(),
-          ozoneKeyDetails.isFile(),
-          ozoneKeyDetails.getOwner(),
-          ozoneKeyDetails.getTags());
-    } else {
-      throw new OMException(ResultCodes.KEY_NOT_FOUND);
+    return headObject(key, 0);
+  }
+
+  /**
+   * Returns metadata for a completed multipart part when {@code partNumber > 0}.
+   */
+  public OzoneKey headObject(String key, int partNumber) throws IOException {
+    OzoneKeyDetails ozoneKeyDetails = getKey(key);
+    if (partNumber <= 0) {
+      return toHeadOzoneKey(ozoneKeyDetails, ozoneKeyDetails.getDataSize());
     }
+
+    Map<Integer, Part> parts = partList.get(key);
+    if (parts == null || !parts.containsKey(partNumber)) {
+      throw new OMException("Invalid part number " + partNumber,
+          ResultCodes.INVALID_PART);
+    }
+    return toHeadOzoneKey(ozoneKeyDetails, parts.get(partNumber).getContent().length);
+  }
+
+  /**
+   * Returns part numbers and sizes for a completed multipart object from stub state.
+   */
+  public NavigableMap<Integer, Long> getCompletedMultipartPartSizes(String key)
+      throws IOException {
+    getKey(key);
+    Map<Integer, Part> parts = partList.get(key);
+    if (parts == null || parts.isEmpty()) {
+      return Collections.emptyNavigableMap();
+    }
+    NavigableMap<Integer, Long> partSizes = new TreeMap<>();
+    for (Map.Entry<Integer, Part> partEntry : parts.entrySet()) {
+      partSizes.put(partEntry.getKey(), (long) partEntry.getValue().getContent().length);
+    }
+    return partSizes;
+  }
+
+  /**
+   * Test-only helper to add key metadata for compatibility tests.
+   */
+  public void putKeyMetadataForTest(String key, String metadataKey, String metadataValue)
+      throws IOException {
+    OzoneKeyDetails details = getKey(key);
+    Map<String, String> metadata = new HashMap<>(details.getMetadata());
+    metadata.put(metadataKey, metadataValue);
+    keyDetails.put(key, new OzoneKeyDetails(
+        details.getVolumeName(),
+        details.getBucketName(),
+        details.getName(),
+        details.getDataSize(),
+        details.getCreationTime().toEpochMilli(),
+        details.getModificationTime().toEpochMilli(),
+        details.getOzoneKeyLocations(),
+        details.getReplicationConfig(),
+        metadata,
+        details.getFileEncryptionInfo(),
+        () -> readKey(key),
+        details.isFile(),
+        details.getOwner(),
+        details.getTags(),
+        details.getGeneration()));
+  }
+
+  private OzoneKey toHeadOzoneKey(OzoneKeyDetails details, long dataSize) {
+    // like OzoneKey.fromKeyInfo, keep the encryption key name of an encrypted key
+    return new OzoneKeyDetails(details.getVolumeName(),
+        details.getBucketName(),
+        details.getName(),
+        dataSize,
+        details.getCreationTime().toEpochMilli(),
+        details.getModificationTime().toEpochMilli(),
+        new ArrayList<>(),
+        details.getReplicationConfig(),
+        details.getMetadata(),
+        details.getFileEncryptionInfo(),
+        () -> readKey(details.getName()),
+        details.isFile(),
+        details.getOwner(),
+        details.getTags());
+  }
+
+  /** Like OM, a file in an encrypted bucket is encrypted with the bucket key. */
+  private FileEncryptionInfo fileEncryptionInfo() {
+    return getEncryptionKeyName() == null ? null : new FileEncryptionInfo(CipherSuite.AES_CTR_NOPADDING,
+        CryptoProtocolVersion.ENCRYPTION_ZONES, new byte[16], new byte[16], getEncryptionKeyName(), "v1");
   }
 
   @Override
@@ -396,6 +657,29 @@ public final class OzoneBucketStub extends OzoneBucket {
     keyDetails.remove(key);
   }
 
+  public void deleteKey(String key, String expectedETag) throws IOException {
+    if (expectedETag == null) {
+      deleteKey(key);
+      return;
+    }
+    OzoneKeyDetails existing = keyDetails.get(key);
+    if (existing == null) {
+      throw new OMException("Key not found for If-Match",
+          ResultCodes.KEY_NOT_FOUND);
+    }
+    if (!"*".equals(expectedETag)) {
+      if (!existing.hasEtag()) {
+        throw new OMException("Key does not have an ETag",
+            ResultCodes.ETAG_NOT_AVAILABLE);
+      }
+      if (!existing.isEtagEquals(expectedETag)) {
+        throw new OMException("ETag mismatch",
+            ResultCodes.ETAG_MISMATCH);
+      }
+    }
+    deleteKey(key);
+  }
+
   @Override
   public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
     Map<String, ErrorInfo> keyErrorMap = new HashMap<>();
@@ -433,7 +717,8 @@ public final class OzoneBucketStub extends OzoneBucket {
        ReplicationConfig config, Map<String, String> metadata, Map<String, String> tags)
       throws IOException {
     String uploadID = UUID.randomUUID().toString();
-    keyToMultipartUpload.put(keyName, new MultipartInfoStub(uploadID, metadata, tags));
+    keyToMultipartUpload.put(keyName,
+        new MultipartInfoStub(uploadID, config, metadata, tags));
     return new OmMultipartInfo(getVolumeName(), getName(), keyName, uploadID);
   }
 
@@ -449,8 +734,10 @@ public final class OzoneBucketStub extends OzoneBucket {
           new KeyMetadataAwareOutputStream((int) size, new HashMap<>()) {
             @Override
             public void close() throws IOException {
-              Part part = new Part(key + size,
-                  toByteArray(), getMetadata().get(ETAG));
+              super.close();
+              byte[] bytes = toByteArray();
+              String eTag = getMetadata().get(ETAG);
+              Part part = new Part(key + size, bytes, eTag, getModificationTime());
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -458,11 +745,16 @@ public final class OzoneBucketStub extends OzoneBucket {
               } else {
                 partList.get(key).put(partNumber, part);
               }
-              super.close();
             }
           };
       return new OzoneOutputStreamStub(keyOutputStream, key + size);
     }
+  }
+
+  @Override
+  public OzoneOutputStream createMultipartKey(String key, long size, int partNumber, String uploadID,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return addDerivedKey(createMultipartKey(key, size, partNumber, uploadID), derivedKeyPiggyBacking);
   }
 
   @Override
@@ -495,6 +787,9 @@ public final class OzoneBucketStub extends OzoneBucket {
         keyContents.put(key, output.toByteArray());
       }
 
+      Map<String, String> metadata = new HashMap<>(keyToMultipartUpload.get(key).getMetadata());
+      metadata.put(ETAG, DigestUtils.sha256Hex(output.toByteArray()) + "-" + partsMap.size());
+
       keyDetails.put(key, new OzoneKeyDetails(
           getVolumeName(),
           getName(),
@@ -503,7 +798,7 @@ public final class OzoneBucketStub extends OzoneBucket {
           System.currentTimeMillis(),
           System.currentTimeMillis(),
           new ArrayList<>(), getReplicationConfig(),
-          keyToMultipartUpload.get(key).getMetadata(), null,
+          metadata, fileEncryptionInfo(),
           () -> readKey(key), true,
           UserGroupInformation.getCurrentUser().getShortUserName(),
           keyToMultipartUpload.get(key).getTags()
@@ -512,6 +807,38 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     return new OmMultipartUploadCompleteInfo(getVolumeName(), getName(), key,
         DigestUtils.sha256Hex(key));
+  }
+
+  @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key, String uploadID,
+      Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag, String excludedETag)
+      throws IOException {
+    validateIfNoneMatch(key, excludedETag);
+    return completeMultipartUpload(key, uploadID, partsMap, expectedDataGeneration, expectedETag);
+  }
+
+  @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key,
+      String uploadID, Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    // Handle If-None-Match: * (expectedDataGeneration == 0 means create-if-absent)
+    if (expectedDataGeneration != null &&
+        expectedDataGeneration == EXPECTED_GEN_CREATE_IF_ABSENT) {
+      if (keyContents.containsKey(key)) {
+        throw new OMException("Key already exists", ResultCodes.KEY_ALREADY_EXISTS);
+      }
+    }
+
+    // Handle If-Match: <etag>
+    if (expectedETag != null) {
+      OzoneKeyDetails existingKey = keyDetails.get(key);
+      if (existingKey == null) {
+        throw new OMException("Key not found", ResultCodes.KEY_NOT_FOUND);
+      }
+      // Stub doesn't track ETag, so we just delegate
+    }
+
+    return completeMultipartUpload(key, uploadID, partsMap);
   }
 
   @Override
@@ -556,7 +883,7 @@ public final class OzoneBucketStub extends OzoneBucket {
         if (partEntry.getKey() > partNumberMarker) {
           PartInfo partInfo = new PartInfo(partEntry.getKey(),
               partEntry.getValue().getPartName(),
-              Time.now(), partEntry.getValue().getContent().length,
+              partEntry.getValue().getModificationTime(), partEntry.getValue().getContent().length,
               DatatypeConverter.printHexBinary(eTagProvider.digest(partEntry
                   .getValue().getContent())).toLowerCase());
           partInfoList.add(partInfo);
@@ -633,19 +960,42 @@ public final class OzoneBucketStub extends OzoneBucket {
     }
   }
 
+  @Override
+  public Map<String, String> getBucketTagging() throws IOException {
+    return Collections.unmodifiableMap(bucketTags);
+  }
+
+  @Override
+  public void putBucketTagging(Map<String, String> tags) throws IOException {
+    bucketTags.clear();
+    if (tags != null) {
+      bucketTags.putAll(tags);
+    }
+  }
+
+  @Override
+  public void deleteBucketTagging() throws IOException {
+    bucketTags.clear();
+  }
+
   /**
    * Class used to hold part information in a upload part request.
    */
   public static class Part {
     private String partName;
     private byte[] content;
-
     private String eTag;
+    private long modificationTime;
 
-    public Part(String name, byte[] data, String eTag) {
+    public Part(String name, byte[] data, String eTag, long modificationTime) {
       this.partName = name;
       this.content = data.clone();
       this.eTag = eTag;
+      this.modificationTime = modificationTime;
+    }
+
+    public long getModificationTime() {
+      return modificationTime;
     }
 
     public String getPartName() {
@@ -696,6 +1046,70 @@ public final class OzoneBucketStub extends OzoneBucket {
     }
   }
 
+  @Override
+  public void setLifecycleConfiguration(
+      OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
+    lifecyclesMap.put(lifecycleConfiguration.getBucket(),
+        toOzoneLifecycleConfiguration(lifecycleConfiguration));
+  }
+
+  @Override
+  public OzoneLifecycleConfiguration getLifecycleConfiguration() throws IOException {
+    OzoneLifecycleConfiguration lcc = lifecyclesMap.get(getName());
+    if (lcc == null) {
+      throw new OMException("Lifecycle configuration not found",
+          LIFECYCLE_CONFIGURATION_NOT_FOUND);
+    }
+    return lcc;
+  }
+
+  @Override
+  public void deleteLifecycleConfiguration()
+      throws IOException {
+    if (!lifecyclesMap.containsKey(getName())) {
+      throw new OMException("Lifecycle configurations does not exist",
+          OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND);
+    }
+    lifecyclesMap.remove(getName());
+  }
+
+  private static OzoneLifecycleConfiguration toOzoneLifecycleConfiguration(
+      OmLifecycleConfiguration omLifecycleConfiguration) {
+    List<OzoneLifecycleConfiguration.OzoneLCRule> rules = new ArrayList<>();
+
+    for (OmLCRule r: omLifecycleConfiguration.getRules()) {
+      OzoneLifecycleConfiguration.OzoneLCExpiration e = null;
+      OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload a = null;
+      OzoneLifecycleConfiguration.OzoneLCFilter f = null;
+
+      if (r.getExpiration() != null) {
+        e = new OzoneLifecycleConfiguration.OzoneLCExpiration(
+            r.getExpiration().getDays(), r.getExpiration().getDate());
+      }
+      if (r.getAbortIncompleteMultipartUpload() != null) {
+        a = new OzoneLifecycleConfiguration.OzoneLCAbortIncompleteMultipartUpload(
+            r.getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+      }
+      if (r.getFilter() != null) {
+        OzoneLifecycleConfiguration.LifecycleAndOperator andOperator = null;
+        if (r.getFilter().getAndOperator() != null) {
+          andOperator = new OzoneLifecycleConfiguration.LifecycleAndOperator(r.getFilter().getAndOperator()
+              .getTags(), r.getFilter().getAndOperator().getPrefix());
+        }
+        f = new OzoneLifecycleConfiguration.OzoneLCFilter(
+            r.getFilter().getPrefix(), r.getFilter().getTag(), andOperator);
+      }
+
+      rules.add(new OzoneLifecycleConfiguration.OzoneLCRule(r.getId(),
+          r.getEffectivePrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, a, f));
+    }
+
+    return new OzoneLifecycleConfiguration(
+        omLifecycleConfiguration.getVolume(),
+        omLifecycleConfiguration.getBucket(),
+        omLifecycleConfiguration.getCreationTime(), rules);
+  }
+
   /**
    * ByteArrayOutputStream stub with metadata and support for pre-commit hooks.
    * This extends KeyOutputStream to allow OzoneOutputStream.getKeyOutputStream() to return a non-null value
@@ -705,6 +1119,7 @@ public final class OzoneBucketStub extends OzoneBucket {
     private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
     private final Map<String, String> metadata;
     private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+    private long modificationTime;
 
     public KeyMetadataAwareOutputStream(Map<String, String> metadata) {
       super(null, null);
@@ -738,7 +1153,13 @@ public final class OzoneBucketStub extends OzoneBucket {
       for (CheckedRunnable<IOException> preCommit : preCommits) {
         preCommit.run();
       }
+      modificationTime = Time.now();
       buffer.close();
+    }
+
+    @Override
+    public long getModificationTime() {
+      return modificationTime;
     }
 
     @Override
@@ -766,6 +1187,7 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     private final Map<String, String> metadata;
     private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+    private long modificationTime;
 
     public KeyMetadataAwareByteBufferStreamOutput(
         Map<String, String> metadata) {
@@ -785,10 +1207,15 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     @Override
     public void close() throws IOException {
-
       for (CheckedRunnable<IOException> preCommit : preCommits) {
         preCommit.run();
       }
+      modificationTime = Time.now();
+    }
+
+    @Override
+    public long getModificationTime() {
+      return modificationTime;
     }
 
     @Override
@@ -818,18 +1245,24 @@ public final class OzoneBucketStub extends OzoneBucket {
   private static class MultipartInfoStub {
 
     private final String uploadId;
+    private final ReplicationConfig replicationConfig;
     private final Map<String, String> metadata;
     private final Map<String, String> tags;
 
-    MultipartInfoStub(String uploadId, Map<String, String> metadata,
-                      Map<String, String> tags) {
+    MultipartInfoStub(String uploadId, ReplicationConfig replicationConfig,
+                      Map<String, String> metadata, Map<String, String> tags) {
       this.uploadId = uploadId;
+      this.replicationConfig = replicationConfig;
       this.metadata = metadata;
       this.tags = tags;
     }
 
     public String getUploadId() {
       return uploadId;
+    }
+
+    public ReplicationConfig getReplicationConfig() {
+      return replicationConfig;
     }
 
     public Map<String, String> getMetadata() {

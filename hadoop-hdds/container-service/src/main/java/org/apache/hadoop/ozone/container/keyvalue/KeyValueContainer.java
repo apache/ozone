@@ -391,7 +391,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     writeLock();
     final State prevState = containerData.getState();
     try {
-      updateContainerState(UNHEALTHY);
+      if (!getContainerFile().getParentFile().exists()) {
+        // Metadata directory is absent (e.g. MISSING_METADATA_DIR detected by scanner).
+        // Attempting to write the .container file would fail
+        // The in-memory UNHEALTHY state is sufficient: SCM will receive it via ICR
+        // and schedule deletion without requiring a persisted .container file.
+        containerData.setState(UNHEALTHY);
+        LOG.debug("Skipping .container file update for container {} with missing metadata directory",
+            containerData.getContainerID());
+      } else {
+        updateContainerState(UNHEALTHY);
+      }
       clearPendingPutBlockCache();
     } finally {
       writeUnlock();
@@ -470,16 +480,24 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   /**
-   *
+   * Applies {@code update} to the in-memory container data and persists it to the .container file.
    * Must be invoked with the writeLock held.
+   * <p>
+   * The rollback only covers a failed write of the .container file: {@code update} is a {@link Runnable}, so it
+   * cannot throw a {@link StorageContainerException}, and only {@code updateContainerFile} can. When the write
+   * fails, the in-memory change has already been applied, so the previous state is restored to match the file on
+   * disk, unless the container became UNHEALTHY in the meantime. Leaving OPEN releases the space reserved for the
+   * container, and restoring OPEN does not reserve it again, so the reservation
+   * is restored explicitly.
    *
-   * @param update
-   * @throws StorageContainerException
+   * @param update the change to apply to the in-memory container data
+   * @throws StorageContainerException if the .container file cannot be written
    */
   private void updateContainerData(Runnable update)
       throws StorageContainerException {
     Preconditions.checkState(hasWriteLock());
     final State oldState = containerData.getState();
+    final boolean committedSpace = containerData.isCommittedSpace();
     try {
       update.run();
       // update the new container data to .container File
@@ -490,6 +508,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         // Failed to update .container file. Reset the state to old state only
         // if the current state is not unhealthy.
         containerData.setState(oldState);
+        // Leaving the old state may have released the reserved space, reserve it again.
+        if (committedSpace && !containerData.isCommittedSpace()) {
+          containerData.commitSpace();
+        }
       }
       throw ex;
     }
@@ -509,7 +531,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
   }
 
-  private void flushAndSyncDB() throws StorageContainerException {
+  void flushAndSyncDB() throws StorageContainerException {
     try {
       try (DBHandle db = BlockUtils.getDB(containerData, config)) {
         db.getStore().flushLog(true);
@@ -664,13 +686,22 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
         BlockUtils.removeContainerFromDB(containerData, config);
       }
-      FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
-      FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
-      FileUtils.deleteDirectory(new File(getContainerData().getContainerPath()));
+      File containerDir = new File(getContainerData().getContainerPath());
+      if (containerDir.exists()) {
+        KeyValueContainerUtil.moveToDeletedContainerDir(containerData,
+            containerData.getVolume());
+        deleteDirectory(KeyValueContainerUtil.getTmpDirectoryPath(containerData,
+            containerData.getVolume()).toFile());
+      }
     } catch (Exception ex) {
       LOG.error("Failed to cleanup destination directories for container {}",
           containerData.getContainerID(), ex);
     }
+  }
+
+  @VisibleForTesting
+  void deleteDirectory(File directory) throws IOException {
+    FileUtils.deleteDirectory(directory);
   }
 
   @Override

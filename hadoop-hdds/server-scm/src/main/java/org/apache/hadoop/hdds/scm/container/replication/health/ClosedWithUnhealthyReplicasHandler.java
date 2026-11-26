@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
@@ -109,9 +109,8 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
     // some unhealthy replicas were found so the container must be
     // over replicated due to unhealthy replicas.
     if (foundUnhealthy) {
-      request.getReport().incrementAndSample(
-          ReplicationManagerReport.HealthState.OVER_REPLICATED,
-          containerInfo.containerID());
+      request.setSimplifiedHealthStateForReporting(
+          SimplifiedContainerHealthStateForReporting.UNHEALTHY_OVER_REPLICATED);
     }
     LOG.debug("Returning {} for container {}", foundUnhealthy, containerInfo);
     return foundUnhealthy;

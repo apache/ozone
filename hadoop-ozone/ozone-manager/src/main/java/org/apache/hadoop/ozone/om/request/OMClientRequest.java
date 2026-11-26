@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.request;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNAUTHORIZED;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -30,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -45,14 +46,21 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -94,8 +102,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   public OMClientRequest(OMRequest omRequest) {
-    Objects.requireNonNull(omRequest, "omRequest == null");
-    this.omRequest = omRequest;
+    this.omRequest = Objects.requireNonNull(omRequest);
     this.omLockDetails.clear();
   }
 
@@ -112,13 +119,39 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-    LayoutVersion layoutVersion = LayoutVersion.newBuilder()
-        .setVersion(ozoneManager.getVersionManager().getMetadataLayoutVersion())
-        .build();
-    omRequest = getOmRequest().toBuilder()
-        .setUserInfo(getUserIfNotExists(ozoneManager))
-        .setLayoutVersion(layoutVersion).build();
+    final OMRequest.Builder requestBuilder = getOmRequest().toBuilder()
+        .setUserInfo(getUserIfNotExists(ozoneManager));
+
+    // VersionManager is always expected in production OzoneManager instances.
+    // Some unit tests use a minimal mocked OzoneManager, so perform null check here.
+    final OMVersionManager versionManager = ozoneManager.getVersionManager();
+    if (versionManager != null) {
+      final LayoutVersion layoutVersion = LayoutVersion.newBuilder()
+          .setVersion(versionManager.getApparentVersion().serialize())
+          .build();
+      requestBuilder.setLayoutVersion(layoutVersion);
+    }
+
+    if (requestBuilder.hasS3Authentication()) {
+      requestBuilder.setS3Authentication(
+          STSSecurityUtil.resolveS3Authentication(requestBuilder.getS3Authentication(), ozoneManager));
+    }
+
+    omRequest = requestBuilder.build();
     return omRequest;
+  }
+
+  /**
+   * Perform post-execute steps on an OMResponse.
+   *
+   * Called from the RPC context on the leader after the request has been applied successfully. When the response is
+   * served from the Ratis retry cache, this is called on a new request instance on which {@link #preExecute} has not
+   * run, and only if the command type is registered in {@code OMExecutionFlow.POST_EXECUTE_CMD_TYPES}.
+   *
+   * @return OMResponse that will be returned to the client.
+   */
+  public OMResponse postExecute(OzoneManager ozoneManager, OMResponse omResponse) throws IOException {
+    return omResponse;
   }
 
   /**
@@ -150,7 +183,11 @@ public abstract class OMClientRequest implements RequestAuditor {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, long transactionLogIndex) {
     ExecutionContext context = ExecutionContext.of(transactionLogIndex,
         TransactionInfo.getTermIndex(transactionLogIndex));
-    return validateAndUpdateCache(ozoneManager, context);
+    try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
+      OMClientResponse response = validateAndUpdateCache(ozoneManager, context);
+      response.addCleanupTables(tracker.removeUpdatedTables());
+      return response;
+    }
   }
 
   @VisibleForTesting
@@ -163,23 +200,65 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
+    return getUserInfo(omRequest, true);
+  }
+
+  /**
+   * Get authenticated user information for a read request submitted to Ratis.
+   * Client-supplied user information is not trusted on this path.
+   * @param omRequest OM request
+   * @return User Info.
+   */
+  public static OzoneManagerProtocolProtos.UserInfo getAuthenticatedUserInfo(
+      OMRequest omRequest) throws IOException {
+    return getUserInfo(omRequest, false);
+  }
+
+  private static OzoneManagerProtocolProtos.UserInfo getUserInfo(
+      OMRequest omRequest, boolean allowClientUserInfo) throws IOException {
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
     InetAddress remoteAddress = ProtobufRpcEngine.Server.getRemoteIp();
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
         OzoneManagerProtocolProtos.UserInfo.newBuilder();
 
-    // If S3 Authentication is set, determine user based on access ID.
+    // If S3 Authentication is set, determine user based on STS token first,
+    // falling back to accessId if session token not present.
     if (omRequest.hasS3Authentication()) {
-      String principal = OzoneAclUtils.accessIdToUserPrincipal(
-          omRequest.getS3Authentication().getAccessId());
-      userInfo.setUserName(principal);
+      final String accessKeyId = omRequest.getS3Authentication().getAccessId();
+      if (accessKeyId.startsWith(S3STSUtils.STS_TOKEN_PREFIX) &&
+          !omRequest.getS3Authentication().hasSessionToken()) {
+        throw new IOException("Error with STS token", new AuthenticationException(
+            "Missing session token for accessKeyId: " + accessKeyId));
+      }
+      if (omRequest.getS3Authentication().hasSessionToken()) {
+        try {
+          final String originalAccessKeyId = OzoneManager.getS3AuthEffectiveAccessId();
+          if (originalAccessKeyId != null && !originalAccessKeyId.isEmpty()) {
+            final String principal = OzoneAclUtils.accessIdToUserPrincipal(originalAccessKeyId);
+            userInfo.setUserName(principal);
+          } else {
+            throw new AuthenticationException(
+                "Invalid STS Token - originalAccessKeyId was null or empty: " + originalAccessKeyId);
+          }
+        } catch (Exception e) {
+          throw new IOException("Error with STS Token", e);
+        }
+      } else {
+        String principal = OzoneAclUtils.accessIdToUserPrincipal(
+            omRequest.getS3Authentication().getAccessId());
+        userInfo.setUserName(principal);
+      }
     } else if (user != null) {
       // Added not null checks, as in UT's these values might be null.
       userInfo.setUserName(user.getUserName());
     }
 
-    // for gRPC s3g omRequests that contain user name
-    if (user == null && omRequest.hasUserInfo()) {
+    // for gRPC s3g omRequests that contain user name. Only adopt the
+    // client-supplied user name when no identity was established above:
+    // it is unauthenticated data and must never override the identity
+    // derived from S3 authentication or from the RPC user.
+    if (allowClientUserInfo && user == null && !userInfo.hasUserName() &&
+        omRequest.hasUserInfo()) {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 
@@ -189,7 +268,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get();
     if (remoteAddress != null) {
       userInfo.setHostName(remoteAddress.getHostName());
-      userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
+      userInfo.setRemoteAddress(remoteAddress.getHostAddress());
     } else if (grpcContextClientHostname != null
         && grpcContextClientIpAddress != null) {
       userInfo.setHostName(grpcContextClientHostname);
@@ -202,7 +281,8 @@ public abstract class OMClientRequest implements RequestAuditor {
   /**
    * For non-rpc internal calls Server.getRemoteUser()
    * and Server.getRemoteIp() will be null.
-   * Passing getCurrentUser() and Ip of the Om node that started it.
+   * Passing getCurrentUser() and Ip of the Om node that started it,
+   * unless getUserInfo() already resolved a user name.
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserIfNotExists(
@@ -221,7 +301,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         LOG.debug("Couldn't get om Rpc server address", e);
         return getUserInfo();
       }
-      newuserInfo.setUserName(user.getUserName());
+      newuserInfo.setUserName(userInfo.hasUserName() ? userInfo.getUserName() : user.getUserName());
       newuserInfo.setHostName(remoteAddress.getHostName());
       newuserInfo.setRemoteAddress(remoteAddress.getHostAddress());
       return newuserInfo.build();
@@ -309,7 +389,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         OmMetadataReader omMetadataReader =
             (OmMetadataReader) rcMetadataReader.get();
 
-        omMetadataReader.checkAcls(obj, contextBuilder.build(), true);
+        omMetadataReader.checkAcls(obj, contextBuilder, true);
       }
     }
   }
@@ -566,39 +646,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * OMException, else return the path.
    */
   public static String isValidKeyPath(String path) throws OMException {
-    boolean isValid = true;
-
-    // If keyName is empty string throw error.
-    if (path.isEmpty()) {
-      throw new OMException("Invalid KeyPath, empty keyName" + path,
-          INVALID_KEY_NAME);
-    } else if (path.startsWith("/")) {
-      isValid = false;
-    } else {
-      // Check for ".." "." ":" "/"
-      String[] components = StringUtils.split(path, '/');
-      for (int i = 0; i < components.length; i++) {
-        String element = components[i];
-        if (element.equals(".") ||
-            (element.contains(":")) ||
-            (element.contains("/") || element.equals(".."))) {
-          isValid = false;
-          break;
-        }
-
-        // The string may end with a /, but not have
-        // "//" in the middle.
-        if (element.isEmpty() && i != components.length - 1) {
-          isValid = false;
-        }
-      }
-    }
-
-    if (isValid) {
-      return path;
-    } else {
-      throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
-    }
+    return OzoneFSUtils.isValidKeyPath(path, true);
   }
 
   public OMLockDetails getOmLockDetails() {
@@ -607,5 +655,20 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   public void mergeOmLockDetails(OMLockDetails details) {
     omLockDetails.merge(details);
+  }
+
+  /**
+   * A scan task may submit its state after the bucket or lifecycle configuration it was scanning is deleted.
+   * Returns false in that case, so the scan state row is not saved to DB.
+   */
+  public static boolean isScanStateValid(OMMetadataManager metadataManager, OmLifecycleScanState state)
+      throws IOException {
+    String bucketKey = state.getBucketKey();
+    OmBucketInfo bucketInfo = metadataManager.getBucketTable().get(bucketKey);
+    if (bucketInfo == null || bucketInfo.getObjectID() != state.getBucketObjID()) {
+      return false;
+    }
+    OmLifecycleConfiguration lcc = metadataManager.getLifecycleConfigurationTable().get(bucketKey);
+    return lcc != null && lcc.getUpdateID() == state.getLifecycleConfigurationUpdateID();
   }
 }

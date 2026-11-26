@@ -60,11 +60,33 @@
       <directory>.</directory>
       <includes>
         <include>.editorconfig</include>
+        <include>mvnw.cmd</include>
         <include>pom.xml</include>
         <include>README.md</include>
         <include>HISTORY.md</include>
         <include>SECURITY.md</include>
         <include>CONTRIBUTING.md</include>
+      </includes>
+    </fileSet>
+    <fileSet>
+      <directory>.</directory>
+      <includes>
+        <include>mvnw</include>
+      </includes>
+      <fileMode>0755</fileMode>
+    </fileSet>
+    <fileSet>
+      <directory>.devcontainer</directory>
+      <includes>
+        <include>**/*</include>
+      </includes>
+      <useDefaultExcludes>true</useDefaultExcludes>
+    </fileSet>
+    <fileSet>
+      <directory>.mvn</directory>
+      <includes>
+        <include>**/*.properties</include>
+        <include>*.xml</include>
       </includes>
     </fileSet>
     <fileSet>
@@ -90,7 +112,6 @@
       <useDefaultExcludes>true</useDefaultExcludes>
       <excludes>
         <exclude>**/.classpath</exclude>
-        <exclude>**/.hugo_build.lock</exclude>
         <exclude>**/.project</exclude>
         <exclude>**/.settings</exclude>
         <exclude>**/*.iml</exclude>

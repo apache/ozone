@@ -37,7 +37,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -48,12 +47,14 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.NodeOperationalStateAndIndex;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -133,9 +134,9 @@ public class TestECMisReplicationCheckHandler {
         new ContainerPlacementStatusDefault(4, 5, 9));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -148,11 +149,11 @@ public class TestECMisReplicationCheckHandler {
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.MIS_REPLICATED));
   }
 
   /**
@@ -179,9 +180,9 @@ public class TestECMisReplicationCheckHandler {
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -195,11 +196,11 @@ public class TestECMisReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.MIS_REPLICATED));
   }
 
   /**
@@ -224,9 +225,9 @@ public class TestECMisReplicationCheckHandler {
     });
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
-        Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
-        Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
-        Pair.of(IN_SERVICE, 5));
+        new NodeOperationalStateAndIndex(IN_SERVICE, 1), new NodeOperationalStateAndIndex(IN_SERVICE, 2),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 3), new NodeOperationalStateAndIndex(IN_SERVICE, 4),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     ContainerReplica unhealthyReplica =
         createContainerReplica(container.containerID(), 1, IN_SERVICE,
             State.UNHEALTHY);
@@ -248,11 +249,11 @@ public class TestECMisReplicationCheckHandler {
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
     assertEquals(0, report.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
     assertEquals(1, report.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.MIS_REPLICATED));
   }
 
 }

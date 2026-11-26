@@ -17,22 +17,26 @@
 
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class contains internal Snapshot Operation metrics.
  */
 @Metrics(about = "Snapshot Internal Operation Metrics", context = OzoneConsts.OZONE)
-public class OmSnapshotInternalMetrics {
+public final class OmSnapshotInternalMetrics implements MetricsSource {
 
   public static final String METRICS_SOURCE_NAME =
       OmSnapshotInternalMetrics.class.getSimpleName();
   private MetricsRegistry registry;
+  private String sourceName;
 
   /*
    * Total internal snapshot deletion operation metrics since last restart.
@@ -51,21 +55,57 @@ public class OmSnapshotInternalMetrics {
   @Metric("Total no. of snapshot move table keys failures")
   private MutableCounterLong numSnapshotMoveTableKeysFails;
 
-  public OmSnapshotInternalMetrics() {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
+  /*
+   * Snapshot defragmentation metrics since last restart.
+   */
+  @Metric("Total no. of snapshot defragmentation operations (full and incremental)")
+  private MutableCounterLong numSnapshotDefrag;
+  @Metric("Total no. of snapshot defragmentation failures (full and incremental)")
+  private MutableCounterLong numSnapshotDefragFails;
+  @Metric("Total no. of snapshots skipped for defragmentation (non-active or already defragmented)")
+  private MutableCounterLong numSnapshotDefragSnapshotSkipped;
+  @Metric("Total no. of full defragmentation operations")
+  private MutableCounterLong numSnapshotFullDefrag;
+  @Metric("Total no. of full defragmentation failures")
+  private MutableCounterLong numSnapshotFullDefragFails;
+  @Metric("Total no. of tables compacted during full defragmentation")
+  private MutableCounterLong numSnapshotFullDefragTablesCompacted;
+  @Metric("Total no. of incremental defragmentation operations")
+  private MutableCounterLong numSnapshotIncDefrag;
+  @Metric("Total no. of incremental defragmentation failures")
+  private MutableCounterLong numSnapshotIncDefragFails;
+  @Metric("Total no. of delta files processed during incremental defragmentation")
+  private MutableCounterLong numSnapshotIncDefragDeltaFilesProcessed;
+
+  private OmSnapshotInternalMetrics(String sourceName) {
+    this.sourceName = sourceName;
+    this.registry = new MetricsRegistry(sourceName);
   }
 
-  public static OmSnapshotInternalMetrics create() {
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
-        "Metrics tracking the progress of snapshot internal operations",
-        new OmSnapshotInternalMetrics());
+  public static OmSnapshotInternalMetrics create(String omServiceId,
+      String omNodeId) {
+    String sourceName = MetricUtil.getMetricsSourceName(METRICS_SOURCE_NAME,
+        omServiceId, omNodeId);
+    OmSnapshotInternalMetrics metrics = new OmSnapshotInternalMetrics(sourceName);
+    metrics.register();
+    return metrics;
+  }
+
+  public void register() {
+    DefaultMetricsSystem.instance().register(sourceName,
+        "Metrics tracking the progress of snapshot internal operations", this);
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    registry.snapshot(collector.addRecord(registry.info()), all);
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+  public void unregister() {
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 
   public void incNumSnapshotPurges() {
@@ -114,5 +154,77 @@ public class OmSnapshotInternalMetrics {
 
   public long getNumSnapshotMoveTableKeysFails() {
     return numSnapshotMoveTableKeysFails.value();
+  }
+
+  public void incNumSnapshotDefrag() {
+    numSnapshotDefrag.incr();
+  }
+
+  public void incNumSnapshotDefragFails() {
+    numSnapshotDefragFails.incr();
+  }
+
+  public void incNumSnapshotDefragSnapshotSkipped() {
+    numSnapshotDefragSnapshotSkipped.incr();
+  }
+
+  public void incNumSnapshotFullDefrag() {
+    numSnapshotFullDefrag.incr();
+  }
+
+  public void incNumSnapshotFullDefragFails() {
+    numSnapshotFullDefragFails.incr();
+  }
+
+  public void incNumSnapshotFullDefragTablesCompacted(long count) {
+    numSnapshotFullDefragTablesCompacted.incr(count);
+  }
+
+  public void incNumSnapshotIncDefrag() {
+    numSnapshotIncDefrag.incr();
+  }
+
+  public void incNumSnapshotIncDefragFails() {
+    numSnapshotIncDefragFails.incr();
+  }
+
+  public void incNumSnapshotIncDefragDeltaFilesProcessed(long count) {
+    numSnapshotIncDefragDeltaFilesProcessed.incr(count);
+  }
+
+  public long getNumSnapshotDefrag() {
+    return numSnapshotDefrag.value();
+  }
+
+  public long getNumSnapshotDefragFails() {
+    return numSnapshotDefragFails.value();
+  }
+
+  public long getNumSnapshotDefragSnapshotSkipped() {
+    return numSnapshotDefragSnapshotSkipped.value();
+  }
+
+  public long getNumSnapshotFullDefrag() {
+    return numSnapshotFullDefrag.value();
+  }
+
+  public long getNumSnapshotFullDefragFails() {
+    return numSnapshotFullDefragFails.value();
+  }
+
+  public long getNumSnapshotFullDefragTablesCompacted() {
+    return numSnapshotFullDefragTablesCompacted.value();
+  }
+
+  public long getNumSnapshotIncDefrag() {
+    return numSnapshotIncDefrag.value();
+  }
+
+  public long getNumSnapshotIncDefragFails() {
+    return numSnapshotIncDefragFails.value();
+  }
+
+  public long getNumSnapshotIncDefragDeltaFilesProcessed() {
+    return numSnapshotIncDefragDeltaFilesProcessed.value();
   }
 }

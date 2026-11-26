@@ -32,7 +32,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.time.Instant;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -62,11 +62,11 @@ import org.yaml.snakeyaml.Yaml;
  */
 public class TestOmSnapshotLocalDataYaml {
 
+  private static final long LAST_DEFRAG_TIME = 123456789L;
+
   private static String testRoot = new FileSystemTestHelper().getTestRootDir();
   private static final OmSnapshotLocalDataYaml.YamlFactory YAML_FACTORY = new OmSnapshotLocalDataYaml.YamlFactory();
   private static ObjectSerializer<OmSnapshotLocalData> omSnapshotLocalDataSerializer;
-
-  private static final Instant NOW = Instant.now();
 
   @BeforeAll
   public static void setupSerializer() throws IOException {
@@ -126,7 +126,7 @@ public class TestOmSnapshotLocalDataYaml {
     dataYaml.setSstFiltered(true);
 
     // Set last defrag time
-    dataYaml.setLastDefragTime(NOW.toEpochMilli());
+    dataYaml.setLastDefragTime(LAST_DEFRAG_TIME);
 
     // Set needs defrag flag
     dataYaml.setNeedsDefrag(true);
@@ -173,7 +173,7 @@ public class TestOmSnapshotLocalDataYaml {
         ImmutableList.of(new SstFileInfo("sst1", "k1", "k2", "table1"),
             new SstFileInfo("sst2", "k3", "k4", "table1"),
             new SstFileInfo("sst3", "k4", "k5", "table2"))), notDefraggedSSTFiles);
-    assertEquals(NOW.toEpochMilli(), snapshotData.getLastDefragTime());
+    assertEquals(LAST_DEFRAG_TIME, snapshotData.getLastDefragTime());
     assertTrue(snapshotData.getNeedsDefrag());
 
     Map<Integer, VersionMeta> defraggedSSTFiles = snapshotData.getVersionSstFileInfos();
@@ -231,6 +231,104 @@ public class TestOmSnapshotLocalDataYaml {
         defraggedFiles.get(45));
   }
 
+  /**
+   * Writes a copy of the YAML without previousSnapshotVersions, as written before it was added.
+   */
+  private File writeWithoutPreviousSnapshotVersions(File yamlFile) throws IOException {
+    File oldLayout = new File(testRoot, "old-" + yamlFile.getName());
+    String content = FileUtils.readFileToString(yamlFile, StandardCharsets.UTF_8);
+    String oldContent = content.replaceFirst("(?m)^" + OzoneConsts.OM_SLD_PREV_SNAP_VERSIONS + ":.*\\n(  .*\\n)*", "");
+    assertThat(oldContent).isNotEqualTo(content).doesNotContain(OzoneConsts.OM_SLD_PREV_SNAP_VERSIONS);
+    FileUtils.writeStringToFile(oldLayout, oldContent, StandardCharsets.UTF_8);
+    return oldLayout;
+  }
+
+  /**
+   * Writes a copy of the YAML cut at versionSstFileInfos, followed by an unterminated mapping.
+   */
+  private File writeTruncatedAtSstFiles(File yamlFile) throws IOException {
+    File truncated = new File(testRoot, "truncated-" + yamlFile.getName());
+    String content = FileUtils.readFileToString(yamlFile, StandardCharsets.UTF_8);
+    String key = OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO + ":";
+    FileUtils.writeStringToFile(truncated, content.substring(0, content.indexOf(key)) + key + " {\n",
+        StandardCharsets.UTF_8);
+    return truncated;
+  }
+
+  @Test
+  public void testPreviousSnapshotVersionsWrittenBeforeSstFiles() throws IOException {
+    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot8", TransactionInfo.valueOf(1, 2)).getLeft();
+    String content = FileUtils.readFileToString(yamlFile, StandardCharsets.UTF_8);
+    int sstFilesIndex = content.indexOf("\n" + OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO + ":");
+    assertThat(sstFilesIndex).isPositive();
+    for (String key : asList(OzoneConsts.OM_SLD_SNAP_ID, OzoneConsts.OM_SLD_PREV_SNAP_ID, OzoneConsts.OM_SLD_VERSION,
+        OzoneConsts.OM_SLD_PREV_SNAP_VERSIONS)) {
+      assertThat(content.indexOf("\n" + key + ":")).as(key).isPositive().isLessThan(sstFilesIndex);
+    }
+
+    // Loading only the part before the SST file lists gives the same result as loading the whole file.
+    File oldLayout = writeWithoutPreviousSnapshotVersions(yamlFile);
+    OmSnapshotLocalData expected = OmSnapshotLocalDataYaml.loadWithoutSstFiles(oldLayout);
+    OmSnapshotLocalData loaded = OmSnapshotLocalDataYaml.loadWithoutSstFiles(writeTruncatedAtSstFiles(yamlFile));
+    assertEquals(expected.getSnapshotId(), loaded.getSnapshotId());
+    assertEquals(expected.getPreviousSnapshotId(), loaded.getPreviousSnapshotId());
+    assertEquals(expected.getVersion(), loaded.getVersion());
+    assertEquals(expected.getVersionSstFileInfos(), loaded.getVersionSstFileInfos());
+
+    // Without previousSnapshotVersions the SST file lists are parsed.
+    File oldTruncated = writeTruncatedAtSstFiles(oldLayout);
+    assertThrows(IOException.class, () -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(oldTruncated));
+  }
+
+  @Test
+  public void testChecksumWithAndWithoutPreviousSnapshotVersions() throws IOException {
+    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot9", TransactionInfo.valueOf(1, 2)).getLeft();
+    File oldLayout = writeWithoutPreviousSnapshotVersions(yamlFile);
+    OmSnapshotLocalData newData = omSnapshotLocalDataSerializer.load(yamlFile);
+    OmSnapshotLocalData oldData = omSnapshotLocalDataSerializer.load(oldLayout);
+
+    // previousSnapshotVersions is not part of the checksum, so a file verifies the same with or without it.
+    assertEquals(newData.getChecksum(), oldData.getChecksum());
+    assertTrue(omSnapshotLocalDataSerializer.verifyChecksum(newData));
+    assertTrue(omSnapshotLocalDataSerializer.verifyChecksum(oldData));
+
+    // Saving a file loaded without previousSnapshotVersions adds it back.
+    omSnapshotLocalDataSerializer.save(oldLayout, oldData);
+    assertEquals(FileUtils.readFileToString(yamlFile, StandardCharsets.UTF_8),
+        FileUtils.readFileToString(oldLayout, StandardCharsets.UTF_8));
+  }
+
+  @Test
+  public void testLoadWithoutSstFiles() throws IOException {
+    File newLayout = writeToYaml(UUID.randomUUID(), "snapshot7", TransactionInfo.valueOf(1, 2)).getLeft();
+    for (File yamlFile : asList(newLayout, writeWithoutPreviousSnapshotVersions(newLayout))) {
+      assertLoadWithoutSstFiles(yamlFile);
+    }
+
+    File noSnapshotId = new File(testRoot, "noSnapshotId.yaml");
+    FileUtils.writeStringToFile(noSnapshotId, FileUtils.readFileToString(newLayout, StandardCharsets.UTF_8)
+        .replaceFirst("(?m)^" + OzoneConsts.OM_SLD_SNAP_ID + ": .*\\n", ""), StandardCharsets.UTF_8);
+    IOException ex = assertThrows(IOException.class, () -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(noSnapshotId));
+    assertThat(ex).hasMessageContaining("Missing " + OzoneConsts.OM_SLD_SNAP_ID);
+  }
+
+  private void assertLoadWithoutSstFiles(File yamlFile) throws IOException {
+    OmSnapshotLocalData fullData = omSnapshotLocalDataSerializer.load(yamlFile);
+    OmSnapshotLocalData metaData = OmSnapshotLocalDataYaml.loadWithoutSstFiles(yamlFile);
+
+    assertEquals(fullData.getSnapshotId(), metaData.getSnapshotId());
+    assertEquals(fullData.getPreviousSnapshotId(), metaData.getPreviousSnapshotId());
+    assertEquals(fullData.getVersion(), metaData.getVersion());
+    assertThat(metaData.getVersionSstFileInfos()).hasSameSizeAs(fullData.getVersionSstFileInfos());
+    fullData.getVersionSstFileInfos().forEach((version, versionMeta) -> {
+      assertThat(versionMeta.getSstFiles()).isNotEmpty();
+      assertThat(metaData.getVersionSstFileInfos()).containsKey(version);
+      VersionMeta metaOnly = metaData.getVersionSstFileInfos().get(version);
+      assertEquals(versionMeta.getPreviousSnapshotVersion(), metaOnly.getPreviousSnapshotVersion());
+      assertThat(metaOnly.getSstFiles()).isEmpty();
+    });
+  }
+
   @Test
   public void testEmptyFile() throws IOException {
     File emptyFile = new File(testRoot, "empty.yaml");
@@ -239,6 +337,42 @@ public class TestOmSnapshotLocalDataYaml {
     IOException ex = assertThrows(IOException.class, () -> omSnapshotLocalDataSerializer.load(emptyFile));
 
     assertThat(ex).hasMessageContaining("Failed to load file. File is empty.");
+    assertThrows(IOException.class, () -> OmSnapshotLocalDataYaml.loadWithoutSstFiles(emptyFile));
+  }
+
+  @Test
+  public void testLoadYamlLargerThanDefaultSnakeYamlLimit() throws IOException {
+    UUID snapshotId = UUID.randomUUID();
+    File yamlFile = new File(testRoot, "large-snapshot.yaml");
+    StringBuilder yaml = new StringBuilder(4 * 1024 * 1024);
+    yaml.append("!<OmSnapshotLocalData>\n")
+        .append("checksum: \"0000000000000000000000000000000000000000000000000000000000000000\"\n")
+        .append("dbTxSequenceNumber: 10\n")
+        .append("isSSTFiltered: false\n")
+        .append("lastDefragTime: 0\n")
+        .append("needsDefrag: false\n")
+        .append("snapshotId: \"").append(snapshotId).append("\"\n")
+        .append("version: 0\n")
+        .append("versionSstFileInfos:\n")
+        .append("  0: !<VersionMeta>\n")
+        .append("    previousSnapshotVersion: 0\n")
+        .append("    sstFiles:\n");
+    int sstFileCount = 0;
+    while (yaml.length() <= 3 * 1024 * 1024 + 1024) {
+      yaml.append("    - !<SstFileInfo>\n")
+          .append("      fileName: file-").append(sstFileCount).append(".sst\n")
+          .append("      startKey: key-start-").append(sstFileCount).append("-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n")
+          .append("      endKey: key-end-").append(sstFileCount).append("-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n")
+          .append("      columnFamily: fileTable\n");
+      sstFileCount++;
+    }
+    FileUtils.writeStringToFile(yamlFile, yaml.toString(), StandardCharsets.UTF_8);
+    assertThat(yamlFile.length()).isGreaterThan(3L * 1024 * 1024);
+
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
+
+    assertThat(snapshotData.getSnapshotId()).isEqualTo(snapshotId);
+    assertThat(snapshotData.getVersionSstFileInfos().get(0).getSstFiles()).hasSize(sstFileCount);
   }
 
   @Test
@@ -261,7 +395,7 @@ public class TestOmSnapshotLocalDataYaml {
   }
 
   @Test
-  public void testYamlContainsAllFields() throws IOException {
+  public void testYamlContainsCurrentFields() throws IOException {
     UUID snapshotId = UUID.randomUUID();
     TransactionInfo transactionInfo = TransactionInfo.valueOf(ThreadLocalRandom.current().nextLong(),
         ThreadLocalRandom.current().nextLong());
@@ -279,5 +413,44 @@ public class TestOmSnapshotLocalDataYaml {
     assertThat(content).contains(OzoneConsts.OM_SLD_SNAP_ID);
     assertThat(content).contains(OzoneConsts.OM_SLD_PREV_SNAP_ID);
     assertThat(content).contains(OzoneConsts.OM_SLD_TXN_INFO);
+  }
+
+  @Test
+  public void testLoadYamlWithoutLastDefragTimeDefaultsTo0() throws IOException {
+    UUID snapshotId = UUID.randomUUID();
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot5", null);
+    File yamlFile = yamlFilePrevIdPair.getLeft();
+    String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
+    String legacyContent = content.replace("lastDefragTime: " + LAST_DEFRAG_TIME + "\n", "");
+    FileUtils.writeStringToFile(yamlFile, legacyContent, Charset.defaultCharset());
+
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
+
+    assertEquals(44, snapshotData.getVersion());
+    assertEquals(0L, snapshotData.getLastDefragTime());
+    assertTrue(snapshotData.getNeedsDefrag());
+    assertTrue(snapshotData.getSstFiltered());
+    assertEquals(3, snapshotData.getVersionSstFileInfos().size());
+  }
+
+  @Test
+  public void testLoadYamlWithEmptyLastDefragTimeDefaultsTo0() throws IOException {
+    // Parser compatibility for older/edited YAML: removing this field or
+    // leaving it empty must not make deserialization fail.
+    UUID snapshotId = UUID.randomUUID();
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot6", null);
+    File yamlFile = yamlFilePrevIdPair.getLeft();
+    String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
+    String legacyContent = content.replace("lastDefragTime: " + LAST_DEFRAG_TIME,
+        "lastDefragTime:");
+    FileUtils.writeStringToFile(yamlFile, legacyContent, Charset.defaultCharset());
+
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
+
+    assertEquals(44, snapshotData.getVersion());
+    assertEquals(0L, snapshotData.getLastDefragTime());
+    assertTrue(snapshotData.getNeedsDefrag());
+    assertTrue(snapshotData.getSstFiltered());
+    assertEquals(3, snapshotData.getVersionSstFileInfos().size());
   }
 }

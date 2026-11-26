@@ -165,7 +165,7 @@ class TestSecureOzoneContainer {
           }
 
           ContainerCommandRequestProto request =
-              getCreateContainerSecureRequest(containerID.getId(),
+              getCreateContainerSecureRequest(containerID.getIdForTesting(),
                   client.getPipeline(), token);
           ContainerCommandResponseProto response = client.sendCommand(request);
           assertNotNull(response);

@@ -24,7 +24,7 @@ import static org.apache.ozone.recon.schema.SqlDbUtils.listAllTables;
 import static org.apache.ozone.recon.schema.StatsSchemaDefinition.GLOBAL_STATS_TABLE_NAME;
 import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -34,12 +34,8 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
-import javax.sql.DataSource;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.ozone.recon.ReconContext;
-import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
-import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
+import org.apache.hadoop.ozone.recon.upgrade.ReconVersion;
+import org.apache.hadoop.ozone.recon.upgrade.ReconVersionManager;
 import org.apache.ozone.recon.schema.SchemaVersionTableDefinition;
 import org.jooq.DSLContext;
 import org.jooq.Record1;
@@ -64,16 +60,16 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     ResultSet resultSet = metaData.getColumns(null, null,
         SCHEMA_VERSION_TABLE_NAME, null);
 
-    List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
+    // SQLite reports BIGINT columns as INTEGER and TIMESTAMP columns as VARCHAR.
+    List<ColumnNameAndType> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("version_number", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("applied_on", Types.TIMESTAMP));
+    expectedPairs.add(new ColumnNameAndType("version_number", Types.INTEGER));
+    expectedPairs.add(new ColumnNameAndType("applied_on", Types.VARCHAR));
 
-    List<Pair<String, Integer>> actualPairs = new ArrayList<>();
+    List<ColumnNameAndType> actualPairs = new ArrayList<>();
 
     while (resultSet.next()) {
-      actualPairs.add(new ImmutablePair<>(resultSet.getString("COLUMN_NAME"),
-          resultSet.getInt("DATA_TYPE")));
+      actualPairs.add(new ColumnNameAndType(resultSet.getString("COLUMN_NAME"), resultSet.getInt("DATA_TYPE")));
     }
 
     assertEquals(2, actualPairs.size(), "Unexpected number of columns");
@@ -141,7 +137,8 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
    *
    * Expected Outcome:
    * - The schema version table is created during initialization.
-   * - The MLV is set to the latest SLV (Software Layout Version), indicating the schema is up-to-date.
+   * - The persisted apparent version in the table is set to the current software version, indicating the schema is
+   * up-to-date.
    * - No upgrade actions are triggered as all tables are already at the latest version.
    */
   @Test
@@ -153,22 +150,17 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize the schema
     SchemaVersionTableDefinition schemaVersionTable = new SchemaVersionTableDefinition(getDataSource());
-    schemaVersionTable.setLatestSLV(3); // Assuming the latest SLV = 3
+    schemaVersionTable.setFreshInstallVersion(3);
     schemaVersionTable.initializeSchema();
 
     // Verify that the SchemaVersionTable is created
     boolean tableExists = TABLE_EXISTS_CHECK.test(connection, SCHEMA_VERSION_TABLE_NAME);
-    assertEquals(true, tableExists, "The Schema Version Table should be created.");
+    assertTrue(tableExists, "The Schema Version Table should be created.");
 
-    // Initialize ReconSchemaVersionTableManager and ReconLayoutVersionManager
-    ReconSchemaVersionTableManager schemaVersionTableManager = new ReconSchemaVersionTableManager(getDataSource());
-    DataSource mockDataSource = mock(DataSource.class);
-    ReconLayoutVersionManager layoutVersionManager =
-        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class), mockDataSource);
-
-    // Fetch and verify the current MLV
-    int mlv = layoutVersionManager.getCurrentMLV();
-    assertEquals(3, mlv, "For a fresh install, MLV should be set to the latest SLV value.");
+    try (ReconVersionManager versionManager = new ReconVersionManager(getDataSource())) {
+      assertEquals(3, versionManager.getPersistedApparentVersion(),
+          "For a fresh install, apparent version should equal software version.");
+    }
   }
 
   /**
@@ -178,7 +170,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
    *
    * Expected Outcome:
    * - The schema version table is created during initialization.
-   * - The MLV is set to -1, indicating the starting point of the schema version framework.
+   * - The apparent version is INITIAL_VERSION (empty version table).
    * - Ensures only necessary upgrades are executed, avoiding redundant updates.
    */
   @Test
@@ -198,29 +190,24 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Verify SchemaVersionTable is created
     boolean tableExists = TABLE_EXISTS_CHECK.test(connection, SCHEMA_VERSION_TABLE_NAME);
-    assertEquals(true, tableExists, "The Schema Version Table should be created.");
+    assertTrue(tableExists, "The Schema Version Table should be created.");
 
-    // Initialize ReconSchemaVersionTableManager and ReconLayoutVersionManager
-    ReconSchemaVersionTableManager schemaVersionTableManager = new ReconSchemaVersionTableManager(getDataSource());
-    DataSource mockDataSource = mock(DataSource.class);
-    ReconLayoutVersionManager layoutVersionManager =
-        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class), mockDataSource);
-
-    // Fetch and verify the current MLV
-    int mlv = layoutVersionManager.getCurrentMLV();
-    assertEquals(-1, mlv, "For a pre-upgraded cluster, MLV should be set to -1.");
+    try (ReconVersionManager versionManager = new ReconVersionManager(getDataSource())) {
+      assertEquals(ReconVersion.INITIAL_VERSION.serialize(), versionManager.getPersistedApparentVersion(),
+          "For a pre-upgraded cluster, apparent version should be INITIAL_VERSION.");
+    }
   }
 
   /***
    * Scenario:
    * - This simulates a cluster where the schema version table already exists,
    *   indicating the schema version framework is in place.
-   * - The schema version table contains a previously finalized Metadata Layout Version (MLV).
+   * - The schema version table contains a previously finalized apparent version.
    *
    * Expected Outcome:
-   * - The MLV stored in the schema version table (2) is correctly read by the ReconLayoutVersionManager.
-   * - The MLV is retained and not overridden by the SLV value (3) during schema initialization.
-   * - This ensures no unnecessary upgrades are triggered and the existing MLV remains consistent.
+   * - The apparent version stored in the schema version table (2) is correctly read.
+   * - It is retained and not overridden by the software version (3) during schema initialization.
+   * - This ensures no unnecessary upgrades are triggered and the existing apparent version remains consistent.
    */
   @Test
   public void testUpgradedClusterScenario() throws Exception {
@@ -236,7 +223,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
       createSchemaVersionTable(connection);
     }
 
-    // Insert a single existing MLV (e.g., version 2) into the Schema Version Table
+    // Insert apparent version 2 into the Schema Version Table
     DSLContext dslContext = DSL.using(connection);
     dslContext.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
         .columns(DSL.field(name("version_number")),
@@ -246,22 +233,14 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
 
     // Initialize the schema
     SchemaVersionTableDefinition schemaVersionTable = new SchemaVersionTableDefinition(getDataSource());
-    schemaVersionTable.setLatestSLV(3); // Assuming the latest SLV = 3
+    schemaVersionTable.setFreshInstallVersion(3);
     schemaVersionTable.initializeSchema();
 
-    // Initialize managers to interact with schema version framework
-    ReconSchemaVersionTableManager schemaVersionTableManager = new ReconSchemaVersionTableManager(getDataSource());
-    DataSource mockDataSource = mock(DataSource.class);
-    ReconLayoutVersionManager layoutVersionManager =
-        new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class), mockDataSource);
-
-    // Fetch and verify the current MLV stored in the database
-    int mlv = layoutVersionManager.getCurrentMLV();
-
-    // Assert that the MLV stored in the DB is retained and not overridden by the SLV value
-    // when running initializeSchema() before upgrade takes place
-    assertEquals(2, mlv, "For a cluster with an existing schema version framework, " +
-        "the MLV should match the value stored in the DB.");
+    try (ReconVersionManager versionManager = new ReconVersionManager(getDataSource())) {
+      assertEquals(2, versionManager.getPersistedApparentVersion(),
+          "For a cluster with an existing schema version framework, " +
+              "the apparent version should match the value stored in the DB.");
+    }
   }
 
   /**

@@ -310,7 +310,7 @@
                 "type": "prometheus"
               },
               "editorMode": "code",
-              "expr": "jvm_metrics_cpu_jvm_load{instance=~\".+9875|.+9876\"}",
+              "expr": "jvm_metrics_cpu_jvm_load{instance=~\".+9874|.+9875\"}",
               "legendFormat": "{{instance}}",
               "range": true,
               "refId": "A"

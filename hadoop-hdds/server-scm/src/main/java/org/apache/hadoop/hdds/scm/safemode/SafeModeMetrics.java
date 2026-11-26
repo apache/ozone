@@ -47,7 +47,7 @@ public class SafeModeMetrics {
 
   // Pipeline metrics for safemode
   private @Metric MutableGaugeLong numHealthyPipelinesThreshold;
-  private @Metric MutableCounterLong currentHealthyPipelinesCount;
+  private @Metric MutableGaugeLong currentHealthyPipelinesCount;
   private @Metric MutableGaugeLong
       numPipelinesWithAtleastOneReplicaReportedThreshold;
   private @Metric MutableCounterLong
@@ -58,6 +58,15 @@ public class SafeModeMetrics {
   
   @Metric private MutableGaugeLong numRequiredDatanodesThreshold;
   @Metric private MutableCounterLong currentRegisteredDatanodesCount;
+
+  @Metric("Wall-clock time (ms) SCM spent in safe mode for the last exit")
+  private MutableGaugeLong scmSafeModeExitDurationMs;
+  @Metric("Duration (ms) of the last Ratis container safe mode rule incremental refresh")
+  private MutableGaugeLong lastRatisContainerSafeModeRuleRefreshDurationMs;
+  @Metric("Duration (ms) of the last EC container safe mode rule incremental refresh")
+  private MutableGaugeLong lastEcContainerSafeModeRuleRefreshDurationMs;
+  @Metric("Number of refresh calls before exiting safemode")
+  private MutableCounterLong numContainerSafeModeRuleRefreshes;
 
   public static SafeModeMetrics create() {
     final MetricsSystem ms = DefaultMetricsSystem.instance();
@@ -70,6 +79,10 @@ public class SafeModeMetrics {
 
   public void incCurrentHealthyPipelinesCount() {
     this.currentHealthyPipelinesCount.incr();
+  }
+
+  public void setNumCurrentHealthyPipelines(long val) {
+    this.currentHealthyPipelinesCount.set(val);
   }
 
   public void setNumPipelinesWithAtleastOneReplicaReportedThreshold(long val) {
@@ -109,15 +122,37 @@ public class SafeModeMetrics {
     this.currentContainersWithECDataReplicaReportedCount.incr();
   }
 
+  public void incNumContainerSafeModeRuleRefreshes() {
+    this.numContainerSafeModeRuleRefreshes.incr();
+  }
+
   public void incCurrentRegisteredDatanodesCount() {
     this.currentRegisteredDatanodesCount.incr();
+  }
+
+  public void setScmSafeModeExitDurationMs(long durationMs) {
+    this.scmSafeModeExitDurationMs.set(durationMs);
+  }
+
+  public void setLastContainerSafeModeRuleRefreshDurationMs(
+      HddsProtos.ReplicationType type, long durationMs) {
+    switch (type) {
+    case RATIS:
+      this.lastRatisContainerSafeModeRuleRefreshDurationMs.set(durationMs);
+      break;
+    case EC:
+      this.lastEcContainerSafeModeRuleRefreshDurationMs.set(durationMs);
+      break;
+    default:
+      break;
+    }
   }
 
   MutableGaugeLong getNumHealthyPipelinesThreshold() {
     return numHealthyPipelinesThreshold;
   }
 
-  MutableCounterLong getCurrentHealthyPipelinesCount() {
+  MutableGaugeLong getCurrentHealthyPipelinesCount() {
     return currentHealthyPipelinesCount;
   }
 
@@ -141,7 +176,11 @@ public class SafeModeMetrics {
   MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
     return currentContainersWithOneReplicaReportedCount;
   }
-  
+
+  public MutableCounterLong getNumContainerSafeModeRuleRefreshes() {
+    return numContainerSafeModeRuleRefreshes;
+  }
+
   MutableCounterLong getCurrentRegisteredDatanodesCount() {
     return currentRegisteredDatanodesCount;
   }

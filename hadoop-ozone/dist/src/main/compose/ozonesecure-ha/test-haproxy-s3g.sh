@@ -25,6 +25,7 @@ export COMPOSE_DIR
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
+export COMPOSE_FILE=docker-compose.yaml:s3-haproxy.yaml
 
 : ${OZONE_BUCKET_KEY_NAME:=key1}
 
@@ -35,11 +36,7 @@ start_docker_env
 
 execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
-## Exclude virtual-host tests. This is tested separately as it requires additional config.
-exclude="--exclude virtual-host"
-for bucket in encrypted; do
-  execute_robot_test recon -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
-  # some tests are independent of the bucket type, only need to be run once
-  ## Exclude virtual-host.robot
-  exclude="--exclude virtual-host --exclude no-bucket-type"
-done
+# some S3 tests are independent of the bucket type, only need to be run once: here (i.e. no exclusions)
+bucket=encrypted
+layout=OBJECT_STORE
+execute_robot_test recon -v BUCKET:${bucket} -v BUCKET_LAYOUT:${layout} -N s3-${layout}-${bucket} s3

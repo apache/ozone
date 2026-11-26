@@ -41,14 +41,14 @@ import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,10 +81,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     conf.setFromObject(config);
 
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 3);
-    conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
-    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
-    conf.setQuietMode(false);
+    OzoneTestUtils.setFastPipelineScrub(conf);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
@@ -97,7 +94,6 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
         .setNumDatanodes(5)
         .build();
     cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
@@ -152,7 +148,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
     BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
-    TestHelper.waitForPipelineClose(key, cluster, false);
+    OzoneTestHelper.waitForPipelineClose(key, cluster, false);
     key.flush();
     assertInstanceOf(GroupMismatchException.class,
         HddsClientUtils.checkForException(blockOutputStream.getIoException()));
@@ -166,13 +162,13 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
                                       long size) throws Exception {
-    return TestHelper
+    return OzoneTestHelper
         .createKey(keyName, type, ReplicationFactor.ONE,
             size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    TestHelper
+    OzoneTestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

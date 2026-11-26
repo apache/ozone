@@ -42,6 +42,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 /** Test {@link Archiver}. */
@@ -76,22 +77,19 @@ class TestArchiver {
     Files.write(tempFile.toPath(), "Test Content".getBytes(StandardCharsets.UTF_8));
 
     TarArchiveOutputStream mockArchiveOutput = mock(TarArchiveOutputStream.class);
-    TarArchiveEntry mockEntry = new TarArchiveEntry(entryName);
-    AtomicBoolean isHardLinkCreated = new AtomicBoolean(false);
-    when(mockArchiveOutput.createArchiveEntry(any(File.class), eq(entryName)))
-        .thenAnswer(invocation -> {
-          File linkFile = invocation.getArgument(0);
-          isHardLinkCreated.set(Files.isSameFile(tempFile.toPath(), linkFile.toPath()));
-          return mockEntry;
-        });
 
     // Call method under test
     long bytesCopied = Archiver.linkAndIncludeFile(tempFile, entryName, mockArchiveOutput, tmpDir);
     assertEquals(Files.size(tempFile.toPath()), bytesCopied);
     // Verify archive interactions
-    verify(mockArchiveOutput, times(1)).putArchiveEntry(mockEntry);
+    ArgumentCaptor<TarArchiveEntry> entryCaptor = ArgumentCaptor.forClass(TarArchiveEntry.class);
+    verify(mockArchiveOutput, times(1)).putArchiveEntry(entryCaptor.capture());
     verify(mockArchiveOutput, times(1)).closeArchiveEntry();
-    assertTrue(isHardLinkCreated.get());
+
+    TarArchiveEntry capturedEntry = entryCaptor.getValue();
+    assertEquals(entryName, capturedEntry.getName());
+    assertEquals(Files.size(tempFile.toPath()), capturedEntry.getSize());
+
     assertFalse(Files.exists(tmpDir.resolve(entryName)));
     // Cleanup
     assertTrue(tempFile.delete());
@@ -135,4 +133,44 @@ class TestArchiver {
     Files.deleteIfExists(tmpDir);
   }
 
+  @Test
+  void appendFileCreatesAndExtendsTar() throws IOException {
+    Path tmpDir = Files.createTempDirectory("archiver-append");
+    File tarFile = tmpDir.resolve("export.tar").toFile();
+    File part1 = tmpDir.resolve("part001.txt").toFile();
+    File part2 = tmpDir.resolve("part002.txt").toFile();
+    Files.write(part1.toPath(), "1\n2\n".getBytes(StandardCharsets.UTF_8));
+    Files.write(part2.toPath(), "3\n".getBytes(StandardCharsets.UTF_8));
+
+    try (Archiver.AppendableTar tar = Archiver.openForAppend(tarFile)) {
+      tar.appendFile(part1, "part001.txt");
+      tar.appendFile(part2, "part002.txt");
+    }
+
+    Path extractDir = tmpDir.resolve("extract");
+    Archiver.extract(tarFile, extractDir);
+    assertThat(extractDir.resolve("part001.txt")).hasSameBinaryContentAs(part1.toPath());
+    assertThat(extractDir.resolve("part002.txt")).hasSameBinaryContentAs(part2.toPath());
+  }
+
+  @Test
+  void appendFilePreservesZeroBlocksAtEndOfEntry() throws IOException {
+    Path tmpDir = Files.createTempDirectory("archiver-append-zero-block");
+    File tarFile = tmpDir.resolve("export.tar").toFile();
+    File part1 = tmpDir.resolve("part001.bin").toFile();
+    File part2 = tmpDir.resolve("part002.txt").toFile();
+    byte[] zeroBlockPayload = new byte[1024];
+    Files.write(part1.toPath(), zeroBlockPayload);
+    Files.write(part2.toPath(), "next\n".getBytes(StandardCharsets.UTF_8));
+
+    try (Archiver.AppendableTar tar = Archiver.openForAppend(tarFile)) {
+      tar.appendFile(part1, "part001.bin");
+      tar.appendFile(part2, "part002.txt");
+    }
+
+    Path extractDir = tmpDir.resolve("extract");
+    Archiver.extract(tarFile, extractDir);
+    assertThat(extractDir.resolve("part001.bin")).hasSameBinaryContentAs(part1.toPath());
+    assertThat(extractDir.resolve("part002.txt")).hasSameBinaryContentAs(part2.toPath());
+  }
 }

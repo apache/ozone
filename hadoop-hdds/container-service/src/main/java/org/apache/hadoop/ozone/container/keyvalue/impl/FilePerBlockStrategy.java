@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SHORT_CIRCUIT_FD_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
@@ -26,10 +26,10 @@ import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limi
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.verifyChunkFileExists;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -39,7 +39,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -57,7 +56,9 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.util.Shell;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,12 +112,13 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-          Container container, BlockID blockID, ContainerMetrics metrics)
-          throws StorageContainerException {
+      Container container, BlockID blockID,
+      CheckedConsumer<ContainerProtos.ContainerCommandRequestProto, IOException> putBlock,
+      ContainerMetrics metrics) throws StorageContainerException {
     checkLayoutVersion(container);
     final File chunkFile = getChunkFile(container, blockID);
     return new KeyValueStreamDataChannel(chunkFile,
-        container.getContainerData(), metrics);
+        container.getContainerData(), putBlock, metrics);
   }
 
   @Override
@@ -153,14 +155,23 @@ public class FilePerBlockStrategy implements ChunkManager {
     HddsVolume volume = containerData.getVolume();
 
     FileChannel channel = null;
-    boolean overwrite;
     try {
       channel = files.getChannel(chunkFile, doSyncWrite);
-      overwrite = validateChunkForOverwrite(channel, info);
     } catch (IOException e) {
       onFailure(volume);
       throw e;
     }
+
+    // Read the block file length once and reuse it for the overwrite check,
+    // the offset validation and the space accounting below.
+    long fileLengthBeforeWrite;
+    try {
+      fileLengthBeforeWrite = channel.size();
+    } catch (IOException e) {
+      throw new UncheckedIOException("Encountered an error while getting the file size for " + chunkFile.getName(), e);
+    }
+
+    boolean overwrite = validateChunkForOverwrite(fileLengthBeforeWrite, info);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
@@ -169,29 +180,40 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     // check whether offset matches block file length if its an overwrite
     if (!overwrite) {
-      ChunkUtils.validateChunkSize(channel, info, chunkFile.getName());
-    }
-
-    long fileLengthBeforeWrite;
-    try {
-      fileLengthBeforeWrite = channel.size();
-    } catch (IOException e) {
-      throw new StorageContainerException("Encountered an error while getting the file size for "
-          + chunkFile.getName(), CHUNK_FILE_INCONSISTENCY);
+      ChunkUtils.validateChunkSize(fileLengthBeforeWrite, info, chunkFile.getName());
     }
 
     ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, chunkLength, volume);
 
-    // When overwriting, update the bytes used if the new length is greater than the old length
-    // This is to ensure that the bytes used is updated correctly when overwriting a smaller chunk
-    // with a larger chunk at the end of the block.
+    // Handle space accounting for overwrites that extend the file length.
+    // For overwrites, we must distinguish between:
+    // 1. Pure overwrites (no file growth): No space consumed, only I/O metrics updated
+    // 2. Overwrites with growth (file extends): Only the delta consumes new space
+    //
+    // Example: File is 4 bytes. Overwrite 6 bytes at offset 2.
+    // - I/O operation: 6 bytes written (tracked by updateWriteStats below)
+    // - Disk growth: 4 bytes (file grows from 4 -> 8, delta = 4)
+    // - Space consumed: 4 bytes (only the delta, not the full 6 bytes)
+    //
+    // We handle the delta BEFORE calling updateWriteStats to ensure correct accounting:
+    // - incrementBlockBytes(delta): Updates blockBytes for disk space growth
+    // - incrWriteBytes(delta): Updates usedSpace/committedBytes for space consumed
+    // - updateWriteStats(chunkLength, true): Updates I/O metrics (writeBytes, writeCount)
+    //   but skips space updates because overwrite=true
     if (overwrite) {
       long fileLengthAfterWrite = offset + chunkLength;
       if (fileLengthAfterWrite > fileLengthBeforeWrite) {
-        containerData.getStatistics().updateWrite(fileLengthAfterWrite - fileLengthBeforeWrite, false);
+        long delta = fileLengthAfterWrite - fileLengthBeforeWrite;
+        // Update disk space accounting for the file growth (delta only)
+        containerData.getStatistics().incrementBlockBytes(delta);
+        // Update volume space accounting for the new space consumed (delta only)
+        containerData.incrWriteBytes(delta);
       }
     }
 
+    // Update I/O metrics (writeBytes, writeCount) and space metrics for new writes.
+    // For overwrites (overwrite=true), this only updates I/O metrics.
+    // For new writes (overwrite=false), this updates both I/O and space metrics.
     containerData.updateWriteStats(chunkLength, overwrite);
   }
 
@@ -226,6 +248,25 @@ public class FilePerBlockStrategy implements ChunkManager {
     }
     return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
         readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
+  }
+
+  @Override
+  public RandomAccessFile getShortCircuitFd(Container container, BlockID blockID) throws StorageContainerException {
+    checkLayoutVersion(container);
+    final File chunkFile = getChunkFile(container, blockID);
+    try {
+      if (!Shell.WINDOWS) {
+        RandomAccessFile rf = new RandomAccessFile(chunkFile, "r");
+        return rf;
+      } else {
+        throw new StorageContainerException("Operation is not supported for platform "
+            + System.getProperty("os.name"), UNSUPPORTED_REQUEST);
+      }
+    } catch (Exception e) {
+      LOG.warn("getShortCircuitFds failed", e);
+      throw new StorageContainerException("getShortCircuitFds " +
+          "for short-circuit local reads failed", GET_SHORT_CIRCUIT_FD_FAILED);
+    }
   }
 
   @Override
@@ -315,25 +356,19 @@ public class FilePerBlockStrategy implements ChunkManager {
   private static final class OpenFiles {
 
     private static final RemovalListener<String, OpenFile> ON_REMOVE =
-        event -> close(event.getKey(), event.getValue());
+        (filename, openFile, cause) -> close(filename, openFile);
 
-    private final Cache<String, OpenFile> files = CacheBuilder.newBuilder()
+    private final Cache<String, OpenFile> files = Caffeine.newBuilder()
         .expireAfterAccess(Duration.ofMinutes(10))
+        // close the removed files on the calling thread, so that close(File) has closed the file when it returns
+        .executor(Runnable::run)
         .removalListener(ON_REMOVE)
         .build();
 
     public FileChannel getChannel(File file, boolean sync)
         throws StorageContainerException {
-      try {
-        return files.get(file.getPath(),
-            () -> open(file, sync)).getChannel();
-      } catch (ExecutionException e) {
-        if (e.getCause() instanceof IOException) {
-          throw new UncheckedIOException((IOException) e.getCause());
-        }
-        throw new StorageContainerException(e.getCause(),
-            ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
-      }
+      // open throws UncheckedIOException, which the cache does not wrap
+      return files.get(file.getPath(), path -> open(file, sync)).getChannel();
     }
 
     private static OpenFile open(File file, boolean sync) {
@@ -393,5 +428,4 @@ public class FilePerBlockStrategy implements ChunkManager {
       }
     }
   }
-
 }

@@ -98,6 +98,10 @@
               {
                 "name": "GetContainerChecksumInfo",
                 "integer": 23
+              },
+              {
+                "name": "ReadBlock",
+                "integer": 24
               }
             ]
           },
@@ -632,6 +636,12 @@
                 "name": "getContainerChecksumInfo",
                 "type": "GetContainerChecksumInfoRequestProto",
                 "optional": true
+              },
+              {
+                "id": 28,
+                "name": "readBlock",
+                "type": "ReadBlockRequestProto",
+                "optional": true
               }
             ]
           },
@@ -780,6 +790,12 @@
                 "id": 24,
                 "name": "getContainerChecksumInfo",
                 "type": "GetContainerChecksumInfoResponseProto",
+                "optional": true
+              },
+              {
+                "id": 25,
+                "name": "readBlock",
+                "type": "ReadBlockResponseProto",
                 "optional": true
               }
             ]
@@ -1176,6 +1192,58 @@
                 "name": "blockData",
                 "type": "BlockData",
                 "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ReadBlockRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "DatanodeBlockID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "offset",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "length",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "responseDataSize",
+                "type": "uint32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ReadBlockResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "checksumData",
+                "type": "ChecksumData",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "offset",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "data",
+                "type": "bytes",
+                "required": true
               }
             ]
           },
@@ -1828,6 +1896,227 @@
       }
     },
     {
+      "protopath": "DiskBalancerProtocol.proto",
+      "def": {
+        "messages": [
+          {
+            "name": "GetDiskBalancerInfoRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "clientVersion",
+                "type": "uint32",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetDiskBalancerInfoResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "info",
+                "type": "DatanodeDiskBalancerInfoProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "StartDiskBalancerRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "config",
+                "type": "DiskBalancerConfigurationProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "StartDiskBalancerResponseProto"
+          },
+          {
+            "name": "StopDiskBalancerRequestProto"
+          },
+          {
+            "name": "StopDiskBalancerResponseProto"
+          },
+          {
+            "name": "UpdateDiskBalancerConfigurationRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "config",
+                "type": "DiskBalancerConfigurationProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "UpdateDiskBalancerConfigurationResponseProto"
+          }
+        ],
+        "services": [
+          {
+            "name": "DiskBalancerProtocolService",
+            "rpcs": [
+              {
+                "name": "getDiskBalancerInfo",
+                "in_type": "GetDiskBalancerInfoRequestProto",
+                "out_type": "GetDiskBalancerInfoResponseProto"
+              },
+              {
+                "name": "startDiskBalancer",
+                "in_type": "StartDiskBalancerRequestProto",
+                "out_type": "StartDiskBalancerResponseProto"
+              },
+              {
+                "name": "stopDiskBalancer",
+                "in_type": "StopDiskBalancerRequestProto",
+                "out_type": "StopDiskBalancerResponseProto"
+              },
+              {
+                "name": "updateDiskBalancerConfiguration",
+                "in_type": "UpdateDiskBalancerConfigurationRequestProto",
+                "out_type": "UpdateDiskBalancerConfigurationResponseProto"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "hdds.proto"
+          }
+        ],
+        "package": {
+          "name": "hadoop.hdds"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.hdds.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "DiskBalancerProtocolProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "IpcConnectionContext.proto",
+      "def": {
+        "messages": [
+          {
+            "name": "UserInformationProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "effectiveUser",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "realUser",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "IpcConnectionContextProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "userInfo",
+                "type": "UserInformationProto",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "protocol",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          }
+        ],
+        "package": {
+          "name": "hadoop.common"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.ipc_.protobuf"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "IpcConnectionContextProtos"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "ProtobufRpcEngine.proto",
+      "def": {
+        "messages": [
+          {
+            "name": "RequestHeaderProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "methodName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "declaringClassProtocolName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "clientProtocolVersion",
+                "type": "uint64",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "package": {
+          "name": "hadoop.common"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.ipc_.protobuf"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "ProtobufRpcEngineProtos"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
       "protopath": "ReconfigureProtocol.proto",
       "def": {
         "messages": [
@@ -1963,6 +2252,385 @@
           {
             "name": "java_generic_services",
             "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "RpcHeader.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "RpcKindProto",
+            "enum_fields": [
+              {
+                "name": "RPC_BUILTIN"
+              },
+              {
+                "name": "RPC_WRITABLE",
+                "integer": 1
+              },
+              {
+                "name": "RPC_PROTOCOL_BUFFER",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "RpcRequestHeaderProto.OperationProto",
+            "enum_fields": [
+              {
+                "name": "RPC_FINAL_PACKET"
+              },
+              {
+                "name": "RPC_CONTINUATION_PACKET",
+                "integer": 1
+              },
+              {
+                "name": "RPC_CLOSE_CONNECTION",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "RpcResponseHeaderProto.RpcStatusProto",
+            "enum_fields": [
+              {
+                "name": "SUCCESS"
+              },
+              {
+                "name": "ERROR",
+                "integer": 1
+              },
+              {
+                "name": "FATAL",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "RpcResponseHeaderProto.RpcErrorCodeProto",
+            "enum_fields": [
+              {
+                "name": "ERROR_APPLICATION",
+                "integer": 1
+              },
+              {
+                "name": "ERROR_NO_SUCH_METHOD",
+                "integer": 2
+              },
+              {
+                "name": "ERROR_NO_SUCH_PROTOCOL",
+                "integer": 3
+              },
+              {
+                "name": "ERROR_RPC_SERVER",
+                "integer": 4
+              },
+              {
+                "name": "ERROR_SERIALIZING_RESPONSE",
+                "integer": 5
+              },
+              {
+                "name": "ERROR_RPC_VERSION_MISMATCH",
+                "integer": 6
+              },
+              {
+                "name": "FATAL_UNKNOWN",
+                "integer": 10
+              },
+              {
+                "name": "FATAL_UNSUPPORTED_SERIALIZATION",
+                "integer": 11
+              },
+              {
+                "name": "FATAL_INVALID_RPC_HEADER",
+                "integer": 12
+              },
+              {
+                "name": "FATAL_DESERIALIZING_REQUEST",
+                "integer": 13
+              },
+              {
+                "name": "FATAL_VERSION_MISMATCH",
+                "integer": 14
+              },
+              {
+                "name": "FATAL_UNAUTHORIZED",
+                "integer": 15
+              }
+            ]
+          },
+          {
+            "name": "RpcSaslProto.SaslState",
+            "enum_fields": [
+              {
+                "name": "SUCCESS"
+              },
+              {
+                "name": "NEGOTIATE",
+                "integer": 1
+              },
+              {
+                "name": "INITIATE",
+                "integer": 2
+              },
+              {
+                "name": "CHALLENGE",
+                "integer": 3
+              },
+              {
+                "name": "RESPONSE",
+                "integer": 4
+              },
+              {
+                "name": "WRAP",
+                "integer": 5
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "RPCTraceInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceId",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "parentId",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RPCCallerContextProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "context",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "signature",
+                "type": "bytes",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RpcRequestHeaderProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "rpcKind",
+                "type": "RpcKindProto",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "rpcOp",
+                "type": "OperationProto",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "callId",
+                "type": "sint32",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "clientId",
+                "type": "bytes",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "retryCount",
+                "type": "sint32",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "-1"
+                  }
+                ]
+              },
+              {
+                "id": 6,
+                "name": "traceInfo",
+                "type": "RPCTraceInfoProto",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "callerContext",
+                "type": "RPCCallerContextProto",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "stateId",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RpcResponseHeaderProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "callId",
+                "type": "uint32",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "status",
+                "type": "RpcStatusProto",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "serverIpcVersionNum",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "exceptionClassName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "errorMsg",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "errorDetail",
+                "type": "RpcErrorCodeProto",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "clientId",
+                "type": "bytes",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "retryCount",
+                "type": "sint32",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "-1"
+                  }
+                ]
+              },
+              {
+                "id": 9,
+                "name": "stateId",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RpcSaslProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "version",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "state",
+                "type": "SaslState",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "token",
+                "type": "bytes",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "auths",
+                "type": "SaslAuth",
+                "is_repeated": true
+              }
+            ],
+            "messages": [
+              {
+                "name": "SaslAuth",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "method",
+                    "type": "string",
+                    "required": true
+                  },
+                  {
+                    "id": 2,
+                    "name": "mechanism",
+                    "type": "string",
+                    "required": true
+                  },
+                  {
+                    "id": 3,
+                    "name": "protocol",
+                    "type": "string",
+                    "optional": true
+                  },
+                  {
+                    "id": 4,
+                    "name": "serverId",
+                    "type": "string",
+                    "optional": true
+                  },
+                  {
+                    "id": 5,
+                    "name": "challenge",
+                    "type": "bytes",
+                    "optional": true
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "package": {
+          "name": "hadoop.common"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.ipc_.protobuf"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "RpcHeaderProtos"
           },
           {
             "name": "java_generate_equals_and_hash",
@@ -2296,6 +2964,23 @@
               {
                 "name": "FINALIZATION_REQUIRED",
                 "integer": 5
+              }
+            ]
+          },
+          {
+            "name": "DiskBalancerRunningStatus",
+            "enum_fields": [
+              {
+                "name": "RUNNING",
+                "integer": 1
+              },
+              {
+                "name": "STOPPED",
+                "integer": 2
+              },
+              {
+                "name": "PAUSED",
+                "integer": 3
               }
             ]
           }
@@ -2734,6 +3419,24 @@
                 "name": "nodeOperationalStates",
                 "type": "NodeOperationalState",
                 "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "totalVolumeCount",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "healthyVolumeCount",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "failedVolumes",
+                "type": "string",
+                "is_repeated": true
               }
             ]
           },
@@ -2796,6 +3499,24 @@
               {
                 "id": 8,
                 "name": "pipelineCount",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "reserved",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "fsCapacity",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "fsAvailable",
                 "type": "int64",
                 "optional": true
               }
@@ -2874,6 +3595,12 @@
                 "id": 12,
                 "name": "ecReplicationConfig",
                 "type": "ECReplicationConfig",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "suppressed",
+                "type": "bool",
                 "optional": true
               }
             ]
@@ -3457,6 +4184,18 @@
                 "name": "statSample",
                 "type": "KeyContainerIDList",
                 "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "sampleLimit",
+                "type": "int32",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "100"
+                  }
+                ]
               }
             ]
           },
@@ -3558,6 +4297,18 @@
                 "name": "moveReplicationTimeout",
                 "type": "int64",
                 "optional": true
+              },
+              {
+                "id": 21,
+                "name": "includeContainers",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 22,
+                "name": "includeNonStandardContainers",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -3600,6 +4351,35 @@
                 "id": 4,
                 "name": "count",
                 "type": "int32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "DeletedBlocksTransactionSummary",
+            "fields": [
+              {
+                "id": 1,
+                "name": "totalTransactionCount",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "totalBlockCount",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "totalBlockSize",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "totalBlockReplicatedSize",
+                "type": "uint64",
                 "optional": true
               }
             ]
@@ -3756,6 +4536,159 @@
                 "id": 3,
                 "name": "childrenMap",
                 "type": "ChildrenMap",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DiskBalancerConfigurationProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "threshold",
+                "type": "double",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "diskBandwidthInMB",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "parallelThread",
+                "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "stopAfterDiskEven",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "containerStates",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "VolumeReportProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "storageId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "storagePath",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "totalCapacity",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "usedSpace",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "committedBytes",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "effectiveUsedSpace",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "utilization",
+                "type": "double",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "ozoneAvailable",
+                "type": "uint64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "DatanodeDiskBalancerInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "node",
+                "type": "DatanodeDetailsProto",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "currentVolumeDensitySum",
+                "type": "double",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "runningStatus",
+                "type": "DiskBalancerRunningStatus",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "diskBalancerConf",
+                "type": "DiskBalancerConfigurationProto",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "successMoveCount",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "failureMoveCount",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "bytesToMove",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "bytesMoved",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "idealUsage",
+                "type": "double",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "volumeInfo",
+                "type": "VolumeReportProto",
                 "is_repeated": true
               }
             ]

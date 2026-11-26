@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_CREDENTIAL_DATE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
@@ -36,6 +38,7 @@ public class TestAuthorizationV4QueryParser {
 
   private static final String DATETIME = ZonedDateTime.now().format(
       StringToSignProducer.TIME_FORMATTER);
+  private static final String CREDENTIAL_DATE = DATETIME.substring(0, 8);
 
   @Test
   public void testInvalidAlgorithm() {
@@ -43,7 +46,8 @@ public class TestAuthorizationV4QueryParser {
     // Missing algorithm
     Map<String, String> parameters = new HashMap<>();
     parameters.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
+        "AKIAIOSFODNN7EXAMPLE%2F" + CREDENTIAL_DATE
+            + "%2Fus-east-1%2Fs3%2Faws4_request");
     parameters.put("X-Amz-Date", DATETIME);
     parameters.put("X-Amz-Expires", "10000");
     parameters.put("X-Amz-SignedHeaders", "host");
@@ -70,13 +74,17 @@ public class TestAuthorizationV4QueryParser {
     Map<String, String> parameters = new HashMap<>();
     parameters.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
     parameters.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
+        "AKIAIOSFODNN7EXAMPLE%2F" + CREDENTIAL_DATE
+            + "%2Fus-east-1%2Fs3%2Faws4_request");
     parameters.put("X-Amz-Expires", "10000");
     parameters.put("X-Amz-SignedHeaders", "host");
     parameters.put("X-Amz-Signature",
         "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
-    assertThrows(MalformedResourceException.class,
+    // A genuinely malformed request (missing date) stays a 400, not 403.
+    MalformedResourceException missingDate = assertThrows(
+        MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
+    assertFalse(missingDate instanceof AccessDeniedResourceException);
 
     // Empty date
     parameters.put("X-Amz-Date", "");
@@ -99,18 +107,20 @@ public class TestAuthorizationV4QueryParser {
     assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
-    // Invalid expires
+    // Out-of-range expires -> 403 (AccessDenied), not 400.
     parameters.put("X-Amz-Expires", "0");
-    assertThrows(MalformedResourceException.class,
+    assertThrows(AccessDeniedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
     parameters.put("X-Amz-Expires", "604801");
-    assertThrows(MalformedResourceException.class,
+    assertThrows(AccessDeniedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
-    // Expired request
+    // Expired request -> 403 (AccessDenied), not 400.
+    parameters.put("X-Amz-Credential",
+        "AKIAIOSFODNN7EXAMPLE%2F20160801%2Fus-east-1%2Fs3%2Faws4_request");
     parameters.put("X-Amz-Date", "20160801T083241Z");
     parameters.put("X-Amz-Expires", "10000");
-    assertThrows(MalformedResourceException.class,
+    assertThrows(AccessDeniedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
   }
@@ -122,7 +132,8 @@ public class TestAuthorizationV4QueryParser {
     Map<String, String> parameters = new HashMap<>();
     parameters.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
     parameters.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
+        "AKIAIOSFODNN7EXAMPLE%2F" + CREDENTIAL_DATE
+            + "%2Fus-east-1%2Fs3%2Faws4_request");
     parameters.put("X-Amz-Date", DATETIME);
     parameters.put("X-Amz-Expires", "10000");
     parameters.put("X-Amz-SignedHeaders", "host");
@@ -147,7 +158,7 @@ public class TestAuthorizationV4QueryParser {
     Map<String, String> parameters = new HashMap<>();
     parameters.put("X-Amz-Algorithm", "AWS4-ZAVC-HJUA123");
     parameters.put("X-Amz-Credential",
-        "%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
+        "%2F" + CREDENTIAL_DATE + "%2Fus-east-1%2Fs3%2Faws4_request");
     parameters.put("X-Amz-Date", DATETIME);
     parameters.put("X-Amz-Expires", "10000");
     parameters.put("X-Amz-SignedHeaders", "host");
@@ -158,25 +169,25 @@ public class TestAuthorizationV4QueryParser {
 
     // Empty AWS region
     parameters.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE%2F20130524%2F%2Fs3%2Faws4_request");
+        "AKIAIOSFODNN7EXAMPLE%2F" + CREDENTIAL_DATE + "%2F%2Fs3%2Faws4_request");
     assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Empty AWS request
     parameters.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2F");
+        "AKIAIOSFODNN7EXAMPLE%2F" + CREDENTIAL_DATE + "%2Fus-east-1%2Fs3%2F");
     assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Invalid aws request
     parameters.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws_request");
+        "AKIAIOSFODNN7EXAMPLE%2F" + CREDENTIAL_DATE + "%2Fus-east-1%2Fs3%2Faws_request");
     assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
     // Empty aws service
     parameters.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2F%2Faws4_request");
+        "AKIAIOSFODNN7EXAMPLE%2F" + CREDENTIAL_DATE + "%2Fus-east-1%2F%2Faws4_request");
     assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
 
@@ -195,7 +206,7 @@ public class TestAuthorizationV4QueryParser {
 
     // No URL encoding
     parameters.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request");
+        "AKIAIOSFODNN7EXAMPLE/" + CREDENTIAL_DATE + "/us-east-1/s3/aws4_request");
     assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
   }
@@ -207,7 +218,8 @@ public class TestAuthorizationV4QueryParser {
     Map<String, String> parameters = new HashMap<>();
     parameters.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
     parameters.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
+        "AKIAIOSFODNN7EXAMPLE%2F" + CREDENTIAL_DATE
+            + "%2Fus-east-1%2Fs3%2Faws4_request");
     parameters.put("X-Amz-Date", DATETIME);
     parameters.put("X-Amz-Expires", "10000");
     parameters.put("X-Amz-Signature",
@@ -228,7 +240,8 @@ public class TestAuthorizationV4QueryParser {
     Map<String, String> parameters = new HashMap<>();
     parameters.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
     parameters.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
+        "AKIAIOSFODNN7EXAMPLE%2F" + CREDENTIAL_DATE
+            + "%2Fus-east-1%2Fs3%2Faws4_request");
     parameters.put("X-Amz-Date", DATETIME);
     parameters.put("X-Amz-Expires", "10000");
     parameters.put("X-Amz-SignedHeaders", "host");
@@ -243,6 +256,22 @@ public class TestAuthorizationV4QueryParser {
         () -> new AuthorizationV4QueryParser(parameters).parseSignature());
   }
 
+  @Test
+  public void testCredentialDateMismatch() {
+    Map<String, String> parameters = new HashMap<>();
+    parameters.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
+    parameters.put("X-Amz-Credential",
+        "AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request");
+    parameters.put("X-Amz-Date", DATETIME);
+    parameters.put("X-Amz-Expires", "10000");
+    parameters.put("X-Amz-SignedHeaders", "host");
+    parameters.put("X-Amz-Signature",
+        "aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404");
+    MalformedResourceException ex = assertThrows(MalformedResourceException.class,
+        () -> new AuthorizationV4QueryParser(parameters).parseSignature());
+    assertEquals(MALFORMED_CREDENTIAL_DATE, ex.getErrorCode());
+  }
+
   /**
    * Based on <a href="https://docs.aws.amazon.com
    * /AmazonS3/latest/API/sigv4-query-string-auth.html">AWS example</a>.
@@ -254,7 +283,7 @@ public class TestAuthorizationV4QueryParser {
 
     queryParams.put("X-Amz-Algorithm", "AWS4-HMAC-SHA256");
     queryParams.put("X-Amz-Credential",
-        "AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request");
+        "AKIAIOSFODNN7EXAMPLE/" + CREDENTIAL_DATE + "/us-east-1/s3/aws4_request");
     queryParams.put("X-Amz-Date", DATETIME);
     queryParams.put("X-Amz-Expires", "86400");
     queryParams.put("X-Amz-SignedHeaders", "host");
@@ -264,7 +293,7 @@ public class TestAuthorizationV4QueryParser {
     String canonicalRequest = "GET\n"
         + "/test.txt\n"
         + "X-Amz-Algorithm=AWS4-HMAC-SHA256&"
-        + "X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20130524%2F"
+        + "X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F" + CREDENTIAL_DATE + "%2F"
         + "us-east-1%2Fs3%2Faws4_request&X-Amz-Date=" + DATETIME
         + "&X-Amz-Expires=86400&X-Amz-SignedHeaders=host\n"
         + "host:localhost\n"
@@ -287,7 +316,7 @@ public class TestAuthorizationV4QueryParser {
     headers.put("host", "localhost");
 
     final String stringToSign =
-        StringToSignProducer.createSignatureBase(signatureInfo, "https", "GET",
+        StringToSignProducer.createSignatureBase(signatureInfo, "GET",
             headers, queryParams);
 
     MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -295,7 +324,7 @@ public class TestAuthorizationV4QueryParser {
 
     assertEquals("AWS4-HMAC-SHA256\n"
         + DATETIME + "\n"
-        + "20130524/us-east-1/s3/aws4_request\n"
+        + CREDENTIAL_DATE + "/us-east-1/s3/aws4_request\n"
         + Hex.encode(md.digest()).toLowerCase(),
         stringToSign);
   }

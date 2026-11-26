@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nonnull;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
  * Args for key. Client use this to specify key's attributes on  key creation
  * (putKey()).
  */
-public final class OmKeyArgs implements Auditable {
+public final class OmKeyArgs extends WithMetadata implements Auditable {
   private final String volumeName;
   private final String bucketName;
   private final String keyName;
@@ -47,14 +47,14 @@ public final class OmKeyArgs implements Auditable {
   private final boolean isMultipartKey;
   private final String multipartUploadID;
   private final int multipartUploadPartNumber;
-  private final Map<String, String> metadata;
   private final boolean sortDatanodesInPipeline;
   private final ImmutableList<OzoneAcl> acls;
   private final boolean latestVersionLocation;
   private final boolean recursive;
   private final boolean headOp;
+  private final boolean assumeS3Context;
   private final boolean forceUpdateContainerCacheFromSCM;
-  private final Map<String, String> tags;
+  private final ImmutableMap<String, String> tags;
   // expectedDataGeneration, when used in key creation indicates that a
   // key with the same keyName should exist with the given generation.
   // For a key commit to succeed, the original key should still be present with the
@@ -62,8 +62,21 @@ public final class OmKeyArgs implements Auditable {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
   private Long expectedDataGeneration = null;
+  // Original S3/list prefix when keyName is empty (root listing). Used for STS
+  // auth to check LIST on this prefix instead of "*".
+  private final String listPrefix;
+  // Set by file system clients so that OM rejects a listing or a key info
+  // read on an OBJECT_STORE bucket.
+  private final boolean requireFileSystemLayout;
+  // Set by file system clients so that OM rejects a rename unless the bucket
+  // is FILE_SYSTEM_OPTIMIZED.
+  private final boolean requireFileSystemOptimized;
+  private final String expectedETag;
+  private final String excludedETag;
+  private final boolean derivedKeyPiggyBacking;
 
   private OmKeyArgs(Builder b) {
+    super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
     this.keyName = b.keyName;
@@ -73,16 +86,22 @@ public final class OmKeyArgs implements Auditable {
     this.isMultipartKey = b.isMultipartKey;
     this.multipartUploadID = b.multipartUploadID;
     this.multipartUploadPartNumber = b.multipartUploadPartNumber;
-    this.metadata = b.metadata;
     this.acls = b.acls.build();
     this.sortDatanodesInPipeline = b.sortDatanodesInPipeline;
     this.latestVersionLocation = b.latestVersionLocation;
     this.recursive = b.recursive;
     this.headOp = b.headOp;
+    this.assumeS3Context = b.assumeS3Context;
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
     this.ownerName = b.ownerName;
-    this.tags = b.tags;
+    this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.listPrefix = b.listPrefix;
+    this.requireFileSystemLayout = b.requireFileSystemLayout;
+    this.requireFileSystemOptimized = b.requireFileSystemOptimized;
+    this.expectedETag = b.expectedETag;
+    this.excludedETag = b.excludedETag;
+    this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
   }
 
   public boolean getIsMultipartKey() {
@@ -129,10 +148,6 @@ public final class OmKeyArgs implements Auditable {
     dataSize = size;
   }
 
-  public Map<String, String> getMetadata() {
-    return metadata;
-  }
-
   public void setLocationInfoList(List<OmKeyLocationInfo> locationInfoList) {
     this.locationInfoList = locationInfoList;
   }
@@ -157,6 +172,10 @@ public final class OmKeyArgs implements Auditable {
     return headOp;
   }
 
+  public boolean isAssumeS3Context() {
+    return assumeS3Context;
+  }
+
   public boolean isForceUpdateContainerCacheFromSCM() {
     return forceUpdateContainerCacheFromSCM;
   }
@@ -167,6 +186,42 @@ public final class OmKeyArgs implements Auditable {
 
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
+  }
+
+  /**
+   * Original S3/list prefix when keyName is empty (root listing).
+   * Used for STS auth to check LIST on this prefix instead of "*".
+   */
+  public String getListPrefix() {
+    return listPrefix;
+  }
+
+  /**
+   * Whether OM must reject the request if the resolved bucket layout is
+   * OBJECT_STORE, because the caller needs file system semantics.
+   */
+  public boolean isRequireFileSystemLayout() {
+    return requireFileSystemLayout;
+  }
+
+  /**
+   * Whether OM must reject a rename unless the resolved bucket layout is
+   * FILE_SYSTEM_OPTIMIZED, because the caller relies on atomic directory rename.
+   */
+  public boolean isRequireFileSystemOptimized() {
+    return requireFileSystemOptimized;
+  }
+
+  public String getExpectedETag() {
+    return expectedETag;
+  }
+
+  public String getExcludedETag() {
+    return excludedETag;
+  }
+
+  public boolean isDerivedKeyPiggyBacking() {
+    return derivedKeyPiggyBacking;
   }
 
   @Override
@@ -214,13 +269,19 @@ public final class OmKeyArgs implements Auditable {
     if (expectedDataGeneration != null) {
       builder.setExpectedDataGeneration(expectedDataGeneration);
     }
+    if (expectedETag != null) {
+      builder.setExpectedETag(expectedETag);
+    }
+    if (excludedETag != null) {
+      builder.setExcludedETag(excludedETag);
+    }
     return builder.build();
   }
 
   /**
    * Builder class of OmKeyArgs.
    */
-  public static class Builder {
+  public static class Builder extends WithMetadata.Builder {
     private String volumeName;
     private String bucketName;
     private String keyName;
@@ -231,25 +292,49 @@ public final class OmKeyArgs implements Auditable {
     private boolean isMultipartKey;
     private String multipartUploadID;
     private int multipartUploadPartNumber;
-    private final Map<String, String> metadata = new HashMap<>();
     private boolean sortDatanodesInPipeline;
     private boolean latestVersionLocation;
     private final AclListBuilder acls;
     private boolean recursive;
     private boolean headOp;
+    private boolean assumeS3Context;
     private boolean forceUpdateContainerCacheFromSCM;
-    private final Map<String, String> tags = new HashMap<>();
+    private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private String listPrefix = null;
+    private boolean requireFileSystemLayout;
+    private boolean requireFileSystemOptimized;
+    private String expectedETag;
+    private String excludedETag;
+    private boolean derivedKeyPiggyBacking;
 
     public Builder() {
       this(AclListBuilder.empty());
     }
 
+    @SuppressWarnings("checkstyle:parameternumber")
+    public Builder(String volumeName, String bucketName, String keyName,
+        long dataSize, ReplicationConfig replicationConfig,
+        Map<String, String> metadata, Map<String, String> tags,
+        boolean latestVersionLocation) {
+      this();
+      setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .setDataSize(dataSize)
+          .setReplicationConfig(replicationConfig)
+          .addAllMetadataGdpr(metadata)
+          .addAllTags(tags)
+          .setLatestVersionLocation(latestVersionLocation);
+    }
+
     private Builder(AclListBuilder acls) {
       this.acls = acls;
+      this.tags = MapBuilder.empty();
     }
 
     public Builder(OmKeyArgs obj) {
+      super(obj);
       this.volumeName = obj.volumeName;
       this.bucketName = obj.bucketName;
       this.keyName = obj.keyName;
@@ -264,12 +349,18 @@ public final class OmKeyArgs implements Auditable {
       this.latestVersionLocation = obj.latestVersionLocation;
       this.recursive = obj.recursive;
       this.headOp = obj.headOp;
+      this.assumeS3Context = obj.assumeS3Context;
       this.forceUpdateContainerCacheFromSCM =
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
-      this.metadata.putAll(obj.metadata);
-      this.tags.putAll(obj.tags);
+      this.expectedETag = obj.expectedETag;
+      this.excludedETag = obj.excludedETag;
+      this.derivedKeyPiggyBacking = obj.derivedKeyPiggyBacking;
+      this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
+      this.listPrefix = obj.listPrefix;
+      this.requireFileSystemLayout = obj.requireFileSystemLayout;
+      this.requireFileSystemOptimized = obj.requireFileSystemOptimized;
     }
 
     public Builder setVolumeName(String volume) {
@@ -287,6 +378,10 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public String getKeyName() {
+      return keyName;
+    }
+
     public Builder setOwnerName(String owner) {
       this.ownerName = owner;
       return this;
@@ -295,6 +390,10 @@ public final class OmKeyArgs implements Auditable {
     public Builder setDataSize(long size) {
       this.dataSize = size;
       return this;
+    }
+
+    public long getDataSize() {
+      return dataSize;
     }
 
     public Builder setReplicationConfig(ReplicationConfig replConfig) {
@@ -307,6 +406,10 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public List<OmKeyLocationInfo> getLocationInfoList() {
+      return locationInfoList;
+    }
+
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       this.acls.addAll(listOfAcls);
       return this;
@@ -315,6 +418,10 @@ public final class OmKeyArgs implements Auditable {
     public Builder setIsMultipartKey(boolean isMultipart) {
       this.isMultipartKey = isMultipart;
       return this;
+    }
+
+    public boolean getIsMultipartKey() {
+      return isMultipartKey;
     }
 
     public Builder setMultipartUploadID(String uploadID) {
@@ -327,20 +434,22 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    @Override
     public Builder addMetadata(String key, String value) {
-      this.metadata.put(key, value);
+      super.addMetadata(key, value);
       return this;
     }
 
+    @Override
     public Builder addAllMetadata(Map<String, String> metadatamap) {
-      this.metadata.putAll(metadatamap);
+      super.addAllMetadata(metadatamap);
       return this;
     }
 
     public Builder addAllMetadataGdpr(Map<String, String> metadatamap) {
       addAllMetadata(metadatamap);
-      if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
-        GDPRSymmetricKey.newDefaultInstance().acceptKeyDetails(metadata::put);
+      if (metadatamap != null && Boolean.parseBoolean(metadatamap.get(OzoneConsts.GDPR_FLAG))) {
+        GDPRSymmetricKey.newDefaultInstance().acceptKeyDetails(this::addMetadata);
       }
       return this;
     }
@@ -375,6 +484,11 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
+    public Builder setAssumeS3Context(boolean assumeS3Context) {
+      this.assumeS3Context = assumeS3Context;
+      return this;
+    }
+
     public Builder setForceUpdateContainerCacheFromSCM(boolean value) {
       this.forceUpdateContainerCacheFromSCM = value;
       return this;
@@ -382,6 +496,36 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder setExpectedDataGeneration(long generation) {
       this.expectedDataGeneration = generation;
+      return this;
+    }
+
+    public Builder setListPrefix(String prefix) {
+      this.listPrefix = prefix;
+      return this;
+    }
+
+    public Builder setRequireFileSystemLayout(boolean require) {
+      this.requireFileSystemLayout = require;
+      return this;
+    }
+
+    public Builder setRequireFileSystemOptimized(boolean require) {
+      this.requireFileSystemOptimized = require;
+      return this;
+    }
+
+    public Builder setExpectedETag(String eTag) {
+      this.expectedETag = eTag;
+      return this;
+    }
+
+    public Builder setExcludedETag(String eTag) {
+      this.excludedETag = eTag;
+      return this;
+    }
+
+    public Builder setDerivedKeyPiggyBacking(boolean derivedKeyPiggyBacking) {
+      this.derivedKeyPiggyBacking = derivedKeyPiggyBacking;
       return this;
     }
 

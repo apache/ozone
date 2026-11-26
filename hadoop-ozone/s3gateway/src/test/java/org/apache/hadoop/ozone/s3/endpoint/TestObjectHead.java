@@ -18,41 +18,97 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CACHE_CONTROL_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_DISPOSITION_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_ENCODING_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_LANGUAGE_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.CONTENT_TYPE_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointBase.EXPIRES_CUSTOM;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
+import static org.apache.hadoop.ozone.s3.endpoint.TestObjectGet.EXPIRES1;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_RANGE;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.stream.Stream;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.RFC1123Util;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test head object.
  */
 public class TestObjectHead {
+  private static final String RANGE_KEY = "range-key";
+  private static final String RANGE_CONTENT = "0123456789";
+
   private String bucketName = "b1";
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
+  private HttpHeaders headers;
 
   @BeforeEach
   public void setup() throws IOException {
     OzoneClient clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
+    headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("UNSIGNED-PAYLOAD");
 
     keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(clientStub)
+        .setHeaders(headers)
         .build();
   }
 
@@ -71,11 +127,163 @@ public class TestObjectHead {
 
     DateTimeFormatter.RFC_1123_DATE_TIME
         .parse(response.getHeaderString("Last-Modified"));
+
+    assertNull(response.getHeaderString(TAG_COUNT_HEADER),
+        "HeadObject must omit x-amz-tagging-count (AWS TagCount) when object has no tags");
   }
 
   @Test
   public void testHeadFailByBadName() throws Exception {
     assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, "badKeyName"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 0})
+  public void testHeadWithNonPositivePartNumber(int partNumber) throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    keyEndpoint.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
+    long failureBefore = keyEndpoint.getMetrics().getHeadKeyFailure();
+
+    assertErrorResponse(INVALID_ARGUMENT, () -> keyEndpoint.head(bucketName, RANGE_KEY));
+
+    assertThat(keyEndpoint.getMetrics().getHeadKeyFailure() - failureBefore).isEqualTo(1);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "2, bytes=100-200",
+      "2, ''",
+      "0, bytes=0-4",
+      "-1, bytes=0-4",
+      "abc, bytes=0-4",
+      "'', bytes=0-4",
+      "1, bytes=0-4"
+  })
+  public void testHeadWithPartNumberAndRange(String partNumber, String range) throws Exception {
+    String uploadId = initiateMultipartUpload(keyEndpoint, bucketName, RANGE_KEY);
+    CompleteMultipartUploadRequest.Part part =
+        uploadPart(keyEndpoint, bucketName, RANGE_KEY, 2, uploadId, RANGE_CONTENT);
+    completeMultipartUpload(keyEndpoint, bucketName, RANGE_KEY, uploadId, singletonList(part));
+    keyEndpoint.queryParamsForTest().unset(S3Consts.QueryParams.UPLOAD_ID);
+    keyEndpoint.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 2);
+    assertSucceeds(() -> keyEndpoint.head(bucketName, RANGE_KEY));
+
+    keyEndpoint.queryParamsForTest().set(S3Consts.QueryParams.PART_NUMBER, partNumber);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
+    long failureBefore = keyEndpoint.getMetrics().getHeadKeyFailure();
+
+    OS3Exception exception = assertErrorResponse(INVALID_REQUEST, () -> keyEndpoint.head(bucketName, RANGE_KEY));
+
+    assertThat(exception.getErrorMessage())
+        .isEqualTo("Cannot specify both Range header and partNumber query parameter");
+    assertThat(keyEndpoint.getMetrics().getHeadKeyFailure() - failureBefore).isEqualTo(1);
+  }
+
+  @ParameterizedTest
+  @MethodSource("rangeCases")
+  public void testHeadWithRange(String range, int expectedStatus, long expectedLength, String expectedContentRange)
+      throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
+
+    Response response = keyEndpoint.head(bucketName, RANGE_KEY);
+
+    assertEquals(expectedStatus, response.getStatus());
+    assertEquals(expectedLength, Long.parseLong(response.getHeaderString(HttpHeaders.CONTENT_LENGTH)));
+    assertEquals(expectedContentRange, response.getHeaderString(CONTENT_RANGE_HEADER));
+    assertEquals(RANGE_HEADER_SUPPORTED_UNIT, response.getHeaderString(ACCEPT_RANGE_HEADER));
+    assertNotNull(response.getHeaderString(HttpHeaders.ETAG));
+  }
+
+  @Test
+  public void testHeadWithInvalidRange() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=10-20");
+    long failureBefore = keyEndpoint.getMetrics().getHeadKeyFailure();
+
+    assertErrorResponse(INVALID_RANGE, () -> keyEndpoint.head(bucketName, RANGE_KEY));
+    assertEquals(1L, keyEndpoint.getMetrics().getHeadKeyFailure() - failureBefore);
+  }
+
+  @Test
+  public void testHeadIfNoneMatchTakesPrecedenceOverRange() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    String eTag = keyEndpoint.head(bucketName, RANGE_KEY).getHeaderString(HttpHeaders.ETAG);
+    when(headers.getHeaderString(IF_NONE_MATCH_HEADER)).thenReturn(eTag);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=10-20");
+
+    Response response = keyEndpoint.head(bucketName, RANGE_KEY);
+
+    assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testHeadIfMatchFailureTakesPrecedenceOverRange() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn("\"mismatched-etag\"");
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=10-20");
+
+    assertErrorResponse(PRECOND_FAILED, () -> keyEndpoint.head(bucketName, RANGE_KEY));
+  }
+
+  @Test
+  public void testHeadIfMatch() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, "etag-key", "head-content"));
+
+    Response response = keyEndpoint.head(bucketName, "etag-key");
+    String eTag = response.getHeaderString(HttpHeaders.ETAG);
+    assertNotNull(eTag);
+
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn(eTag);
+
+    response = keyEndpoint.head(bucketName, "etag-key");
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+  }
+
+  @Test
+  public void testHeadIfNoneMatchReturnsNotModified() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, "etag-key", "head-content"));
+
+    Response response = keyEndpoint.head(bucketName, "etag-key");
+    String eTag = response.getHeaderString(HttpHeaders.ETAG);
+    assertNotNull(eTag);
+
+    when(headers.getHeaderString(IF_NONE_MATCH_HEADER)).thenReturn(eTag);
+
+    response = keyEndpoint.head(bucketName, "etag-key");
+    assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(),
+        response.getStatus());
+  }
+
+  @Test
+  public void testHeadIfUnmodifiedSinceFailure() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, "etag-key", "head-content"));
+
+    when(headers.getHeaderString(IF_UNMODIFIED_SINCE_HEADER))
+        .thenReturn(formatHttpDate(bucket.getKey("etag-key")
+            .getModificationTime().minusSeconds(60)));
+
+    OS3Exception ex = assertErrorResponse(PRECOND_FAILED,
+        () -> keyEndpoint.head(bucketName, "etag-key"));
+    assertNotNull(ex);
+  }
+
+  @Test
+  public void testHeadIgnoresIfUnmodifiedSinceAfterMatchingIfMatch()
+      throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, "etag-key", "head-content"));
+
+    Response response = keyEndpoint.head(bucketName, "etag-key");
+    String eTag = response.getHeaderString(HttpHeaders.ETAG);
+    assertNotNull(eTag);
+
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn(eTag);
+    when(headers.getHeaderString(IF_UNMODIFIED_SINCE_HEADER))
+        .thenReturn(formatHttpDate(bucket.getKey("etag-key")
+            .getModificationTime().minusSeconds(60)));
+
+    response = keyEndpoint.head(bucketName, "etag-key");
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
   }
 
   @Test
@@ -130,11 +338,110 @@ public class TestObjectHead {
     assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, keyPath + "/"));
   }
 
+  @Test
+  public void testHeadObjectIncludesTagCount()
+      throws Exception {
+    String keyName = "head-with-tags";
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "c"));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    // S3 HeadObject TagCount in the AWS API is driven by x-amz-tagging-count
+    assertNotNull(response.getHeaderString(TAG_COUNT_HEADER),
+        "HeadObject must include x-amz-tagging-count when object has tags (AWS TagCount)");
+    assertEquals("2", response.getHeaderString(TAG_COUNT_HEADER));
+  }
+
+  @ParameterizedTest
+  @MethodSource("reservedMetadataCollisionCases")
+  public void testHeadSeparatesUserMetadataFromSystemHeader(
+      String headerName, String customKey, String systemValue, String userValue)
+      throws Exception {
+    String keyName = "reserved-" + customKey;
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + headerName.toLowerCase(), userValue);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+    if (HttpHeaders.CONTENT_TYPE.equals(headerName)) {
+      when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE))
+          .thenReturn(systemValue);
+    } else {
+      when(headers.getHeaderString(headerName)).thenReturn(systemValue);
+    }
+
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "body"));
+
+    assertEquals(systemValue, bucket.getKey(keyName).getMetadata().get(headerName));
+    assertEquals(userValue,
+        bucket.getKey(keyName).getMetadata().get(customKey));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    assertEquals(systemValue, response.getHeaderString(headerName));
+    assertEquals(userValue,
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + headerName.toLowerCase()));
+  }
+
+  @Test
+  public void testUserMetadataSuffixDoesNotCollideWithInternalKey() throws Exception {
+    String keyName = "reserved-cache-control-suffix";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "cache-control", "user-cache");
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "cache-control-custom", "suffix-value");
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+    when(headers.getHeaderString(HttpHeaders.CACHE_CONTROL)).thenReturn("no-cache");
+
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "body"));
+
+    assertEquals("no-cache",
+        bucket.getKey(keyName).getMetadata().get(HttpHeaders.CACHE_CONTROL));
+    assertEquals("user-cache",
+        bucket.getKey(keyName).getMetadata().get(CACHE_CONTROL_CUSTOM));
+    assertEquals("suffix-value",
+        bucket.getKey(keyName).getMetadata().get("cache-control-custom"));
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+    assertEquals("no-cache", response.getHeaderString(HttpHeaders.CACHE_CONTROL));
+    assertEquals("user-cache",
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "cache-control"));
+    assertEquals("suffix-value",
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "cache-control-custom"));
+  }
+
+  private static Stream<Arguments> reservedMetadataCollisionCases() {
+    return Stream.of(
+        Arguments.of(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM, "image/jpeg", "user/custom-type"),
+        Arguments.of(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL_CUSTOM, "no-cache", "user-cache"),
+        Arguments.of(HttpHeaders.EXPIRES, EXPIRES_CUSTOM, EXPIRES1, "user-expires"),
+        Arguments.of(HttpHeaders.CONTENT_ENCODING, CONTENT_ENCODING_CUSTOM, "gzip", "user-encoding"),
+        Arguments.of(HttpHeaders.CONTENT_LANGUAGE, CONTENT_LANGUAGE_CUSTOM, "en-CA", "user-lang"),
+        Arguments.of(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION_CUSTOM, "inline", "user-disp"));
+  }
+
+  private static Stream<Arguments> rangeCases() {
+    return Stream.of(
+        Arguments.of(null, HttpStatus.SC_OK, 10L, null),
+        Arguments.of("bytes=0-4", HttpStatus.SC_PARTIAL_CONTENT, 5L, "bytes 0-4/10"),
+        Arguments.of("bytes=5-", HttpStatus.SC_PARTIAL_CONTENT, 5L, "bytes 5-9/10"),
+        Arguments.of("bytes=-3", HttpStatus.SC_PARTIAL_CONTENT, 3L, "bytes 7-9/10"),
+        Arguments.of("bytes=8-20", HttpStatus.SC_PARTIAL_CONTENT, 2L, "bytes 8-9/10"),
+        Arguments.of("bytes=5-2", HttpStatus.SC_OK, 10L, null),
+        Arguments.of("bytes=-", HttpStatus.SC_OK, 10L, null),
+        Arguments.of("bytes=0-" + Long.MAX_VALUE, HttpStatus.SC_PARTIAL_CONTENT, 10L, "bytes 0-9/10"),
+        Arguments.of("bytes=0-9223372036854775808", HttpStatus.SC_OK, 10L, null),
+        Arguments.of("bytes=0-99999999999999999999", HttpStatus.SC_OK, 10L, null));
+  }
+
   private byte[] createKey(String keyPath) throws IOException {
     byte[] bytes = RandomStringUtils.secure().nextAlphanumeric(32).getBytes(UTF_8);
     try (OutputStream out = bucket.createKey(keyPath, bytes.length)) {
       out.write(bytes);
     }
     return bytes;
+  }
+
+  private static String formatHttpDate(Instant instant) {
+    return RFC1123Util.FORMAT.format(
+        instant.atZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE)));
   }
 }

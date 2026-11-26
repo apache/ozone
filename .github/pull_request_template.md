@@ -22,6 +22,9 @@ Examples of well-written pull requests:
 Please create an issue in ASF JIRA before opening a pull request, and you need to set the title of the pull
 request which starts with the corresponding JIRA issue number. (e.g. HDDS-XXXX. Fix a typo in YYY.)
 
+If you do not have an ASF Jira account yet, please follow the first-time contributor
+instructions in the [Jira guideline](../CONTRIBUTING.md#jira-guideline).
+
 (Please replace this section with the link to the Apache JIRA)
 
 ## How was this patch tested?

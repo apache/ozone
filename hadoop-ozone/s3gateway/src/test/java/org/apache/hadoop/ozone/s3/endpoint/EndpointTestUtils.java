@@ -21,13 +21,24 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
+import javax.ws.rs.HttpMethod;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -36,12 +47,27 @@ import org.apache.ratis.util.function.CheckedSupplier;
 /** Utilities for unit-testing S3 endpoints. */
 public final class EndpointTestUtils {
 
+  /** Create an object endpoint backed by the supplied protocol and volume mocks. */
+  static ObjectEndpoint createObjectEndpoint(ClientProtocol protocol, OzoneVolume volume, String bucketName)
+      throws IOException {
+    OzoneClient mockClient = mock(OzoneClient.class);
+    ObjectStore objectStore = mock(ObjectStore.class);
+    when(mockClient.getObjectStore()).thenReturn(objectStore);
+    when(mockClient.getProxy()).thenReturn(protocol);
+    when(objectStore.getClientProxy()).thenReturn(protocol);
+    when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getName()).thenReturn("s3Volume");
+    when(volume.getBucket(bucketName)).thenReturn(mock(OzoneBucket.class));
+    return EndpointBuilder.newObjectEndpointBuilder().setClient(mockClient).build();
+  }
+
   /** Get key content. */
   public static Response get(
       ObjectEndpoint subject,
       String bucket,
       String key
   ) throws IOException, OS3Exception {
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
     return subject.get(bucket, key);
   }
 
@@ -52,6 +78,41 @@ public final class EndpointTestUtils {
       String key
   ) throws IOException, OS3Exception {
     subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
+    return subject.get(bucket, key);
+  }
+
+  /** Get object attributes (?attributes). */
+  public static Response getObjectAttributes(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      String attributesHeader
+  ) throws IOException, OS3Exception {
+    return getObjectAttributes(subject, bucket, key, attributesHeader, null, null);
+  }
+
+  /** Get object attributes (?attributes) with optional ObjectParts pagination headers. */
+  public static Response getObjectAttributes(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      String attributesHeader,
+      Integer maxParts,
+      Integer partNumberMarker
+  ) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.ATTRIBUTES, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
+    when(subject.getHeaders().getHeaderString(S3Consts.OBJECT_ATTRIBUTES_HEADER))
+        .thenReturn(attributesHeader);
+    if (maxParts != null) {
+      when(subject.getHeaders().getHeaderString(S3Consts.MAX_PARTS_HEADER))
+          .thenReturn(String.valueOf(maxParts));
+    }
+    if (partNumberMarker != null) {
+      when(subject.getHeaders().getHeaderString(S3Consts.PART_NUMBER_MARKER_HEADER))
+          .thenReturn(String.valueOf(partNumberMarker));
+    }
     return subject.get(bucket, key);
   }
 
@@ -97,12 +158,14 @@ public final class EndpointTestUtils {
       String content
   ) throws IOException, OS3Exception {
     subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    setLengthHeader(subject, content);
+
     if (content == null) {
-      return subject.put(bucket, key, 0, null);
+      return subject.put(bucket, key, null);
     } else {
-      final long length = content.length();
       try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
-        return subject.put(bucket, key, length, body);
+        return subject.put(bucket, key, body);
       }
     }
   }
@@ -116,17 +179,37 @@ public final class EndpointTestUtils {
       String uploadID,
       String content
   ) throws IOException, OS3Exception {
+    return put(subject, bucket, key, partNumber, uploadID,
+        contentLength(content), content);
+  }
+
+  /** Put with content, part number, upload ID, and explicit Content-Length. */
+  public static Response put(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      int partNumber,
+      String uploadID,
+      long contentLength,
+      String content
+  ) throws IOException, OS3Exception {
     if (uploadID != null) {
       subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     }
-    subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
+    if (partNumber == 0 && uploadID == null) {
+      subject.queryParamsForTest().unset(S3Consts.QueryParams.PART_NUMBER);
+    } else {
+      subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
+    }
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    when(subject.getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH))
+        .thenReturn(String.valueOf(contentLength));
 
     if (content == null) {
-      return subject.put(bucket, key, 0, null);
+      return subject.put(bucket, key, null);
     } else {
-      final long length = content.length();
       try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
-        return subject.put(bucket, key, length, body);
+        return subject.put(bucket, key, body);
       }
     }
   }
@@ -137,6 +220,7 @@ public final class EndpointTestUtils {
       String bucket,
       String key
   ) throws IOException, OS3Exception {
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.DELETE);
     return subject.delete(bucket, key);
   }
 
@@ -147,7 +231,49 @@ public final class EndpointTestUtils {
       String key
   ) throws IOException, OS3Exception {
     subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.DELETE);
     return subject.delete(bucket, key);
+  }
+
+  /**
+   * Get bucket tags (?tagging).
+   */
+  public static Response getBucketTagging(
+      BucketEndpoint subject,
+      String bucket
+  ) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
+    return subject.get(bucket);
+  }
+
+  /**
+   * Add tagging on bucket (?tagging).
+   */
+  public static Response putBucketTagging(
+      BucketEndpoint subject, String bucket, String content)
+      throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    setLengthHeader(subject, content);
+
+    if (content == null) {
+      return subject.put(bucket, null);
+    } else {
+      try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
+        return subject.put(bucket, body);
+      }
+    }
+  }
+
+  /**
+   * Delete bucket tags (?tagging).
+   */
+  public static Response deleteBucketTagging(
+      BucketEndpoint subject, String bucket) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.DELETE);
+    return subject.delete(bucket);
   }
 
   /** Initiate multipart upload.
@@ -236,20 +362,61 @@ public final class EndpointTestUtils {
     }
   }
 
-  /** Verify error response for {@code request} matches {@code expected} {@link OS3Exception}. */
-  public static OS3Exception assertErrorResponse(OS3Exception expected, CheckedRunnable<?> request) {
+  /** Verify error response for {@code request} matches {@code expected} {@link S3ErrorTable}. */
+  public static OS3Exception assertErrorResponse(S3ErrorTable expected, CheckedRunnable<?> request) {
     OS3Exception actual = assertThrows(OS3Exception.class, request::run);
     assertEquals(expected.getCode(), actual.getCode());
     assertEquals(expected.getHttpCode(), actual.getHttpCode());
     return actual;
   }
 
-  /** Verify error response for {@code request} matches {@code expected} {@link OS3Exception}. */
-  public static OS3Exception assertErrorResponse(OS3Exception expected, CheckedSupplier<Response, ?> request) {
+  /** Verify error response for {@code request} matches {@code expected} {@link S3ErrorTable}. */
+  public static OS3Exception assertErrorResponse(S3ErrorTable expected, CheckedSupplier<Response, ?> request) {
     OS3Exception actual = assertThrows(OS3Exception.class, () -> request.get().close());
     assertEquals(expected.getCode(), actual.getCode());
     assertEquals(expected.getHttpCode(), actual.getHttpCode());
     return actual;
+  }
+
+  private static void setLengthHeader(EndpointBase subject, String content) {
+    when(subject.getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH))
+        .thenReturn(String.valueOf(contentLength(content)));
+  }
+
+  private static long contentLength(String content) {
+    return content != null ? content.getBytes(UTF_8).length : 0;
+  }
+
+  static final class FailingInputStream extends InputStream {
+
+    private final byte[] content;
+    private final int failAfterBytes;
+    private int position;
+
+    FailingInputStream(byte[] content, int failAfterBytes) {
+      this.content = content;
+      this.failAfterBytes = failAfterBytes;
+    }
+
+    @Override
+    public int read(byte[] buffer, int offset, int length) throws IOException {
+      if (position >= failAfterBytes) {
+        throw new IOException("upload interrupted");
+      }
+
+      int bytesToRead = Math.min(length, failAfterBytes - position);
+      System.arraycopy(content, position, buffer, offset, bytesToRead);
+      position += bytesToRead;
+      return bytesToRead;
+    }
+
+    @Override
+    public int read() throws IOException {
+      if (position >= failAfterBytes) {
+        throw new IOException("upload interrupted");
+      }
+      return content[position++];
+    }
   }
 
   private EndpointTestUtils() {

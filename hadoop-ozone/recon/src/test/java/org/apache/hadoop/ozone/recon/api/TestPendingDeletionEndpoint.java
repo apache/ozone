@@ -18,23 +18,18 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayOutputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsProgressResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,13 +52,13 @@ public class TestPendingDeletionEndpoint {
   private PendingDeletionEndpoint pendingDeletionEndpoint;
   private ReconGlobalMetricsService reconGlobalMetricsService;
   private DataNodeMetricsService dataNodeMetricsService;
-  private StorageContainerLocationProtocol scmClient;
+  private StorageContainerLocationInternalInterface scmClient;
 
   @BeforeEach
   public void setup() {
     reconGlobalMetricsService = mock(ReconGlobalMetricsService.class);
     dataNodeMetricsService = mock(DataNodeMetricsService.class);
-    scmClient = mock(StorageContainerLocationProtocol.class);
+    scmClient = mock(StorageContainerLocationInternalInterface.class);
     pendingDeletionEndpoint = new PendingDeletionEndpoint(
         reconGlobalMetricsService, dataNodeMetricsService, scmClient);
   }
@@ -111,14 +106,12 @@ public class TestPendingDeletionEndpoint {
 
   @Test
   public void testDnComponentReturnsOkWhenFinished() {
-    DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
-        .setStatus(DataNodeMetricsService.MetricCollectionStatus.FINISHED)
-        .setTotalPendingDeletionSize(100L)
-        .setTotalNodesQueried(1)
-        .setTotalNodeQueryFailures(0)
-        .setPendingDeletion(Arrays.asList(
-            new DatanodePendingDeletionMetrics("dn1", "uuid-1", 100L)))
-        .build();
+    DataNodeMetricsCompleteResponse metricsResponse = new DataNodeMetricsCompleteResponse(
+        DataNodeMetricsService.MetricCollectionStatus.FINISHED,
+        1,
+        0,
+        100L,
+        Arrays.asList(new DatanodePendingDeletionMetrics("dn1", "uuid-1", 100L)));
     when(dataNodeMetricsService.getCollectedMetrics(5)).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.getPendingDeletionByComponent("DN", 5);
@@ -129,12 +122,12 @@ public class TestPendingDeletionEndpoint {
 
   @Test
   public void testDnComponentAllowsNullLimit() {
-    DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
-        .setStatus(DataNodeMetricsService.MetricCollectionStatus.FINISHED)
-        .setTotalPendingDeletionSize(100L)
-        .setTotalNodesQueried(1)
-        .setTotalNodeQueryFailures(0)
-        .build();
+    DataNodeMetricsCompleteResponse metricsResponse = new DataNodeMetricsCompleteResponse(
+        DataNodeMetricsService.MetricCollectionStatus.FINISHED,
+        1,
+        0,
+        100L,
+        Arrays.asList(new DatanodePendingDeletionMetrics("dn1", "uuid-1", 100L)));
     when(dataNodeMetricsService.getCollectedMetrics(null)).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.getPendingDeletionByComponent("dn", null);
@@ -145,9 +138,9 @@ public class TestPendingDeletionEndpoint {
 
   @Test
   public void testDnComponentReturnsAcceptedWhenInProgress() {
-    DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
-        .setStatus(DataNodeMetricsService.MetricCollectionStatus.IN_PROGRESS)
-        .build();
+    DataNodeMetricsProgressResponse metricsResponse = new DataNodeMetricsProgressResponse(
+        DataNodeMetricsService.MetricCollectionStatus.IN_PROGRESS,
+        "Metrics collection task is currently running. Please wait for task to finish.");
     when(dataNodeMetricsService.getCollectedMetrics(2)).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.getPendingDeletionByComponent("dn", 2);
@@ -211,59 +204,5 @@ public class TestPendingDeletionEndpoint {
 
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     assertEquals(pendingSizes, response.getEntity());
-  }
-
-  @Test
-  public void testDownloadReturnsAcceptedWhenCollectionInProgress() {
-    DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
-        .setStatus(DataNodeMetricsService.MetricCollectionStatus.IN_PROGRESS)
-        .build();
-    when(dataNodeMetricsService.getCollectedMetrics(null)).thenReturn(metricsResponse);
-
-    Response response = pendingDeletionEndpoint.downloadPendingDeleteData();
-
-    assertEquals(Response.Status.ACCEPTED.getStatusCode(), response.getStatus());
-    assertEquals("application/json", response.getMediaType().toString());
-    assertEquals(metricsResponse, response.getEntity());
-  }
-
-  @Test
-  public void testDownloadReturnsServerErrorWhenMetricsMissing() {
-    DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
-        .setStatus(DataNodeMetricsService.MetricCollectionStatus.FINISHED)
-        .build();
-    when(dataNodeMetricsService.getCollectedMetrics(null)).thenReturn(metricsResponse);
-
-    Response response = pendingDeletionEndpoint.downloadPendingDeleteData();
-
-    assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
-    assertEquals("Metrics data is missing despite FINISHED status.", response.getEntity());
-    assertEquals("text/plain", response.getMediaType().toString());
-  }
-
-  @Test
-  public void testDownloadReturnsCsvWithMetrics() throws Exception {
-    List<DatanodePendingDeletionMetrics> pendingDeletionMetrics = Arrays.asList(
-        new DatanodePendingDeletionMetrics("dn1", "uuid-1", 10L),
-        new DatanodePendingDeletionMetrics("dn2", "uuid-2", 20L));
-    DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
-        .setStatus(DataNodeMetricsService.MetricCollectionStatus.FINISHED)
-        .setPendingDeletion(pendingDeletionMetrics)
-        .build();
-    when(dataNodeMetricsService.getCollectedMetrics(null)).thenReturn(metricsResponse);
-
-    Response response = pendingDeletionEndpoint.downloadPendingDeleteData();
-
-    assertEquals(Response.Status.ACCEPTED.getStatusCode(), response.getStatus());
-    assertEquals("text/csv", response.getMediaType().toString());
-    assertEquals("attachment; filename=\"pending_deletion_all_datanode_stats.csv\"",
-        response.getHeaderString("Content-Disposition"));
-    StreamingOutput streamingOutput = assertInstanceOf(StreamingOutput.class, response.getEntity());
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    streamingOutput.write(outputStream);
-    String csv = new String(outputStream.toByteArray(), StandardCharsets.UTF_8);
-    assertTrue(csv.contains("HostName,Datanode UUID,Pending Block Size (bytes)"));
-    assertTrue(csv.contains("dn1,uuid-1,10"));
-    assertTrue(csv.contains("dn2,uuid-2,20"));
   }
 }

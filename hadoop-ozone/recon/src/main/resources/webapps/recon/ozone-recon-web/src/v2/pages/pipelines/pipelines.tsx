@@ -95,7 +95,7 @@ const Pipelines: React.FC<{}> = () => {
 
   // Create refresh function for auto-reload
   const loadPipelinesData = () => {
-    pipelinesData.refetch();
+    pipelinesData.refetch().catch(() => {});
   };
 
   const autoReload = useAutoReload(loadPipelinesData);

@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.Objects;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ha.invoker.StatefulServiceStateManagerInvoker;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.slf4j.Logger;
@@ -63,7 +63,8 @@ public final class StatefulServiceStateManagerImpl
     if (transactionBuffer instanceof SCMHADBTransactionBuffer) {
       SCMHADBTransactionBuffer buffer =
               (SCMHADBTransactionBuffer) transactionBuffer;
-      buffer.flush();
+      // Defer until applyTransaction has advanced the transaction index.
+      buffer.flushIfNeeded(0);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Transaction buffer flushed");
       }
@@ -130,12 +131,11 @@ public final class StatefulServiceStateManagerImpl
       Objects.requireNonNull(statefulServiceConfig, "statefulServiceConfig == null");
       Objects.requireNonNull(transactionBuffer, "transactionBuffer == null");
 
-      final StatefulServiceStateManager stateManager =
+      final StatefulServiceStateManager impl =
           new StatefulServiceStateManagerImpl(statefulServiceConfig,
               transactionBuffer);
 
-      return scmRatisServer.getProxyHandler(RequestType.STATEFUL_SERVICE_CONFIG,
-          StatefulServiceStateManager.class, stateManager);
+      return scmRatisServer.getProxyHandler(new StatefulServiceStateManagerInvoker(impl, scmRatisServer));
     }
   }
 }

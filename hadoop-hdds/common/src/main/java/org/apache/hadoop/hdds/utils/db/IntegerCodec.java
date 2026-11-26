@@ -58,12 +58,20 @@ public final class IntegerCodec implements Codec<Integer> {
 
   @Override
   public byte[] toPersistedFormat(Integer object) {
-    return ByteBuffer.wrap(new byte[Integer.BYTES]).putInt(object).array();
+    return object != null ? toByteArray(object) : null;
+  }
+
+  public byte[] toByteArray(int value) {
+    return ByteBuffer.wrap(new byte[Integer.BYTES]).putInt(value).array();
   }
 
   @Override
-  public Integer fromPersistedFormat(byte[] rawData) {
-    return ByteBuffer.wrap(rawData).getInt();
+  public Integer fromPersistedFormat(byte[] bytes) {
+    return bytes != null ? fromByteArray(bytes) : null;
+  }
+
+  public int fromByteArray(byte[] bytes) {
+    return ByteBuffer.wrap(bytes).getInt();
   }
 
   @Override

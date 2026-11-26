@@ -250,11 +250,13 @@ public class OpenKeyCleanupService extends BackgroundService {
 
     private OMRequest createCommitKeyRequest(
         CommitKeyRequest.Builder request) {
+      // Submitting to Ratis skips preExecute, which sets the modification time for client commits.
+      request.getKeyArgsBuilder().setModificationTime(Time.now());
       return OMRequest.newBuilder()
           .setCmdType(Type.CommitKey)
           .setCommitKeyRequest(request)
           .setClientId(clientId.toString())
-          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT.serialize())
           .build();
     }
 

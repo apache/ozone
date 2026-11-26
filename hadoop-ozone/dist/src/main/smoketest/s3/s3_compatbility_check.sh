@@ -22,7 +22,7 @@ set -e
 
 
 # To run this script
-#    mvn clean install -DskipShade -DskipTests
+#    ./mvnw clean install -DskipShade -DskipTests
 #    cd hadoop-ozone/dist/target/ozone-*/smoketest/s3/
 #    python3 -m venv s3env
 #    source s3env/bin/activate
@@ -85,6 +85,7 @@ run_robot_test objectmultidelete
 run_robot_test objecthead
 run_robot_test MultipartUpload
 run_robot_test objecttagging
+run_robot_test buckettagging
 run_robot_test objectlist
 
 rebot --outputdir results/ results/*.xml

@@ -31,7 +31,7 @@ public class TestObjectKeyNameAdapter {
   public void testEncodeResult() throws Exception {
     assertEquals("abc/", getAdapter()
         .marshal(EncodingTypeObject.createNullable("abc/", ENCODING_TYPE)));
-    assertEquals("a+b+c/", getAdapter()
+    assertEquals("a%20b%20c/", getAdapter()
         .marshal(EncodingTypeObject.createNullable("a b c/", ENCODING_TYPE)));
     assertEquals("a%2Bb%2Bc/", getAdapter()
         .marshal(EncodingTypeObject.createNullable("a+b+c/", ENCODING_TYPE)));
@@ -42,6 +42,11 @@ public class TestObjectKeyNameAdapter {
         .marshal(EncodingTypeObject.createNullable("a b c/", null)));
     assertEquals("a+b+c/", getAdapter()
         .marshal(EncodingTypeObject.createNullable("a+b+c/", null)));
+
+    assertEquals("", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("", null)));
+    assertEquals("", getAdapter()
+        .marshal(EncodingTypeObject.createNullable("", ENCODING_TYPE)));
   }
 
   private XmlAdapter<String, EncodingTypeObject> getAdapter() {

@@ -25,8 +25,8 @@ import static org.apache.hadoop.fs.contract.ContractTestUtils.toList;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.toListThroughNextCallsAlone;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.touch;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.treeWalk;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 import static org.assertj.core.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -321,28 +321,28 @@ public abstract class AbstractContractGetFileStatusTest extends AbstractFSContra
   public void testListStatusIteratorNoDir() throws Throwable {
     describe("test the listStatusIterator call on a path which is not " +
         "present");
-    intercept(FileNotFoundException.class,
+    assertThrows(FileNotFoundException.class,
         () -> getFileSystem().listStatusIterator(path("missing")));
   }
 
   @Test
   public void testLocatedStatusNoDir() throws Throwable {
     describe("test the LocatedStatus call on a path which is not present");
-    intercept(FileNotFoundException.class,
+    assertThrows(FileNotFoundException.class,
         () -> getFileSystem().listLocatedStatus(path("missing")));
   }
 
   @Test
   public void testListStatusNoDir() throws Throwable {
     describe("test the listStatus(path) call on a path which is not present");
-    intercept(FileNotFoundException.class,
+    assertThrows(FileNotFoundException.class,
         () -> getFileSystem().listStatus(path("missing")));
   }
 
   @Test
   public void testListStatusFilteredNoDir() throws Throwable {
     describe("test the listStatus(path, filter) call on a missing path");
-    intercept(FileNotFoundException.class,
+    assertThrows(FileNotFoundException.class,
         () -> getFileSystem().listStatus(path("missing"), ALL_PATHS));
   }
 

@@ -177,7 +177,8 @@ const Buckets: React.FC<{}> = () => {
         quotaInBytes: bucket.quotaInBytes,
         quotaInNamespace: bucket.quotaInNamespace,
         owner: bucket.owner,
-        acls: bucket.acls
+        acls: bucket.acls,
+        replicationConfigInfo: bucket.replicationConfigInfo
       }));
 
       const volumeBucketMap: Map<string, Set<Bucket>> = getVolumeBucketMap(buckets);
@@ -262,7 +263,9 @@ const Buckets: React.FC<{}> = () => {
                 onChange={handleVolumeChange}
                 fixedColumn=''
                 onTagClose={() => { }}
-                columnLength={volumeOptions.length} />
+                columnLength={volumeOptions.length}
+                showSearch={true}
+                showSelectAll={true} />
               <MultiSelect
                 options={columnOptions}
                 defaultValue={selectedColumns}
@@ -270,8 +273,9 @@ const Buckets: React.FC<{}> = () => {
                 placeholder='Columns'
                 onChange={handleColumnChange}
                 onTagClose={() => { }}
-                fixedColumn='name'
-                columnLength={COLUMNS.length} />
+                fixedColumn={['name', 'volumeName']}
+                columnLength={COLUMNS.length}
+                showSelectAll={true} />
               <SingleSelect
                 options={LIMIT_OPTIONS}
                 defaultValue={selectedLimit}

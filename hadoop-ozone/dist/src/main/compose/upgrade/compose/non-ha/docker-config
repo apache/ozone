@@ -38,6 +38,7 @@ OZONE-SITE.XML_hdds.datanode.volume.min.free.space.percent=0
 
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.recon.om.snapshot.task.interval.delay=1m
+OZONE-SITE.XML_ozone.recon.om.snapshot.task.initial.delay=20s
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s
 OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 OZONE-SITE.XML_ozone.client.hbase.enhancements.allowed=true
@@ -52,3 +53,6 @@ no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 # Does not take effect on Ozone versions < 1.4.0
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
+
+# Revert when HDDS-17350 is merged. (lazy client tracing init)
+OZONE-SITE.XML_ozone.tracing.client.application-aware=false

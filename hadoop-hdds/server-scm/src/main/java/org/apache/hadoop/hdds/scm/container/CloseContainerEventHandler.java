@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.lease.LeaseAlreadyExistException;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
@@ -135,7 +134,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
     } catch (NotLeaderException nle) {
       LOG.warn("Skip sending close container command,"
           + " since current SCM is not leader.", nle);
-    } catch (IOException | InvalidStateTransitionException ex) {
+    } catch (IOException ex) {
       LOG.error("Failed to close the container {}.", containerID, ex);
     }
   }

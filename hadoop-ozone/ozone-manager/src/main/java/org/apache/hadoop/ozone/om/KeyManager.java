@@ -23,6 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -36,10 +39,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
@@ -86,6 +91,33 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   OmKeyInfo getKeyInfo(OmKeyArgs args, ResolvedBucket buctket,
       String clientAddress) throws IOException;
+
+  /**
+   * List the status for a file or a directory and its contents.
+   * Optionally skips pipeline refresh for callers that only need metadata.
+   *
+   * @param args       Key args
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @param clientAddress a hint to key manager, order the datanode in returned
+   *                      pipeline by distance between client and datanode.
+   * @param allowPartialPrefixes if partial prefixes should be allowed,
+   *                             this is needed in context of ListKeys
+   * @param refreshPipelineInfo if true, update pipeline location information
+   *                            using SCM-backed cache; if false, skip it
+   * @return list of file status
+   * @throws IOException if file or bucket or volume does not exist
+   */
+  default List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
+      String startKey, long numEntries, String clientAddress,
+      boolean allowPartialPrefixes, boolean refreshPipelineInfo)
+      throws IOException {
+    return listStatus(args, recursive, startKey, numEntries, clientAddress,
+        allowPartialPrefixes);
+  }
 
   /**
    * Returns a list of keys represented by {@link OmKeyInfo}
@@ -276,7 +308,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   /**
    * Returns an iterator for pending deleted directories all buckets.
    */
-  default TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries() throws IOException {
+  default TableIterator<String, Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries() throws IOException {
     return getDeletedDirEntries(null, null);
   }
 
@@ -284,7 +316,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * Returns an iterator for pending deleted directories for volume and bucket.
    * @throws IOException
    */
-  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
+  TableIterator<String, Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
       String volume, String bucket) throws IOException;
 
   default List<Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(String volume, String bucket, int size)
@@ -347,6 +379,11 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   SstFilteringService getSnapshotSstFilteringService();
 
   /**
+   * Restart the snapshot SST filtering service with the interval in {@code conf}; it stays stopped if disabled.
+   */
+  void restartSnapshotSstFilteringService(OzoneConfiguration conf);
+
+  /**
    * Returns the instance of Snapshot Defrag service.
    * @return Background service.
    */
@@ -363,4 +400,40 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return BackgroundService
    */
   CompactionService getCompactionService();
+
+  /**
+   * Returns the instance of key/object lifecycle service.
+   * @return Background service.
+   */
+  KeyLifecycleService getKeyLifecycleService();
+
+  /**
+   * Resolve the streaming-write client's rack in OM's cached cluster map using the DNS-to-switch mapping.
+   *
+   * @param clientMachine client address (IP or hostname), must not be empty
+   * @param clusterMap OM's cached cluster map
+   * @return a node attached to the client's rack, or null if unresolved so the caller can let SCM sort
+   */
+  Node resolveClientForWrite(String clientMachine, NetworkTopology clusterMap);
+
+  /**
+   * Sort write pipeline datanodes nearest-first using OM's cached cluster map. A datanode matching
+   * {@code clientMachine} takes precedence over {@code client} and sorts first.
+   *
+   * @param nodes the pipeline nodes to sort
+   * @param clientMachine client address (IP or hostname), must not be empty
+   * @param client the node returned by {@link #resolveClientForWrite}, must not be null
+   * @param clusterMap OM's cached cluster map used to resolve topology distance
+   * @return nodes sorted nearest-first, or null if a pipeline node is missing from the cluster map;
+   *     callers must preserve the pipeline's order in that case
+   */
+  List<? extends DatanodeDetails> sortDatanodesForWrite(
+      List<? extends DatanodeDetails> nodes, String clientMachine, Node client, NetworkTopology clusterMap);
+
+  /**
+   * @return true if OM should sort the streaming-write pipeline locally
+   *     ({@code ozone.om.block.write.sort.datanodes.enabled}); false to leave
+   *     the sort to SCM.
+   */
+  boolean isSortDatanodesForWriteEnabled();
 }

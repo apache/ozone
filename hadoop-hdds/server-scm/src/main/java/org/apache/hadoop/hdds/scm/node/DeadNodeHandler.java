@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.node;
 
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.List;
@@ -32,7 +31,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -77,6 +75,14 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
                         final EventPublisher publisher) {
 
     try {
+      NodeStatus currentStatus =
+          nodeManager.getNodeStatus(datanodeDetails);
+
+      if (currentStatus.getHealth() != HddsProtos.NodeState.DEAD) {
+        LOG.info("Skip event for dead node {} since the current " +
+            "state is {}", datanodeDetails, currentStatus.getHealth());
+        return;
+      }
 
       /*
        * We should have already destroyed all the pipelines on this datanode
@@ -92,7 +98,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       closeContainers(datanodeDetails, publisher);
       destroyPipelines(datanodeDetails);
 
-      boolean isNodeInMaintenance = nodeManager.getNodeStatus(datanodeDetails).isInMaintenance();
+      boolean isNodeInMaintenance = currentStatus.isInMaintenance();
 
       // Remove the container replicas associated with the dead node unless it
       // is IN_MAINTENANCE
@@ -117,17 +123,6 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       // is IN_MAINTENANCE
       if (deletedBlockLog != null && !isNodeInMaintenance) {
         deletedBlockLog.onDatanodeDead(datanodeDetails.getID());
-      }
-
-      //move dead datanode out of ClusterNetworkTopology
-      NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
-      if (nt.contains(datanodeDetails)) {
-        nt.remove(datanodeDetails);
-        //make sure after DN is removed from topology,
-        //DatanodeDetails instance returned from nodeStateManager has no parent.
-        Preconditions.checkState(
-            nodeManager.getNode(datanodeDetails.getID())
-                .getParent() == null);
       }
     } catch (NodeNotFoundException ex) {
       // This should not happen, we cannot get a dead node event for an

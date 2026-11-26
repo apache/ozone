@@ -113,11 +113,13 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     UserGroupInformation ugi = createUGIForApi();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
         IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
-    if (!ozoneManager.isAdmin(ugi) &&
-        !ozoneManager.isOwner(ugi, bucketOwner)) {
-      throw new OMException(
-          "Only bucket owners and Ozone admins can create snapshots",
-          OMException.ResultCodes.PERMISSION_DENIED);
+    if (ozoneManager.isAdminAuthorizationEnabled()) {
+      if (!ozoneManager.isAdmin(ugi) &&
+          !ozoneManager.isOwner(ugi, bucketOwner)) {
+        throw new OMException(
+            "Only bucket owners and Ozone admins can create snapshots",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
     }
     // verify snapshot limit
     ozoneManager.getOmSnapshotManager().snapshotLimitCheck();
@@ -218,12 +220,12 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         snapshotInfo.toAuditMap(), exception, userInfo));
 
     if (exception == null) {
-      LOG.info("Created snapshot: '{}' with snapshotId: '{}' under path '{}'",
+      LOG.info("Created snapshot '{}' (snapshotId='{}') under path '{}'",
           snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
       omMetrics.incNumSnapshotActive();
     } else {
       omMetrics.incNumSnapshotCreateFails();
-      LOG.error("Failed to create snapshot '{}' with snapshotId: '{}' under " +
+      LOG.error("Failed to create snapshot '{}' (snapshotId='{}') under " +
               "path '{}'",
           snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
     }

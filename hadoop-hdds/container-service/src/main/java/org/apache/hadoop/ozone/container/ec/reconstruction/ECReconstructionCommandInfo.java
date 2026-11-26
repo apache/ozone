@@ -25,6 +25,7 @@ import com.google.protobuf.ByteString;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.stream.IntStream;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -42,6 +43,7 @@ public class ECReconstructionCommandInfo {
   private final ByteString missingContainerIndexes;
   private final long deadlineMsSinceEpoch;
   private final long term;
+  private final ComponentVersion apparentVersion;
 
   public ECReconstructionCommandInfo(ReconstructECContainersCommand cmd) {
     this.containerID = cmd.getContainerID();
@@ -49,6 +51,7 @@ public class ECReconstructionCommandInfo {
     this.missingContainerIndexes = cmd.getMissingContainerIndexes();
     this.deadlineMsSinceEpoch = cmd.getDeadline();
     this.term = cmd.getTerm();
+    this.apparentVersion = cmd.getApparentVersion();
 
     sourceNodeMap = cmd.getSources().stream()
         .collect(toMap(
@@ -95,6 +98,16 @@ public class ECReconstructionCommandInfo {
 
   public long getTerm() {
     return term;
+  }
+
+  /**
+   * This method exists to handle future incompatible changes that may be introduced to the EC reconstruction protocol.
+   *
+   * @return the version that this reconstruction request must operate in to maintain compatibility with all nodes
+   *    involved.
+   */
+  public ComponentVersion getApparentVersion() {
+    return apparentVersion;
   }
 
 }

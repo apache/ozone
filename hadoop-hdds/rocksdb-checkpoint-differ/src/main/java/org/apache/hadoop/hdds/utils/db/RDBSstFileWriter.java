@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.Closeable;
 import java.io.File;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDirectSlice;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
@@ -36,8 +37,13 @@ public class RDBSstFileWriter implements Closeable {
   private AtomicLong keyCounter;
   private ManagedOptions emptyOption = new ManagedOptions();
   private final ManagedEnvOptions emptyEnvOptions = new ManagedEnvOptions();
+  private final ManagedBlockBasedTableConfig tableConfig = new ManagedBlockBasedTableConfig();
 
   public RDBSstFileWriter(File externalFile) throws RocksDatabaseException {
+    // Pin the SST format version so files written here (e.g. snapshot defrag
+    // ingest) stay readable if Ozone is downgraded before finalization.
+    tableConfig.setFormatVersion(ManagedBlockBasedTableConfig.FORMAT_VERSION);
+    emptyOption.setTableFormatConfig(tableConfig);
     this.sstFileWriter = new ManagedSstFileWriter(emptyEnvOptions, emptyOption);
     this.keyCounter = new AtomicLong(0);
     this.sstFile = externalFile;
@@ -117,6 +123,7 @@ public class RDBSstFileWriter implements Closeable {
     sstFileWriter = null;
     emptyOption.close();
     emptyEnvOptions.close();
+    tableConfig.close();
   }
 
   private void closeOnFailure() {

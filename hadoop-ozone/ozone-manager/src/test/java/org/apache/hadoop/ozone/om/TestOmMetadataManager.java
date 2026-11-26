@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESH
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.COMPACTION_LOG_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELEGATION_TOKEN_TABLE;
@@ -32,12 +33,16 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_PARTS_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
@@ -49,15 +54,18 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import java.io.File;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -72,11 +80,15 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -86,8 +98,11 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -101,6 +116,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -122,6 +139,7 @@ public class TestOmMetadataManager {
       DELETED_TABLE,
       OPEN_KEY_TABLE,
       MULTIPART_INFO_TABLE,
+      MULTIPART_PARTS_TABLE,
       S3_SECRET_TABLE,
       DELEGATION_TOKEN_TABLE,
       PREFIX_TABLE,
@@ -136,7 +154,10 @@ public class TestOmMetadataManager {
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
       SNAPSHOT_RENAMED_TABLE,
-      COMPACTION_LOG_TABLE
+      COMPACTION_LOG_TABLE,
+      S3_REVOKED_STS_TOKEN_TABLE,
+      LIFECYCLE_CONFIGURATION_TABLE,
+      LIFECYCLE_SCAN_STATE_TABLE
   };
 
   private OMMetadataManager omMetadataManager;
@@ -519,6 +540,89 @@ public class TestOmMetadataManager {
   }
 
   @Test
+  public void testListKeysWithStartKeyBeforePrefix() throws Exception {
+    String volumeName = "volumeA";
+    String bucketName = "startKeyBeforePrefix";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    // Even index keys go to the DB and odd index keys to the cache.
+    addKeysToOM(volumeName, bucketName, "dir1/dir2/file1", 0);
+    addKeysToOM(volumeName, bucketName, "dir1/file2", 2);
+    addKeysToOM(volumeName, bucketName, "dir1bh/file1", 4);
+    addKeysToOM(volumeName, bucketName, "dir1bha/file1", 6);
+    addKeysToOM(volumeName, bucketName, "dir1bhb/file1", 1);
+    addKeysToOM(volumeName, bucketName, "dir2/file1", 8);
+
+    List<String> expected = Arrays.asList("dir1bh/file1", "dir1bha/file1", "dir1bhb/file1");
+
+    // startKey exists and sorts before keyPrefix, with non-matching keys in between.
+    assertEquals(expected, listKeyNames(volumeName, bucketName, "dir1/dir2/file1", "dir1bh", 100));
+    // startKey does not exist and sorts before keyPrefix.
+    assertEquals(expected, listKeyNames(volumeName, bucketName, "a", "dir1bh", 100));
+    assertEquals(expected, listKeyNames(volumeName, bucketName, null, "dir1bh", 100));
+
+    // Pagination continues from the last returned key.
+    assertEquals(expected.subList(0, 2), listKeyNames(volumeName, bucketName, "dir1/dir2/file1", "dir1bh", 2));
+    assertEquals(expected.subList(2, 3), listKeyNames(volumeName, bucketName, "dir1bha/file1", "dir1bh", 2));
+
+    // startKey sorts after every key matching keyPrefix.
+    assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, "dir1bi", "dir1bh", 100));
+  }
+
+  /**
+   * keyPrefix "/" maps to the DB prefix of the bucket, so it also matches keys that sort before "/",
+   * and pagination must not restart from the first key.
+   */
+  @Test
+  public void testListKeysWithSlashPrefixAndStartKeyBeforeSlash() throws Exception {
+    String volumeName = "volumeA";
+    String bucketName = "slashPrefix";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    // Even index keys go to the DB and odd index keys to the cache.
+    addKeysToOM(volumeName, bucketName, ".cache/0", 0);
+    addKeysToOM(volumeName, bucketName, ".cache/1", 1);
+    addKeysToOM(volumeName, bucketName, ".cache/2", 2);
+    addKeysToOM(volumeName, bucketName, "/keep", 3);
+
+    List<String> expected = Arrays.asList(".cache/0", ".cache/1", ".cache/2", "/keep");
+
+    assertEquals(expected.subList(0, 2), listKeyNames(volumeName, bucketName, null, "/", 2));
+    assertEquals(expected.subList(2, 4), listKeyNames(volumeName, bucketName, ".cache/1", "/", 2));
+    assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, "/keep", "/", 2));
+  }
+
+  /**
+   * A whitespace-only key is a valid startKey, so pagination must not restart from the first key.
+   */
+  @Test
+  public void testListKeysWithWhitespaceStartKey() throws Exception {
+    String volumeName = "volumeA";
+    String bucketName = "whitespaceStartKey";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    // Even index keys go to the DB and odd index keys to the cache.
+    addKeysToOM(volumeName, bucketName, " ", 0);
+    addKeysToOM(volumeName, bucketName, "  x", 1);
+    addKeysToOM(volumeName, bucketName, "k", 2);
+
+    List<String> expected = Arrays.asList(" ", "  x", "k");
+
+    assertEquals(expected.subList(0, 1), listKeyNames(volumeName, bucketName, null, null, 1));
+    assertEquals(expected.subList(1, 3), listKeyNames(volumeName, bucketName, " ", null, 2));
+  }
+
+  private List<String> listKeyNames(String volumeName, String bucketName, String startKey, String keyPrefix,
+      int maxKeys) throws IOException {
+    return omMetadataManager.listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+  }
+
+  @Test
   public void testListKeysWithFewDeleteEntriesInCache() throws Exception {
     String volumeNameA = "volumeA";
     String ozoneBucket = "ozoneBucket";
@@ -773,6 +877,61 @@ public class TestOmMetadataManager {
       assertEquals(clientID, keySession.getId());
       assertEquals(0, keySession.getOpenVersion());
     }
+  }
+
+  /**
+   * The open key of a multipart upload ends with the upload ID, not a client ID.
+   * listOpenFiles lists it with client ID 0 next to the other open keys, whether or not it carries the
+   * isMultipartKey flag (rows written before HDDS-9017 do not), while the open key of a part being written,
+   * which has the flag, keeps its client ID.
+   */
+  @ParameterizedTest
+  @EnumSource
+  public void testListOpenFilesWithMultipartUpload(BucketLayout bucketLayout) throws Exception {
+    final long clientID = 1000L;
+    final long partClientID = 2000L;
+    String volumeName = "volume-lof-mpu";
+    String bucketName = "bucket-" + bucketLayout.name().toLowerCase();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
+
+    OmKeyInfo openKey = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "key0",
+        RatisReplicationConfig.getInstance(ONE)).build();
+    OmKeyInfo uploadKey = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "key1",
+        RatisReplicationConfig.getInstance(ONE)).build();
+    OmKeyInfo partKey = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "key1",
+        RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true)).build();
+    String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+    String dbPrefix;
+    if (bucketLayout.isFileSystemOptimized()) {
+      OMRequestTestUtils.addFileToKeyTable(true, false, openKey.getFileName(), openKey, clientID, 0L,
+          omMetadataManager);
+      OMRequestTestUtils.addMultipartKeyToOpenFileTable(false, uploadKey.getFileName(), uploadKey, uploadId, 0L,
+          omMetadataManager);
+      OMRequestTestUtils.addFileToKeyTable(true, false, partKey.getFileName(), partKey, partClientID, 0L,
+          omMetadataManager);
+      dbPrefix = omMetadataManager.getOzoneKeyFSO(volumeName, bucketName, "");
+    } else {
+      OMRequestTestUtils.addKeyToTable(true, false, openKey, clientID, 0L, omMetadataManager);
+      OMRequestTestUtils.addMultipartKeyToOpenKeyTable(false, uploadKey, uploadId, 0L, omMetadataManager);
+      OMRequestTestUtils.addKeyToTable(true, false, partKey, partClientID, 0L, omMetadataManager);
+      dbPrefix = omMetadataManager.getOzoneKey(volumeName, bucketName, "");
+    }
+
+    ListOpenFilesResult res = omMetadataManager.listOpenFiles(bucketLayout, 100, dbPrefix, false, dbPrefix);
+    assertThat(res.getTotalOpenKeyCount()).isEqualTo(3);
+    assertThat(res.hasMore()).isFalse();
+    assertThat(res.getOpenKeys())
+        .extracting(s -> s.getKeyInfo().getKeyName(), OpenKeySession::getId)
+        .containsExactlyInAnyOrder(tuple("key0", clientID), tuple("key1", partClientID), tuple("key1", 0L));
+
+    // Page through it: the continuation token of the first page is the open key before the upload
+    res = omMetadataManager.listOpenFiles(bucketLayout, 1, dbPrefix, false, dbPrefix);
+    assertThat(res.hasMore()).isTrue();
+    res = omMetadataManager.listOpenFiles(bucketLayout, 2, dbPrefix, true, res.getContinuationToken());
+    assertThat(res.hasMore()).isFalse();
+    assertThat(res.getOpenKeys())
+        .extracting(s -> s.getKeyInfo().getKeyName(), OpenKeySession::getId)
+        .containsExactlyInAnyOrder(tuple("key1", partClientID), tuple("key1", 0L));
   }
 
   private static BucketLayout getDefaultBucketLayout() {
@@ -1041,6 +1200,226 @@ public class TestOmMetadataManager {
     assertThat(expiredMPUs).containsAll(names);
   }
 
+  @Test
+  public void testGetExpiredMPUsSplitSchema() throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    final int numExpiredMPUs = 4;
+    final int numUnexpiredMPUs = 1;
+    final int numPartsPerMPU = 5;
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_MPU_EXPIRE_THRESHOLD,
+        OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+
+    final long expiredMPUCreationTime =
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+
+    Set<String> expiredMPUs = new HashSet<>();
+    for (int i = 0; i < numExpiredMPUs + numUnexpiredMPUs; i++) {
+      final long creationTime = i < numExpiredMPUs ?
+          expiredMPUCreationTime : Time.now();
+
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      final OmMultipartKeyInfo mpuKeyInfo = new OmMultipartKeyInfo.Builder(
+          OMRequestTestUtils.createOmMultipartKeyInfo(uploadId, creationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L))
+          .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+          .build();
+
+      String keyName = "expired-split" + i;
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+              bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(creationTime)
+          .build();
+
+      for (int j = 1; j <= numPartsPerMPU; j++) {
+        addSplitSchemaPart(uploadId, j);
+      }
+
+      final String mpuDbKey = OMRequestTestUtils.addMultipartInfoToTable(
+          false, keyInfo, mpuKeyInfo, 0L, omMetadataManager);
+
+      expiredMPUs.add(mpuDbKey);
+    }
+
+    List<ExpiredMultipartUploadsBucket> someExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(
+            expireThreshold,
+            (numExpiredMPUs * numPartsPerMPU) - (numPartsPerMPU));
+    List<String> names = getMultipartKeyNames(someExpiredMPUs);
+    assertEquals(numExpiredMPUs - 1, names.size());
+    assertThat(expiredMPUs).containsAll(names);
+
+    List<ExpiredMultipartUploadsBucket> allExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold,
+            (numExpiredMPUs * numPartsPerMPU));
+    names = getMultipartKeyNames(allExpiredMPUs);
+    assertEquals(numExpiredMPUs, names.size());
+    assertThat(expiredMPUs).containsAll(names);
+  }
+
+  @Test
+  public void testGetExpiredMPUsMixedSchema() throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    final int numPartsPerMPU = 3;
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_MPU_EXPIRE_THRESHOLD,
+        OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+    final long expiredCreationTime =
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+
+    Set<String> expiredLegacyKeys = new HashSet<>();
+    Set<String> expiredSplitKeys = new HashSet<>();
+
+    // Create 2 legacy-schema expired MPUs with embedded parts
+    for (int i = 0; i < 2; i++) {
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      OmMultipartKeyInfo mpuKeyInfo = OMRequestTestUtils
+          .createOmMultipartKeyInfo(uploadId, expiredCreationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L);
+      String keyName = "legacy" + i;
+      OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+              bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(expiredCreationTime)
+          .build();
+      for (int j = 1; j <= numPartsPerMPU; j++) {
+        PartKeyInfo partKeyInfo = OMRequestTestUtils
+            .createPartKeyInfo(volumeName, bucketName, keyName, uploadId, j);
+        OMRequestTestUtils.addPart(partKeyInfo, mpuKeyInfo);
+      }
+      String mpuDbKey = OMRequestTestUtils.addMultipartInfoToTable(
+          false, keyInfo, mpuKeyInfo, 0L, omMetadataManager);
+      expiredLegacyKeys.add(mpuDbKey);
+    }
+
+    // Create 2 split-schema expired MPUs with parts in multipartPartsTable
+    for (int i = 0; i < 2; i++) {
+      String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+      OmMultipartKeyInfo mpuKeyInfo = new OmMultipartKeyInfo.Builder(
+          OMRequestTestUtils.createOmMultipartKeyInfo(uploadId, expiredCreationTime,
+              HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L))
+          .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+          .build();
+      String keyName = "split" + i;
+      OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+              bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(expiredCreationTime)
+          .build();
+      for (int j = 1; j <= numPartsPerMPU; j++) {
+        addSplitSchemaPart(uploadId, j);
+      }
+      String mpuDbKey = OMRequestTestUtils.addMultipartInfoToTable(
+          false, keyInfo, mpuKeyInfo, 0L, omMetadataManager);
+      expiredSplitKeys.add(mpuDbKey);
+    }
+
+    // Budget of 9 parts fits exactly 3 MPUs (3 parts each)
+    List<ExpiredMultipartUploadsBucket> someExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold,
+            numPartsPerMPU * 3);
+    List<String> names = getMultipartKeyNames(someExpiredMPUs);
+    assertEquals(3, names.size());
+
+    // Budget of 12 parts fits all 4 expired MPUs
+    List<ExpiredMultipartUploadsBucket> allExpiredMPUs =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold,
+            numPartsPerMPU * 4);
+    names = getMultipartKeyNames(allExpiredMPUs);
+    assertEquals(4, names.size());
+    assertThat(names).containsAll(expiredLegacyKeys);
+    assertThat(names).containsAll(expiredSplitKeys);
+  }
+
+  @Test
+  public void testGetExpiredMPUsZeroPartsSplitSchema() throws Exception {
+    final String bucketName = UUID.randomUUID().toString();
+    final String volumeName = UUID.randomUUID().toString();
+    final long expireThresholdMillis = ozoneConfiguration.getTimeDuration(
+        OZONE_OM_MPU_EXPIRE_THRESHOLD,
+        OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final Duration expireThreshold = Duration.ofMillis(expireThresholdMillis);
+    final long expiredCreationTime =
+        expireThreshold.negated().plusMillis(Time.now()).toMillis();
+
+    // Zero-parts split-schema MPU (freshly initiated, no parts uploaded)
+    String uploadIdZero = OMMultipartUploadUtils.getMultipartUploadId();
+    OmMultipartKeyInfo mpuZero = new OmMultipartKeyInfo.Builder(
+        OMRequestTestUtils.createOmMultipartKeyInfo(uploadIdZero, expiredCreationTime,
+            HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, 0L))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    OmKeyInfo keyInfoZero = OMRequestTestUtils.createOmKeyInfo(volumeName,
+            bucketName, "aaa-zero-parts", RatisReplicationConfig.getInstance(ONE))
+        .setCreationTime(expiredCreationTime)
+        .build();
+    String zeroKey = OMRequestTestUtils.addMultipartInfoToTable(
+        false, keyInfoZero, mpuZero, 0L, omMetadataManager);
+
+    // Split-schema MPU with 3 parts
+    String uploadIdThree = OMMultipartUploadUtils.getMultipartUploadId();
+    OmMultipartKeyInfo mpuThree = new OmMultipartKeyInfo.Builder(
+        OMRequestTestUtils.createOmMultipartKeyInfo(uploadIdThree, expiredCreationTime,
+            HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, 0L))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    OmKeyInfo keyInfoThree = OMRequestTestUtils.createOmKeyInfo(volumeName,
+            bucketName, "zzz-three-parts", RatisReplicationConfig.getInstance(ONE))
+        .setCreationTime(expiredCreationTime)
+        .build();
+    for (int j = 1; j <= 3; j++) {
+      addSplitSchemaPart(uploadIdThree, j);
+    }
+    String threeKey = OMRequestTestUtils.addMultipartInfoToTable(
+        false, keyInfoThree, mpuThree, 0L, omMetadataManager);
+
+    // maxParts=0 returns nothing (loop pre-check 0 < 0 is false)
+    List<ExpiredMultipartUploadsBucket> noneExpired =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold, 0);
+    assertTrue(getMultipartKeyNames(noneExpired).isEmpty());
+
+    // maxParts=3 should return both: zero-parts contributes 0, three-parts
+    // contributes 3, total = 3 which satisfies the loop exit condition
+    List<ExpiredMultipartUploadsBucket> allExpired =
+        omMetadataManager.getExpiredMultipartUploads(expireThreshold, 3);
+    List<String> names = getMultipartKeyNames(allExpired);
+    assertEquals(2, names.size());
+    assertThat(names).contains(zeroKey);
+    assertThat(names).contains(threeKey);
+  }
+
+  private void addSplitSchemaPart(String uploadId, int partNumber) throws IOException {
+    OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(1L, partNumber))
+        .setLength(100)
+        .build();
+    OmKeyLocationInfoGroup locationGroup = new OmKeyLocationInfoGroup(0,
+        Collections.singletonList(locationInfo));
+    String partName = "part-" + partNumber;
+    OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo("vol", "bucket", "key",
+            RatisReplicationConfig.getInstance(ONE))
+        .setDataSize(100L)
+        .setObjectID(partNumber)
+        .setUpdateID(partNumber)
+        .addOmKeyLocationInfoGroup(locationGroup)
+        .addMetadata(org.apache.hadoop.ozone.OzoneConsts.ETAG, "etag-" + partNumber)
+        .build();
+    OmMultipartPartInfo partInfo = OmMultipartPartInfo.from(partName, partNumber, keyInfo);
+    omMetadataManager.getMultipartPartsTable().put(
+        OmMultipartPartKey.of(uploadId, partNumber), partInfo);
+  }
+
   private List<String> getOpenKeyNames(
       Collection<OpenKeyBucket.Builder> openKeyBuckets) {
     return openKeyBuckets.stream()
@@ -1080,6 +1459,48 @@ public class TestOmMetadataManager {
 
     final Set<String> tablesInManager = omMetadataManager.listTableNames();
     assertEquals(tablesByDefinition, tablesInManager);
+  }
+
+  /**
+   * Snapshot and checkpoint DBs are opened and closed repeatedly, so opening one must not create a FULL_CACHE table,
+   * and opening and closing one must not leave any thread behind.
+   */
+  @Test
+  public void testSnapshotDbOpenLeaksNoThread() throws Exception {
+    final String snapshotDirName = SnapshotInfo.getCheckpointDirName(UUID.randomUUID(), 0);
+    ((RDBStore) omMetadataManager.getStore()).getSnapshot(snapshotDirName);
+    final DBCheckpoint checkpoint = omMetadataManager.getStore().getCheckpoint(true);
+    final int iterations = 10;
+    // The active DB has FULL_CACHE tables, so the thread name used below is right.
+    assertThat(countFullTableCacheThreads()).isPositive();
+
+    // Warm up, so that threads started once on first use are not counted.
+    openAndCloseSnapshotDbs(snapshotDirName, checkpoint);
+    final Set<Thread> before = Thread.getAllStackTraces().keySet();
+    for (int i = 0; i < iterations; i++) {
+      openAndCloseSnapshotDbs(snapshotDirName, checkpoint);
+    }
+
+    final Set<Thread> leaked = new HashSet<>(Thread.getAllStackTraces().keySet());
+    leaked.removeAll(before);
+    // Tolerate a few transient threads; a per-open leak adds at least one per iteration.
+    assertThat(leaked).hasSizeLessThan(iterations);
+  }
+
+  private void openAndCloseSnapshotDbs(String snapshotDirName, DBCheckpoint checkpoint) throws Exception {
+    final long fullTableCacheThreads = countFullTableCacheThreads();
+    try (OmMetadataManagerImpl snapshotManager = new OmMetadataManagerImpl(ozoneConfiguration, snapshotDirName,
+            OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
+        OmMetadataManagerImpl checkpointManager =
+            OmMetadataManagerImpl.createCheckpointMetadataManager(ozoneConfiguration, checkpoint)) {
+      assertEquals(fullTableCacheThreads, countFullTableCacheThreads());
+    }
+  }
+
+  private static long countFullTableCacheThreads() {
+    return Thread.getAllStackTraces().keySet().stream()
+        .filter(t -> t.getName().contains("FullTableCache-Cleanup"))
+        .count();
   }
 
   @Test
@@ -1291,5 +1712,267 @@ public class TestOmMetadataManager {
         volumeName, bucketName, prefix, null, null, 10, true);
 
     assertEquals(25, noPagination.size());
+  }
+
+  @Test
+  public void testGetMultipartUploadKeysWithKeyMarkerBeforePrefix() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    // "c-key" sorts between key-marker "a" and prefix "dir/".
+    addMultipartUpload(volumeName, bucketName, "c-key", "upload1", false);
+    addMultipartUpload(volumeName, bucketName, "dir/key1", "upload2", false);
+    addMultipartUpload(volumeName, bucketName, "dir/key2", "upload3", false);
+
+    // key-marker sorts before the prefix, so all uploads under the prefix are after the marker.
+    List<String> keys = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "dir/", "a", null, 10, false)
+        .stream()
+        .map(OmMultipartUpload::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("dir/key1", "dir/key2"), keys);
+
+    keys = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "dir/", "a", "upload0", 10, false)
+        .stream()
+        .map(OmMultipartUpload::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("dir/key1", "dir/key2"), keys);
+  }
+
+  @Test
+  public void testGetMultipartUploadKeysWithOnlyKeyMarker() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    addMultipartUpload(volumeName, bucketName, "a", "upload1", false);
+    addMultipartUpload(volumeName, bucketName, "a/x", "upload2", false);
+    addMultipartUpload(volumeName, bucketName, "ab", "upload3", false);
+    addMultipartUpload(volumeName, bucketName, "b", "upload4", false);
+    // The cache has to skip the uploads of key-marker itself but not the keys starting with "key-marker/" either.
+    addMultipartUpload(volumeName, bucketName, "a", "upload5", true);
+    addMultipartUpload(volumeName, bucketName, "a/y", "upload6", true);
+    addMultipartUpload(volumeName, bucketName, "a.txt", "upload7", false);
+
+    // Uploads are listed in DB key order, where "a.txt" sorts before "a" since "." < "/".
+    List<String> keys = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", null, null, 10, false)
+        .stream()
+        .map(OmMultipartUpload::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("a.txt", "a", "a", "a/x", "a/y", "ab", "b"), keys);
+
+    // Without upload-id-marker, only uploads of key-marker itself are skipped, not keys starting with it.
+    // "a.txt" is not listed as it sorts before key-marker "a", unlike S3.
+    keys = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", "a", null, 10, false)
+        .stream()
+        .map(OmMultipartUpload::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("a/x", "a/y", "ab", "b"), keys);
+
+    // "a" is listed as it sorts after key-marker "a.txt", unlike S3.
+    keys = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", "a.txt", null, 10, false)
+        .stream()
+        .map(OmMultipartUpload::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("a", "a", "a/x", "a/y", "ab", "b"), keys);
+  }
+
+  @Test
+  public void testGetMultipartUploadKeysWithUploadIdMarker() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    addMultipartUpload(volumeName, bucketName, "a", "upload1", false);
+    addMultipartUpload(volumeName, bucketName, "a", "upload12", true);
+    addMultipartUpload(volumeName, bucketName, "a", "upload2", false);
+    addMultipartUpload(volumeName, bucketName, "b", "upload3", true);
+
+    // Only the marker itself is skipped, not upload IDs starting with it.
+    List<String> afterDbMarker = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", "a", "upload1",
+        10, false).stream()
+        .map(OmMultipartUpload::getUploadId)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("upload12", "upload2", "upload3"), afterDbMarker);
+
+    List<String> afterCacheMarker = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", "a",
+        "upload12", 10, false).stream()
+        .map(OmMultipartUpload::getUploadId)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList("upload2", "upload3"), afterCacheMarker);
+  }
+
+  @Test
+  public void testGetMultipartUploadKeysPaginationListsEachUploadOnce() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    addMultipartUpload(volumeName, bucketName, "a.txt", "upload1", false);
+    addMultipartUpload(volumeName, bucketName, "a", "upload2", true);
+    addMultipartUpload(volumeName, bucketName, "a", "upload3", false);
+    addMultipartUpload(volumeName, bucketName, "a/x", "upload4", true);
+    addMultipartUpload(volumeName, bucketName, "ab", "upload5", false);
+    addMultipartUpload(volumeName, bucketName, "b", "upload6", true);
+
+    // Page through one upload at a time with both markers taken from the last upload of the previous page,
+    // as KeyManagerImpl does. "a" sorts after "a.txt" in DB key order, so its uploads must still be listed
+    // after key-marker "a.txt" even though "a" < "a.txt".
+    List<String> listed = new ArrayList<>();
+    String keyMarker = null;
+    String uploadIdMarker = null;
+    // Bounded in case a broken marker keeps returning the same upload.
+    for (int i = 0; i < 10; i++) {
+      List<OmMultipartUpload> page = omMetadataManager.getMultipartUploadKeys(volumeName, bucketName, "", keyMarker,
+          uploadIdMarker, 1, false);
+      if (page.isEmpty()) {
+        break;
+      }
+      OmMultipartUpload lastReturned = page.get(0);
+      listed.add(lastReturned.getKeyName() + "/" + lastReturned.getUploadId());
+      if (page.size() == 1) {
+        break;
+      }
+      keyMarker = lastReturned.getKeyName();
+      uploadIdMarker = lastReturned.getUploadId();
+    }
+    assertEquals(Arrays.asList("a.txt/upload1", "a/upload2", "a/upload3", "a/x/upload4", "ab/upload5", "b/upload6"),
+        listed);
+  }
+
+  private void addMultipartUpload(String volumeName, String bucketName, String keyName, String uploadId,
+      boolean cacheOnly) throws Exception {
+    OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+        RatisReplicationConfig.getInstance(ONE)).build();
+    OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.createOmMultipartKeyInfo(uploadId, Time.now(),
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE, 0L);
+    if (cacheOnly) {
+      OMRequestTestUtils.addMultipartInfoToTableCache(keyInfo, multipartKeyInfo, 0L, omMetadataManager);
+    } else {
+      OMRequestTestUtils.addMultipartInfoToTable(false, keyInfo, multipartKeyInfo, 0L, omMetadataManager);
+    }
+  }
+
+  @Test
+  public void testS3RevokedStsTokenTablePutAndGet() throws Exception {
+    // Ensure the table is initialized
+    assertNotNull(omMetadataManager.getS3RevokedStsTokenTable(), "s3RevokedStsTokenTable should be initialized");
+
+    final MockClock clock = MockClock.newInstance();
+    final String originalAccessKeyId1 = "orig-1";
+    final long insertionTime1 = clock.millis();
+    final String originalAccessKeyId2 = "orig-2";
+    final long insertionTime2 = insertionTime1 + 1234L;
+
+    // This table is configured as FULL_CACHE in OmMetadataManagerImpl.
+    // A put() writes to RocksDB but does not update the table cache, so get() and getIfExist() will return null unless
+    // the cache is updated with addCacheEntry().  getSkipCache() will read the DB instead of the cache.
+    final TypedTable<String, Long> revokedTable =
+        (TypedTable<String, Long>) omMetadataManager.getS3RevokedStsTokenTable();
+
+    revokedTable.put(originalAccessKeyId1, insertionTime1);
+    revokedTable.put(originalAccessKeyId2, insertionTime2);
+
+    // Verify the values are persisted in RocksDB.
+    assertEquals(insertionTime1, revokedTable.getSkipCache(originalAccessKeyId1));
+    assertEquals(insertionTime2, revokedTable.getSkipCache(originalAccessKeyId2));
+
+    // Update cache to make get/getIfExist reflect the write for FULL_CACHE tables.
+    revokedTable.addCacheEntry(originalAccessKeyId1, insertionTime1, 1L);
+    revokedTable.addCacheEntry(originalAccessKeyId2, insertionTime2, 1L);
+
+    // Verify get and getIfExist return the stored value
+    assertEquals(insertionTime1, revokedTable.get(originalAccessKeyId1));
+    assertEquals(insertionTime1, revokedTable.getIfExist(originalAccessKeyId1));
+    assertEquals(insertionTime2, revokedTable.get(originalAccessKeyId2));
+    assertEquals(insertionTime2, revokedTable.getIfExist(originalAccessKeyId2));
+
+    // Invalid originalAccessKeyId should return null for getIfExist.
+    assertNull(revokedTable.getIfExist("INVALID_ORIGINAL_ACCESS_KEY_ID"));
+  }
+
+  @Test
+  public void testListKeysSpecialKeyNames() throws Exception {
+    List<String> keyNames = Arrays.asList(" ", "\"",
+        "$", "%", "&", "'", "<", ">", "_", "_ ", "_ _", "__");
+
+    String volumeName = "volumeA";
+    String bucketName = "bucketA";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    assertEquals("/volumeA/bucketA/ ",
+        omMetadataManager.getOzoneKey(volumeName, bucketName, " "));
+
+    for (int i = 0; i < keyNames.size(); i++) {
+      addKeysToOM(volumeName, bucketName, keyNames.get(i), i);
+    }
+
+    List<String> listedKeys = omMetadataManager.listKeys(volumeName, bucketName,
+        null, null, 100).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+
+    assertEquals(keyNames, listedKeys);
+  }
+
+  @Test
+  public void testListKeysWithWhitespaceAndNewlinePrefix() throws Exception {
+    String volumeName = "volumeA";
+    String bucketName = "bucketA";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    String spaceOnly = " ";
+    String spacePrefixed = " x";
+    String doubleSpacePrefixed = "  y";
+    String newlinePrefixed = "\nbar";
+    String normalKey = "normal";
+
+    List<String> allKeys = Arrays.asList(
+        spaceOnly, spacePrefixed, doubleSpacePrefixed, newlinePrefixed, normalKey);
+    for (int i = 0; i < allKeys.size(); i++) {
+      addKeysToOM(volumeName, bucketName, allKeys.get(i), i);
+    }
+
+    List<String> spacePrefixMatches = omMetadataManager.listKeys(volumeName, bucketName,
+        null, spaceOnly, 100).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Arrays.asList(spaceOnly, doubleSpacePrefixed, spacePrefixed),
+        spacePrefixMatches);
+
+    List<String> newlinePrefixMatches = omMetadataManager.listKeys(volumeName, bucketName,
+        null, "\n", 100).getKeys().stream()
+        .map(OmKeyInfo::getKeyName)
+        .collect(Collectors.toList());
+    assertEquals(Collections.singletonList(newlinePrefixed), newlinePrefixMatches);
+  }
+
+  @Test
+  public void testStopShutsDownTableCacheThreads() throws Exception {
+    omMetadataManager.stop();
+    Set<Thread> otherThreads = tableCacheThreads();
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    // A cleanup starts the thread of a partial table cache, full table caches start theirs when created.
+    omMetadataManager.getKeyTable(BucketLayout.DEFAULT).cleanupCache(Collections.singletonList(1L));
+    Set<Thread> threads = tableCacheThreads();
+    threads.removeAll(otherThreads);
+    assertThat(threads).extracting(Thread::getName)
+        .anyMatch(name -> name.contains("FullTableCache-Cleanup"))
+        .anyMatch(name -> name.contains("PartialTableCache-Cleanup"));
+
+    omMetadataManager.stop();
+    GenericTestUtils.waitFor(() -> threads.stream().noneMatch(Thread::isAlive), 100, 10_000);
+  }
+
+  private static Set<Thread> tableCacheThreads() {
+    return Thread.getAllStackTraces().keySet().stream()
+        .filter(t -> t.getName().contains("TableCache-Cleanup"))
+        .collect(Collectors.toSet());
   }
 }

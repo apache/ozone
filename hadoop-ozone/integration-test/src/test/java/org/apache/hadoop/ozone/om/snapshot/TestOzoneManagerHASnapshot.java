@@ -18,13 +18,14 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.ozone.test.LambdaTestUtils.await;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,7 +33,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -42,11 +42,10 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -61,6 +60,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests snapshot in OM HA setup.
@@ -88,7 +89,7 @@ public class TestOzoneManagerHASnapshot {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     store = client.getObjectStore();
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(client);
+    ozoneBucket = DataTestUtil.createVolumeAndBucket(client);
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
   }
@@ -105,14 +106,14 @@ public class TestOzoneManagerHASnapshot {
   @Test
   public void testSnapshotDiffWhenOmLeaderRestart()
       throws Exception {
-    String snapshot1 = "snap-" + RandomStringUtils.secure().nextNumeric(10);
-    String snapshot2 = "snap-" + RandomStringUtils.secure().nextNumeric(10);
+    String snapshot1 = uniqueObjectName("snap-");
+    String snapshot2 = uniqueObjectName("snap-");
 
-    createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
+    createFileKey(ozoneBucket, uniqueObjectName("key-"));
     store.createSnapshot(volumeName, bucketName, snapshot1);
 
     for (int i = 0; i < 100; i++) {
-      createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
+      createFileKey(ozoneBucket, uniqueObjectName("key-"));
     }
 
     store.createSnapshot(volumeName, bucketName, snapshot2);
@@ -123,46 +124,29 @@ public class TestOzoneManagerHASnapshot {
 
     assertEquals(IN_PROGRESS, response.getJobStatus());
 
-    String oldLeader = cluster.getOMLeader().getOMNodeId();
-
     OzoneManager omLeader = cluster.getOMLeader();
     cluster.shutdownOzoneManager(omLeader);
     cluster.restartOzoneManager(omLeader, true);
 
     cluster.waitForLeaderOM();
 
-    String newLeader = cluster.getOMLeader().getOMNodeId();
-
-    if (Objects.equals(oldLeader, newLeader)) {
-      // If old leader becomes leader again. Job should be done by this time.
-      response = store.snapshotDiff(volumeName, bucketName,
-          snapshot1, snapshot2, null, 0, false, false);
-      assertEquals(DONE, response.getJobStatus());
-      assertEquals(100, response.getSnapshotDiffReport().getDiffList().size());
-    } else {
-      // If new leader is different from old leader. SnapDiff request will be
-      // new to OM, and job status should be IN_PROGRESS.
+    while (true) {
       response = store.snapshotDiff(volumeName, bucketName, snapshot1,
-          snapshot2, null, 0, false, false);
-      assertEquals(IN_PROGRESS, response.getJobStatus());
-      while (true) {
-        response = store.snapshotDiff(volumeName, bucketName, snapshot1,
-                snapshot2, null, 0, false, false);
-        if (DONE == response.getJobStatus()) {
-          assertEquals(100,
-              response.getSnapshotDiffReport().getDiffList().size());
-          break;
-        }
-        Thread.sleep(response.getWaitTimeInMs());
+              snapshot2, null, 0, false, false);
+      if (DONE == response.getJobStatus()) {
+        assertEquals(100,
+            response.getSnapshotDiffReport().getDiffList().size());
+        break;
       }
+      Thread.sleep(response.getWaitTimeInMs());
     }
   }
 
   @Test
   public void testSnapshotIdConsistency() throws Exception {
-    createFileKey(ozoneBucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
+    createFileKey(ozoneBucket, uniqueObjectName("key-"));
 
-    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(10);
+    String snapshotName = uniqueObjectName("snap-");
 
     store.createSnapshot(volumeName, bucketName, snapshotName);
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
@@ -197,21 +181,17 @@ public class TestOzoneManagerHASnapshot {
    */
   @Test
   public void testSnapshotNameConsistency() throws Exception {
-    store.createSnapshot(volumeName, bucketName, "");
+    String snapshotName = store.createSnapshot(volumeName, bucketName, "");
     List<OzoneManager> ozoneManagers = cluster.getOzoneManagersList();
     List<String> snapshotNames = new ArrayList<>();
 
     for (OzoneManager ozoneManager : ozoneManagers) {
       await(120_000, 100, () -> {
-        String snapshotPrefix = OM_KEY_PREFIX + volumeName +
-            OM_KEY_PREFIX + bucketName;
-        SnapshotInfo snapshotInfo = null;
-        try (Table.KeyValueIterator<String, SnapshotInfo>
-                 iterator = ozoneManager.getMetadataManager()
-            .getSnapshotInfoTable().iterator(snapshotPrefix)) {
-          while (iterator.hasNext()) {
-            snapshotInfo = iterator.next().getValue();
-          }
+        SnapshotInfo snapshotInfo;
+        try {
+          snapshotInfo = ozoneManager.getMetadataManager()
+              .getSnapshotInfoTable()
+              .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
@@ -237,7 +217,7 @@ public class TestOzoneManagerHASnapshot {
 
     // Create 10 buckets and initialize snapshot name lists.
     for (int i = 0; i < 10; i++) {
-      OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+      OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client);
       ozoneBuckets.add(bucket);
       volumeNames.add(bucket.getVolumeName());
       bucketNames.add(bucket.getName());
@@ -250,8 +230,8 @@ public class TestOzoneManagerHASnapshot {
       for (int j = 0; j < 10; j++) {
         OzoneBucket bucket = ozoneBuckets.get(j);
         // Create a new key to generate state change.
-        createFileKey(bucket, "key-" + RandomStringUtils.secure().nextNumeric(10));
-        String snapshotName = "snapshot-" + RandomStringUtils.secure().nextNumeric(10);
+        createFileKey(bucket, uniqueObjectName("key-"));
+        String snapshotName = uniqueObjectName("snapshot-");
         store.createSnapshot(volumeNames.get(j), bucketNames.get(j), snapshotName);
         snapshotNamesList.get(j).add(snapshotName);
       }
@@ -300,6 +280,83 @@ public class TestOzoneManagerHASnapshot {
     assertFalse(metadataManager.getSnapshotChainManager().isSnapshotChainCorrupted());
   }
 
+  /**
+   * Tests that SnapshotDeletingService (SDS) correctly handles an OM leader
+   * failover with {@code numSnapshots} snapshots queued for deletion. The old
+   * leader's SDS is suspended (simulating SDS being blocked or mid-cleanup)
+   * before the failover. After the failover, the new leader's SDS must pick up
+   * all pending deletions, purge them from the DB, and leave the snapshot chain
+   * consistent. (HDDS-8703)
+   */
+  @ParameterizedTest
+  @ValueSource(ints = {1, 3})
+  public void testSnapshotDeletingServiceDuringOMFailover(int numSnapshots)
+      throws Exception {
+    OzoneManager oldLeader = cluster.getOMLeader();
+    String oldLeaderId = oldLeader.getOMNodeId();
+
+    List<String> snapshotNames = new ArrayList<>();
+    List<String> tableKeys = new ArrayList<>();
+
+    // Create numSnapshots snapshots, each capturing distinct state.
+    for (int i = 0; i < numSnapshots; i++) {
+      createFileKey(ozoneBucket, uniqueObjectName("key-"));
+      String snapshotName = uniqueObjectName("snap-");
+      createSnapshot(volumeName, bucketName, snapshotName);
+      snapshotNames.add(snapshotName);
+      tableKeys.add(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
+    }
+
+    // Suspend SDS on the current leader before any snapshot is deleted,
+    // simulating SDS being blocked while cleanup is pending.
+    oldLeader.getKeyManager().getSnapshotDeletingService().suspend();
+
+    // Queue all snapshots for deletion.
+    for (String snapshotName : snapshotNames) {
+      store.deleteSnapshot(volumeName, bucketName, snapshotName);
+    }
+
+    // Wait for every snapshot to reach SNAPSHOT_DELETED state on the old leader.
+    for (String tableKey : tableKeys) {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          SnapshotInfo info = oldLeader.getMetadataManager()
+              .getSnapshotInfoTable().get(tableKey);
+          return info != null
+              && info.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }, 1000, 30000);
+    }
+
+    try {
+      // Trigger OM leader failover: with 3 OMs and quorum=2, the remaining
+      // two nodes elect a new leader.
+      cluster.shutdownOzoneManager(oldLeader);
+      cluster.waitForLeaderOM();
+
+      OzoneManager newLeader = cluster.getOMLeader();
+      assertNotNull(newLeader);
+      // Confirm that a genuinely different OM node became leader.
+      assertNotEquals(oldLeaderId, newLeader.getOMNodeId());
+
+      // The new leader's SDS (not suspended) must purge all deleted snapshots,
+      // even though the old leader's SDS never ran the cleanup.
+      for (String tableKey : tableKeys) {
+        checkSnapshotIsPurgedFromDB(newLeader, tableKey);
+      }
+
+      // Verify the snapshot chain is not corrupted after all cleanups.
+      OmMetadataManagerImpl metadataManager =
+          (OmMetadataManagerImpl) newLeader.getMetadataManager();
+      assertFalse(metadataManager.getSnapshotChainManager().isSnapshotChainCorrupted());
+    } finally {
+      // Restore the 3-node cluster for subsequent tests.
+      cluster.restartOzoneManager(oldLeader, true);
+    }
+  }
+
   private void createFileKey(OzoneBucket bucket, String keyName)
       throws IOException {
     byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
@@ -327,7 +384,7 @@ public class TestOzoneManagerHASnapshot {
     int numKeys = 5;
     List<String> keys = new ArrayList<>();
     for (int i = 0; i < numKeys; i++) {
-      String keyName = "key-" + RandomStringUtils.secure().nextNumeric(10);
+      String keyName = uniqueObjectName("key-");
       createFileKey(ozoneBucket, keyName);
       keys.add(keyName);
     }
@@ -342,7 +399,7 @@ public class TestOzoneManagerHASnapshot {
       ozoneBucket.deleteKey(keys.get(i));
     }
 
-    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(10);
+    String snapshotName = uniqueObjectName("snap-");
     createSnapshot(volumeName, bucketName, snapshotName);
 
     // Wait for double buffer flush on follower to ensure that

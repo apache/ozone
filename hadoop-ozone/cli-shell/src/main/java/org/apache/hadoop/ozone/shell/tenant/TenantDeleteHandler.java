@@ -51,7 +51,7 @@ public class TenantDeleteHandler extends TenantHandler {
         "But the associated volume '" + volumeName + "' is not removed. ";
     if (volumeRefCount == 0L) {
       err().println(extraPrompt + "To delete it, run"
-          + "\n    ozone sh volume delete " + volumeName + "\n");
+          + "%n    ozone sh volume delete " + volumeName + "%n");
     } else {
       err().println(extraPrompt + "And it is still referenced by some "
           + "other Ozone features (refCount is " + volumeRefCount + ").");

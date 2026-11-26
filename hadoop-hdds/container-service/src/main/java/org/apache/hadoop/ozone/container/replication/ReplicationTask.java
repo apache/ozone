@@ -17,19 +17,20 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import java.util.List;
 import java.util.Objects;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 /**
- * The task to download a container from the sources.
+ * Task to push a container to a target datanode.
  */
 public class ReplicationTask extends AbstractReplicationTask {
 
   private final ReplicateContainerCommand cmd;
   private final ContainerReplicator replicator;
   private final String debugString;
+  private final ComponentVersion apparentVersion;
   public static final String METRIC_NAME = "ContainerReplications";
   public static final String METRIC_DESCRIPTION_SEGMENT = "container replications";
 
@@ -44,26 +45,8 @@ public class ReplicationTask extends AbstractReplicationTask {
     setPriority(cmd.getPriority());
     this.cmd = cmd;
     this.replicator = replicator;
-    if (cmd.getTargetDatanode() != null) {
-      // Only push replication will have a target datanode set, and it must be
-      // sent to the source datanode to be executed. It is possible the source
-      // is out of service, so we need to set the flag to allow the command to
-      // run.
-      setShouldOnlyRunOnInServiceDatanodes(false);
-    }
+    this.apparentVersion = cmd.getApparentVersion();
     debugString = cmd.toString();
-  }
-
-  /**
-   * Intended to only be used in tests.
-   */
-  protected ReplicationTask(
-      long containerId,
-      List<DatanodeDetails> sources,
-      ContainerReplicator replicator
-  ) {
-    this(ReplicateContainerCommand.fromSources(containerId, sources),
-        replicator);
   }
 
   @Override
@@ -99,10 +82,6 @@ public class ReplicationTask extends AbstractReplicationTask {
     return cmd.getContainerID();
   }
 
-  public List<DatanodeDetails> getSources() {
-    return cmd.getSourceDatanodes();
-  }
-
   @Override
   protected Object getCommandForDebug() {
     return debugString;
@@ -123,6 +102,15 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   public void setTransferredBytes(long transferredBytes) {
     this.transferredBytes = transferredBytes;
+  }
+
+  /**
+   * @return the apparent version to use for this replication task. Replicators
+   *     can use this to gate version-dependent protocol features so that the
+   *     newer side downgrades to a behavior the older side understands.
+   */
+  public ComponentVersion getApparentVersion() {
+    return apparentVersion;
   }
 
   DatanodeDetails getTarget() {

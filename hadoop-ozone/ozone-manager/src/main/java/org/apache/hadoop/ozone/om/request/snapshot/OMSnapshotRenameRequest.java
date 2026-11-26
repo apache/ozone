@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
@@ -69,6 +72,13 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     final OMRequest omRequest = super.preExecute(ozoneManager);
 
+    if (!ozoneManager.getConfiguration().getBoolean(
+        OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY,
+        OZONE_OM_SNAPSHOT_RENAME_ALLOWED_DEFAULT)) {
+      throw new OMException("Ozone snapshot rename feature is not allowed per Ozone Manager server config",
+          FEATURE_NOT_ENABLED);
+    }
+
     final RenameSnapshotRequest renameSnapshotRequest =
         omRequest.getRenameSnapshotRequest();
 
@@ -88,11 +98,13 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
     UserGroupInformation ugi = createUGIForApi();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
                                                      IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
-    if (!ozoneManager.isAdmin(ugi) &&
-        !ozoneManager.isOwner(ugi, bucketOwner)) {
-      throw new OMException(
-          "Only bucket owners and Ozone admins can rename snapshots",
-          OMException.ResultCodes.PERMISSION_DENIED);
+    if (ozoneManager.isAdminAuthorizationEnabled()) {
+      if (!ozoneManager.isAdmin(ugi) &&
+          !ozoneManager.isOwner(ugi, bucketOwner)) {
+        throw new OMException(
+            "Only bucket owners and Ozone admins can rename snapshots",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
     }
 
     // Set rename time here so OM leader and follower would have the

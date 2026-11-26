@@ -26,17 +26,20 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +53,10 @@ public class TestReconContainerMetadataManagerImpl {
   @TempDir()
   private static Path temporaryFolder;
   private static ReconContainerMetadataManager reconContainerMetadataManager;
+  private static OMMetadataManager omMetadataManager;
+  private static ReconOMMetadataManager reconOMMetadataManager;
+  private static ReconDBProvider reconDBProvider;
+  private static ReconReplicaHistoryDBProvider replicaHistoryDBProvider;
 
   private String keyPrefix1 = "V3/B1/K1";
   private String keyPrefix2 = "V3/B1/K2";
@@ -57,9 +64,9 @@ public class TestReconContainerMetadataManagerImpl {
 
   @BeforeAll
   public static void setupOnce() throws Exception {
-    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    omMetadataManager = initializeNewOmMetadataManager(
+        Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
@@ -69,6 +76,24 @@ public class TestReconContainerMetadataManagerImpl {
             .build();
     reconContainerMetadataManager =
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
+    replicaHistoryDBProvider = reconTestInjector.getInstance(ReconReplicaHistoryDBProvider.class);
+  }
+
+  @AfterAll
+  public static void tearDownOnce() throws Exception {
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (replicaHistoryDBProvider != null) {
+      replicaHistoryDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
   }
 
   @BeforeEach
@@ -153,6 +178,27 @@ public class TestReconContainerMetadataManagerImpl {
 
     assertEquals(0, reconContainerMetadataManager
         .getCountForContainerKeyPrefix(ckp1).intValue());
+  }
+
+  @Test
+  public void testReinitWithUninitializedTables() throws Exception {
+    ReconContainerMetadataManagerImpl manager =
+        (ReconContainerMetadataManagerImpl) reconContainerMetadataManager;
+    setFieldToNull(manager, "containerKeyTable");
+    setFieldToNull(manager, "keyContainerTable");
+    setFieldToNull(manager, "containerKeyCountTable");
+
+    manager.reinitWithNewContainerDataFromOm(null);
+
+    assertNotNull(manager.getContainerKeyTableForTesting());
+    assertNotNull(manager.getKeyContainerTable());
+    assertEquals(0, manager.getKeyCountForContainer(1L));
+  }
+
+  private static void setFieldToNull(ReconContainerMetadataManagerImpl manager, String fieldName) throws Exception {
+    Field field = ReconContainerMetadataManagerImpl.class.getDeclaredField(fieldName);
+    field.setAccessible(true);
+    field.set(manager, null);
   }
 
   @Test

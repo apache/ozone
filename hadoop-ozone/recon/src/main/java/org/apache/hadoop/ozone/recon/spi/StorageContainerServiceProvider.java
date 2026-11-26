@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.spi;
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -55,6 +56,18 @@ public interface StorageContainerServiceProvider {
       throws IOException;
 
   /**
+   * Returns container metadata without requiring a pipeline.
+   * @throws IOException if the SCM RPC call fails
+   */
+  ContainerInfo getContainerInfo(long containerId) throws IOException;
+
+  /**
+   * Returns metadata for existing containers without resolving their pipelines.
+   * @throws IOException if the SCM RPC call fails
+   */
+  List<ContainerInfo> getExistingContainersInBatch(List<ContainerID> containerIDs) throws IOException;
+
+  /**
    * Requests SCM for which containers in given ID list.
    * @param containerIDs containerId list
    * @return list of ContainerInfo + Pipeline info exists in SCM
@@ -80,15 +93,15 @@ public interface StorageContainerServiceProvider {
   DBCheckpoint getSCMDBSnapshot();
 
   /**
-   * Get the list of containers from SCM. This is a RPC call.
+   * Get the list of container IDs from SCM. This is an RPC call.
    *
    * @param startContainerID the start container id
    * @param count the number of containers to return
    * @param state the containers in given state to be returned
-   * @return the list of containers from SCM in a given state
+   * @return the list of container IDs from SCM in a given state
    * @throws IOException
    */
-  List<ContainerInfo> getListOfContainers(long startContainerID,
+  List<ContainerID> getListOfContainerIDs(ContainerID startContainerID,
                                           int count,
                                           HddsProtos.LifeCycleState state)
       throws IOException;
@@ -98,4 +111,32 @@ public interface StorageContainerServiceProvider {
    * @return Total number of containers in SCM.
    */
   long getContainerCount(HddsProtos.LifeCycleState state) throws IOException;
+
+  /**
+   * Returns a page of {@link ContainerInfo} objects (no pipeline required)
+   * starting at {@code startContainerID} for the given lifecycle state.
+   *
+   * <p>Unlike {@link #getListOfContainerIDs} this method returns full
+   * {@code ContainerInfo} metadata so callers can add containers to Recon
+   * without needing a valid pipeline. Non-OPEN containers (CLOSED,
+   * QUASI_CLOSED) do not need a pipeline in Recon's container state manager,
+   * so this path is safe to use for those states.
+   *
+   * <p>Intended as a <em>targeted fallback</em> for containers whose pipeline
+   * cannot be resolved by {@link #getExistContainerWithPipelinesInBatch}
+   * (e.g. QUASI_CLOSED containers with zero viable replicas). It should NOT
+   * replace the ID-only paginated scan for the hot path — the ID-only API
+   * transfers a much smaller payload and is preferred for full-set sweeps.
+   *
+   * @param startContainerID first container ID to return (inclusive)
+   * @param count            maximum number of containers to return (&gt; 0)
+   * @param state            lifecycle state filter
+   * @return list of {@link ContainerInfo} objects (may be smaller than count
+   *         if fewer containers exist at or above {@code startContainerID})
+   * @throws IOException if the SCM RPC call fails
+   */
+  List<ContainerInfo> getListOfContainerInfos(ContainerID startContainerID,
+                                              int count,
+                                              HddsProtos.LifeCycleState state)
+      throws IOException;
 }

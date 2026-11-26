@@ -101,7 +101,6 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
     DEFAULT_DELETE_PENDING_KEYS_RESPONSE,
     {
       retryAttempts: 2,
-      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -135,11 +134,6 @@ const DeletePendingKeysTable: React.FC<DeletePendingKeysTableProps> = ({
       setExpandedDeletePendingKeys(expandedData);
     }
   }, [deletePendingKeysData.data]);
-
-  // Refetch when limit changes
-  useEffect(() => {
-    deletePendingKeysData.refetch();
-  }, [limit.value]);
 
   function filterData(data: DeletePendingKeysColumns[] | undefined) {
     return data?.filter(

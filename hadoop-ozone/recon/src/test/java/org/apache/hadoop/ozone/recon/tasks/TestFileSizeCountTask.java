@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.returnsElementsOf;
 import static org.mockito.BDDMockito.given;
@@ -42,7 +43,6 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -52,7 +52,9 @@ import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,14 +68,17 @@ public class TestFileSizeCountTask {
   @TempDir
   private static Path temporaryFolder;
   private static ReconFileMetadataManager reconFileMetadataManager;
+  private static OMMetadataManager testOmMetadataManager;
+  private static ReconOMMetadataManager reconOMMetadataManager;
+  private static ReconDBProvider reconDBProvider;
   private FileSizeCountTaskOBS fileSizeCountTaskOBS;
   private FileSizeCountTaskFSO fileSizeCountTaskFSO;
 
   @BeforeAll
   public static void setupOnce() throws Exception {
-    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    testOmMetadataManager = initializeNewOmMetadataManager(Files.createDirectory(
+        temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(testOmMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
@@ -82,6 +87,20 @@ public class TestFileSizeCountTask {
             .withContainerDB()
             .build();
     reconFileMetadataManager = reconTestInjector.getInstance(ReconFileMetadataManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
+  }
+
+  @AfterAll
+  public static void tearDownOnce() throws Exception {
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (testOmMetadataManager != null) {
+      testOmMetadataManager.stop();
+    }
   }
 
   @BeforeEach
@@ -93,16 +112,17 @@ public class TestFileSizeCountTask {
     // Create separate task instances.
     fileSizeCountTaskOBS = new FileSizeCountTaskOBS(reconFileMetadataManager, configuration);
     fileSizeCountTaskFSO = new FileSizeCountTaskFSO(reconFileMetadataManager, configuration);
-    // Clear RocksDB table before each test.
-    try (TableIterator<FileSizeCountKey, ? extends Table.KeyValue<FileSizeCountKey, Long>> iterator = 
-         reconFileMetadataManager.getFileCountTable().iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<FileSizeCountKey, Long> keyValue = iterator.next();
-        reconFileMetadataManager.getFileCountTable().delete(keyValue.getKey());
-      }
-    } catch (Exception e) {
-      // Ignore cleanup errors
-    }
+    reconFileMetadataManager.clearFileCountTable();
+  }
+
+  @Test
+  public void testClearFileCountTable() throws IOException {
+    FileSizeCountKey key = new FileSizeCountKey("vol1", "bucket1", 1024L);
+    reconFileMetadataManager.getFileCountTable().put(key, 1L);
+
+    reconFileMetadataManager.clearFileCountTable();
+
+    assertNull(reconFileMetadataManager.getFileSizeCount(key));
   }
 
   @Test

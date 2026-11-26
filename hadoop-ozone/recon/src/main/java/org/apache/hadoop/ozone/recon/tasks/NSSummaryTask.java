@@ -37,13 +37,13 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskDbEventHandler.ProcessResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,6 +82,16 @@ public class NSSummaryTask implements ReconOmTask {
   private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
   private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
+
+  // Shared executor for the three FSO/Legacy/OBS sub-tasks during process().
+  // The sub-tasks operate on disjoint slices of the event stream (filtered by
+  // table and bucket layout) and write to disjoint NSSummary entries, so they
+  // are safe to run in parallel.
+  private static final ExecutorService SUB_TASK_EXECUTOR =
+      Executors.newFixedThreadPool(3, new ThreadFactoryBuilder()
+          .setNameFormat("NSSummarySubTask-%d")
+          .setDaemon(true)
+          .build());
 
   /**
    * Rebuild state enum to track NSSummary tree rebuild status.
@@ -172,42 +182,56 @@ public class NSSummaryTask implements ReconOmTask {
   @Override
   public TaskResult process(
       OMUpdateEventBatch events, Map<String, Integer> subTaskSeekPosMap) {
-    boolean anyFailure = false; // Track if any bucket fails
     Map<String, Integer> updatedSeekPositions = new HashMap<>();
 
-    // Process FSO bucket
-    Integer bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.FSO.name(), 0);
-    Pair<Integer, Boolean> bucketResult = nsSummaryTaskWithFSO.processWithFSO(events, bucketSeek);
-    updatedSeekPositions.put(BucketType.FSO.name(), bucketResult.getLeft());
-    if (!bucketResult.getRight()) {
-      LOG.error("processWithFSO failed.");
-      anyFailure = true;
-    }
+    int fsoSeek = subTaskSeekPosMap.getOrDefault(BucketType.FSO.name(), 0);
+    int legacySeek = subTaskSeekPosMap.getOrDefault(BucketType.LEGACY.name(), 0);
+    int obsSeek = subTaskSeekPosMap.getOrDefault(BucketType.OBS.name(), 0);
 
-    // Process Legacy bucket
-    bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.LEGACY.name(), 0);
-    bucketResult = nsSummaryTaskWithLegacy.processWithLegacy(events, bucketSeek);
-    updatedSeekPositions.put(BucketType.LEGACY.name(), bucketResult.getLeft());
-    if (!bucketResult.getRight()) {
-      LOG.error("processWithLegacy failed.");
-      anyFailure = true;
-    }
+    Future<ProcessResult> fsoFuture = SUB_TASK_EXECUTOR.submit(
+        () -> nsSummaryTaskWithFSO.processWithFSO(events, fsoSeek));
+    Future<ProcessResult> legacyFuture = SUB_TASK_EXECUTOR.submit(
+        () -> nsSummaryTaskWithLegacy.processWithLegacy(events, legacySeek));
+    Future<ProcessResult> obsFuture = SUB_TASK_EXECUTOR.submit(
+        () -> nsSummaryTaskWithOBS.processWithOBS(events, obsSeek));
 
-    // Process OBS bucket
-    bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.OBS.name(), 0);
-    bucketResult = nsSummaryTaskWithOBS.processWithOBS(events, bucketSeek);
-    updatedSeekPositions.put(BucketType.OBS.name(), bucketResult.getLeft());
-    if (!bucketResult.getRight()) {
-      LOG.error("processWithOBS failed.");
-      anyFailure = true;
-    }
+    boolean anyFailure = false;
+    anyFailure |= !awaitSubTask("processWithFSO", BucketType.FSO,
+        fsoFuture, fsoSeek, updatedSeekPositions);
+    anyFailure |= !awaitSubTask("processWithLegacy", BucketType.LEGACY,
+        legacyFuture, legacySeek, updatedSeekPositions);
+    anyFailure |= !awaitSubTask("processWithOBS", BucketType.OBS,
+        obsFuture, obsSeek, updatedSeekPositions);
 
-    // Return task failure if any bucket failed, while keeping each bucket's latest seek position
     return new TaskResult.Builder()
         .setTaskName(getTaskName())
         .setSubTaskSeekPositions(updatedSeekPositions)
         .setTaskSuccess(!anyFailure)
         .build();
+  }
+
+  private boolean awaitSubTask(String name, BucketType type,
+                               Future<ProcessResult> future,
+                               int fallbackSeek,
+                               Map<String, Integer> updatedSeekPositions) {
+    try {
+      ProcessResult result = future.get();
+      updatedSeekPositions.put(type.name(), result.seekPosition());
+      if (!result.success()) {
+        LOG.error("{} failed.", name);
+        return false;
+      }
+      return true;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.error("{} interrupted.", name, e);
+      updatedSeekPositions.put(type.name(), fallbackSeek);
+      return false;
+    } catch (ExecutionException e) {
+      LOG.error("{} threw an exception.", name, e.getCause());
+      updatedSeekPositions.put(type.name(), fallbackSeek);
+      return false;
+    }
   }
 
   @Override

@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.client.rpc.TestContainerStateMachineStream;
 import org.apache.hadoop.ozone.client.rpc.TestDiscardPreallocatedBlocks;
 import org.apache.hadoop.ozone.client.rpc.TestOzoneClientMultipartUploadWithFSO;
 import org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientWithKeyLatestVersion;
+import org.apache.hadoop.ozone.om.OMMXBeanTests;
 import org.apache.hadoop.ozone.om.TestBucketLayoutWithOlderClient;
 import org.apache.hadoop.ozone.om.TestListKeys;
 import org.apache.hadoop.ozone.om.TestListKeysWithFSO;
@@ -55,10 +56,10 @@ import org.apache.hadoop.ozone.om.TestOzoneManagerRestInterface;
 import org.apache.hadoop.ozone.reconfig.TestDatanodeReconfiguration;
 import org.apache.hadoop.ozone.reconfig.TestOmReconfiguration;
 import org.apache.hadoop.ozone.reconfig.TestScmReconfiguration;
-import org.apache.hadoop.ozone.shell.TestOzoneDebugReplicasVerify;
-import org.apache.hadoop.ozone.shell.TestOzoneDebugShell;
 import org.apache.hadoop.ozone.shell.TestReconfigShell;
 import org.apache.hadoop.ozone.shell.TestReplicationConfigPreference;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 
@@ -70,11 +71,16 @@ import org.junit.jupiter.api.TestInstance;
  * same cluster.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
+abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
-  /** Test cases for non-HA cluster should implement this. */
-  public interface TestCase {
-    MiniOzoneCluster cluster();
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
   }
 
   @Nested
@@ -167,6 +173,14 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class SCMMXBean extends TestSCMMXBean {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class OMMXBean extends OMMXBeanTests {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
@@ -374,14 +388,6 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
   }
 
   @Nested
-  class OzoneDebugShell extends TestOzoneDebugShell {
-    @Override
-    public MiniOzoneCluster cluster() {
-      return getCluster();
-    }
-  }
-
-  @Nested
   class ReconfigShell extends TestReconfigShell {
     @Override
     public MiniOzoneCluster cluster() {
@@ -391,14 +397,6 @@ public abstract class NonHATests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class ScmReconfiguration extends TestScmReconfiguration {
-    @Override
-    public MiniOzoneCluster cluster() {
-      return getCluster();
-    }
-  }
-
-  @Nested
-  class OzoneDebugReplicasVerify extends TestOzoneDebugReplicasVerify {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();

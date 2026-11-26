@@ -33,6 +33,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_ARGUMENT;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.MALFORMED_REQUEST;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNCLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
@@ -56,23 +57,23 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
-import static org.apache.hadoop.hdds.utils.IOUtils.roundUp;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.ratis.util.Preconditions.assertSame;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -101,7 +102,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
@@ -119,16 +119,17 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
+import org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -141,6 +142,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.helpers.ReadBlockContext;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -165,12 +167,16 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -181,7 +187,14 @@ public class KeyValueHandler extends Handler {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
-  private static final int STREAMING_BYTES_PER_CHUNK = 1024 * 64;
+  /** ReadBlock response size used when the client does not choose one. */
+  private static final int DEFAULT_READ_BLOCK_RESPONSE_DATA_SIZE = 1 << 20;
+  /**
+   * Upper bound of the ReadBlock response size: the response must fit in the client's gRPC inbound message limit,
+   * {@link OzoneConsts#OZONE_SCM_CHUNK_MAX_SIZE}, together with its checksum list and envelope. The checksum list is
+   * at most 32 bytes per 8 KiB of data, so 1 MiB of headroom is enough.
+   */
+  static final int MAX_READ_BLOCK_RESPONSE_DATA_SIZE = OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE - (1 << 20);
 
   private final BlockManager blockManager;
   private final ChunkManager chunkManager;
@@ -195,8 +208,10 @@ public class KeyValueHandler extends Handler {
   private final Striped<Lock> containerCreationLocks;
   private final ContainerChecksumTreeManager checksumManager;
   private static FaultInjector injector;
+  private OzoneContainer ozoneContainer;
   private final Clock clock;
-  private final BlockInputStreamFactoryImpl blockInputStreamFactory;
+  // Not final so tests can substitute a stubbed factory to drive reconcileChunksPerBlock without a live peer.
+  private BlockInputStreamFactoryImpl blockInputStreamFactory;
 
   public KeyValueHandler(ConfigurationSource config,
                          String datanodeId,
@@ -205,7 +220,7 @@ public class KeyValueHandler extends Handler {
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender,
                          ContainerChecksumTreeManager checksumManager) {
-    this(config, datanodeId, contSet, volSet, null, metrics, icrSender, Clock.systemUTC(), checksumManager);
+    this(config, datanodeId, contSet, volSet, null, metrics, icrSender, Clock.systemUTC(), checksumManager, null);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -217,8 +232,10 @@ public class KeyValueHandler extends Handler {
                          ContainerMetrics metrics,
                          IncrementalReportSender<Container> icrSender,
                          Clock clock,
-                         ContainerChecksumTreeManager checksumManager) {
+                         ContainerChecksumTreeManager checksumManager,
+                         OzoneContainer ozoneContainer) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
+    this.ozoneContainer = ozoneContainer;
     this.clock = clock;
     blockManager = new BlockManagerImpl(config);
     validateChunkChecksumData = conf.getObject(
@@ -270,7 +287,8 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-      Container container, ContainerCommandRequestProto msg)
+      Container container, ContainerCommandRequestProto msg,
+      CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock)
       throws StorageContainerException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     checkContainerOpen(kvContainer);
@@ -280,7 +298,7 @@ public class KeyValueHandler extends Handler {
           BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
 
       return chunkManager.getStreamDataChannel(kvContainer,
-          blockID, metrics);
+          blockID, putBlock, metrics);
     } else {
       throw new StorageContainerException("Malformed request.",
           ContainerProtos.Result.IO_EXCEPTION);
@@ -339,7 +357,7 @@ public class KeyValueHandler extends Handler {
     case PutBlock:
       return handler.handlePutBlock(request, kvContainer, dispatcherContext);
     case GetBlock:
-      return handler.handleGetBlock(request, kvContainer);
+      return handler.handleGetBlock(request, kvContainer, dispatcherContext);
     case DeleteBlock:
       return handler.handleDeleteBlock(request, kvContainer);
     case ListBlock:
@@ -351,6 +369,7 @@ public class KeyValueHandler extends Handler {
     case WriteChunk:
       return handler.handleWriteChunk(request, kvContainer, dispatcherContext);
     case StreamInit:
+    case StreamInitWithPutBlock:
       return handler.handleStreamInit(request, kvContainer, dispatcherContext);
     case ListChunk:
       return handler.handleUnsupportedOp(request);
@@ -387,6 +406,11 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   public ContainerChecksumTreeManager getChecksumManager() {
     return this.checksumManager;
+  }
+
+  @VisibleForTesting
+  void setBlockInputStreamFactory(BlockInputStreamFactoryImpl factory) {
+    this.blockInputStreamFactory = Objects.requireNonNull(factory, "factory == null");
   }
 
   ContainerCommandResponseProto handleStreamInit(
@@ -493,10 +517,13 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Container already exists. container Id {}", containerID);
       }
     } catch (StorageContainerException ex) {
-      newContainerData.releaseCommitSpace();
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } finally {
       containerIdLock.unlock();
+      if (!created) {
+        // Release the space reserved when the volume was chosen, also on unchecked exceptions.
+        newContainerData.releaseCommitSpace();
+      }
     }
 
     if (created) {
@@ -678,6 +705,9 @@ public class KeyValueHandler extends Handler {
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
       blockManager.putBlock(kvContainer, blockData, endOfBlock);
+      if (request.getPutBlock().getSync()) {
+        kvContainer.flushAndSyncDB();
+      }
 
       blockDataProto = blockData.getProtoBufMessage();
 
@@ -685,12 +715,17 @@ public class KeyValueHandler extends Handler {
       metrics.incContainerBytesStats(Type.PutBlock, numBytes);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (CodecException ex) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("Malformed PutBlock request", ex,
+              MALFORMED_REQUEST), request);
     } catch (IOException ex) {
       return ContainerUtils.logAndReturnError(LOG,
           new StorageContainerException("Put Key failed", ex, IO_EXCEPTION),
           request);
     }
 
+    updateRecoveringContainerTimeout(kvContainer);
     return putBlockResponseSuccess(request, blockDataProto);
   }
 
@@ -812,7 +847,7 @@ public class KeyValueHandler extends Handler {
    * Handle Get Block operation. Calls BlockManager to process the request.
    */
   ContainerCommandResponseProto handleGetBlock(
-      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer, DispatcherContext dispatcherContext) {
 
     if (!request.hasGetBlock()) {
       if (LOG.isDebugEnabled()) {
@@ -823,14 +858,30 @@ public class KeyValueHandler extends Handler {
     }
 
     ContainerProtos.BlockData responseData;
+    boolean shortCircuitGranted = false;
     try {
-      BlockID blockID = BlockID.getFromProtobuf(
-          request.getGetBlock().getBlockID());
+      ContainerProtos.GetBlockRequestProto getBlock = request.getGetBlock();
+      BlockID blockID = BlockID.getFromProtobuf(getBlock.getBlockID());
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
+      // only the domain socket path can pass the opened file on, other transports get the block data only
+      if (getBlock.hasRequestShortCircuitAccess() && getBlock.getRequestShortCircuitAccess()
+          && DispatcherContext.op(dispatcherContext) == DispatcherContext.Op.HANDLE_SHORT_CIRCUIT_READ) {
+        boolean domainSocketServerEnabled = ozoneContainer != null
+            && ozoneContainer.getReadDomainSocketChannel() != null
+            && ozoneContainer.getReadDomainSocketChannel().isStarted();
+        if (domainSocketServerEnabled) {
+          RandomAccessFile file = chunkManager.getShortCircuitFd(kvContainer, blockID);
+          Preconditions.checkState(file != null);
+          dispatcherContext.setShortCircuitBlockFile(file);
+          shortCircuitGranted = true;
+        }
+      }
       final long numBytes = responseData.getSerializedSize();
       metrics.incContainerBytesStats(Type.GetBlock, numBytes);
-
+      if (shortCircuitGranted) {
+        metrics.incContainerLocalBytesStats(Type.GetBlock, numBytes);
+      }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -839,7 +890,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return getBlockDataResponse(request, responseData);
+    return getBlockDataResponse(request, responseData, shortCircuitGranted);
   }
 
   /**
@@ -1012,7 +1063,9 @@ public class KeyValueHandler extends Handler {
           final ChunkBuffer b = (ChunkBuffer)data;
           Checksum.verifyChecksum(b.duplicate(b.position(), b.limit()), info.getChecksumData(), 0);
         } else {
-          Checksum.verifyChecksum(data.toByteString(byteBufferToByteString).asReadOnlyByteBuffer(),
+          // Skip concatenating into one ByteString - that would materialize
+          // a chunk-sized copy on the hot write path.
+          Checksum.verifyChecksum(data.toByteStringList(byteBufferToByteString),
               info.getChecksumData(), 0);
         }
       } catch (OzoneChecksumException ex) {
@@ -1049,7 +1102,9 @@ public class KeyValueHandler extends Handler {
 
       ChunkBuffer data = null;
       if (dispatcherContext == null) {
-        dispatcherContext = DispatcherContext.getHandleWriteChunk();
+        dispatcherContext = DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_WRITE_CHUNK)
+            .setWriteVersion(ClientCommandsUtils.getWritePipelineVersion(request))
+            .build();
       }
       final boolean isWrite = dispatcherContext.getStage().isWrite();
       if (isWrite) {
@@ -1099,7 +1154,15 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
+    updateRecoveringContainerTimeout(kvContainer);
     return getWriteChunkResponseSuccess(request, blockDataProto);
+  }
+
+  private void updateRecoveringContainerTimeout(KeyValueContainer kvContainer) {
+    if (kvContainer.getContainerState() != RECOVERING) {
+      return;
+    }
+    containerSet.updateRecoveringContainerTimeout(kvContainer.getContainerData().getContainerID());
   }
 
   /**
@@ -1132,12 +1195,17 @@ public class KeyValueHandler extends Handler {
    * @param kvContainer           - Container for which block data need to be persisted.
    * @param blockData             - Block Data to be persisted (BlockData should have the chunks).
    * @param blockCommitSequenceId - Block Commit Sequence ID for the block.
-   * @param overwriteBscId        - To overwrite bcsId in the block data and container. In case of chunk failure
-   *                              during reconciliation, we do not want to overwrite the bcsId as this block/container
-   *                              is incomplete in its current state.
+   * @param overwriteBscId        - To overwrite bcsId in the block data. In case of chunk failure during
+   *                              reconciliation, we do not want to overwrite the bcsId as this block is incomplete
+   *                              in its current state.
+   * @param updateContainerBcsId  - Also advance the container-wide BCSID to this block's value. The container BCSID
+   *                              quantifies over all blocks, so reconciliation passes false here and advances the
+   *                              container once per peer round instead, only when every repaired block ended fully
+   *                              covered (see advanceContainerBcsIdForFullyCoveredRound).
    */
   public void putBlockForClosedContainer(KeyValueContainer kvContainer, BlockData blockData,
-                                         long blockCommitSequenceId, boolean overwriteBscId)
+                                         long blockCommitSequenceId, boolean overwriteBscId,
+                                         boolean updateContainerBcsId)
       throws IOException {
     Objects.requireNonNull(kvContainer, "kvContainer == null");
     Objects.requireNonNull(blockData, "blockData == null");
@@ -1152,7 +1220,9 @@ public class KeyValueHandler extends Handler {
       blockData.setBlockCommitSequenceId(blockCommitSequenceId);
     }
 
-    blockManager.putBlockForClosedContainer(kvContainer, blockData, overwriteBscId);
+    // The block data is persisted with whatever BCSID it carries; the flag passed down only gates the
+    // container-wide BCSID update.
+    blockManager.putBlockForClosedContainer(kvContainer, blockData, overwriteBscId && updateContainerBcsId);
     ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
     final long numBytes = blockDataProto.getSerializedSize();
     // Increment write stats for PutBlock after write.
@@ -1193,7 +1263,9 @@ public class KeyValueHandler extends Handler {
       ChunkBuffer data = ChunkBuffer.wrap(
           putSmallFileReq.getData().asReadOnlyByteBufferList());
       if (dispatcherContext == null) {
-        dispatcherContext = DispatcherContext.getHandlePutSmallFile();
+        dispatcherContext = DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_PUT_SMALL_FILE)
+            .setWriteVersion(ClientCommandsUtils.getWritePipelineVersion(request))
+            .build();
       }
 
       BlockID blockID = blockData.getBlockID();
@@ -1368,6 +1440,10 @@ public class KeyValueHandler extends Handler {
     KeyValueContainer container = createNewContainer(targetTempContainerData);
     HddsVolume targetVolume = targetTempContainerData.getVolume();
     populateContainerPathFields(container, targetVolume);
+    // createNewContainer() builds the new data as OPEN state. Set it as RECOVERING, as a
+    // replication import does, so the data checksum and empty flag are checked and loaded.
+    // In the meanwhile, the container file on disk is of RECOVERING state too at this point.
+    container.getContainerData().setState(RECOVERING);
     container.importContainerData((KeyValueContainerData) targetTempContainerData);
     return container;
   }
@@ -1392,12 +1468,12 @@ public class KeyValueHandler extends Handler {
           container.getContainerState();
       // Move the container to CLOSING state only if it's OPEN/RECOVERING
       if (HddsUtils.isOpenToWriteState(state)) {
+        container.markContainerForClose();
         if (state == RECOVERING) {
           containerSet.removeRecoveringContainer(
               container.getContainerData().getContainerID());
           ContainerLogger.logRecovered(container.getContainerData());
         }
-        container.markContainerForClose();
         stateChanged = true;
       }
     } finally {
@@ -1511,10 +1587,17 @@ public class KeyValueHandler extends Handler {
   @Override
   public void markContainerUnhealthy(Container container, ScanResult reason)
       throws IOException {
-    container.writeLock();
     long containerID = container.getContainerData().getContainerID();
+    Container<?> lockedContainer = containerSet.getContainerWithWriteLock(containerID);
+    if (lockedContainer == null) {
+      // null means container retries exhausted ;
+      // container not-found throws StorageContainerException.
+      LOG.warn("Exceeded {} attempts locking live container {}; skipping markContainerUnhealthy.",
+          ContainerSet.maxContainerMapSwapRetries(), containerID);
+      return;
+    }
     try {
-      if (container.getContainerState() == State.UNHEALTHY) {
+      if (lockedContainer.getContainerState() == State.UNHEALTHY) {
         LOG.debug("Call to mark already unhealthy container {} as unhealthy",
             containerID);
         return;
@@ -1522,25 +1605,25 @@ public class KeyValueHandler extends Handler {
       // If the volume is unhealthy, no action is needed. The container has
       // already been discarded and SCM notified. Once a volume is failed, it
       // cannot be restored without a restart.
-      HddsVolume containerVolume = container.getContainerData().getVolume();
+      HddsVolume containerVolume = lockedContainer.getContainerData().getVolume();
       if (containerVolume.isFailed()) {
         LOG.debug("Ignoring unhealthy container {} detected on an " +
             "already failed volume {}", containerID, containerVolume);
         return;
       }
-      container.markContainerUnhealthy();
+      lockedContainer.markContainerUnhealthy();
     } catch (StorageContainerException ex) {
       LOG.warn("Unexpected error while marking container {} unhealthy",
           containerID, ex);
     } finally {
-      container.writeUnlock();
+      lockedContainer.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(container);
+    updateContainerChecksumFromMetadataIfNeeded(lockedContainer);
     // Even if the container file is corrupted/missing and the unhealthy
     // update fails, the unhealthy state is kept in memory and sent to
     // SCM. Write a corresponding entry to the container log as well.
-    ContainerLogger.logUnhealthy(container.getContainerData(), reason);
-    sendICR(container);
+    ContainerLogger.logUnhealthy(lockedContainer.getContainerData(), reason);
+    sendICR(lockedContainer);
   }
 
   @Override
@@ -1574,17 +1657,24 @@ public class KeyValueHandler extends Handler {
   @Override
   public void closeContainer(Container container)
       throws IOException {
-    container.writeLock();
+    long containerID = container.getContainerData().getContainerID();
+    Container<?> lockedContainer = containerSet.getContainerWithWriteLock(containerID);
+    if (lockedContainer == null) {
+      // null means container locking retries exhausted ;
+      // container not-found throws StorageContainerException.
+      LOG.warn("Exceeded {} attempts locking live container {}; skipping closeContainer.",
+          ContainerSet.maxContainerMapSwapRetries(), containerID);
+      return;
+    }
     try {
-      final State state = container.getContainerState();
+      final State state = lockedContainer.getContainerState();
       // Close call is idempotent.
       if (state == State.CLOSED) {
         return;
       }
       if (state == State.UNHEALTHY) {
         throw new StorageContainerException(
-            "Cannot close container #" + container.getContainerData()
-                .getContainerID() + " while in " + state + " state.",
+            "Cannot close container #" + containerID + " while in " + state + " state.",
             ContainerProtos.Result.CONTAINER_UNHEALTHY);
       }
       // The container has to be either in CLOSING or in QUASI_CLOSED state.
@@ -1593,16 +1683,15 @@ public class KeyValueHandler extends Handler {
             state == State.INVALID ? INVALID_CONTAINER_STATE :
                 CONTAINER_INTERNAL_ERROR;
         throw new StorageContainerException(
-            "Cannot close container #" + container.getContainerData()
-                .getContainerID() + " while in " + state + " state.", error);
+            "Cannot close container #" + containerID + " while in " + state + " state.", error);
       }
-      container.close();
+      lockedContainer.close();
     } finally {
-      container.writeUnlock();
+      lockedContainer.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(container);
-    ContainerLogger.logClosed(container.getContainerData());
-    sendICR(container);
+    updateContainerChecksumFromMetadataIfNeeded(lockedContainer);
+    ContainerLogger.logClosed(lockedContainer.getContainerData());
+    sendICR(lockedContainer);
   }
 
   @Override
@@ -1668,6 +1757,10 @@ public class KeyValueHandler extends Handler {
         long numCorruptChunksRepaired = 0;
         long numMissingChunksRepaired = 0;
         long numDivergedDeletedBlocksUpdated = 0;
+        // Container-level BCSID advancement is decided once per peer round: only when every repaired block in
+        // this round ended fully covered may the container BCSID move to the highest adopted block BCSID.
+        boolean allRepairedBlocksCovered = true;
+        long maxAdoptedBcsId = 0;
 
         LOG.info("Beginning reconciliation for container {} with peer {}. Current data checksum is {}",
             containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
@@ -1696,19 +1789,16 @@ public class KeyValueHandler extends Handler {
         for (ContainerProtos.BlockMerkleTree missingBlock : diffReport.getMissingBlocks()) {
           try {
             long localID = missingBlock.getBlockID();
-            BlockID blockID = new BlockID(containerID, localID);
-            if (getBlockManager().blockExists(container, blockID)) {
-              LOG.warn("Cannot reconcile block {} in container {} which was previously reported missing but is now " +
-                  "present. Our container merkle tree is stale.", localID, containerID);
-            } else {
-              long chunksInBlockRetrieved = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, localID,
-                  missingBlock.getChunkMerkleTreeList(), updatedTreeWriter, chunkByteBuffer);
-              if (chunksInBlockRetrieved != 0) {
-                allBlocksUpdated.add(localID);
-                numMissingBlocksRepaired++;
-              }
+            BlockRepairResult blockResult = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, localID,
+                missingBlock.getChunkMerkleTreeList(), updatedTreeWriter, chunkByteBuffer);
+            allRepairedBlocksCovered &= blockResult.isBlockFullyCovered();
+            maxAdoptedBcsId = Math.max(maxAdoptedBcsId, blockResult.getAdoptedBcsId());
+            if (blockResult.getNumChunksRepaired() >= 0) {
+              allBlocksUpdated.add(localID);
+              numMissingBlocksRepaired++;
             }
           } catch (IOException e) {
+            allRepairedBlocksCovered = false;
             LOG.error("Error while reconciling missing block for block {} in container {}", missingBlock.getBlockID(),
                   containerID, e);
           }
@@ -1718,13 +1808,16 @@ public class KeyValueHandler extends Handler {
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getMissingChunks().entrySet()) {
           long localID = entry.getKey();
           try {
-            long missingChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
+            BlockRepairResult blockResult = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
                 entry.getValue(), updatedTreeWriter, chunkByteBuffer);
-            if (missingChunksRepaired != 0) {
+            allRepairedBlocksCovered &= blockResult.isBlockFullyCovered();
+            maxAdoptedBcsId = Math.max(maxAdoptedBcsId, blockResult.getAdoptedBcsId());
+            if (blockResult.getNumChunksRepaired() != 0) {
               allBlocksUpdated.add(localID);
-              numMissingChunksRepaired += missingChunksRepaired;
+              numMissingChunksRepaired += blockResult.getNumChunksRepaired();
             }
           } catch (IOException e) {
+            allRepairedBlocksCovered = false;
             LOG.error("Error while reconciling missing chunk for block {} in container {}", entry.getKey(),
                 containerID, e);
           }
@@ -1734,13 +1827,16 @@ public class KeyValueHandler extends Handler {
         for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
           long localID = entry.getKey();
           try {
-            long corruptChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
+            BlockRepairResult blockResult = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
                 entry.getValue(), updatedTreeWriter, chunkByteBuffer);
-            if (corruptChunksRepaired != 0) {
+            allRepairedBlocksCovered &= blockResult.isBlockFullyCovered();
+            maxAdoptedBcsId = Math.max(maxAdoptedBcsId, blockResult.getAdoptedBcsId());
+            if (blockResult.getNumChunksRepaired() != 0) {
               allBlocksUpdated.add(localID);
-              numCorruptChunksRepaired += corruptChunksRepaired;
+              numCorruptChunksRepaired += blockResult.getNumChunksRepaired();
             }
           } catch (IOException e) {
+            allRepairedBlocksCovered = false;
             LOG.error("Error while reconciling corrupt chunk for block {} in container {}", entry.getKey(),
                 containerID, e);
           }
@@ -1751,6 +1847,11 @@ public class KeyValueHandler extends Handler {
           updatedTreeWriter.setDeletedBlock(deletedBlock.getBlockID(), deletedBlock.getDataChecksum());
           numDivergedDeletedBlocksUpdated++;
         }
+
+        // Advance the container-wide BCSID only when this round left no block partially repaired and the
+        // diff dropped nothing as unhealthy.
+        advanceContainerBcsIdForFullyCoveredRound(kvContainer, diffReport, allRepairedBlocksCovered,
+            maxAdoptedBcsId);
 
         // Based on repaired done with this peer, write the updated merkle tree to the container.
         // This updated tree will be used when we reconcile with the next peer.
@@ -1821,15 +1922,20 @@ public class KeyValueHandler extends Handler {
    * We will keep pulling chunks from the peer unless the requested chunk's offset would leave a hole if written past
    * the end of our current block file. Since we currently don't support leaving holes in block files, reconciliation
    * for this block will be stopped at this point and whatever data we have pulled will be committed.
-   * Block commit sequence ID of the block and container are only updated based on the peer's value if the entire block
-   * is read and written successfully.
+   * The block's commit sequence ID is only updated to the peer's value if the entire block is read and written
+   * successfully, i.e. only when the local block ends up covering every chunk in the peer's committed block metadata
+   * (see coversPeerBlock); chunks already present locally count toward that coverage. The container-wide BCSID is
+   * never touched here: it quantifies over all blocks, so it is advanced once per reconciliation round, only when
+   * every repaired block ended fully covered (see advanceContainerBcsIdForFullyCoveredRound).
    *
    * To avoid verbose logging during reconciliation, this method should not log successful operations above the debug
    * level.
    *
-   * @return The number of chunks that were reconciled in our container.
+   * @return The repair outcome for this block: chunks reconciled, whether the block ended fully covered, and the
+   * block BCSID adopted from the peer (0 when none).
    */
-  private long reconcileChunksPerBlock(KeyValueContainer container, Pipeline pipeline,
+  @VisibleForTesting
+  BlockRepairResult reconcileChunksPerBlock(KeyValueContainer container, Pipeline pipeline,
       DNContainerOperationClient dnClient, long localID, List<ContainerProtos.ChunkMerkleTree> peerChunkList,
       ContainerMerkleTreeWriter treeWriter, ByteBuffer chunkByteBuffer) throws IOException {
     long containerID = container.getContainerData().getContainerID();
@@ -1862,6 +1968,8 @@ public class KeyValueHandler extends Handler {
 
     boolean allChunksSuccessful = true;
     int numSuccessfulChunks = 0;
+    boolean adoptPeerBcsId = false;
+    long adoptedBcsId = 0;
 
     BlockLocationInfo blkInfo = new BlockLocationInfo.Builder()
         .setBlockID(blockID)
@@ -1870,9 +1978,12 @@ public class KeyValueHandler extends Handler {
         .build();
     // Under construction is set here, during BlockInputStream#initialize() it is used to update the block length.
     blkInfo.setUnderConstruction(true);
+    // Always verify peer data before using it to repair this replica, regardless of the client setting.
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
     try (BlockInputStream blockInputStream = blockInputStreamFactory.createBlockInputStream(
         blkInfo, pipeline, blockToken, dnClient.getXceiverClientManager(),
-        null, conf.getObject(OzoneClientConfig.class))) {
+        null, clientConfig)) {
       // Initialize the BlockInputStream. Gets the blockData from the peer, sets the block length and
       // initializes ChunkInputStream for each chunk.
       blockInputStream.initialize();
@@ -1882,6 +1993,11 @@ public class KeyValueHandler extends Handler {
       for (ContainerProtos.ChunkMerkleTree chunkMerkleTree : peerChunkList) {
         long chunkOffset = chunkMerkleTree.getOffset();
         if (!previousChunkPresent(blockID, chunkOffset, localOffset2Chunk)) {
+          // A hole remains: the chunk preceding this offset is missing locally, so the block stays
+          // incomplete. Treat this like the per-chunk failure path below so the commit does not
+          // overwrite the block/container BCSID with the peer's value while data past the hole is
+          // absent. Advancing the BCSID here would falsely advertise committed data we do not hold.
+          allChunksSuccessful = false;
           break;
         }
 
@@ -1949,21 +2065,89 @@ public class KeyValueHandler extends Handler {
       if (!localOffset2Chunk.isEmpty()) {
         List<ContainerProtos.ChunkInfo> allChunks = new ArrayList<>(localOffset2Chunk.values());
         localBlockData.setChunks(allChunks);
-        putBlockForClosedContainer(container, localBlockData, maxBcsId, allChunksSuccessful);
+        // The peer's BCSID attests exactly the chunk list in its committed BlockData, so that list is the oracle for
+        // adopting it -- not the diff-derived peerChunkList, which omits chunks the peer's scanner marked unhealthy
+        // (and the in-loop unhealthy skip above does not clear allChunksSuccessful). Without this check a trailing
+        // unrepairable peer chunk lets the BCSID advance past data we do not hold: the replica would then admit
+        // reads it cannot serve and look complete to SCM's sequenceId-based source and delete selection.
+        adoptPeerBcsId = allChunksSuccessful && coversPeerBlock(peerBlockData, localOffset2Chunk);
+        adoptedBcsId = adoptPeerBcsId ? maxBcsId : 0;
+        if (allChunksSuccessful && !adoptPeerBcsId) {
+          LOG.warn("Repaired all {} diff chunks for block {} in container {} from peer {}, but the local block does " +
+              "not cover the peer's committed chunk list. BCSID stays at the local value.",
+              peerChunkList.size(), localID, containerID, peer);
+        }
+        putBlockForClosedContainer(container, localBlockData, maxBcsId, adoptPeerBcsId, false);
         // Invalidate the file handle cache, so new read requests get the new file if one was created.
         chunkManager.finishWriteChunks(container, localBlockData);
       }
     }
 
+    logBlockRepairOutcome(allChunksSuccessful, numSuccessfulChunks, peerChunkList.size(), localID, containerID, peer);
+    return new BlockRepairResult(numSuccessfulChunks, adoptPeerBcsId, adoptedBcsId);
+  }
+
+  private static void logBlockRepairOutcome(boolean allChunksSuccessful, int numSuccessfulChunks, int peerListSize,
+      long localID, long containerID, DatanodeDetails peer) {
     if (!allChunksSuccessful) {
       LOG.warn("Partially reconciled block {} in container {} with peer {}. {}/{} chunks were " +
-          "obtained successfully", localID, containerID, peer, numSuccessfulChunks, peerChunkList.size());
+          "obtained successfully", localID, containerID, peer, numSuccessfulChunks, peerListSize);
     } else if (LOG.isDebugEnabled()) {
       LOG.debug("Reconciled all {} chunks in block {} in container {} from peer {}",
-          peerChunkList.size(), localID, containerID, peer);
+          peerListSize, localID, containerID, peer);
+    }
+  }
+
+  /**
+   * Outcome of repairing one block from a peer, aggregated per reconciliation round by
+   * reconcileContainerInternal to decide container-level BCSID advancement.
+   */
+  static final class BlockRepairResult {
+    private final long numChunksRepaired;
+    private final boolean blockFullyCovered;
+    private final long adoptedBcsId;
+
+    BlockRepairResult(long numChunksRepaired, boolean blockFullyCovered, long adoptedBcsId) {
+      this.numChunksRepaired = numChunksRepaired;
+      this.blockFullyCovered = blockFullyCovered;
+      this.adoptedBcsId = adoptedBcsId;
     }
 
-    return numSuccessfulChunks;
+    long getNumChunksRepaired() {
+      return numChunksRepaired;
+    }
+
+    boolean isBlockFullyCovered() {
+      return blockFullyCovered;
+    }
+
+    long getAdoptedBcsId() {
+      return adoptedBcsId;
+    }
+  }
+
+  /**
+   * Advances the container-wide BCSID after reconciling with one peer, and only when the round proved container
+   * scope coverage. The container BCSID quantifies over all blocks: a fully covered block at a higher BCSID must
+   * not advance the container past another block that remains incomplete at a lower BCSID, because the missing
+   * data of that block would then be attested as present. Two conditions guard the advancement:
+   * (1) every block repaired in the round ended fully covered, and (2) the diff dropped nothing as unhealthy --
+   * a block whose only differences were dropped by reportChunkIfHealthy never enters the repair lists, so it can
+   * not dirty the round through a partial repair, and only the report's filtered counter reveals it. When either
+   * condition fails, the container BCSID stays put and converges on a later round once every repair completes.
+   *
+   * <p>Accepted boundary: data absent from both replicas' trees is invisible to any diff, so advancing based on a
+   * clean round inherits the peer's own container-level claim at exactly the trust level of replicating the
+   * container wholesale. Container-level adoption on merkle tree equality without repair is tracked in HDDS-16011.
+   */
+  @VisibleForTesting
+  void advanceContainerBcsIdForFullyCoveredRound(KeyValueContainer container, ContainerDiffReport diffReport,
+      boolean allRepairedBlocksCovered, long maxAdoptedBcsId) throws IOException {
+    if (!allRepairedBlocksCovered || diffReport.getNumUnhealthyChunksFiltered() > 0
+        || maxAdoptedBcsId <= container.getContainerData().getBlockCommitSequenceId()) {
+      return;
+    }
+    blockManager.updateContainerBcsId(container, maxAdoptedBcsId);
   }
 
   private void verifyChunksLength(ContainerProtos.ChunkInfo peerChunkInfo, ContainerProtos.ChunkInfo localChunkInfo)
@@ -1981,6 +2165,24 @@ public class KeyValueHandler extends Handler {
       throw new StorageContainerException("Length mismatch for chunk at offset " + localChunkInfo.getOffset() +
           ". Expected: " + localChunkInfo.getLen() + ", Actual: " + peerChunkInfo.getLen(), CHUNK_FILE_INCONSISTENCY);
     }
+  }
+
+  /**
+   * Returns true when every chunk in the peer's committed block metadata is present locally at the same offset with
+   * the same length. Only then does the local block hold everything the peer's BCSID attests, making it safe to adopt
+   * that BCSID. Offset and length equality is sufficient: a chunk at a matching offset either matched checksums in
+   * the merkle tree diff or was length-verified during ingest this round. An empty peer chunk list is vacuously
+   * covered: the peer's BCSID then attests an empty block, which any local state satisfies.
+   */
+  private static boolean coversPeerBlock(ContainerProtos.BlockData peerBlockData,
+      NavigableMap<Long, ContainerProtos.ChunkInfo> localOffset2Chunk) {
+    for (ContainerProtos.ChunkInfo peerChunk : peerBlockData.getChunksList()) {
+      ContainerProtos.ChunkInfo localChunk = localOffset2Chunk.get(peerChunk.getOffset());
+      if (localChunk == null || localChunk.getLen() != peerChunk.getLen()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -2056,6 +2258,11 @@ public class KeyValueHandler extends Handler {
     // Since the putBlock request may fail, we don't know if the chunk exists,
     // thus we need to check it when receiving the request to delete such blocks
     String[] chunkNames = getFilesWithPrefix(prefix, chunkDir);
+    if (chunkNames == null) {
+      throw new IOException("Failed to list chunks under " + chunkDir
+          + " for unreferenced block " + localID + " in container "
+          + containerID);
+    }
     if (chunkNames.length == 0) {
       LOG.warn("Missing delete block(Container = {}, Block = {}",
           containerID, localID);
@@ -2066,16 +2273,24 @@ public class KeyValueHandler extends Handler {
       if (!file.isFile()) {
         continue;
       }
-      FileUtil.fullyDelete(file);
+      if (!deleteUnreferencedFile(file)) {
+        throw new IOException("Failed to delete unreferenced chunk/block "
+            + file + " in container " + containerID);
+      }
       LOG.info("Deleted unreferenced chunk/block {} in container {}", name,
           containerID);
     }
   }
 
+  @VisibleForTesting
+  boolean deleteUnreferencedFile(File file) {
+    return FileUtil.fullyDelete(file);
+  }
+
   @Override
   public ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto request, Container kvContainer,
-      RandomAccessFileChannel blockFile,
+      ReadBlockContext readBlockContext,
       StreamObserver<ContainerCommandResponseProto> streamObserver) {
 
     if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
@@ -2091,14 +2306,23 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
     try {
-      readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
-      // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
+      final long startTime = Time.monotonicNow();
+      final long bytesRead = readBlockImpl(request, readBlockContext, kvContainer, streamObserver);
+      KeyValueContainerData containerData = (KeyValueContainerData) kvContainer
+          .getContainerData();
+      HddsVolume volume = containerData.getVolume();
+      if (volume != null) {
+        volume.getVolumeIOStats().recordReadOperation(startTime, bytesRead);
+      }
+      metrics.incContainerBytesStats(Type.ReadBlock, bytesRead);
     } catch (StorageContainerException ex) {
       responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ioe) {
       final StorageContainerException sce = new StorageContainerException(
           "Failed to readBlock " + request.getReadBlock(), ioe, IO_EXCEPTION);
       responseProto = ContainerUtils.logAndReturnError(LOG, sce, request);
+    } catch (StatusRuntimeException sre) {
+      throw sre;
     } catch (Exception e) {
       final StorageContainerException sce = new StorageContainerException(
           "Failed to readBlock " + request.getReadBlock(), e, CONTAINER_INTERNAL_ERROR);
@@ -2108,16 +2332,14 @@ public class KeyValueHandler extends Handler {
     return responseProto;
   }
 
-  private void readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
-      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean verifyChecksum)
+  private long readBlockImpl(ContainerCommandRequestProto request, ReadBlockContext readBlockContext,
+      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
-    int responseDataSize = readBlock.getResponseDataSize();
-    if (responseDataSize == 0) {
-      responseDataSize = 1 << 20;
-    }
+    final int responseDataSize = boundResponseDataSize(readBlock.getResponseDataSize());
 
     final BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
+    final RandomAccessFileChannel blockFile = readBlockContext.getBlockFile();
     if (!blockFile.isOpen()) {
       final File file = FILE_PER_BLOCK.getChunkFile(kvContainer.getContainerData(), blockID, "unused");
       blockFile.open(file);
@@ -2127,95 +2349,65 @@ public class KeyValueHandler extends Handler {
     BlockUtils.verifyReplicaIdx(kvContainer, blockID);
     BlockUtils.verifyBCSId(kvContainer, blockID);
 
-    final BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
-    final List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
-    final int bytesPerChunk = Math.toIntExact(chunkInfos.get(0).getLen());
-    final ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
-    ChecksumData checksumData = null;
-    int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;
-    if (checksumType == ContainerProtos.ChecksumType.NONE) {
-      checksumData = new ChecksumData(checksumType, 0);
-    } else {
-      bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
+    if (readBlock.getOffset() < 0 || readBlock.getLength() < 0) {
+      return rejectReadBlock(readBlockContext, streamObserver, Status.INVALID_ARGUMENT.withDescription(
+          "Negative offset " + readBlock.getOffset() + " or length " + readBlock.getLength() + " for " + blockID));
     }
-    // We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
-    // previous checksum boundary.
-    // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
-    // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
-    // it simplifies the code to always do this.
-    final long offsetAlignment = readBlock.getOffset() % bytesPerChecksum;
-    long adjustedOffset = readBlock.getOffset() - offsetAlignment;
 
-    final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
-    blockFile.position(adjustedOffset);
-    int totalDataLength = 0;
-    int numResponses = 0;
-    final long rounded = roundUp(readBlock.getLength() + offsetAlignment, bytesPerChecksum);
-    final long requiredLength = Math.min(rounded, blockData.getSize() - adjustedOffset);
-    LOG.debug("adjustedOffset {}, requiredLength {}, blockSize {}",
-        adjustedOffset, requiredLength, blockData.getSize());
-    for (boolean shouldRead = true; totalDataLength < requiredLength && shouldRead;) {
-      shouldRead = blockFile.read(buffer);
+    // Cached per stream; re-resolve when the range reaches the cached size, since the block may have grown.
+    BlockData blockData = readBlockContext.getCachedBlockData(blockID);
+    if (blockData == null || readBlock.getLength() >= blockData.getSize() - readBlock.getOffset()) {
+      blockData = getBlockManager().getBlock(kvContainer, blockID);
+      readBlockContext.cacheBlockData(blockData);
+    }
+    if (readBlock.getOffset() >= blockData.getSize()) {
+      return rejectReadBlock(readBlockContext, streamObserver, Status.OUT_OF_RANGE.withDescription(
+          "Requested offset " + readBlock.getOffset() + " is beyond the end of block " + blockID + " with size "
+              + blockData.getSize()));
+    }
+    final BlockReadCursor cursor = new BlockReadCursor(readBlock.getOffset(), readBlock.getLength(),
+        responseDataSize, blockData.getChunks());
+    long bytesRead = 0;
+    while (cursor.hasNext()) {
+      final BlockReadCursor.ReadRange range = cursor.next();
+      // Reused across the stream's requests: gRPC serializes the response inside onNext, before the buffer is refilled.
+      final ByteBuffer buffer = readBlockContext.getReadBuffer(range.length());
+      blockFile.position(range.offset());
+      buffer.limit(range.length());
+      blockFile.read(buffer);
+      if (buffer.hasRemaining()) {
+        throw new EOFException("Unexpected end of block " + blockID + " at " + range.offset());
+      }
+      bytesRead += range.length();
       buffer.flip();
-      final int readLength = buffer.remaining();
-      if (readLength == 0) {
-        assertTrue(!shouldRead);
-        break;
+      if (validateChunkChecksumData) {
+        Checksum.validateChecksums(buffer, range.offset(), 0, range.chunks());
       }
-      assertTrue(readLength > 0, () -> "readLength = " + readLength + " <= 0");
-
-      if (checksumType != ContainerProtos.ChecksumType.NONE) {
-        final List<ByteString> checksums = getChecksums(adjustedOffset, readLength,
-            bytesPerChunk, bytesPerChecksum, chunkInfos);
-        LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChunk {}, bytesPerChecksum {}",
-            readBlock, adjustedOffset, readLength, bytesPerChunk, bytesPerChecksum);
-        checksumData = new ChecksumData(checksumType, bytesPerChecksum, checksums);
-        if (verifyChecksum) {
-          Checksum.verifyChecksum(buffer.duplicate(), checksumData, 0);
-        }
-      }
-      final ContainerCommandResponseProto response = getReadBlockResponse(
-          request, checksumData, buffer, adjustedOffset);
-      final int dataLength = response.getReadBlock().getData().size();
-      LOG.debug("server onNext response {}: dataLength={}, numChecksums={}",
-          numResponses, dataLength, response.getReadBlock().getChecksumData().getChecksumsList().size());
-      streamObserver.onNext(response);
-      buffer.clear();
-
-      adjustedOffset += readLength;
-      totalDataLength += dataLength;
-      numResponses++;
+      streamObserver.onNext(
+          getReadBlockResponse(request, range.chunks(), buffer, range.offset(), byteBufferToByteString));
     }
+    return bytesRead;
   }
 
-  static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChunk, int bytesPerChecksum,
-      final List<ContainerProtos.ChunkInfo> chunks) {
-    assertSame(0, blockOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
-    final int numChecksums = 1 + (readLength - 1) / bytesPerChecksum;
-    final List<ByteString> checksums = new ArrayList<>(numChecksums);
-    for (int i = 0; i < numChecksums; i++) {
-      // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from,
-      // and its offset to pull out the correct checksum bytes for each read.
-      final int n = i * bytesPerChecksum;
-      final long offset = blockOffset + n;
-      final int c = Math.toIntExact(offset / bytesPerChunk);
-      final int chunkOffset = Math.toIntExact(offset % bytesPerChunk);
-      final int csi = chunkOffset / bytesPerChecksum;
+  /**
+   * Report a client fault on the stream instead of throwing, which would become a CONTAINER_INTERNAL_ERROR response
+   * and make the dispatcher scan the container. This ends the call from the datanode side, so also close the stream's
+   * block file: GrpcXceiverService closes it only when the client ends the stream or a request throws.
+   */
+  private static long rejectReadBlock(ReadBlockContext readBlockContext,
+      StreamObserver<ContainerCommandResponseProto> streamObserver, Status status) {
+    readBlockContext.close();
+    streamObserver.onError(status.asRuntimeException());
+    return 0;
+  }
 
-      assertTrue(c < chunks.size(),
-          () -> "chunkIndex = " + c + " >= chunk.size()" + chunks.size());
-      final ContainerProtos.ChunkInfo chunk = chunks.get(c);
-      if (c < chunks.size() - 1) {
-        assertSame(bytesPerChunk, chunk.getLen(), "bytesPerChunk");
-      }
-      final ContainerProtos.ChecksumData checksumDataProto = chunks.get(c).getChecksumData();
-      assertSame(bytesPerChecksum, checksumDataProto.getBytesPerChecksum(), "bytesPerChecksum");
-      final List<ByteString> checksumsList = checksumDataProto.getChecksumsList();
-      assertTrue(csi < checksumsList.size(),
-          () -> "checksumIndex = " + csi + " >= checksumsList.size()" + checksumsList.size());
-      checksums.add(checksumsList.get(csi));
+  /** The client chooses the response size, which is a uint32 and sizes a buffer kept for the stream: bound it. */
+  @VisibleForTesting
+  static int boundResponseDataSize(int responseDataSize) {
+    if (responseDataSize <= 0) {
+      return DEFAULT_READ_BLOCK_RESPONSE_DATA_SIZE;
     }
-    return checksums;
+    return Math.min(responseDataSize, MAX_READ_BLOCK_RESPONSE_DATA_SIZE);
   }
 
   @Override
@@ -2291,24 +2483,33 @@ public class KeyValueHandler extends Handler {
 
   private void deleteInternal(Container container, boolean force)
       throws StorageContainerException {
+    final long containerId = container.getContainerData().getContainerID();
     long startTime = clock.millis();
-    container.writeLock();
+    Container<?> containerLocked = containerSet.getContainerWithWriteLock(containerId);
+    if (containerLocked == null) {
+      // null means container locking retries exhausted ;
+      // container not-found throws StorageContainerException.
+      LOG.info("Exceeded {} retries to lock container {}; Now SCM will resend for delete with " +
+              "the current container replica", ContainerSet.maxContainerMapSwapRetries(),
+          containerId);
+      return;
+    }
     try {
-      final ContainerData data = container.getContainerData();
-      if (container.getContainerData().getVolume().isFailed()) {
+      final ContainerData data = containerLocked.getContainerData();
+      if (containerLocked.getContainerData().getVolume().isFailed()) {
         // if the  volume in which the container resides fails
         // don't attempt to delete/move it. When a volume fails,
         // failedVolumeListener will pick it up and clear the container
         // from the container set.
         LOG.info("Delete container issued on containerID {} which is in a " +
-                "failed volume. Skipping", container.getContainerData()
+                "failed volume. Skipping", containerLocked.getContainerData()
             .getContainerID());
         return;
       }
       // If force is false, we check container state.
       if (!force) {
         // Check if container is open
-        if (container.getContainerData().isOpen()) {
+        if (containerLocked.getContainerData().isOpen()) {
           throw new StorageContainerException(
               "Deletion of Open Container is not allowed.",
               DELETE_ON_OPEN_CONTAINER);
@@ -2317,14 +2518,14 @@ public class KeyValueHandler extends Handler {
         // If the container is not empty, it should not be deleted unless the
         // container is being forcefully deleted (which happens when
         // container is unhealthy or over-replicated).
-        if (container.hasBlocks()) {
+        if (containerLocked.hasBlocks()) {
           metrics.incContainerDeleteFailedNonEmpty();
           LOG.error("Received container deletion command for non-empty {}: {}", data, data.getStatistics());
           // blocks table for future debugging.
           // List blocks
-          logBlocksIfNonZero(container);
+          logBlocksIfNonZero(containerLocked);
           // Log chunks
-          logBlocksFoundOnDisk(container);
+          logBlocksFoundOnDisk(containerLocked);
           throw new StorageContainerException("Non-force deletion of " +
               "non-empty container is not allowed.",
               DELETE_ON_NON_EMPTY_CONTAINER);
@@ -2332,9 +2533,9 @@ public class KeyValueHandler extends Handler {
       } else {
         metrics.incContainersForceDelete();
       }
-      if (container.getContainerData() instanceof KeyValueContainerData) {
+      if (containerLocked.getContainerData() instanceof KeyValueContainerData) {
         KeyValueContainerData keyValueContainerData =
-            (KeyValueContainerData) container.getContainerData();
+            (KeyValueContainerData) containerLocked.getContainerData();
         HddsVolume hddsVolume = keyValueContainerData.getVolume();
 
         // Steps to delete
@@ -2348,21 +2549,20 @@ public class KeyValueHandler extends Handler {
           if (waitTime > maxDeleteLockWaitMs) {
             LOG.warn("An attempt to delete container {} took {} ms acquiring locks and pre-checks. " +
                     "The delete has been skipped and should be retried automatically by SCM.",
-                container.getContainerData().getContainerID(), waitTime);
+                containerLocked.getContainerData().getContainerID(), waitTime);
             return;
           }
-          container.markContainerForDelete();
-          long containerId = container.getContainerData().getContainerID();
+          containerLocked.markContainerForDelete();
           containerSet.removeContainer(containerId);
-          ContainerLogger.logDeleted(container.getContainerData(), force);
+          ContainerLogger.logDeleted(containerLocked.getContainerData(), force);
           KeyValueContainerUtil.removeContainer(keyValueContainerData, conf);
         } catch (IOException ioe) {
           LOG.error("Failed to move container under " + hddsVolume
               .getDeletedContainerDir());
           String errorMsg =
-              "Failed to move container" + container.getContainerData()
+              "Failed to move container" + containerLocked.getContainerData()
                   .getContainerID();
-          triggerVolumeScanAndThrowException(container, errorMsg,
+          triggerVolumeScanAndThrowException(containerLocked, errorMsg,
               CONTAINER_INTERNAL_ERROR);
         }
       }
@@ -2372,20 +2572,20 @@ public class KeyValueHandler extends Handler {
       // All other IO Exceptions should be treated as if the container is not
       // empty as a defensive check.
       LOG.error("Could not determine if the container {} is empty",
-          container.getContainerData().getContainerID(), e);
+          containerLocked.getContainerData().getContainerID(), e);
       String errorMsg =
-          "Failed to read container dir" + container.getContainerData()
+          "Failed to read container dir" + containerLocked.getContainerData()
               .getContainerID();
-      triggerVolumeScanAndThrowException(container, errorMsg,
+      triggerVolumeScanAndThrowException(containerLocked, errorMsg,
           CONTAINER_INTERNAL_ERROR);
     } finally {
-      container.writeUnlock();
+      containerLocked.writeUnlock();
     }
     // Avoid holding write locks for disk operations
-    sendICR(container);
-    long bytesUsed = container.getContainerData().getBytesUsed();
-    HddsVolume volume = container.getContainerData().getVolume();
-    container.delete();
+    sendICR(containerLocked);
+    long bytesUsed = containerLocked.getContainerData().getBytesUsed();
+    HddsVolume volume = containerLocked.getContainerData().getVolume();
+    containerLocked.delete();
     volume.decrementUsedSpace(bytesUsed);
   }
 

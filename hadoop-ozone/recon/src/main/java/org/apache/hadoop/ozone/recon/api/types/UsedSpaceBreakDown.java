@@ -45,32 +45,24 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class UsedSpaceBreakDown {
 
   @JsonProperty("openKeyBytes")
-  private long openKeyBytes;
+  private OpenKeyBytesInfo openKeyBytes;
 
-  @JsonProperty("committedKeyBytes")
-  private long committedKeyBytes;
-
-  @JsonProperty("preAllocatedContainerBytes")
-  private long preAllocatedContainerBytes;
+  @JsonProperty("finalizedKeyBytes")
+  private long finalizedKeyBytes;
 
   public UsedSpaceBreakDown() {
   }
 
-  public UsedSpaceBreakDown(long openKeyBytes, long committedKeyBytes, long preAllocatedContainerBytes) {
+  public UsedSpaceBreakDown(OpenKeyBytesInfo openKeyBytes, long finalizedKeyBytes) {
     this.openKeyBytes = openKeyBytes;
-    this.committedKeyBytes = committedKeyBytes;
-    this.preAllocatedContainerBytes = preAllocatedContainerBytes;
+    this.finalizedKeyBytes = finalizedKeyBytes;
   }
 
-  public long getOpenKeyBytes() {
+  public OpenKeyBytesInfo getOpenKeyBytes() {
     return openKeyBytes;
   }
 
-  public long getCommittedKeyBytes() {
-    return committedKeyBytes;
-  }
-
-  public long getPreAllocatedContainerBytes() {
-    return preAllocatedContainerBytes;
+  public long getFinalizedKeyBytes() {
+    return finalizedKeyBytes;
   }
 }

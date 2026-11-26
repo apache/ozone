@@ -121,7 +121,6 @@ public class TestECContainerRecovery {
     conf.setTimeDuration(
         "hdds.ratis.raft.server.notification.no-leader.timeout", 300,
         TimeUnit.SECONDS);
-    conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 500,

@@ -19,16 +19,25 @@ package org.apache.hadoop.ozone.container.common.transport.server;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.getSendMethod;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
-import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
+import org.apache.hadoop.ozone.container.common.helpers.ReadBlockContext;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
+import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
 import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
 import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
@@ -47,12 +56,24 @@ public class GrpcXceiverService extends
       LOG = LoggerFactory.getLogger(GrpcXceiverService.class);
 
   private final ContainerDispatcher dispatcher;
+  // A streaming ReadBlock call has no deadline, so an idle stream would pin its block file indefinitely.
+  // This timer closes the file of any stream idle for longer than the timeout; the next request reopens it.
+  private final long streamReadFileIdleTimeoutNanos;
+  private final ScheduledExecutorService idleFileCloser;
   private final ZeroCopyMessageMarshaller<ContainerCommandRequestProto>
       zeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
           ContainerCommandRequestProto.getDefaultInstance());
 
-  public GrpcXceiverService(ContainerDispatcher dispatcher) {
+  public GrpcXceiverService(ContainerDispatcher dispatcher, Duration streamReadFileIdleTimeout,
+      String threadNamePrefix) {
     this.dispatcher = dispatcher;
+    this.streamReadFileIdleTimeoutNanos = streamReadFileIdleTimeout.toNanos();
+    this.idleFileCloser = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setDaemon(true)
+        .setNameFormat(threadNamePrefix + "ReadBlockIdleFileCloser").build());
+  }
+
+  public void shutdown() {
+    idleFileCloser.shutdownNow();
   }
 
   /**
@@ -98,14 +119,54 @@ public class GrpcXceiverService extends
       StreamObserver<ContainerCommandResponseProto> responseObserver) {
     return new StreamObserver<ContainerCommandRequestProto>() {
       private final AtomicBoolean isClosed = new AtomicBoolean(false);
-      private final RandomAccessFileChannel blockFile = new RandomAccessFileChannel();
+      private final ReadBlockContext readBlockContext = new ReadBlockContext();
+      // Held while a request is served, so the idle closer never closes the file under an in-flight read.
+      private final ReentrantLock requestLock = new ReentrantLock();
+      private volatile long lastRequestNanos;
+      private volatile ScheduledFuture<?> idleFileCheck;
 
       boolean close() {
         if (isClosed.compareAndSet(false, true)) {
-          blockFile.close();
+          final ScheduledFuture<?> check = idleFileCheck;
+          if (check != null) {
+            check.cancel(false);
+          }
+          readBlockContext.close();
           return true;
         }
         return false;
+      }
+
+      private void scheduleIdleFileCheck(long delayNanos) {
+        try {
+          idleFileCheck = idleFileCloser.schedule(this::closeFileIfIdle, delayNanos, TimeUnit.NANOSECONDS);
+        } catch (RejectedExecutionException e) {
+          // Server is shutting down; the file is closed when the stream ends.
+          LOG.debug("Idle file closer is shut down, not scheduling check", e);
+        }
+      }
+
+      private void closeFileIfIdle() {
+        if (isClosed.get()) {
+          return;
+        }
+        final long idleNanos = System.nanoTime() - lastRequestNanos;
+        if (idleNanos < streamReadFileIdleTimeoutNanos || !requestLock.tryLock()) {
+          // Not idle for long enough, or a request is in flight: check again later.
+          scheduleIdleFileCheck(idleNanos < streamReadFileIdleTimeoutNanos
+              ? streamReadFileIdleTimeoutNanos - idleNanos : streamReadFileIdleTimeoutNanos);
+          return;
+        }
+        try {
+          if (readBlockContext.getBlockFile().isOpen()) {
+            LOG.debug("Closing block file of streaming read idle for {}ms", TimeUnit.NANOSECONDS.toMillis(idleNanos));
+            readBlockContext.close();
+          }
+          // The next request reopens the file and schedules a new check.
+          idleFileCheck = null;
+        } finally {
+          requestLock.unlock();
+        }
       }
 
       @Override
@@ -115,9 +176,16 @@ public class GrpcXceiverService extends
             .setReleaseSupported(true)
             .build();
 
+        requestLock.lock();
         try {
+          if (Context.current().isCancelled()) {
+            // The client deadline expired, or the call was cancelled, while the request waited for a thread.
+            // Nobody waits for the response, so do not spend disk I/O on it.
+            LOG.debug("Skip {} of a cancelled call", request.getCmdType());
+            return;
+          }
           if (request.getCmdType() == Type.ReadBlock) {
-            dispatcher.streamDataReadOnly(request, responseObserver, blockFile, context);
+            dispatcher.streamDataReadOnly(request, responseObserver, readBlockContext, context);
           } else {
             final ContainerCommandResponseProto resp = dispatcher.dispatch(request, context);
             responseObserver.onNext(resp);
@@ -132,6 +200,11 @@ public class GrpcXceiverService extends
           if (context != null) {
             context.release();
           }
+          lastRequestNanos = System.nanoTime();
+          if (!isClosed.get() && readBlockContext.getBlockFile().isOpen() && idleFileCheck == null) {
+            scheduleIdleFileCheck(streamReadFileIdleTimeoutNanos);
+          }
+          requestLock.unlock();
         }
       }
 

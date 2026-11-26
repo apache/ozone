@@ -23,8 +23,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.S
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.SCRUBBER_CLOSED_PIPELINES;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.time.Clock;
@@ -43,9 +45,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +68,8 @@ public class BackgroundPipelineCreator implements SCMService {
    * 1) after leaving safe mode, BackgroundPipelineCreator needs to
    *    wait for a while before really take effect.
    * 2) NewNodeHandler, NodeAddressUpdateHandler,
-   *    NonHealthyToHealthyNodeHandler, PreCheckComplete
+   *    NonHealthyToHealthyNodeHandler, PreCheckComplete,
+   *    BackgroundPipelineScrubber closing pipelines
    *    will trigger a one-shot run of BackgroundPipelineCreator,
    *    no matter in safe mode or not.
    */
@@ -88,6 +91,7 @@ public class BackgroundPipelineCreator implements SCMService {
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final long intervalInMillis;
   private final Clock clock;
+  private final boolean createRatisThreeForEcDefault;
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
       ConfigurationSource conf, SCMContext scmContext, Clock clock) {
@@ -109,6 +113,9 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+    this.createRatisThreeForEcDefault = conf.getBoolean(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE_DEFAULT);
 
     threadName = scmContext.threadNamePrefix() + THREAD_NAME;
   }
@@ -204,42 +211,18 @@ public class BackgroundPipelineCreator implements SCMService {
   }
 
   private void createPipelines() throws RuntimeException {
-    // TODO: #CLUTIL Different replication factor may need to be supported
-    HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
-        conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-            OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
-    boolean autoCreateFactorOne = conf.getBoolean(
-        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+    boolean autoCreateFactorOne = conf.getBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
-    List<ReplicationConfig> list =
-        new ArrayList<>();
-    for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
-        .values()) {
-      if (factor == ReplicationFactor.ZERO) {
-        continue; // Ignore it.
-      }
-      final ReplicationConfig replicationConfig;
-      if (type != EC) {
-        replicationConfig =
-            ReplicationConfig.fromProtoTypeAndFactor(type, factor);
-      } else if (factor == ReplicationFactor.ONE) {
-        replicationConfig =
-            ReplicationConfig.fromProtoTypeAndFactor(RATIS, factor);
-      } else {
-        continue;
-      }
-      if (skipCreation(replicationConfig, autoCreateFactorOne)) {
-        // Skip this iteration for creating pipeline
-        continue;
-      }
-      list.add(replicationConfig);
+    List<ReplicationConfig> list = getReplicationConfigs(autoCreateFactorOne);
+    if (list.isEmpty()) {
+      LOG.debug("No replication configs selected for background pipeline creation.");
+      return;
     }
 
     LoopingIterator it = new LoopingIterator(list);
     while (it.hasNext()) {
-      ReplicationConfig replicationConfig =
-          (ReplicationConfig) it.next();
+      ReplicationConfig replicationConfig = (ReplicationConfig) it.next();
 
       try {
         Pipeline pipeline = pipelineManager.createPipeline(replicationConfig);
@@ -253,6 +236,54 @@ public class BackgroundPipelineCreator implements SCMService {
     }
 
     LOG.debug("BackgroundPipelineCreator createPipelines finished.");
+  }
+
+  /**
+   * Returns replication configs eligible for background pipeline creation.
+   *
+   * <p>If the default replication config is invalid, this returns an empty
+   * list and skips pipeline creation to avoid guessing from raw config values.
+   * For EC-default clusters, this only returns RATIS/THREE when
+   * {@link ScmConfigKeys#OZONE_SCM_PIPELINE_CREATE_RATIS_THREE} is enabled.
+   */
+  @VisibleForTesting
+  List<ReplicationConfig> getReplicationConfigs(boolean autoCreateFactorOne) {
+    List<ReplicationConfig> list = new ArrayList<>();
+    ReplicationConfig defaultReplicationConfig = ScmUtils
+        .getDefaultReplicationConfig(conf, LOG,
+            BackgroundPipelineCreator.class.getSimpleName());
+    if (defaultReplicationConfig == null) {
+      LOG.warn("Skipping background pipeline creation: default replication "
+          + "config is invalid.");
+      return list;
+    }
+    // TODO: #CLUTIL Different replication factor may need to be supported
+    HddsProtos.ReplicationType type =
+        defaultReplicationConfig.getReplicationType();
+    if (type == EC && createRatisThreeForEcDefault) {
+      list.add(ReplicationConfig.fromProtoTypeAndFactor(RATIS,
+          ReplicationFactor.THREE));
+    }
+    if (type == EC) {
+      return list;
+    }
+
+    for (HddsProtos.ReplicationFactor factor
+        : HddsProtos.ReplicationFactor.values()) {
+      if (factor == ReplicationFactor.ZERO) {
+        continue; // Ignore it.
+      }
+      final ReplicationConfig replicationConfig =
+          ReplicationConfig.fromProtoTypeAndFactor(type, factor);
+      if (skipCreation(replicationConfig, autoCreateFactorOne)) {
+        // Skip this iteration for creating pipeline
+        continue;
+      }
+      if (!list.contains(replicationConfig)) {
+        list.add(replicationConfig);
+      }
+    }
+    return list;
   }
 
   @Override
@@ -286,7 +317,8 @@ public class BackgroundPipelineCreator implements SCMService {
     if (event == NEW_NODE_HANDLER_TRIGGERED
             || event == NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED
             || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
-            || event == PRE_CHECK_COMPLETED) {
+            || event == PRE_CHECK_COMPLETED
+            || event == SCRUBBER_CLOSED_PIPELINES) {
       LOG.info("trigger a one-shot run on {}.", threadName);
 
       serviceLock.lock();

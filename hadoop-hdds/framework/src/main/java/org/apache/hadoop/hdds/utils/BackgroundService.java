@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
@@ -42,12 +41,11 @@ public abstract class BackgroundService {
 
   // Executor to launch child tasks
   private ScheduledThreadPoolExecutor exec;
-  private ThreadGroup threadGroup;
   private final String serviceName;
   private long interval;
   private volatile long serviceTimeoutInNanos;
   private TimeUnit unit;
-  private final int threadPoolSize;
+  private int threadPoolSize;
   private final String threadNamePrefix;
   private final PeriodicalTask service;
   private CompletableFuture<Void> future;
@@ -67,7 +65,7 @@ public abstract class BackgroundService {
             .toLong(TimeUnit.NANOSECONDS);
     this.threadPoolSize = threadPoolSize;
     this.threadNamePrefix = threadNamePrefix;
-    initExecutorAndThreadGroup();
+    initExecutor();
     service = new PeriodicalTask();
     this.future = CompletableFuture.completedFuture(null);
   }
@@ -77,7 +75,7 @@ public abstract class BackgroundService {
   }
 
   @VisibleForTesting
-  public synchronized ExecutorService getExecutorService() {
+  public synchronized ScheduledThreadPoolExecutor getExecutorService() {
     return this.exec;
   }
 
@@ -90,6 +88,7 @@ public abstract class BackgroundService {
     // the corePoolSize will always less maximumPoolSize.
     // So we can directly set the corePoolSize
     exec.setCorePoolSize(size);
+    threadPoolSize = size;
   }
 
   public synchronized void setServiceTimeoutInNanos(long newTimeout) {
@@ -99,7 +98,7 @@ public abstract class BackgroundService {
 
   @VisibleForTesting
   public int getThreadCount() {
-    return threadGroup.activeCount();
+    return exec.getPoolSize();
   }
 
   @VisibleForTesting
@@ -114,7 +113,7 @@ public abstract class BackgroundService {
   // start service
   public synchronized void start() {
     if (exec == null || exec.isShutdown() || exec.isTerminated()) {
-      initExecutorAndThreadGroup();
+      initExecutor();
     }
     LOG.info("Starting service {} with interval {} {}", serviceName,
         interval, unit.name().toLowerCase());
@@ -126,7 +125,7 @@ public abstract class BackgroundService {
     this.unit = newUnit;
   }
 
-  protected synchronized long getIntervalMillis() {
+  public synchronized long getIntervalMillis() {
     return this.unit.toMillis(interval);
   }
 
@@ -153,7 +152,14 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Running background service : {}", serviceName);
       }
-      BackgroundTaskQueue tasks = getTasks();
+      final BackgroundTaskQueue tasks;
+      try {
+        tasks = getTasks();
+      } catch (RuntimeException e) {
+        // An exception escaping run() would cancel all future executions of this periodic task.
+        LOG.error("Failed to get tasks for background service {}. Will retry in the next interval.", serviceName, e);
+        return;
+      }
       if (tasks.isEmpty()) {
         // No task found, or some problems to init tasks
         // return and retry in next interval.
@@ -190,28 +196,31 @@ public abstract class BackgroundService {
     }
   }
 
-  // shutdown and make sure all threads are properly released.
-  public synchronized void shutdown() {
+  /**
+   * Shuts down the scheduled executor and waits for pool threads to finish.
+   * DO NOT call while holding the monitor on this instance. {@link PeriodicalTask}
+   * uses the same lock and can deadlock during {@code awaitTermination}.
+   */
+  public void shutdown() {
     LOG.info("Shutting down service {}", this.serviceName);
-    exec.shutdown();
+    final ScheduledThreadPoolExecutor current;
+    synchronized (this) {
+      current = exec;
+    }
+    current.shutdown();
     try {
-      if (!exec.awaitTermination(60, TimeUnit.SECONDS)) {
-        exec.shutdownNow();
+      if (!current.awaitTermination(60, TimeUnit.SECONDS)) {
+        current.shutdownNow();
       }
     } catch (InterruptedException e) {
       // Re-interrupt the thread while catching InterruptedException
       Thread.currentThread().interrupt();
-      exec.shutdownNow();
-    }
-    if (threadGroup.activeCount() == 0 && !threadGroup.isDestroyed()) {
-      threadGroup.destroy();
+      current.shutdownNow();
     }
   }
 
-  private void initExecutorAndThreadGroup() {
-    threadGroup = new ThreadGroup(serviceName);
+  private void initExecutor() {
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setThreadFactory(r -> new Thread(threadGroup, r))
         .setDaemon(true)
         .setNameFormat(threadNamePrefix + serviceName + "#%d")
         .build();

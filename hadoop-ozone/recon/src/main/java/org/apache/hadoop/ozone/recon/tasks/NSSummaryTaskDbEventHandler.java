@@ -17,11 +17,16 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
+
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -43,12 +48,52 @@ public class NSSummaryTaskDbEventHandler {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
 
+  // Cache OmBucketInfo lookups across process() calls so the Legacy and OBS
+  // sub-tasks don't pay a RocksDB point read per event. A bucket's objectID and
+  // layout are stable while the bucket exists, but a bucket can be deleted and
+  // recreated under the same volume/bucket name with a new objectID (same DB
+  // key, different identity). A recreate is always preceded by a delete, so the
+  // sub-tasks call invalidateBucketCache() when they observe a bucketTable
+  // delete event; a recreated bucket is then re-read instead of served stale.
+  //
+  // Single-thread access only (each sub-task runs on its own thread and owns
+  // its own cache instance). HashMap is fine.
+  private final Map<String, OmBucketInfo> bucketInfoCache = new HashMap<>();
+
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                      reconNamespaceSummaryManager,
                                      ReconOMMetadataManager
                                      reconOMMetadataManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
+  }
+
+  /** Look up an {@link OmBucketInfo} via {@code getBucketTable().getSkipCache}
+   *  and cache the result. Bucket layout/object-id are stable while a bucket
+   *  exists, so a field-level cache avoids one RocksDB point read per event in
+   *  the per-event sub-task loops. Entries are dropped via
+   *  {@link #invalidateBucketCache(String)} when a bucketTable delete event is
+   *  seen, so a bucket deleted and recreated under the same name is not served
+   *  stale. */
+  protected OmBucketInfo lookupBucketCached(String bucketDBKey) throws IOException {
+    OmBucketInfo cached = bucketInfoCache.get(bucketDBKey);
+    if (cached != null) {
+      return cached;
+    }
+    OmBucketInfo info = reconOMMetadataManager.getBucketTable().getSkipCache(bucketDBKey);
+    if (info != null) {
+      bucketInfoCache.put(bucketDBKey, info);
+    }
+    return info;
+  }
+
+  /** Drop the cached {@link OmBucketInfo} for the given bucket DB key. Invoked
+   *  when a bucketTable delete event is observed so the next key event re-reads
+   *  the current bucket info. This matters when a bucket is deleted and
+   *  recreated under the same volume/bucket name, which assigns a new objectID;
+   *  the recreate always follows the delete, so invalidating on delete suffices. */
+  protected void invalidateBucketCache(String bucketDBKey) {
+    bucketInfoCache.remove(bucketDBKey);
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
@@ -312,8 +357,19 @@ public class NSSummaryTaskDbEventHandler {
       return;
     }
 
-    // Remove the deleted directory ID from parent's childDir set
-    parentNsSummary.removeChildDir(deletedDirObjectId);
+    // A rename is a DELETE of the old key and a PUT of the new key, which may arrive in either order. If the
+    // PUT was processed first, the stored summary already describes the new key (other parent or other name).
+    // NSSummary.setDirName stores names without the trailing slash Legacy directory keys carry.
+    String deletedDirName = directoryInfo.getName() == null
+        ? null : removeTrailingSlashIfNeeded(directoryInfo.getName());
+    boolean putAlreadyApplied = deletedDirSummary != null
+        && (deletedDirSummary.getParentId() != parentObjectId
+            || !Objects.equals(deletedDirSummary.getDirName(), deletedDirName));
+
+    // Remove the deleted directory ID from parent's childDir set, unless the PUT re-added it under the same parent
+    if (!putAlreadyApplied || deletedDirSummary.getParentId() != parentObjectId) {
+      parentNsSummary.removeChildDir(deletedDirObjectId);
+    }
 
     // If deleted directory exists with content, update immediate parent's stats
     if (deletedDirSummary != null) {
@@ -336,18 +392,26 @@ public class NSSummaryTaskDbEventHandler {
       // Propagate to grandparents and beyond
       propagateSizeUpwards(parentObjectId, -deletedSize, -deletedReplSize, -deletedNumFiles, nsSummaryMap);
       
-      // Set the deleted directory's parentId to 0 (unlink it)
-      deletedDirSummary.setParentId(0);
-      nsSummaryMap.put(deletedDirObjectId, deletedDirSummary);
+      // Set the deleted directory's parentId to 0 (unlink it), unless it was already relinked by the PUT
+      if (!putAlreadyApplied) {
+        deletedDirSummary.setParentId(0);
+        nsSummaryMap.put(deletedDirObjectId, deletedDirSummary);
+      }
     } else {
       nsSummaryMap.put(parentObjectId, parentNsSummary);
     }
   }
 
+  /**
+   * Flush and commit NSSummary to DB.
+   *
+   * @param nsSummaryMap Map of objectId to NSSummary
+   * @return true if successful, false otherwise
+   */
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
     try {
       updateNSSummariesToDB(nsSummaryMap, Collections.emptyList());
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
       return false;
     } finally {
@@ -367,7 +431,7 @@ public class NSSummaryTaskDbEventHandler {
                                                 Collection<Long> objectIdsToBeDeleted) {
     try {
       updateNSSummariesToDB(nsSummaryMap, objectIdsToBeDeleted);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB. batchSize={}", nsSummaryMap.size(), e);
       return false;
     } finally {
@@ -418,4 +482,10 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
+  /**
+   * The seek position reached by an NSSummary sub-task paired with whether it processed the events successfully,
+   * used as the result of processing an event batch.
+   */
+  public record ProcessResult(int seekPosition, boolean success) {
+  }
 }

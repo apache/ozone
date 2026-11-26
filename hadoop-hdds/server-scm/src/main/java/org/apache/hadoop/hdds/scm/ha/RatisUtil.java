@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmRatisServerConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
@@ -196,6 +197,8 @@ public final class RatisUtil {
             ozoneConf.getInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP,
                     ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     Log.setSegmentCacheNumMax(properties, 2);
+    Log.setAppendEntriesComposeEnabled(properties,
+        ozoneConf.getObject(ScmRatisServerConfig.class).isAppendEntriesComposeEnabled());
 
     return logAppenderQueueByteLimit;
   }
@@ -231,9 +234,6 @@ public final class RatisUtil {
     Snapshot.setAutoTriggerThreshold(properties,
         ozoneConf.getLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
                 ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT));
-    Snapshot.setCreationGap(properties,
-        ozoneConf.getLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_GAP,
-            ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_GAP_DEFAULT));
   }
 
   public static void checkRatisException(IOException e, String port,

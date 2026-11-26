@@ -76,8 +76,10 @@ public class QuasiClosedStuckOverReplicationHandler implements UnhealthyReplicat
         })
         .collect(Collectors.toSet());
 
+    ReplicationManager.ReplicationManagerConfiguration rmConf = replicationManager.getConfig();
     QuasiClosedStuckReplicaCount replicaCount =
-        new QuasiClosedStuckReplicaCount(healthyReplicas, remainingMaintenanceRedundancy);
+        new QuasiClosedStuckReplicaCount(healthyReplicas, remainingMaintenanceRedundancy,
+            rmConf.getQuasiClosedStuckBestOriginCopies(), rmConf.getQuasiClosedStuckOtherOriginCopies());
 
     List<QuasiClosedStuckReplicaCount.MisReplicatedOrigin> misReplicatedOrigins
         = replicaCount.getOverReplicatedOrigins();

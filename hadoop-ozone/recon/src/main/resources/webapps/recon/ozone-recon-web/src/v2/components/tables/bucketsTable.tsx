@@ -41,6 +41,7 @@ import {
   Bucket,
   BucketLayout,
   BucketLayoutTypeList,
+  BucketReplicationConfig,
   BucketsTableProps,
   BucketStorage,
   BucketStorageTypeList
@@ -78,11 +79,33 @@ function renderBucketLayout(bucketLayout: BucketLayout) {
   return <Tag color={color}>{bucketLayout}</Tag>;
 };
 
+const REPLICATION_TYPE_LABELS: Record<string, string> = {
+  RATIS: 'Ratis',
+  STANDALONE: 'Standalone'
+};
+
+// Formats the bucket's default replication configuration for display
+function formatReplicationType(replicationConfigInfo?: BucketReplicationConfig | null) {
+  const replicationConfig = replicationConfigInfo?.replicationConfig;
+  if (replicationConfig?.replicationType === 'EC') {
+    const { codec, data, parity, ecChunkSize } = replicationConfig;
+    return `${codec.toLowerCase()}-${data}-${parity}-${Math.floor(ecChunkSize / 1024)}k`;
+  }
+  if (replicationConfig) {
+    const label = REPLICATION_TYPE_LABELS[replicationConfig.replicationType]
+      ?? replicationConfig.replicationType;
+    return `${label}-${replicationConfig.requiredNodes}`;
+  }
+  // Fall back to the bare type, then to NA for buckets with no default replication config
+  return replicationConfigInfo?.type ?? 'NA';
+};
+
 export const COLUMNS: ColumnsType<Bucket> = [
   {
     title: 'Bucket',
     dataIndex: 'name',
     key: 'name',
+    fixed: 'left',
     sorter: (a: Bucket, b: Bucket) => a.name.localeCompare(b.name),
     defaultSortOrder: 'ascend' as const
   },
@@ -90,6 +113,7 @@ export const COLUMNS: ColumnsType<Bucket> = [
     title: 'Volume',
     dataIndex: 'volumeName',
     key: 'volumeName',
+    fixed: 'left',
     sorter: (a: Bucket, b: Bucket) => a.volumeName.localeCompare(b.volumeName),
     defaultSortOrder: 'ascend' as const
   },
@@ -124,6 +148,15 @@ export const COLUMNS: ColumnsType<Bucket> = [
     onFilter: (value, record: Bucket) => record.bucketLayout === value,
     sorter: (a: Bucket, b: Bucket) => a.bucketLayout.localeCompare(b.bucketLayout),
     render: (bucketLayout: BucketLayout) => renderBucketLayout(bucketLayout)
+  },
+  {
+    title: 'Replication Type',
+    dataIndex: 'replicationConfigInfo',
+    key: 'replicationType',
+    sorter: (a: Bucket, b: Bucket) => formatReplicationType(a.replicationConfigInfo)
+      .localeCompare(formatReplicationType(b.replicationConfigInfo)),
+    render: (replicationConfigInfo: BucketReplicationConfig | null | undefined) =>
+      formatReplicationType(replicationConfigInfo)
   },
   {
     title: 'Creation Time',

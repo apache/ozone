@@ -29,18 +29,19 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.nio.file.Path;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.retry.RetryInvocationHandler;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.io_.retry.RetryInvocationHandler;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -54,7 +55,11 @@ import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.shell.tenant.TenantShell;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.PrintStreamCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemErrCapturer;
+import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,8 +97,8 @@ public class TestOzoneTenantShell {
   private static OzoneShell ozoneSh = null;
   private static TenantShell tenantShell = null;
 
-  private final StringWriter out = new StringWriter();
-  private final StringWriter err = new StringWriter();
+  private PrintStreamCapturer out;
+  private PrintStreamCapturer err;
 
   private static String omServiceId;
   private static int numOfOMs;
@@ -150,10 +155,6 @@ public class TestOzoneTenantShell {
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
-    tenantShell.getCmd().setOut(new PrintWriter(out));
-    tenantShell.getCmd().setErr(new PrintWriter(err));
-    ozoneSh.getCmd().setOut(new PrintWriter(out));
-    ozoneSh.getCmd().setErr(new PrintWriter(err));
     // Suppress OMNotLeaderException in the log
     GenericTestUtils.setLogLevel(RetryInvocationHandler.class, Level.WARN);
     // Enable debug logging for interested classes
@@ -163,6 +164,14 @@ public class TestOzoneTenantShell {
     GenericTestUtils.setLogLevel(AuthorizerLockImpl.class, Level.DEBUG);
 
     GenericTestUtils.setLogLevel(OMRangerBGSyncService.class, Level.DEBUG);
+
+    out = new SystemOutCapturer();
+    err = new SystemErrCapturer();
+  }
+
+  @AfterEach
+  void close() {
+    IOUtils.closeQuietly(out, err);
   }
 
   /**
@@ -173,7 +182,7 @@ public class TestOzoneTenantShell {
     CommandLine cmd = shell.getCmd();
     CommandLine.IExecutionExceptionHandler exceptionHandler =
         (ex, commandLine, parseResult) -> {
-          commandLine.getErr().println(ex.getMessage());
+          System.err.println(ex.getMessage());
           return commandLine.getCommandSpec().exitCodeOnExecutionException();
         };
 
@@ -182,6 +191,7 @@ public class TestOzoneTenantShell {
     String[] argsWithHAConf = getHASetConfStrings(args);
 
     cmd.setExecutionExceptionHandler(exceptionHandler);
+    out.reset(); err.reset(); // drop previous content
     return cmd.execute(argsWithHAConf);
   }
 
@@ -256,17 +266,13 @@ public class TestOzoneTenantShell {
   /**
    * Helper function that checks command output AND clears it.
    */
-  private void checkOutput(StringWriter writer, String stringToMatch,
-                           boolean exactMatch) throws IOException {
-    writer.flush();
+  private void checkOutput(PrintStreamCapturer writer, String stringToMatch, boolean exactMatch) {
     final String str = writer.toString();
     checkOutput(str, stringToMatch, exactMatch);
-    writer.getBuffer().setLength(0);
   }
 
-  private void checkOutput(StringWriter writer, String stringToMatch,
+  private void checkOutput(PrintStreamCapturer writer, String stringToMatch,
       boolean exactMatch, boolean expectValidJSON) throws IOException {
-    writer.flush();
     final String str = writer.toString();
     if (expectValidJSON) {
       // Verify if the String can be parsed as a valid JSON
@@ -274,7 +280,6 @@ public class TestOzoneTenantShell {
       objectMapper.readTree(str);
     }
     checkOutput(str, stringToMatch, exactMatch);
-    writer.getBuffer().setLength(0);
   }
 
   private void checkOutput(String str, String stringToMatch,
@@ -353,12 +358,20 @@ public class TestOzoneTenantShell {
   @SuppressWarnings("methodlength")
   public void testOzoneTenantBasicOperations() throws IOException {
 
-    List<String> lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
+    List<String> lines = FileUtils.readLines(AUDIT_LOG_FILE, (String) null).stream()
+        .filter(line -> !line.contains("OMSystemAudit"))
+            .collect(Collectors.toList());
     assertEquals(0, lines.size());
 
     executeHA(tenantShell, new String[] {"list"});
-    checkOutput(out, "", true);
-    checkOutput(err, "", true);
+    // ignore possible output from gRPC TcpMetrics static init:
+    // ... org.apache.ratis.thirdparty.io.grpc.netty.TcpMetrics loadEpollInfo
+    // INFO: Epoll available during static init of TcpMetrics:true
+    Pattern tcpMetrics = Pattern.compile(".*TcpMetrics.*\n");
+    String stdout = tcpMetrics.matcher(out.get()).replaceAll("");
+    String stderr = tcpMetrics.matcher(err.get()).replaceAll("");
+    checkOutput(stdout, "", true);
+    checkOutput(stderr, "", true);
 
     // Create tenants
     // Equivalent to `ozone tenant create finance`
@@ -526,14 +539,14 @@ public class TestOzoneTenantShell {
     // Attempt to assign the user to the tenant again
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob", "--tenant=research",
-        "--accessId=research$bob"});
+        "--access-id=research$bob"});
     checkOutput(out, "", false);
     checkOutput(err, "accessId 'research$bob' already exists!\n", true);
 
     // Attempt to assign the user to the tenant with a custom accessId
     executeHA(tenantShell, new String[] {
         "user", "assign", "bob", "--tenant=research",
-        "--accessId=research$bob42"});
+        "--access-id=research$bob42"});
     checkOutput(out, "", false);
     // HDDS-6366: Disallow specifying custom accessId.
     checkOutput(err, "Invalid accessId 'research$bob42'. "

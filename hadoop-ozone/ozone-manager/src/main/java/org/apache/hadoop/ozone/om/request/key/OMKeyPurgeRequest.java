@@ -142,7 +142,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         deletingServiceMetrics.setLastAOSTransactionInfo(transactionInfo);
       }
       List<OmBucketInfo> bucketInfoList = updateBucketSize(purgeKeysRequest.getBucketPurgeKeysSizeList(),
-          omMetadataManager);
+          omMetadataManager, context.getIndex());
 
       if (LOG.isDebugEnabled()) {
         Map<String, String> auditParams = new LinkedHashMap<>();
@@ -168,7 +168,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
   }
 
   private List<OmBucketInfo> updateBucketSize(List<BucketPurgeKeysSize> bucketPurgeKeysSizeList,
-      OMMetadataManager omMetadataManager) throws OMException {
+      OMMetadataManager omMetadataManager, long trxnLogIndex) throws OMException {
     Map<String, Map<String, List<BucketPurgeKeysSize>>> bucketPurgeKeysSizes = new HashMap<>();
     List<String[]> bucketKeyList = new ArrayList<>();
     for (BucketPurgeKeysSize bucketPurgeKey : bucketPurgeKeysSizeList) {
@@ -192,7 +192,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         String volumeName = volEntry.getKey();
         for (Map.Entry<String, List<BucketPurgeKeysSize>> bucketEntry : volEntry.getValue().entrySet()) {
           String bucketName = bucketEntry.getKey();
-          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+          OmBucketInfo omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
           // Check null if bucket has been deleted.
           if (omBucketInfo != null) {
             boolean bucketUpdated = false;
@@ -205,6 +205,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
               }
             }
             if (bucketUpdated) {
+              omMetadataManager.getBucketTable().addCacheEntry(
+                  omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
               bucketInfoList.add(omBucketInfo.copyObject());
             }
           }

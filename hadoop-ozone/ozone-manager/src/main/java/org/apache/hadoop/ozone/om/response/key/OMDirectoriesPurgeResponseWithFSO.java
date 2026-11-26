@@ -17,11 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -30,7 +25,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.OmUtils;
@@ -44,10 +38,10 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.helpers.VolumeBucket;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -57,21 +51,19 @@ import org.slf4j.LoggerFactory;
 /**
  * Response for {@link OMDirectoriesPurgeRequestWithFSO} request.
  */
-@CleanupTableInfo(cleanupTables = {DELETED_TABLE, DELETED_DIR_TABLE,
-    DIRECTORY_TABLE, FILE_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoriesPurgeResponseWithFSO.class);
 
   private List<OzoneManagerProtocolProtos.PurgePathRequest> paths;
-  private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;
+  private Map<VolumeBucket, OmBucketInfo> volBucketInfoMap;
   private SnapshotInfo fromSnapshotInfo;
   private Map<String, OmKeyInfo> openKeyInfoMap;
 
   public OMDirectoriesPurgeResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull List<OzoneManagerProtocolProtos.PurgePathRequest> paths,
       @Nonnull BucketLayout bucketLayout,
-      Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap,
+      Map<VolumeBucket, OmBucketInfo> volBucketInfoMap,
       SnapshotInfo fromSnapshotInfo, Map<String, OmKeyInfo> openKeyInfoMap) {
     super(omResponse, bucketLayout);
     this.paths = paths;
@@ -202,7 +194,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
   }
 
   @VisibleForTesting
-  public Map<Pair<String, String>, OmBucketInfo> getVolBucketInfoMap() {
+  public Map<VolumeBucket, OmBucketInfo> getVolBucketInfoMap() {
     return volBucketInfoMap;
   }
 }

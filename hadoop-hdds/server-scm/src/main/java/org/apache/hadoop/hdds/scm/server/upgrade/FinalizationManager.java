@@ -17,54 +17,15 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 
 /**
  * Class to initiate SCM finalization and query its progress.
  */
 public interface FinalizationManager {
 
-  UpgradeFinalization.StatusAndMessages finalizeUpgrade(String upgradeClientID)
-      throws IOException;
-
-  UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean takeover, boolean readonly
-  ) throws IOException;
-
-  @VisibleForTesting
-  BasicUpgradeFinalizer<SCMUpgradeFinalizationContext, HDDSLayoutVersionManager>
-      getUpgradeFinalizer();
-
-  void runPrefinalizeStateActions() throws IOException;
-
-  boolean crossedCheckpoint(FinalizationCheckpoint checkpoint);
-
-  FinalizationCheckpoint getCheckpoint();
-
-  void buildUpgradeContext(NodeManager nodeManager,
-                                  PipelineManager pipelineManager,
-                                  SCMContext scmContext);
+  void finalizeUpgrade() throws IOException;
 
   void reinitialize(Table<String, String> finalizationStore) throws IOException;
-
-  void onLeaderReady();
-
-  static boolean shouldCreateNewPipelines(FinalizationCheckpoint checkpoint) {
-    return !checkpoint.hasCrossed(FinalizationCheckpoint.FINALIZATION_STARTED)
-        || checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
-  }
-
-  static boolean shouldTellDatanodesToFinalize(
-      FinalizationCheckpoint checkpoint) {
-    return checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
-  }
-
 }

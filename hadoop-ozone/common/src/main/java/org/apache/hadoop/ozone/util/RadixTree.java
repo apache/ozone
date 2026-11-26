@@ -178,8 +178,8 @@ public class RadixTree<T> {
   public static String radixPathToString(List<RadixNode<Integer>> path) {
     StringBuilder sb = new StringBuilder();
     for (RadixNode n : path) {
-      sb.append(n.getName());
-      sb.append(n.getName().equals(PATH_DELIMITER) ? "" : PATH_DELIMITER);
+      sb.append(n.getName())
+          .append(n.getName().equals(PATH_DELIMITER) ? "" : PATH_DELIMITER);
     }
     return sb.toString();
   }

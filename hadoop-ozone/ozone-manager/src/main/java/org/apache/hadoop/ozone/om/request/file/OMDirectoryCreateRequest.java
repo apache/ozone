@@ -177,7 +177,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         List<String> missingParents = omPathInfo.getMissingParents();
         long baseObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         OmBucketInfo omBucketInfo =
-            getBucketInfo(omMetadataManager, volumeName, bucketName);
+            getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
         dirKeyInfo = createDirectoryKeyInfoWithACL(keyName, keyArgs, baseObjId,
             omBucketInfo, omPathInfo, trxnLogIndex,
@@ -193,7 +193,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, omBucketInfo.getBucketLayout(),
             dirKeyInfo, missingParentInfos, trxnLogIndex);
-        
+
+        omMetadataManager.getBucketTable().addCacheEntry(
+            omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
             dirKeyInfo, missingParentInfos, result, getBucketLayout(),

@@ -46,7 +46,7 @@ public final class ClusterStateResponse {
    * Storage Report of the cluster.
    */
   @JsonProperty("storageReport")
-  private DatanodeStorageReport storageReport;
+  private ClusterStorageReport storageReport;
 
   /**
    * Total count of containers in the cluster.
@@ -142,7 +142,7 @@ public final class ClusterStateResponse {
     private int pipelines;
     private int totalDatanodes;
     private int healthyDatanodes;
-    private DatanodeStorageReport storageReport;
+    private ClusterStorageReport storageReport;
     private int containers;
     private int missingContainers;
     private int openContainers;
@@ -186,7 +186,7 @@ public final class ClusterStateResponse {
       return this;
     }
 
-    public Builder setStorageReport(DatanodeStorageReport storageReport) {
+    public Builder setStorageReport(ClusterStorageReport storageReport) {
       this.storageReport = storageReport;
       return this;
     }
@@ -263,7 +263,7 @@ public final class ClusterStateResponse {
     return healthyDatanodes;
   }
 
-  public DatanodeStorageReport getStorageReport() {
+  public ClusterStorageReport getStorageReport() {
     return storageReport;
   }
 

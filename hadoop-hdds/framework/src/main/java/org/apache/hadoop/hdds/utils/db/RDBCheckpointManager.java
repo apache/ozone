@@ -24,7 +24,6 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase.RocksCheckpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +32,6 @@ import org.slf4j.LoggerFactory;
  */
 public class RDBCheckpointManager implements Closeable {
   private final RocksDatabase db;
-  private final RocksCheckpoint checkpoint;
   public static final String RDB_CHECKPOINT_DIR_PREFIX = "checkpoint_";
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBCheckpointManager.class);
@@ -48,7 +46,6 @@ public class RDBCheckpointManager implements Closeable {
   public RDBCheckpointManager(RocksDatabase db, String checkpointPrefix) {
     this.db = db;
     this.checkpointNamePrefix = checkpointPrefix;
-    this.checkpoint = db.createCheckpoint();
   }
 
   /**
@@ -62,25 +59,28 @@ public class RDBCheckpointManager implements Closeable {
     try {
       long currentTime = System.currentTimeMillis();
 
-      String checkpointDir = StringUtils.EMPTY;
+      StringBuilder checkpointDir = new StringBuilder();
       if (StringUtils.isNotEmpty(checkpointNamePrefix)) {
-        checkpointDir += checkpointNamePrefix;
+        checkpointDir.append(checkpointNamePrefix);
       }
-      if (name == null) {
-        name = "_" + RDB_CHECKPOINT_DIR_PREFIX + currentTime;
-      }
-      checkpointDir += name;
 
-      Path checkpointPath = Paths.get(parentDir, checkpointDir);
+      if (name == null) {
+        checkpointDir.append('_')
+            .append(RDB_CHECKPOINT_DIR_PREFIX)
+            .append(currentTime);
+      } else {
+        checkpointDir.append(name);
+      }
+
+      Path checkpointPath = Paths.get(parentDir, checkpointDir.toString());
       Instant start = Instant.now();
 
       // Flush the DB WAL and mem table.
       db.flushWal(true);
       db.flush();
 
-      checkpoint.createCheckpoint(checkpointPath);
       // Best guesstimate here. Not accurate.
-      final long latest = checkpoint.getLatestSequenceNumber();
+      final long latest = db.createCheckpoint(checkpointPath);
 
       Instant end = Instant.now();
       long duration = Duration.between(start, end).toMillis();
@@ -113,6 +113,6 @@ public class RDBCheckpointManager implements Closeable {
 
   @Override
   public void close() throws IOException {
-    checkpoint.close();
+    // Checkpoints are created and closed per call, nothing to release here.
   }
 }

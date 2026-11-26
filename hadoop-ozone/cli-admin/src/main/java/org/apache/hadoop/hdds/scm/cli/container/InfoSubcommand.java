@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -112,7 +113,7 @@ public class InfoSubcommand extends ScmSubcommand {
       container = scmClient.getContainerWithPipeline(containerID);
       Objects.requireNonNull(container, "Container cannot be null");
     } catch (IOException e) {
-      printError("Unable to retrieve the container details for " + containerID);
+      rootCommand().printError(e);
       return;
     }
 
@@ -120,7 +121,7 @@ public class InfoSubcommand extends ScmSubcommand {
     try {
       replicas = scmClient.getContainerReplicas(containerID);
     } catch (IOException e) {
-      printError("Unable to retrieve the replica details: " + e.getMessage());
+      rootCommand().printError(e);
     }
 
     if (json) {
@@ -156,16 +157,20 @@ public class InfoSubcommand extends ScmSubcommand {
         if (SCMHAUtils.unwrapException(
             ioe) instanceof PipelineNotFoundException) {
           System.out.println("Write Pipeline State: CLOSED");
+        } else if (HddsUtils.formatAccessControlExceptionLine(ioe) != null) {
+          rootCommand().printError(ioe);
+          return;
         } else {
           printError("Failed to retrieve pipeline info");
         }
       }
       System.out.printf("Container State: %s%n", container.getContainerInfo().getState());
-
+      System.out.printf("SequenceId: %s%n", container.getContainerInfo().getSequenceId());
+      
       // Print pipeline of an existing container.
       String machinesStr = container.getPipeline().getNodes().stream().map(
               InfoSubcommand::buildDatanodeDetails)
-          .collect(Collectors.joining(",\n"));
+          .collect(Collectors.joining("," + System.lineSeparator()));
       System.out.printf("Datanodes: [%s]%n", machinesStr);
 
       // Print the replica details if available
@@ -173,7 +178,7 @@ public class InfoSubcommand extends ScmSubcommand {
         String replicaStr = replicas.stream()
             .sorted(Comparator.comparing(ContainerReplicaInfo::getReplicaIndex))
             .map(InfoSubcommand::buildReplicaDetails)
-            .collect(Collectors.joining(",\n"));
+            .collect(Collectors.joining("," + System.lineSeparator()));
         System.out.printf("Replicas: [%s]%n", replicaStr);
       }
     }
@@ -189,7 +194,8 @@ public class InfoSubcommand extends ScmSubcommand {
     if (replica.getReplicaIndex() != -1) {
       sb.append(" ReplicaIndex: ").append(replica.getReplicaIndex()).append(';');
     }
-    sb.append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(';')
+    sb.append(" SequenceId: ").append(replica.getSequenceId()).append(';')
+        .append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(';')
         .append(" Location: ").append(buildDatanodeDetails(replica.getDatanodeDetails()));
     return sb.toString();
   }

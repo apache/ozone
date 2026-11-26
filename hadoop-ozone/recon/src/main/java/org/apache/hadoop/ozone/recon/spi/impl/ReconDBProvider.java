@@ -31,9 +31,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +38,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Provider for Recon's RDB.
  */
-public class ReconDBProvider {
+public class ReconDBProvider implements AutoCloseable {
   private static final String STAGED_EXT = ".staged";
   private static final String BACKUP_EXT = ".backup";
   private OzoneConfiguration configuration;
@@ -111,19 +108,6 @@ public class ReconDBProvider {
     return dbStore;
   }
 
-  static void truncateTable(Table table) throws IOException {
-    if (table == null) {
-      return;
-    }
-    try (TableIterator<Object, ? extends KeyValue<Object, Object>>
-            tableIterator = table.iterator()) {
-      while (tableIterator.hasNext()) {
-        KeyValue<Object, Object> entry = tableIterator.next();
-        table.delete(entry.getKey());
-      }
-    }
-  }
-
   private static DBStore initializeDBStore(OzoneConfiguration configuration,
                                            String dbName) {
     DBStore dbStore = null;
@@ -136,6 +120,7 @@ public class ReconDBProvider {
     return dbStore;
   }
 
+  @Override
   public void close() throws Exception {
     if (this.dbStore != null) {
       dbStore.close();

@@ -25,10 +25,20 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.security.KeyPair;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -49,6 +59,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Certificate Signing Request.
@@ -257,6 +268,120 @@ public class TestCertificateSignRequest {
     // Verify de-serialized CSR matches with the original CSR
     PKCS10CertificationRequest dsCsr = new PKCS10CertificationRequest(csrBytes);
     assertEquals(csr, dsCsr);
+  }
+
+  @Test
+  public void testAddInetAddressesAddsDnsNameFromCanonicalHostName() throws Exception {
+    InetAddress address = mock(InetAddress.class);
+    when(address.getHostAddress()).thenReturn("192.0.2.10");
+    when(address.getCanonicalHostName()).thenReturn("scm1.lxd");
+
+    CertificateSignRequest.Builder builder = newBuilder();
+    builder.addInetAddresses(Collections.singletonList(address));
+
+    PKCS10CertificationRequest csr = builder.build().generateCSR();
+    List<GeneralName> sanNames = getSanNames(csr);
+    assertEquals(1, countByTag(sanNames, GeneralName.iPAddress));
+    assertEquals(1, countByTag(sanNames, GeneralName.dNSName));
+    assertTrue(dnsNameValues(sanNames).contains("scm1.lxd"));
+  }
+
+  @Test
+  public void testAddInetAddressesSkipsIpLiteralAndFallbackFailure() throws Exception {
+    InetAddress address = mock(InetAddress.class);
+    when(address.getHostAddress()).thenReturn("192.0.2.11");
+    when(address.getCanonicalHostName()).thenReturn("10.0.0.5");
+
+    CertificateSignRequest.Builder builder = newBuilder();
+    try (MockedStatic<InetAddress> mockedInetAddress = mockStatic(InetAddress.class, CALLS_REAL_METHODS)) {
+      mockedInetAddress.when(InetAddress::getLocalHost).thenThrow(new UnknownHostException("no localhost"));
+      builder.addInetAddresses(Collections.singletonList(address));
+    }
+
+    PKCS10CertificationRequest csr = builder.build().generateCSR();
+    List<GeneralName> sanNames = getSanNames(csr);
+    assertEquals(1, countByTag(sanNames, GeneralName.iPAddress));
+    assertEquals(0, countByTag(sanNames, GeneralName.dNSName));
+  }
+
+  @Test
+  public void testAddInetAddressesFallsBackToLocalHostCanonicalName() throws Exception {
+    InetAddress address = mock(InetAddress.class);
+    when(address.getHostAddress()).thenReturn("192.0.2.12");
+    when(address.getCanonicalHostName()).thenReturn("10.0.0.5");
+
+    InetAddress localHost = mock(InetAddress.class);
+    when(localHost.getCanonicalHostName()).thenReturn("fallback1.lxd");
+
+    CertificateSignRequest.Builder builder = newBuilder();
+    try (MockedStatic<InetAddress> mockedInetAddress = mockStatic(InetAddress.class, CALLS_REAL_METHODS)) {
+      mockedInetAddress.when(InetAddress::getLocalHost).thenReturn(localHost);
+      builder.addInetAddresses(Collections.singletonList(address));
+    }
+
+    PKCS10CertificationRequest csr = builder.build().generateCSR();
+    List<GeneralName> sanNames = getSanNames(csr);
+    assertEquals(1, countByTag(sanNames, GeneralName.dNSName));
+    assertEquals(Collections.singletonList("fallback1.lxd"), dnsNameValues(sanNames));
+  }
+
+  @Test
+  public void testAddInetAddressesDeduplicatesDnsNamesCaseInsensitively() throws Exception {
+    InetAddress address1 = mock(InetAddress.class);
+    when(address1.getHostAddress()).thenReturn("192.0.2.13");
+    when(address1.getCanonicalHostName()).thenReturn("SCM1.LXD");
+
+    InetAddress address2 = mock(InetAddress.class);
+    when(address2.getHostAddress()).thenReturn("192.0.2.14");
+    when(address2.getCanonicalHostName()).thenReturn("scm1.lxd");
+
+    CertificateSignRequest.Builder builder = newBuilder();
+    builder.addInetAddresses(Arrays.asList(address1, address2));
+
+    PKCS10CertificationRequest csr = builder.build().generateCSR();
+    List<GeneralName> sanNames = getSanNames(csr);
+    assertEquals(2, countByTag(sanNames, GeneralName.iPAddress));
+    assertEquals(1, countByTag(sanNames, GeneralName.dNSName));
+  }
+
+  private CertificateSignRequest.Builder newBuilder() throws Exception {
+    String clusterID = UUID.randomUUID().toString();
+    String scmID = UUID.randomUUID().toString();
+    String subject = "DN001";
+    HDDSKeyGenerator keyGen = new HDDSKeyGenerator(securityConfig);
+    KeyPair keyPair = keyGen.generateKey();
+    return new CertificateSignRequest.Builder()
+        .setSubject(subject)
+        .setScmID(scmID)
+        .setClusterID(clusterID)
+        .setKey(keyPair)
+        .setConfiguration(securityConfig);
+  }
+
+  private List<GeneralName> getSanNames(PKCS10CertificationRequest csr) throws Exception {
+    Extensions extensions = getPkcs9Extensions(csr);
+    Extension ext = extensions.getExtension(Extension.subjectAlternativeName);
+    return Arrays.asList(GeneralNames.getInstance(ext.getParsedValue()).getNames());
+  }
+
+  private long countByTag(List<GeneralName> names, int tag) {
+    long count = 0;
+    for (GeneralName name : names) {
+      if (name.getTagNo() == tag) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  private List<String> dnsNameValues(List<GeneralName> names) {
+    List<String> values = new ArrayList<>();
+    for (GeneralName name : names) {
+      if (name.getTagNo() == GeneralName.dNSName) {
+        values.add(name.getName().toString());
+      }
+    }
+    return values;
   }
 
   private void verifyServiceId(Extensions extensions) {

@@ -18,16 +18,19 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Preconditions;
+import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 
 /**
@@ -161,15 +164,16 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private boolean followerReadLocalLeaseEnabled;
 
-  @Config(key = "ozone.om.follower.read.local.lease.lag.limit",
+  @Config(key = "ozone.om.follower.read.local.lease.log.limit",
       defaultValue = "10000",
       reconfigurable = true,
       type = ConfigType.LONG,
       tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA, ConfigTag.RATIS},
-      description = "If the lag between leader OM and follower OM is larger " +
-          "than this number, the follower OM is not up-to-date."
+      description = "If the log lag between leader OM and follower OM is larger " +
+          "than this number, the follower OM is not up-to-date. " +
+          "Setting this to -1 to allow infinite lag."
   )
-  private long followerReadLocalLeaseLagLimit;
+  private long followerReadLocalLeaseLogLimit;
 
   @Config(key = "ozone.om.follower.read.local.lease.time.ms",
       defaultValue = "5000",
@@ -178,12 +182,63 @@ public class OmConfig extends ReconfigurableConfig {
       tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA, ConfigTag.RATIS},
       description = " If the lag time Ms between leader OM and follower OM is larger " +
           "than this number, the follower OM is not up-to-date. " +
-          "By default, it's set to Ratis RPC timeout value."
+          "By default, it's set to Ratis RPC timeout value. " +
+          "Setting this to -1 to allow infinite lag."
   )
   private long followerReadLocalLeaseTimeMs;
 
+  @Config(key = "ozone.om.block.write.sort.datanodes.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.OM, ConfigTag.PERFORMANCE},
+      description = "If true, OM sorts the streaming-write pipeline (nearest " +
+          "datanode first) locally using its cached cluster topology, instead " +
+          "of asking SCM to sort on every allocateBlock. Defaults to false so " +
+          "SCM performs the sort. Enable this to offload the sort from SCM " +
+          "when multiple OM services share a single SCM service. SCM still sorts if OM has no cached topology " +
+          "or cannot resolve the client. If OM's topology lacks a pipeline datanode, the pipeline order is preserved."
+  )
+  private boolean sortDatanodesForWriteEnabled;
+
+  @Config(key = "ozone.om.mpu.part.encryption.iv.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.OM, ConfigTag.SECURITY},
+      description = "If true, once Ozone Manager is finalized, each multipart upload part in an encrypted bucket "
+          + "gets its own encryption IV. Clients older than this version cannot read multipart keys that have "
+          + "such parts. Set to false to keep new multipart keys readable by older clients."
+  )
+  private boolean mpuPartEncryptionIvEnabled = Defaults.MPU_PART_ENCRYPTION_IV_ENABLED;
+
+  @Config(key = "ozone.om.bind.host",
+      defaultValue = "",
+      type = ConfigType.STRING,
+      tags = {ConfigTag.OM, ConfigTag.MANAGEMENT},
+      description = "The hostname or IP address the OM RPC server binds to. If set, it overrides only the " +
+          "hostname portion of ozone.om.address for the listener. OM still advertises ozone.om.address to " +
+          "clients and to the other OMs. If unset, the OM RPC server binds to the host in ozone.om.address. " +
+          "Set it to \"::\" to accept IPv6 connections on all interfaces. Whether the same listener also " +
+          "accepts IPv4 depends on the operating system's dual-stack socket setting. " +
+          "When HA mode is enabled, append the service ID and node ID to the property, " +
+          "for example ozone.om.bind.host.service1.om1."
+  )
+  private String rpcBindHost;
+
   public long getRatisBasedFinalizationTimeout() {
     return ratisBasedFinalizationTimeout;
+  }
+
+  /**
+   * Returns the address the OM RPC server binds to. If {@code ozone.om.bind.host} is set, its host replaces the
+   * host of the given RPC address; the port is always kept. OM keeps advertising the RPC address.
+   *
+   * @param omRpcAddress the OM RPC address from {@code ozone.om.address}
+   * @return the address for the OM RPC listener
+   */
+  public InetSocketAddress getRpcBindAddress(InetSocketAddress omRpcAddress) {
+    return HddsUtils.getHostName(rpcBindHost)
+        .map(host -> NetUtils.createSocketAddr(HddsUtils.getHostPortString(host, omRpcAddress.getPort())))
+        .orElse(omRpcAddress);
   }
 
   public boolean isFileSystemPathEnabled() {
@@ -222,6 +277,18 @@ public class OmConfig extends ReconfigurableConfig {
     allowLeaderSkipLinearizableRead = newValue;
   }
 
+  public boolean isSortDatanodesForWriteEnabled() {
+    return sortDatanodesForWriteEnabled;
+  }
+
+  public boolean isMpuPartEncryptionIvEnabled() {
+    return mpuPartEncryptionIvEnabled;
+  }
+
+  public void setMpuPartEncryptionIvEnabled(boolean newValue) {
+    mpuPartEncryptionIvEnabled = newValue;
+  }
+
   public boolean isFollowerReadLocalLeaseEnabled() {
     return followerReadLocalLeaseEnabled;
   }
@@ -230,12 +297,12 @@ public class OmConfig extends ReconfigurableConfig {
     this.followerReadLocalLeaseEnabled = newValue;
   }
 
-  public long getFollowerReadLocalLeaseLagLimit() {
-    return followerReadLocalLeaseLagLimit;
+  public long getFollowerReadLocalLeaseLogLimit() {
+    return followerReadLocalLeaseLogLimit;
   }
 
-  public void setFollowerReadLocalLeaseLagLimit(long newValue) {
-    this.followerReadLocalLeaseLagLimit = newValue;
+  public void setFollowerReadLocalLeaseLogLimit(long newValue) {
+    this.followerReadLocalLeaseLogLimit = newValue;
   }
 
   public long getFollowerReadLocalLeaseTimeMs() {
@@ -322,6 +389,7 @@ public class OmConfig extends ReconfigurableConfig {
     userDefaultRights = other.userDefaultRights;
     groupDefaultRights = other.groupDefaultRights;
     allowLeaderSkipLinearizableRead = other.allowLeaderSkipLinearizableRead;
+    mpuPartEncryptionIvEnabled = other.mpuPartEncryptionIvEnabled;
 
     validate();
   }
@@ -330,10 +398,12 @@ public class OmConfig extends ReconfigurableConfig {
    * String keys for tests and grep.
    */
   public static final class Keys {
+    public static final String BIND_HOST = "ozone.om.bind.host";
     public static final String ENABLE_FILESYSTEM_PATHS = "ozone.om.enable.filesystem.paths";
     public static final String LIST_ALL_VOLUMES_ALLOWED = "ozone.om.volume.listall.allowed";
     public static final String SERVER_LIST_MAX_SIZE = "ozone.om.server.list.max.size";
     public static final String USER_MAX_VOLUME = "ozone.om.user.max.volume";
+    public static final String MPU_PART_ENCRYPTION_IV_ENABLED = "ozone.om.mpu.part.encryption.iv.enabled";
   }
 
   /**
@@ -343,6 +413,7 @@ public class OmConfig extends ReconfigurableConfig {
     public static final boolean ENABLE_FILESYSTEM_PATHS = false;
     public static final boolean LIST_ALL_VOLUMES_ALLOWED = true;
     public static final long SERVER_LIST_MAX_SIZE = 1000;
+    public static final boolean MPU_PART_ENCRYPTION_IV_ENABLED = true;
   }
 
 }

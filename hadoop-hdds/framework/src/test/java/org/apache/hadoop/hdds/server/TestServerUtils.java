@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -52,6 +53,21 @@ public class TestServerUtils {
 
   @TempDir
   private Path folder;
+
+  /**
+   * The address written back after a server binds must stay parseable, so an
+   * IPv6 listen address is bracketed rather than joined with a plain colon.
+   */
+  @Test
+  public void testUpdateListenAddressBracketsIPv6() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    InetSocketAddress bindAddr = new InetSocketAddress("2001:db8::1", 0);
+    InetSocketAddress listenAddr = new InetSocketAddress("2001:db8::1", 9860);
+
+    ServerUtils.updateListenAddress(conf, "test.address.key", bindAddr, listenAddr);
+
+    assertEquals("[2001:db8:0:0:0:0:0:1]:9860", conf.get("test.address.key"));
+  }
 
   /**
    * Test case for {@link ServerUtils#getPermissions}.
@@ -78,6 +94,27 @@ public class TestServerUtils {
     assertEquals("700",
         ServerUtils.getPermissions(OzoneConfigKeys.OZONE_OM_DB_DIRS, conf));
 
+  }
+
+  @Test
+  public void testGetPermissionsWithDefaults() {
+    // Create an OzoneConfiguration without explicitly setting permissions
+    // Should fall back to default values from ozone-default.xml (700)
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    // Test getPermissions for different config names and verify they use defaults
+    assertEquals("700",
+        ServerUtils.getPermissions(ReconConfigKeys.OZONE_RECON_DB_DIR, conf),
+        "Should use default 700 for Recon DB dirs");
+    assertEquals("700",
+        ServerUtils.getPermissions(ScmConfigKeys.OZONE_SCM_DB_DIRS, conf),
+        "Should use default 700 for SCM DB dirs");
+    assertEquals("700",
+        ServerUtils.getPermissions(OzoneConfigKeys.OZONE_METADATA_DIRS, conf),
+        "Should use default 700 for metadata dirs");
+    assertEquals("700",
+        ServerUtils.getPermissions(OzoneConfigKeys.OZONE_OM_DB_DIRS, conf),
+        "Should use default 700 for OM DB dirs");
   }
 
   @Test
@@ -438,5 +475,108 @@ public class TestServerUtils {
     } finally {
       FileUtils.deleteQuietly(metaDir);
     }
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithOctal() throws IOException {
+    File testDir = new File(folder.toFile(), "testDir");
+    assertTrue(testDir.mkdirs());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "700");
+
+    ServerUtils.setDataDirectoryPermissions(testDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    Path dirPath = testDir.toPath();
+    Set<PosixFilePermission> expectedPermissions =
+        PosixFilePermissions.fromString("rwx------");
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+
+    assertEquals(expectedPermissions, actualPermissions);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithSymbolic() throws IOException {
+    File testDir = new File(folder.toFile(), "testDir2");
+    assertTrue(testDir.mkdirs());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "rwx------");
+
+    ServerUtils.setDataDirectoryPermissions(testDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    Path dirPath = testDir.toPath();
+    Set<PosixFilePermission> expectedPermissions =
+        PosixFilePermissions.fromString("rwx------");
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+
+    assertEquals(expectedPermissions, actualPermissions);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithDefaultValue() throws IOException {
+    File testDir = new File(folder.toFile(), "testDir3");
+    assertTrue(testDir.mkdirs());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // Don't explicitly set the permission config key - should use default value (700)
+
+    // Should use default value from ozone-default.xml (700)
+    ServerUtils.setDataDirectoryPermissions(testDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    // Permissions should be set to default value (700 = rwx------)
+    Path dirPath = testDir.toPath();
+    Set<PosixFilePermission> expectedPermissions =
+        PosixFilePermissions.fromString("rwx------");
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+    assertEquals(expectedPermissions, actualPermissions);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithNonExistentDir() {
+    File nonExistentDir = new File(folder.toFile(), "nonExistent");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "700");
+
+    // Should not throw exception for non-existent directory
+    ServerUtils.setDataDirectoryPermissions(nonExistentDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsSkipsReadOnlyDir() throws IOException {
+    // Create a directory and set it to read-only
+    File readOnlyDir = new File(folder.toFile(), "readOnlyDir");
+    assertTrue(readOnlyDir.mkdirs());
+
+    // Set initial permissions and make it read-only
+    Path dirPath = readOnlyDir.toPath();
+    Set<PosixFilePermission> readOnlyPermissions =
+        PosixFilePermissions.fromString("r-xr-xr-x");
+    Files.setPosixFilePermissions(dirPath, readOnlyPermissions);
+
+    // Verify directory is read-only
+    assertFalse(readOnlyDir.canWrite());
+
+    // Configure system to use 700 permissions
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "700");
+
+    // Call setDataDirectoryPermissions on read-only directory
+    // Should skip permission setting and not throw exception
+    ServerUtils.setDataDirectoryPermissions(readOnlyDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    // Verify permissions were NOT changed (still read-only)
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+    assertEquals(readOnlyPermissions, actualPermissions);
+    assertFalse(readOnlyDir.canWrite());
   }
 }

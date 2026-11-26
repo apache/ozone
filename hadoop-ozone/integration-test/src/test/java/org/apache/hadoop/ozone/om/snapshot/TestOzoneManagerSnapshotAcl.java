@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -28,6 +29,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import java.io.File;
@@ -37,7 +39,6 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -49,7 +50,8 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -60,9 +62,11 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -107,8 +111,10 @@ public class TestOzoneManagerSnapshotAcl {
   public static void init() throws Exception {
     UserGroupInformation.setLoginUser(ADMIN_UGI);
     final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY, true);
 
     final String omServiceId = "om-service-test-1"
         + RandomStringUtils.secure().nextNumeric(32);
@@ -132,7 +138,7 @@ public class TestOzoneManagerSnapshotAcl {
     objectStore = client.getObjectStore();
 
     ozoneManager = cluster.getOzoneManager();
-    final KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
+    final KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
 
     // stop the deletion services so that keys can still be read
@@ -273,8 +279,12 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    assertDoesNotThrow(
-        () -> ozoneManager.lookupFile(snapshotKeyArgs));
+    if (bucketLayout == BucketLayout.OBJECT_STORE) {
+      assertLookupFileNotSupported(snapshotKeyArgs);
+    } else {
+      assertDoesNotThrow(
+          () -> ozoneManager.lookupFile(snapshotKeyArgs));
+    }
   }
 
   @ParameterizedTest
@@ -288,6 +298,16 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
+
+    if (bucketLayout == BucketLayout.OBJECT_STORE) {
+      // HDDS-15951: the layout check runs before the ACL check, so the
+      // rejection wins over PERMISSION_DENIED on both the snapshot and the
+      // active file system.
+      assertLookupFileNotSupported(snapshotKeyArgs);
+      assertLookupFileNotSupported(keyArgs);
+      return;
+    }
+
     final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
 
@@ -296,6 +316,18 @@ public class TestOzoneManagerSnapshotAcl {
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
     assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
+  }
+
+  /**
+   * HDDS-15951 moved the OBJECT_STORE layout check for LookupFile from the file
+   * system client into OM, so OBS buckets - which have no file system semantics
+   * - are now rejected server-side, snapshots included.
+   */
+  private static void assertLookupFileNotSupported(OmKeyArgs keyArgs) {
+    final OMException ex = assertThrows(OMException.class,
+        () -> ozoneManager.lookupFile(keyArgs));
+    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION,
+        ex.getResult());
   }
 
   @ParameterizedTest
@@ -450,9 +482,10 @@ public class TestOzoneManagerSnapshotAcl {
   /**
    * Verifies that bucket owner can: create, rename and delete snapshots.
    * Verifies that non bucket owner can not create, rename and delete.
-   * Verifies that user with bucket read permissions can: list snapshots, get snapshot info,
+   * Verifies that user with bucket read and list permissions can: list snapshots, get snapshot info,
    * snapshot diff, list snapshot diff jobs and cancel snapshot diff jobs.
    * Verifies that user with no permissions cannot do any of the above.
+   * Verifies that user with only bucket read, or only bucket list, permission cannot run snapshot diff.
    *
    * @param bucketLayout
    * @throws Exception
@@ -513,6 +546,8 @@ public class TestOzoneManagerSnapshotAcl {
               snapshot1, snapshot2, null, 0, false, false);
     objectStore2.listSnapshotDiffJobs(volumeName, bucketName, "", true, null);
     objectStore2.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
+    objectStore2.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2, false, false, false);
+    objectStore2.getClientProxy().listStatus(volumeName, bucketName, "", false, "", 10);
 
     // user3 has no ACL permissions, should not be able to list the snapshots, get snapshot info,
     // snapshot diff, list snapshot diff jobs and cancel snapshot diff jobs.
@@ -539,6 +574,44 @@ public class TestOzoneManagerSnapshotAcl {
         () -> objectStore3.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2));
     assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
 
+    // user3 with bucket READ only: reads by name are allowed, snapshot diff and listings are denied.
+    final OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder().setResType(OzoneObj.ResourceType.VOLUME)
+        .setStoreType(OzoneObj.StoreType.OZONE).setVolumeName(volumeName).build();
+    final OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder().setResType(OzoneObj.ResourceType.BUCKET)
+        .setStoreType(OzoneObj.StoreType.OZONE).setVolumeName(volumeName).setBucketName(bucketName).build();
+    final OzoneAcl user3Read = OzoneAcl.parseAcl("user:" + USER3 + ":r");
+    final OzoneAcl user3List = OzoneAcl.parseAcl("user:" + USER3 + ":l");
+    objectStore.addAcl(volumeObj, user3Read);
+    objectStore.addAcl(bucketObj, user3Read);
+    objectStore3.getVolume(volumeName).getBucket(bucketName);
+    objectStore3.getSnapshotInfo(volumeName, bucketName, snapshot1);
+    objectStore3.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
+    assertPermissionDenied(() -> objectStore3.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+        null, 0, false, false));
+    assertPermissionDenied(() -> objectStore3.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+        false, false, false));
+    assertPermissionDenied(() -> objectStore3.getClientProxy().listStatus(volumeName, bucketName, "", false, "", 10));
+    assertPermissionDenied(() -> objectStore3.listSnapshot(volumeName, bucketName, null, null).hasNext());
+    assertPermissionDenied(() -> objectStore3.listSnapshotDiffJobs(volumeName, bucketName, "", true, null));
+
+    // user3 with bucket LIST only: listing snapshots and diff jobs is allowed, everything else is denied.
+    objectStore.removeAcl(bucketObj, user3Read);
+    objectStore.addAcl(bucketObj, user3List);
+    assertTrue(objectStore3.listSnapshot(volumeName, bucketName, null, null).hasNext());
+    objectStore3.listSnapshotDiffJobs(volumeName, bucketName, "", true, null);
+    assertPermissionDenied(() -> objectStore3.getVolume(volumeName).getBucket(bucketName));
+    assertPermissionDenied(() -> objectStore3.getSnapshotInfo(volumeName, bucketName, snapshot1));
+    assertPermissionDenied(() -> objectStore3.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2));
+    assertPermissionDenied(() -> objectStore3.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+        null, 0, false, false));
+    assertPermissionDenied(() -> objectStore3.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+        false, false, false));
+    assertPermissionDenied(() -> objectStore3.getClientProxy().listStatus(volumeName, bucketName, "", false, "", 10));
+  }
+
+  private static void assertPermissionDenied(Executable executable) {
+    final OMException ex = assertThrows(OMException.class, executable);
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
   }
 
   private void setup(BucketLayout bucketLayout)

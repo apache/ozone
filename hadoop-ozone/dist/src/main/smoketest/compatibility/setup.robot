@@ -19,7 +19,17 @@ Library             OperatingSystem
 Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
-${EC_VERSION}     1.3.0
-${FSO_VERSION}    1.3.0
-${HSYNC_VERSION}  2.0.0
-${TESTFILE}       ${TEST_DATA_DIR}/small
+${EC_VERSION}         1.3.0
+${FSO_VERSION}        1.3.0
+${SNAPSHOT_VERSION}   1.4.0
+${SNAPSHOT_DIFF_SUBMIT_VERSION}   2.2.0
+${SNAPSHOT_DIFF_ORDERED_VERSION}   2.3.0
+${HSYNC_VERSION}      2.0.0
+${TESTFILE}           ${TEST_DATA_DIR}/small
+
+*** Keywords ***
+Setup Suite
+    Setup Batch
+
+Teardown Suite
+    Teardown Batch

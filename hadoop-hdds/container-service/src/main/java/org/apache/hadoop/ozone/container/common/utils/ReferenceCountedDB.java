@@ -56,7 +56,7 @@ public class ReferenceCountedDB extends DBHandle {
 
   public void decrementReference() {
     int refCount = this.referenceCount.decrementAndGet();
-    Preconditions.checkArgument(refCount >= 0, "refCount:", refCount);
+    Preconditions.checkArgument(refCount >= 0, "refCount: %s", refCount);
     if (LOG.isTraceEnabled()) {
       LOG.trace("DecRef {} to refCnt {}, stackTrace: {}", getContainerDBPath(),
           referenceCount.get(), ExceptionUtils.getStackTrace(new Throwable()));

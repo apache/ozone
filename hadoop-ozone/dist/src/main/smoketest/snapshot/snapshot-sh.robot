@@ -51,12 +51,14 @@ Snapshot Diff
     ${snapshot_three} =     Create snapshot     ${VOLUME}       ${BUCKET}
     Set Suite Variable      ${SNAPSHOT_THREE}     ${snapshot_three}
     ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
-                    Should contain      ${result}       Snapshot diff job is IN_PROGRESS
+                    Should contain      ${result}       Submitting a new job
+                    Should contain      ${result}       --get-report option
     ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_THREE}
-                    Should contain      ${result}       Snapshot diff job is IN_PROGRESS
+                    Should contain      ${result}       Submitting a new job
+                    Should contain      ${result}       --get-report option
 
 Snapshot Diff as JSON
-    ${result} =     Execute             ozone sh snapshot diff --json /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
+    ${result} =     Execute             ozone sh snapshot diff --get-report --json /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
                     Should contain      echo '${result}' | jq '.jobStatus'   DONE
                     Should contain      echo '${result}' | jq '.snapshotDiffReport.volumeName'    ${VOLUME}
                     Should contain      echo '${result}' | jq '.snapshotDiffReport.bucketName'    ${BUCKET}
@@ -64,7 +66,7 @@ Snapshot Diff as JSON
                     Should contain      echo '${result}' | jq '.snapshotDiffReport.toSnapshot'    ${SNAPSHOT_TWO}
                     Should contain      echo '${result}' | jq '.snapshotDiffReport.diffList | .[].sourcePath'    ${KEY_TWO}
                     Should contain      echo '${result}' | jq '.snapshotDiffReport.diffList | .[].sourcePath'    ${KEY_THREE}
-    ${result} =     Execute             ozone sh snapshot diff --json /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
+    ${result} =     Execute             ozone sh snapshot diff --get-report --json /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_THREE}
                     Should contain      echo '${result}' | jq '.jobStatus'   DONE
 
 List Snapshot Diff Jobs

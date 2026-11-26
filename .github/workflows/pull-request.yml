@@ -23,12 +23,20 @@ on:
       - edited
       - synchronize
 
+permissions: { }
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   title:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Check pull request title
         env:
           TITLE: ${{ github.event.pull_request.title }}

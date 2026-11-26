@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
@@ -25,8 +26,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -72,8 +71,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
 
-  public Pair<Integer, Boolean> processWithLegacy(OMUpdateEventBatch events,
-                                                  int seekPos) {
+  public ProcessResult processWithLegacy(OMUpdateEventBatch events, int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
     int itrPos = 0;
     while (eventIterator.hasNext() && itrPos < seekPos) {
@@ -91,9 +89,20 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
       eventCounter++;
 
-      // we only process updates on OM's KeyTable
       String table = omdbUpdateEvent.getTable();
+      // A bucket can be deleted and recreated under the same name with a new
+      // objectID. A recreate is always preceded by a delete, so dropping the
+      // cached OmBucketInfo on the delete event is enough for a later key event
+      // to re-read the recreated bucket. Bucket property updates don't change
+      // objectID or layout, so they need not invalidate the cache.
+      if (table.equals(BUCKET_TABLE)) {
+        if (action == OMDBUpdateEvent.OMDBUpdateAction.DELETE) {
+          invalidateBucketCache(omdbUpdateEvent.getKey());
+        }
+        continue;
+      }
 
+      // we only process updates on OM's KeyTable
       if (!table.equals(KEY_TABLE)) {
         continue;
       }
@@ -125,27 +134,27 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
           processWithObjectStoreLayout(updatedKeyInfo, oldKeyInfo, action,
               nsSummaryMap);
         }
-      } catch (IOException ioEx) {
-        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-            ioEx);
-        nsSummaryMap.clear();
-        return new ImmutablePair<>(seekPos, false);
-      }
-      if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-        if (!flushAndCommitNSToDB(nsSummaryMap)) {
-          return new ImmutablePair<>(seekPos, false);
+        if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+          if (!flushAndCommitNSToDB(nsSummaryMap)) {
+            return new ProcessResult(seekPos, false);
+          }
+          seekPos = itrPos + eventCounter;
         }
-        seekPos = eventCounter + 1;
+      } catch (IOException | RuntimeException ex) {
+        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
+            ex);
+        nsSummaryMap.clear();
+        return new ProcessResult(seekPos, false);
       }
     }
 
     // flush and commit left out entries at end
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
-      return new ImmutablePair<>(seekPos, false);
+      return new ProcessResult(seekPos, false);
     }
 
     LOG.debug("Completed a process run of NSSummaryTaskWithLegacy");
-    return new ImmutablePair<>(seekPos, true);
+    return new ProcessResult(itrPos + eventCounter, true);
   }
 
   private void processWithFileSystemLayout(OmKeyInfo updatedKeyInfo,
@@ -261,8 +270,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getKeyTable(LEGACY_BUCKET_LAYOUT);
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          keyTableIter = keyTable.iterator()) {
+      try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> keyTableIter = keyTable.iterator()) {
 
         while (keyTableIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
@@ -363,8 +371,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       throws IOException {
     String bucketKey = getReconOMMetadataManager()
         .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
-    OmBucketInfo parentBucketInfo =
-        getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
+    OmBucketInfo parentBucketInfo = lookupBucketCached(bucketKey);
 
     if (parentBucketInfo != null) {
       return parentBucketInfo.getObjectID();
@@ -388,8 +395,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     String volumeName = keyInfo.getVolumeName();
     String bucketName = keyInfo.getBucketName();
     String bucketDBKey = metadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-        metadataManager.getBucketTable().getSkipCache(bucketDBKey);
+    OmBucketInfo omBucketInfo = lookupBucketCached(bucketDBKey);
 
     if (omBucketInfo.getBucketLayout() != LEGACY_BUCKET_LAYOUT) {
       LOG.debug(

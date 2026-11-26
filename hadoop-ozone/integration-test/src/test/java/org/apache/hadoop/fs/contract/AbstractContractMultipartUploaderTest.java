@@ -20,16 +20,16 @@ package org.apache.hadoop.fs.contract;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.verifyPathExists;
 import static org.apache.hadoop.fs.statistics.IOStatisticsLogging.ioStatisticsSourceToString;
 import static org.apache.hadoop.io.IOUtils.cleanupWithLogger;
-import static org.apache.hadoop.test.LambdaTestUtils.eventually;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 import static org.apache.hadoop.util.functional.FutureIO.awaitFuture;
 import static org.assertj.core.api.Assumptions.assumeThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.base.Charsets;
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.HashMap;
@@ -47,8 +47,8 @@ import org.apache.hadoop.fs.PartHandle;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathHandle;
 import org.apache.hadoop.fs.UploadHandle;
-import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.util.DurationInfo;
+import org.apache.ozone.test.GenericTestUtils;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -262,7 +262,7 @@ public abstract class AbstractContractMultipartUploaderTest extends
     // verify that if the implementation processes data immediately
     // then a second attempt at the upload will fail.
     if (finalizeConsumesUploadIdImmediately()) {
-      intercept(FileNotFoundException.class,
+      assertThrows(FileNotFoundException.class,
           () -> complete(completer, uploadHandle, file, partHandles));
     } else {
       // otherwise, the same or other uploader can try again.
@@ -429,14 +429,18 @@ public abstract class AbstractContractMultipartUploaderTest extends
    * @param expectedLength expected length
    * @throws IOException IO failure
    */
-  private void verifyFileLength(final Path file, final long expectedLength)
-      throws IOException {
-    FileStatus st = getFileSystem().getFileStatus(file);
-    Assertions.assertThat(st)
-        .describedAs("Uploaded file %s", st)
-        .matches(FileStatus::isFile)
-        .extracting(FileStatus::getLen)
-        .isEqualTo(expectedLength);
+  private boolean verifyFileLength(final Path file, final long expectedLength) {
+    try {
+      FileStatus st = getFileSystem().getFileStatus(file);
+      Assertions.assertThat(st)
+          .describedAs("Uploaded file %s", st)
+          .matches(FileStatus::isFile)
+          .extracting(FileStatus::getLen)
+          .isEqualTo(expectedLength);
+      return true;
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   /**
@@ -608,10 +612,10 @@ public abstract class AbstractContractMultipartUploaderTest extends
     int len = contents.getBytes(Charsets.UTF_8).length;
     InputStream is = IOUtils.toInputStream(contents, "UTF-8");
 
-    intercept(IOException.class,
+    assertThrows(IOException.class,
         () -> awaitFuture(
             uploader0.putPart(uploadHandle, 49, true, file, is, len)));
-    intercept(IOException.class,
+    assertThrows(IOException.class,
         () -> complete(uploader0, uploadHandle, file, partHandles));
 
     assertPathDoesNotExist("Uploaded file should not exist", file);
@@ -619,7 +623,7 @@ public abstract class AbstractContractMultipartUploaderTest extends
     // A second abort should be an FileNotFoundException if the UploadHandle is
     // consumed by finalization operations (complete, abort).
     if (finalizeConsumesUploadIdImmediately()) {
-      intercept(FileNotFoundException.class,
+      assertThrows(FileNotFoundException.class,
           () -> abortUpload(uploadHandle, file));
     } else {
       abortUpload(uploadHandle, file);
@@ -634,7 +638,7 @@ public abstract class AbstractContractMultipartUploaderTest extends
     Path file = methodPath();
     ByteBuffer byteBuffer = ByteBuffer.wrap(
         "invalid-handle".getBytes(Charsets.UTF_8));
-    intercept(FileNotFoundException.class,
+    assertThrows(FileNotFoundException.class,
         () -> abortUpload(BBUploadHandle.from(byteBuffer), file));
   }
 
@@ -681,7 +685,7 @@ public abstract class AbstractContractMultipartUploaderTest extends
   @Test
   public void testAbortEmptyUploadHandle() throws Exception {
     ByteBuffer byteBuffer = ByteBuffer.wrap(new byte[0]);
-    intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> abortUpload(BBUploadHandle.from(byteBuffer), methodPath()));
   }
 
@@ -693,7 +697,7 @@ public abstract class AbstractContractMultipartUploaderTest extends
     describe("Expect an empty MPU to fail, but still be abortable");
     Path dest = methodPath();
     UploadHandle handle = startUpload(dest);
-    intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> complete(uploader0, handle, dest, new HashMap<>()));
     abortUpload(handle, dest);
   }
@@ -709,7 +713,7 @@ public abstract class AbstractContractMultipartUploaderTest extends
         BBUploadHandle.from(ByteBuffer.wrap(new byte[0]));
     byte[] payload = generatePayload(1);
     InputStream is = new ByteArrayInputStream(payload);
-    intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> uploader0.putPart(emptyHandle, 1, true, dest, is,
             payload.length));
   }
@@ -729,14 +733,14 @@ public abstract class AbstractContractMultipartUploaderTest extends
         generatePayload(1, SMALL_FILE));
     partHandles.put(1, partHandle);
 
-    intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> complete(uploader0, emptyHandle, dest, partHandles));
 
     // and, while things are setup, attempt to complete with
     // a part index of 0
     partHandles.clear();
     partHandles.put(0, partHandle);
-    intercept(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> complete(uploader0, realHandle, dest, partHandles));
   }
 
@@ -758,7 +762,7 @@ public abstract class AbstractContractMultipartUploaderTest extends
     partHandles.put(1, partHandle);
 
     fs.mkdirs(file);
-    intercept(IOException.class,
+    assertThrows(IOException.class,
         () -> completeUpload(file, uploadHandle, partHandles, null,
             size));
     // abort should still work
@@ -830,11 +834,8 @@ public abstract class AbstractContractMultipartUploaderTest extends
     // consistent.
     final int consistencyDelay = timeToBecomeConsistentMillis();
     if (consistencyDelay > 0) {
-      eventually(consistencyDelay,
-          () -> verifyFileLength(file, size2),
-          new LambdaTestUtils.ProportionalRetryInterval(
-              CONSISTENCY_INTERVAL,
-              consistencyDelay));
+      GenericTestUtils.waitFor(() -> verifyFileLength(file, size2),
+          CONSISTENCY_INTERVAL, consistencyDelay);
     }
 
     verifyContents(file, digest2, size2);

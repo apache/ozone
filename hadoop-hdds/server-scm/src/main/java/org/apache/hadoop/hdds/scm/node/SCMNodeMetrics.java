@@ -30,6 +30,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.StringUtils;
 
@@ -50,6 +51,11 @@ public final class SCMNodeMetrics implements MetricsSource {
   private @Metric MutableCounterLong numNodeCommandQueueReportProcessed;
   private @Metric MutableCounterLong numNodeCommandQueueReportProcessingFailed;
   private @Metric String textMetric;
+  // Pending container allocations at SCM (per-DN tracker), not yet on datanodes.
+  private @Metric MutableCounterLong numPendingContainersAdded;
+  private @Metric MutableCounterLong numPendingContainersRemoved;
+  private @Metric MutableCounterLong numSkippedFullNodeContainerAllocation;
+  private @Metric MutableGaugeLong totalPendingContainerSlots;
 
   private final MetricsRegistry registry;
   private final NodeManagerMXBean managerMXBean;
@@ -124,6 +130,34 @@ public final class SCMNodeMetrics implements MetricsSource {
     numNodeCommandQueueReportProcessingFailed.incr();
   }
 
+  void incNumPendingContainersAdded() {
+    numPendingContainersAdded.incr();
+  }
+
+  void incNumPendingContainersRemoved() {
+    numPendingContainersRemoved.incr();
+  }
+
+  public long getNumPendingContainersAdded() {
+    return numPendingContainersAdded.value();
+  }
+
+  public long getNumPendingContainersRemoved() {
+    return numPendingContainersRemoved.value();
+  }
+
+  void incNumSkippedFullNodeContainerAllocation() {
+    numSkippedFullNodeContainerAllocation.incr();
+  }
+
+  void setTotalPendingContainerSlots(long value) {
+    totalPendingContainerSlots.set(value);
+  }
+
+  public long getTotalPendingContainerSlots() {
+    return totalPendingContainerSlots.value();
+  }
+
   /**
    * Get aggregated counter and gauge metrics.
    */
@@ -164,6 +198,14 @@ public final class SCMNodeMetrics implements MetricsSource {
               "they are either not in IN_SERVICE and HEALTHY state, cannot allocate new containers or " +
               "cannot write to existing containers."),
           Integer.parseInt(nonWritableNodes));
+    }
+
+    String volumeFailures = nodeStatistics.get("VolumeFailures");
+    if (volumeFailures != null) {
+      metrics.addGauge(
+          Interns.info("VolumeFailures",
+              "Number of datanodes with at least one failed volume"),
+          Integer.parseInt(volumeFailures));
     }
 
     for (Map.Entry<String, Long> e : nodeInfo.entrySet()) {

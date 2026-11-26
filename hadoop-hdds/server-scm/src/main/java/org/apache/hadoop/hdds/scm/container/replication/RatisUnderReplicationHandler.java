@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,6 +87,15 @@ public class RatisUnderReplicationHandler
       throws IOException {
     ContainerInfo containerInfo = result.getContainerInfo();
     LOG.debug("Handling under replicated Ratis container {}", containerInfo);
+
+    // Check if container is empty before attempting replication
+    // Empty containers will be deleted by EmptyContainerHandler
+    boolean allReplicasEmpty = !replicas.isEmpty() && replicas.stream().allMatch(ContainerReplica::isEmpty);
+    if (allReplicasEmpty && containerInfo.getState() == LifeCycleState.QUASI_CLOSED) {
+      LOG.info("Skipping replication for empty QUASI_CLOSED container {}. " +
+          "It will be deleted by EmptyContainerHandler.", containerInfo.containerID());
+      return 0;
+    }
 
     RatisContainerReplicaCount withUnhealthy =
         new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
@@ -461,23 +469,11 @@ public class RatisUnderReplicationHandler
       ContainerInfo containerInfo, List<DatanodeDetails> sources,
       List<DatanodeDetails> targets) throws CommandTargetOverloadedException,
       NotLeaderException {
-    final boolean push = replicationManager.getConfig().isPush();
     int commandsSent = 0;
-
-    if (push) {
-      for (DatanodeDetails target : targets) {
-        replicationManager.sendThrottledReplicationCommand(
-            containerInfo, sources, target, 0);
-        commandsSent++;
-      }
-    } else {
-      for (DatanodeDetails target : targets) {
-        ReplicateContainerCommand command =
-            ReplicateContainerCommand.fromSources(
-                containerInfo.getContainerID(), sources);
-        replicationManager.sendDatanodeCommand(command, containerInfo, target);
-        commandsSent++;
-      }
+    for (DatanodeDetails target : targets) {
+      replicationManager.sendThrottledReplicationCommand(
+          containerInfo, sources, target, 0);
+      commandsSent++;
     }
     return commandsSent;
   }

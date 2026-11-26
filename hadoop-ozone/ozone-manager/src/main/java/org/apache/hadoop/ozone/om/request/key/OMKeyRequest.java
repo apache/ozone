@@ -21,10 +21,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_PART;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
@@ -32,20 +32,24 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -55,24 +59,31 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -100,6 +111,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,8 +124,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
   // transaction (recursive directory creations) is 2^8 - 1 as only 8
   // bits are set aside for this in ObjectID.
   private static final long MAX_NUM_OF_RECURSIVE_DIRS = 255;
+  private static final Set<AccessModeProto> READ_WRITE = EnumSet.of(READ, WRITE);
 
   protected static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
+  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
@@ -144,6 +158,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
     keyArgs = bucket.update(keyArgs);
     return keyArgs;
+  }
+
+  protected KeyArgs resolveBucketLinkForAudit(OzoneManager ozoneManager,
+      KeyArgs keyArgs) {
+    try {
+      return resolveBucketLink(ozoneManager, keyArgs);
+    } catch (IOException e) {
+      return keyArgs;
+    }
   }
 
   protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
@@ -179,55 +202,93 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return resolvedArgs;
   }
 
-  /**
-   * This methods avoids multiple rpc calls to SCM by allocating multiple blocks
-   * in one rpc call.
-   * @throws IOException
-   */
-  @SuppressWarnings("parameternumber")
-  protected List< OmKeyLocationInfo > allocateBlock(ScmClient scmClient,
-      OzoneBlockTokenSecretManager secretManager,
+  /** Allocate multiple blocks using one rpc to SCM. */
+  protected List<OmKeyLocationInfo> allocateBlock(
       ReplicationConfig replicationConfig, ExcludeList excludeList,
-      long requestedSize, long scmBlockSize, int preallocateBlocksMax,
-      boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
-      boolean shouldSortDatanodes, UserInfo userInfo)
+      long requestedSize, boolean shouldSortDatanodes,
+      UserInfo userInfo, OzoneManager ozoneManager)
       throws IOException {
+    Preconditions.checkArgument(requestedSize > 0, "requestedSize = %s <= 0", requestedSize);
+    final long scmBlockSize = ozoneManager.getScmBlockSize();
+    final KeyManager keyManager = ozoneManager.getKeyManager();
+
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
-    int numBlocks = (int) Math.min(preallocateBlocksMax,
+    final int numBlocks = (int) Math.min(ozoneManager.getPreallocateBlocksMax(),
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
-    String clientMachine = "";
-    if (shouldSortDatanodes) {
-      clientMachine = userInfo.getRemoteAddress();
+    final String scmClientMachine;
+    // Sorted order cached by datanode set so blocks whose pipelines share the
+    // same datanodes are sorted once (mirrors the read path's caching). Keyed by
+    // the UUID set so it is order-insensitive and dedups across pipelines.
+    final Map<Set<String>, List<? extends DatanodeDetails>> sortedByNodes;
+    final String remoteAddress = userInfo.getRemoteAddress();
+    final NetworkTopology clusterMap = shouldSortDatanodes
+        && keyManager.isSortDatanodesForWriteEnabled()
+        ? ozoneManager.getClusterMapAllowNull() : null;
+    // Resolve the client once per request, before the block loop, so the
+    // DNS-to-switch mapping is consulted at most once.
+    final Node omClient = clusterMap != null && !remoteAddress.isEmpty()
+        ? keyManager.resolveClientForWrite(remoteAddress, clusterMap) : null;
+    if (!shouldSortDatanodes) {
+      scmClientMachine = "";
+      sortedByNodes = null;
+    } else if (omClient != null) {
+      // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
+      scmClientMachine = "";
+      sortedByNodes = new HashMap<>();
+    } else {
+      // Sort in SCM when OM has no topology or cannot resolve the client (or keep order
+      // when remoteAddress is empty, since SCM skips sorting for an empty client machine).
+      scmClientMachine = remoteAddress;
+      sortedByNodes = null;
     }
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
-    List<AllocatedBlock> allocatedBlocks;
+    final List<AllocatedBlock> allocatedBlocks;
     try {
-      allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
+      allocatedBlocks = ozoneManager.getScmClient().getBlockClient().allocateBlock(
+          scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, scmClientMachine);
     } catch (SCMException ex) {
-      omMetrics.incNumBlockAllocateCallFails();
-      if (ex.getResult()
-          .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
+      ozoneManager.getMetrics().incNumBlockAllocateCallFails();
+      if (ex.getResult() == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {
         throw new OMException(ex.getMessage(),
             OMException.ResultCodes.SCM_IN_SAFE_MODE);
+      }
+      if (ex.getResult() == SCMException.ResultCodes.PIPELINE_NOT_FOUND) {
+        throw new OMException(ex.getMessage(), ex, OMException.ResultCodes.KEY_ALLOCATION_ERROR);
       }
       throw ex;
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
+      Pipeline pipeline = allocatedBlock.getPipeline();
+      if (sortedByNodes != null) {
+        final List<DatanodeDetails> nodes = pipeline.getNodes();
+        final Set<String> uuidSet = nodes.stream()
+            .map(DatanodeDetails::getUuidString).collect(Collectors.toSet());
+        List<? extends DatanodeDetails> sorted = sortedByNodes.get(uuidSet);
+        if (sorted == null) {
+          sorted = keyManager.sortDatanodesForWrite(nodes, remoteAddress, omClient, clusterMap);
+          // Cache only sorted results; a skipped sort must preserve each pipeline's own order.
+          if (sorted != null) {
+            sortedByNodes.put(uuidSet, sorted);
+          }
+        }
+        if (sorted != null && !Objects.equals(sorted, pipeline.getNodesInOrder())) {
+          pipeline = pipeline.copyWithNodesInOrder(sorted);
+        }
+      }
       OmKeyLocationInfo.Builder builder = new OmKeyLocationInfo.Builder()
           .setBlockID(blockID)
           .setLength(scmBlockSize)
           .setOffset(0)
-          .setPipeline(allocatedBlock.getPipeline());
-      if (grpcBlockTokenEnabled) {
-        builder.setToken(secretManager.generateToken(remoteUser, blockID,
-            EnumSet.of(READ, WRITE), scmBlockSize));
+          .setPipeline(pipeline);
+      if (ozoneManager.isGrpcBlockTokenEnabled()) {
+        final Token<OzoneBlockTokenIdentifier> token = ozoneManager.getBlockTokenSecretManager().generateToken(
+            remoteUser, blockID, READ_WRITE, scmBlockSize);
+        builder.setToken(token);
       }
       locationInfos.add(builder.build());
     }
@@ -328,12 +389,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return edek;
   }
 
-  protected List<OzoneAcl> getAclsForKey(KeyArgs keyArgs,
+  protected Set<OzoneAcl> getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
       PrefixManager prefixManager, OmConfig config) throws OMException {
 
-    List<OzoneAcl> acls = new ArrayList<>();
-    acls.addAll(getDefaultAclList(createUGIForApi(), config));
+    final Set<OzoneAcl> acls = new LinkedHashSet<>(getDefaultAclList(createUGIForApi(), config));
     if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
@@ -352,7 +412,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         if (prefixInfo  != null) {
           if (OzoneAclUtil.inheritDefaultAcls(acls, prefixInfo.getAcls(), ACCESS)) {
             // Remove the duplicates
-            acls = acls.stream().distinct().collect(Collectors.toList());
             return acls;
           }
         }
@@ -363,7 +422,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // prefix are not set
     if (omPathInfo != null) {
       if (OzoneAclUtil.inheritDefaultAcls(acls, omPathInfo.getAcls(), ACCESS)) {
-        acls = acls.stream().distinct().collect(Collectors.toList());
         return acls;
       }
     }
@@ -372,12 +430,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // parent-dir are not set.
     if (bucketInfo != null) {
       if (OzoneAclUtil.inheritDefaultAcls(acls, bucketInfo.getAcls(), ACCESS)) {
-        acls = acls.stream().distinct().collect(Collectors.toList());
         return acls;
       }
     }
 
-    acls = acls.stream().distinct().collect(Collectors.toList());
     return acls;
   }
 
@@ -389,12 +445,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param config
    * @return Acls which inherited parent DEFAULT and keyArgs ACCESS acls.
    */
-  protected List<OzoneAcl> getAclsForDir(KeyArgs keyArgs, OmBucketInfo bucketInfo,
+  protected Set<OzoneAcl> getAclsForDir(KeyArgs keyArgs, OmBucketInfo bucketInfo,
       OMFileRequest.OMPathInfo omPathInfo, OmConfig config) throws OMException {
     // Acls inherited from parent or bucket will convert to DEFAULT scope
-    List<OzoneAcl> acls = new ArrayList<>();
     // add default ACLs
-    acls.addAll(getDefaultAclList(createUGIForApi(), config));
+    final Set<OzoneAcl> acls = new LinkedHashSet<>(getDefaultAclList(createUGIForApi(), config));
 
     // Inherit DEFAULT acls from parent-dir
     if (omPathInfo != null) {
@@ -411,7 +466,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (!keyArgs.getAclsList().isEmpty() && !config.ignoreClientACLs()) {
       acls.addAll(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
     }
-    acls = acls.stream().distinct().collect(Collectors.toList());
     return acls;
   }
 
@@ -577,7 +631,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   protected OmKeyInfo.Builder dirKeyInfoBuilderNoACL(String keyName, KeyArgs keyArgs, long objectId,
-      ReplicationConfig serverDefaultReplConfig) {
+      ReplicationConfig serverDefaultReplConfig) throws OMException {
     String dirName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
     OmKeyInfo.Builder keyInfoBuilder =
@@ -595,12 +649,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .getFactor() != HddsProtos.ReplicationFactor.ZERO && keyArgs
         .getType() != HddsProtos.ReplicationType.EC) {
       // Factor available and not an EC replication config.
-      keyInfoBuilder.setReplicationConfig(ReplicationConfig
-          .fromProtoTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()));
+      keyInfoBuilder.setReplicationConfig(OzoneConfigUtil
+          .toReplicationConfig(keyArgs.getType(), keyArgs.getFactor(), null));
     } else if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
       // Found EC type
-      keyInfoBuilder.setReplicationConfig(
-          new ECReplicationConfig(keyArgs.getEcReplicationConfig()));
+      keyInfoBuilder.setReplicationConfig(OzoneConfigUtil
+          .toReplicationConfig(keyArgs.getType(), keyArgs.getFactor(), keyArgs.getEcReplicationConfig()));
     } else {
       // default type
       keyInfoBuilder.setReplicationConfig(serverDefaultReplConfig);
@@ -712,6 +766,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     boolean acquireLock = false;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    newKeyArgs.clearPartIv();
 
     // When TDE is enabled, we are doing a DB read in pre-execute. As for
     // most of the operations we don't read from DB because of our isLeader
@@ -732,22 +787,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
             omMetadataManager.getBucketKey(volumeName,
                 bucketName));
 
-        // If bucket is symlink, resolveBucketLink to figure out real
-        // volume/bucket.
-        if (bucketInfo.isLink()) {
-          ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-              Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
-
-          bucketInfo = omMetadataManager.getBucketTable().get(
-              omMetadataManager.getBucketKey(resolvedBucket.realVolume(),
-                  resolvedBucket.realBucket()));
-        }
-
       } finally {
         if (acquireLock) {
           mergeOmLockDetails(omMetadataManager.getLock().releaseReadLock(
               BUCKET_LOCK, volumeName, bucketName));
         }
+      }
+
+      // If bucket is symlink, resolveBucketLink to figure out real
+      // volume/bucket. It takes the lock of each bucket it reads, so it must be called without holding a bucket lock.
+      if (bucketInfo != null && bucketInfo.isLink()) {
+        final ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+            Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
+
+        bucketInfo = omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(resolvedBucket.realVolume(), resolvedBucket.realBucket()));
       }
 
       // Don't throw exception of bucket not found when bucketinfo is
@@ -774,25 +828,22 @@ public abstract class OMKeyRequest extends OMClientRequest {
       KeyArgs.Builder newKeyArgs, OzoneManager ozoneManager)
       throws IOException {
 
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
-
-    boolean acquireLock = false;
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    newKeyArgs.clearPartIv();
 
     if (ozoneManager.getKmsProvider() != null) {
-      mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
-          BUCKET_LOCK, volumeName, bucketName));
-      acquireLock = getOmLockDetails().isLockAcquired();
+      // Resolved before taking a bucket lock, see generateRequiredEncryptionInfo.
+      final ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
+      final String realVolume = resolvedBucket.realVolume();
+      final String realBucket = resolvedBucket.realBucket();
+      mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(BUCKET_LOCK, realVolume, realBucket));
+      final boolean acquireLock = getOmLockDetails().isLockAcquired();
       try {
-        ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
-            Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
-
         // Get the DB key name for looking up keyInfo in OpenKeyTable with
         // resolved volume/bucket.
         String dbMultipartOpenKey =
-            getDBMultipartOpenKey(resolvedBucket.realVolume(),
-                resolvedBucket.realBucket(), keyArgs.getKeyName(),
+            getDBMultipartOpenKey(realVolume, realBucket, keyArgs.getKeyName(),
                 keyArgs.getMultipartUploadID(), omMetadataManager);
 
         OmKeyInfo omKeyInfo =
@@ -803,6 +854,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
           if (omKeyInfo.getFileEncryptionInfo() != null) {
             newKeyArgs.setFileEncryptionInfo(
                 OMPBHelper.convert(omKeyInfo.getFileEncryptionInfo()));
+            if (ozoneManager.getConfig().isMpuPartEncryptionIvEnabled()
+                && ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.MULTIPART_PART_IV)
+                && ClientVersion.MULTIPART_PART_IV_SUPPORT.isSupportedBy(getOmRequest().getVersion())) {
+              // Each part is encrypted as a separate stream, so it gets its own IV.
+              byte[] iv = new byte[omKeyInfo.getFileEncryptionInfo().getIV().length];
+              SECURE_RANDOM.nextBytes(iv);
+              newKeyArgs.setPartIv(ByteString.copyFrom(iv));
+            }
           }
         } else {
           LOG.warn("omKeyInfo not found. Key: " + dbMultipartOpenKey +
@@ -810,8 +869,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         }
       } finally {
         if (acquireLock) {
-          mergeOmLockDetails(omMetadataManager.getLock()
-              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName));
+          mergeOmLockDetails(omMetadataManager.getLock().releaseReadLock(BUCKET_LOCK, realVolume, realBucket));
         }
       }
     }
@@ -897,9 +955,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   public static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
     for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
-        bytesUsed += QuotaUtil.getReplicatedSize(
-            locationInfo.getLength(), omKeyInfo.getReplicationConfig());
+      for (List<OmKeyLocationInfo> locationInfoList : group.getLocationLists()) {
+        for (OmKeyLocationInfo locationInfo : locationInfoList) {
+          bytesUsed += QuotaUtil.getReplicatedSize(
+              locationInfo.getLength(), omKeyInfo.getReplicationConfig());
+        }
       }
     }
 
@@ -907,7 +967,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Return bucket info for the specified bucket.
+   * Return bucket info for the specified bucket, for read-only use.
+   * <p>
+   * The returned {@link OmBucketInfo} is the cached instance, returned by
+   * reference. Callers that mutate it must use
+   * {@link #getBucketInfoForUpdate(OMMetadataManager, String, String)} instead.
    */
   @Nullable
   public static OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
@@ -918,6 +982,24 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .getCacheValue(new CacheKey<>(bucketKey));
 
     return value != null ? value.getCacheValue() : null;
+  }
+
+  /**
+   * Return a copy of the cached bucket info for callers that mutate it.
+   * <p>
+   * Mutations stay invisible until the caller publishes the copy with
+   * {@code getBucketTable().addCacheEntry(...)}, after all fallible work and
+   * only on the path that persists the response. A caller that publishes must
+   * hold the bucket write lock for the whole read-modify-publish, not just the
+   * publish, or a concurrent writer can be lost. A caller under key path
+   * locking holds only the bucket read lock, so it must not publish.
+   */
+  @Nullable
+  public static OmBucketInfo getBucketInfoForUpdate(OMMetadataManager omMetadataManager,
+      String volume, String bucket) {
+    OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volume, bucket);
+
+    return omBucketInfo != null ? omBucketInfo.copyObject() : null;
   }
 
   /**
@@ -1040,6 +1122,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setUpdateID(transactionLogIndex)
             .setOwnerName(keyArgs.getOwnerName())
             .setFile(true);
+    if (keyArgs.hasExpectedDataGeneration()) {
+      builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+    }
+    if (keyArgs.hasPartIv()) {
+      builder.setPartIv(keyArgs.getPartIv().toByteArray());
+    }
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
       OMFileRequest.OMPathInfoWithFSO omPathInfoFSO
@@ -1068,8 +1156,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nonnull long transactionLogIndex, long objectID,
           OmConfig configuration) throws IOException {
 
-    Preconditions.checkArgument(args.getMultipartNumber() > 0,
-            "PartNumber Should be greater than zero");
+    validatePartNumber(args.getMultipartNumber());
     // When key is multipart upload part key, we should take replication
     // type and replication factor from original key which has done
     // initiate multipart upload. If we have not found any such, we throw
@@ -1105,6 +1192,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return createFileInfo(args, locations, partKeyInfo.getReplicationConfig(),
             size, encInfo, prefixManager, omBucketInfo, omPathInfo,
             transactionLogIndex, objectID, configuration);
+  }
+
+  protected static void validatePartNumber(int partNumber) throws OMException {
+    if (partNumber <= 0) {
+      throw new OMException("Part number should be greater than zero, but was " + partNumber, INVALID_PART);
+    }
   }
 
   /**
@@ -1160,11 +1253,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     LOG.debug("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
-    OmKeyInfo pseudoKeyInfo = omKeyInfo.toBuilder()
-        .setObjectID(OBJECT_ID_RECLAIM_BLOCKS)
-        .build();
-    // This is a special marker to indicate that SnapshotDeletingService
-    // can reclaim this key's blocks unconditionally.
+    // The pseudo key keeps the object ID and the hsync metadata of the key, so callers wrap before they remove the
+    // latter. A block committed by an earlier hsync may be referenced by a snapshot, and key deletion retains the
+    // pseudo key while the previous snapshot holds an hsync'ed version of the key with this object ID. That version
+    // may not list the block itself, as an hsync between two snapshots can drop a block that the older one references.
+    OmKeyInfo pseudoKeyInfo = omKeyInfo.toBuilder().build();
     // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
     // version not matters in the current logic of keyDeletingService,
@@ -1208,7 +1301,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // the referenceKey.
     Map<ContainerBlockID, OmKeyLocationInfo> cbIdSet = referenceKey.getKeyLocationVersions()
         .stream()
-        .flatMap(e -> e.getLocationList().stream())
+        .flatMap(group -> group.getLocationLists().stream())
+        .flatMap(List::stream)
         .collect(Collectors.toMap(omKeyLocationInfo -> omKeyLocationInfo.getBlockID().getContainerBlockID(),
             Function.identity()));
     Map<OmKeyInfo, List<OmKeyLocationInfo>> filteredOutBlocks = new HashMap<>();
@@ -1302,5 +1396,107 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throw new OMException("Attempting to create unencrypted file " +
           keyArgs.getKeyName() + " in encrypted bucket " + keyArgs.getBucketName(), INVALID_REQUEST);
     }
+  }
+
+  /**
+   * Validates atomic rewrite conditions for conditional writes.
+   * <p>
+   * For If-None-Match: * (expectedDataGeneration = EXPECTED_GEN_CREATE_IF_NOT_EXISTS),
+   * the key must NOT exist.
+   * <p>
+   * For If-Match with a specific generation, the key must exist with matching updateID.
+   *
+   * @param dbKeyInfo the existing key info from the database (null if key doesn't exist)
+   * @param keyArgs the key arguments containing expected generation
+   * @throws OMException if validation fails
+   */
+  protected void validateAtomicRewrite(OmKeyInfo dbKeyInfo, KeyArgs keyArgs)
+      throws OMException {
+    if (keyArgs.hasExpectedDataGeneration()) {
+      long expectedGen = keyArgs.getExpectedDataGeneration();
+      // If expectedGen is EXPECTED_GEN_CREATE_IF_NOT_EXISTS, it means the key MUST NOT exist (If-None-Match)
+      if (expectedGen == OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT) {
+        if (dbKeyInfo != null) {
+          throw new OMException("Key already exists",
+              OMException.ResultCodes.KEY_ALREADY_EXISTS);
+        }
+      } else {
+        // If a key does not exist, or if it exists but the updateID do not match, then fail this request.
+        if (dbKeyInfo == null) {
+          throw new OMException("Key not found during expected rewrite",
+              OMException.ResultCodes.KEY_NOT_FOUND);
+        }
+        if (dbKeyInfo.getUpdateID() != expectedGen) {
+          throw new OMException("Generation mismatch during expected rewrite",
+              OMException.ResultCodes.KEY_NOT_FOUND);
+        }
+      }
+    }
+  }
+
+  /**
+   * Validates If-Match ETag condition.
+   * <p>
+   * This method checks if the existing key's ETag matches the expected ETag.
+   * Use this for single-phase operations (like MPU complete) where no rewrite is needed.
+   *
+   * @param keyArgs the key arguments containing expected ETag
+   * @param dbKeyInfo the existing key info from the database
+   * @throws OMException if validation fails
+   */
+  protected void validateIfMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo)
+      throws OMException {
+    if (!keyArgs.hasExpectedETag()) {
+      return;
+    }
+
+    String expectedETag = keyArgs.getExpectedETag();
+    if (dbKeyInfo == null) {
+      throw new OMException("Key not found for If-Match",
+          OMException.ResultCodes.KEY_NOT_FOUND);
+    }
+    if (!dbKeyInfo.hasEtag()) {
+      throw new OMException("Key does not have an ETag",
+          OMException.ResultCodes.ETAG_NOT_AVAILABLE);
+    }
+    if (!dbKeyInfo.isEtagEquals(expectedETag)) {
+      throw new OMException("ETag mismatch",
+          OMException.ResultCodes.ETAG_MISMATCH);
+    }
+  }
+
+  protected void validateIfNoneMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+    if (keyArgs.hasExcludedETag() && dbKeyInfo != null && dbKeyInfo.isEtagEquals(keyArgs.getExcludedETag())) {
+      throw new OMException("ETag matches If-None-Match", OMException.ResultCodes.KEY_ALREADY_EXISTS);
+    }
+  }
+
+  /**
+   * Validates ETag conditions and converts them to expectedDataGeneration.
+   * <p>
+   * This method checks the existing key against the ETag conditions.
+   * If satisfied, the ETag condition is converted to a generation-based condition
+   * for atomic commit validation in two-phase operations (CreateKey → CommitKey).
+   *
+   * @param keyArgs the key arguments containing expected ETag
+   * @param dbKeyInfo the existing key info from the database
+   * @return updated KeyArgs with expectedDataGeneration set (if an ETag condition was specified)
+   * @throws OMException if validation fails
+   */
+  protected KeyArgs validateAndRewriteETagConditionsAsExpectedGeneration(
+      KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+    validateIfMatchETag(keyArgs, dbKeyInfo);
+    validateIfNoneMatchETag(keyArgs, dbKeyInfo);
+
+    if ((!keyArgs.hasExpectedETag() && !keyArgs.hasExcludedETag()) || keyArgs.hasExpectedDataGeneration()) {
+      return keyArgs;
+    }
+
+    return keyArgs.toBuilder()
+        .setExpectedDataGeneration(
+            dbKeyInfo == null ? OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT : dbKeyInfo.getUpdateID())
+        .clearExpectedETag()
+        .clearExcludedETag()
+        .build();
   }
 }

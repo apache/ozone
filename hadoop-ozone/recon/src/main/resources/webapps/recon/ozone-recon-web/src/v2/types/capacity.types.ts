@@ -17,9 +17,13 @@
  */
 
 type GlobalStorage = {
-  totalUsedSpace: number;
-  totalFreeSpace: number;
-  totalCapacity: number;
+  totalFileSystemCapacity: number;
+  totalReservedSpace: number;
+  totalOzoneCapacity: number;
+  totalOzoneUsedSpace: number;
+  totalOzoneFreeSpace: number;
+  totalOzoneCommittedSpace: number;
+  totalMinimumFreeSpace: number;
 };
 
 type GlobalNamespace = {
@@ -28,9 +32,14 @@ type GlobalNamespace = {
 };
 
 type UsedSpaceBreakdown = {
-  openKeyBytes: number;
-  committedKeyBytes: number;
-  preAllocatedContainerBytes: number;
+  openKeyBytes: OpenKeyBytesInfo;
+  finalizedKeyBytes: number;
+};
+
+type OpenKeyBytesInfo = {
+  totalOpenKeyBytes: number;
+  openKeyAndFileBytes: number;
+  multipartOpenKeyBytes: number;
 };
 
 type DNPendingDeleteStat = {

@@ -21,7 +21,7 @@ import java.util.List;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
@@ -52,13 +52,13 @@ public interface StorageContainerNodeProtocol {
    * @param datanodeDetails DatanodeDetails
    * @param nodeReport NodeReportProto
    * @param pipelineReport PipelineReportsProto
-   * @param layoutVersionInfo LayoutVersionProto
+   * @param versionInfo DatanodeVersionProto
    * @return  SCMRegisteredResponseProto
    */
   RegisteredCommand register(DatanodeDetails datanodeDetails,
                              NodeReportProto nodeReport,
                              PipelineReportsProto pipelineReport,
-                             LayoutVersionProto layoutVersionInfo);
+                             DatanodeVersionProto versionInfo);
 
   /**
    * Send heartbeat to indicate the datanode is alive and doing well.

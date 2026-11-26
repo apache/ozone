@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
@@ -37,7 +38,6 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -54,6 +54,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
@@ -81,10 +82,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Provides the current checkpoint Snapshot of the OM DB. (tar.gz)
  *
- * When Ozone ACL is enabled (`ozone.acl.enabled`=`true`), only users/principals
- * configured in `ozone.administrator` (along with the user that starts OM,
- * which automatically becomes an Ozone administrator but not necessarily in
- * the config) are allowed to access this endpoint.
+ * When Ozone authorization is enabled (`ozone.authorization.enabled`=`true`),
+ * only users/principals configured in `ozone.administrator` (along with the user
+ * that starts OM, which automatically becomes an Ozone administrator but not
+ * necessarily in the config) are allowed to access this endpoint.
  *
  * If Kerberos is enabled, the principal should be appended to
  * `ozone.administrator`, e.g. `scm/scm@EXAMPLE.COM`
@@ -125,7 +126,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     initialize(om.getMetadataManager().getStore(),
         om.getMetrics().getDBCheckpointMetrics(),
-        om.getAclsEnabled(),
+        om.isAdminAuthorizationEnabled(),
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
@@ -134,9 +135,27 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   @Override
+  public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+      boolean isFormData, boolean flush) {
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    if (!om.isLeader()) {
+      String msg = "Unable to process metadata snapshot request as this OM is not the leader";
+      LOG.warn(msg);
+      try {
+        response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, msg);
+      } catch (IOException e) {
+        LOG.warn("Failed to send error response, falling back to status only", e);
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      }
+      return;
+    }
+    super.processMetadataSnapshotRequest(request, response, isFormData, flush);
+  }
+
+  @Override
   public void writeDbDataToStream(DBCheckpoint checkpoint,
                                   HttpServletRequest request,
-                                  OutputStream destination,
+                                  HttpServletResponse response,
                                   Set<String> toExcludeList,
                                   Path tmpdir)
       throws IOException, InterruptedException {
@@ -154,18 +173,35 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     // Map of link to path.
     Map<Path, Path> hardLinkFiles = new HashMap<>();
 
-    try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination)) {
-      RocksDBCheckpointDiffer differ =
-          getDbStore().getRocksDBCheckpointDiffer();
-      DirectoryData sstBackupDir = new DirectoryData(tmpdir,
-          differ.getSSTBackupDir());
-      DirectoryData compactionLogDir = new DirectoryData(tmpdir,
-          differ.getCompactionLogDir());
+    RocksDBCheckpointDiffer differ =
+        getDbStore().getRocksDBCheckpointDiffer();
+    DirectoryData sstBackupDir = new DirectoryData(tmpdir,
+        differ.getSSTBackupDir());
+    DirectoryData compactionLogDir = new DirectoryData(tmpdir,
+        differ.getCompactionLogDir());
 
-      // Files to be excluded from tarball
-      Map<String, Map<Path, Path>> sstFilesToExclude = normalizeExcludeList(toExcludeList,
-          checkpoint.getCheckpointLocation(), sstBackupDir);
+    // Files to be excluded from tarball
+    Map<String, Map<Path, Path>> sstFilesToExclude = normalizeExcludeList(toExcludeList,
+        checkpoint.getCheckpointLocation(), sstBackupDir);
 
+    if (sstFilesToExclude.isEmpty()) {
+      try {
+        Set<Path> snapshotPaths =
+            snapshotPathsForCheckpointEstimate(checkpoint, includeSnapshotData(request));
+        OMDBCheckpointUtils.SstSizeEstimate estimate =
+            OMDBCheckpointUtils.estimateCheckpointTarballSstDetails(
+                checkpoint.getCheckpointLocation(), snapshotPaths);
+        response.setHeader(OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER,
+            Long.toString(estimate.getTotalBytes()));
+        OMDBCheckpointUtils.logEstimatedTarballSize(estimate, snapshotPaths.size());
+      } catch (IOException e) {
+        LOG.warn("Could not estimate checkpoint tarball SST size for response header: {}",
+            e.getMessage());
+      }
+    }
+
+    try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream =
+             tar(response.getOutputStream())) {
       boolean completed = getFilesForArchive(checkpoint, copyFiles,
           hardLinkFiles, sstFilesToExclude, includeSnapshotData(request),
           sstBackupDir, compactionLogDir);
@@ -177,6 +213,15 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       LOG.error("got exception writing to archive " + e);
       throw e;
     }
+  }
+
+  private Set<Path> snapshotPathsForCheckpointEstimate(DBCheckpoint checkpoint,
+      boolean includeSnapshotData) throws IOException {
+    Set<Path> snapshotPaths = new HashSet<>();
+    if (includeSnapshotData) {
+      snapshotPaths = getSnapshotDirs(checkpoint, false);
+    }
+    return snapshotPaths;
   }
 
   /**
@@ -289,11 +334,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     AtomicLong copySize = new AtomicLong(0L);
 
-    // Log estimated total data transferred on first request.
-    if (sstFilesToExclude.isEmpty()) {
-      logEstimatedTarballSize(checkpoint, includeSnapshotData);
-    }
-
     // Get the active fs files.
     Path dir = checkpoint.getCheckpointLocation();
     if (!processDir(dir, copyFiles, hardLinkFiles, sstFilesToExclude,
@@ -326,16 +366,6 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         compactionLogDir.getOriginalDir().toPath());
   }
 
-  private void logEstimatedTarballSize(DBCheckpoint checkpoint, boolean includeSnapshotData)
-      throws IOException {
-    Set<Path> snapshotPaths = new HashSet<>();
-    if (includeSnapshotData) {
-      // since this is an estimate we can avoid waiting for dir to exist.
-      snapshotPaths = getSnapshotDirs(checkpoint, false);
-    }
-    OMDBCheckpointUtils.logEstimatedTarballSize(checkpoint.getCheckpointLocation(), snapshotPaths);
-  }
-
   /**
    * The snapshotInfo table may contain a snapshot that
    * doesn't yet exist on the fs, so wait a few seconds for it.
@@ -355,7 +385,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     try (OmMetadataManagerImpl checkpointMetadataManager =
         OmMetadataManagerImpl.createCheckpointMetadataManager(
             conf, checkpoint);
-        TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+        TableIterator<String, Table.KeyValue<String, SnapshotInfo>>
             iterator = checkpointMetadataManager
             .getSnapshotInfoTable().iterator()) {
 

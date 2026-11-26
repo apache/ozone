@@ -19,13 +19,13 @@ package org.apache.hadoop.fs.ozone;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.Optional;
 import java.util.OptionalInt;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsShell;
@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.HATests;
+import org.apache.ozone.test.HACluster;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -56,7 +56,7 @@ import org.slf4j.LoggerFactory;
  * Test client-side URI handling with Ozone Manager HA.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
+public abstract class TestOzoneFsHAURLs implements HACluster.TestCase {
 
   /**
     * Set a timeout for each test.
@@ -102,12 +102,12 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
 
     assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
-    volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    volumeName = uniqueObjectName("volume");
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
 
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
-    bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    bucketName = uniqueObjectName("bucket");
     retVolumeinfo.createBucket(bucketName);
 
     rootPath = String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,
@@ -174,7 +174,6 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
   @Test
   public void testWithQualifiedDefaultFS() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
-    clientConf.setQuietMode(false);
     clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     // fs.defaultFS = o3fs://bucketName.volumeName.omServiceId/
     clientConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
@@ -269,7 +268,6 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
    */
   private void testWithDefaultFS(String defaultFS) throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
-    clientConf.setQuietMode(false);
     clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     // fs.defaultFS = file:///
     clientConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
@@ -314,7 +312,6 @@ public abstract class TestOzoneFsHAURLs implements HATests.TestCase {
   @Test
   public void testIncorrectAuthorityInURI() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
-    clientConf.setQuietMode(false);
     clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     clientConf.set(OFS_IMPL_KEY, OFS_IMPL_VALUE);
     FsShell shell = new FsShell(clientConf);

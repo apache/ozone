@@ -621,7 +621,7 @@ public final class ContainerTestHelper {
       ClientVersion clientVersion, ContainerProtos.Type cmdType, int replicaIndex) {
     final Builder builder =
         ContainerCommandRequestProto.newBuilder()
-            .setVersion(clientVersion.toProtoValue())
+            .setVersion(clientVersion.serialize())
             .setCmdType(cmdType)
             .setContainerID(DUMMY_CONTAINER_ID)
             .setDatanodeUuid(DATANODE_UUID);
@@ -649,7 +649,7 @@ public final class ContainerTestHelper {
       break;
     case GetBlock:
       builder.setGetBlock(ContainerProtos.GetBlockRequestProto.newBuilder()
-          .setBlockID(fakeBlockId).build());
+          .setBlockID(fakeBlockId).setRequestShortCircuitAccess(true).build());
       break;
     case GetCommittedBlockLength:
       builder.setGetCommittedBlockLength(

@@ -33,9 +33,12 @@ public class OzoneManagerHttpServer extends BaseHttpServer {
 
   public OzoneManagerHttpServer(MutableConfigurationSource conf,
       OzoneManager om) throws IOException {
-    super(conf, "ozoneManager");
+    super(conf, "ozoneManager", om == null ? null
+        : om.getOMServiceId() + '-' + om.getOMNodeId());
     addServlet("serviceList", OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT,
         ServiceListJSONServlet.class);
+    addServlet("snapshotList", "/snapshotList",
+        SnapshotListJSONServlet.class);
     addServlet("dbCheckpoint", OZONE_DB_CHECKPOINT_HTTP_ENDPOINT,
         OMDBCheckpointServlet.class);
     addServlet("dbCheckpointv2", OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2,

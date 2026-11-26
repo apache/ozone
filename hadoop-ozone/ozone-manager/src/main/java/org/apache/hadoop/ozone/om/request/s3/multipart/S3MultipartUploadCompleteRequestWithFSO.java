@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
 
 import java.io.IOException;
@@ -33,6 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponse;
@@ -61,10 +63,12 @@ public class S3MultipartUploadCompleteRequestWithFSO
         OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager,
             omBucketInfo.getVolumeName(), omBucketInfo.getBucketName(),
             keyName, keyPath);
-    // Check for directory exists with same name, if it exists throw error.
     if (pathInfoFSO.getDirectoryResult() == DIRECTORY_EXISTS) {
       throw new OMException("Can not Complete MPU for file: " + keyName +
           " as there is already directory in the given path",
+          NOT_A_FILE);
+    } else if (pathInfoFSO.getDirectoryResult() == FILE_EXISTS_IN_GIVENPATH) {
+      throw new OMException("Can not Complete MPU for file: " + keyName + " as there is already file in the given path",
           NOT_A_FILE);
     }
   }
@@ -165,12 +169,13 @@ public class S3MultipartUploadCompleteRequestWithFSO
       String dbMultipartOpenKey, OmKeyInfo omKeyInfo,
       List<OmKeyInfo> allKeyInfoToRemove, OmBucketInfo omBucketInfo,
       long volumeId, long bucketId, List<OmDirectoryInfo> missingParentInfos,
-      OmMultipartKeyInfo multipartKeyInfo) {
+      OmMultipartKeyInfo multipartKeyInfo,
+      List<OmMultipartPartKey> multipartPartKeysToDelete) {
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
         getBucketLayout(), omBucketInfo, volumeId, bucketId,
-        missingParentInfos, multipartKeyInfo);
+        missingParentInfos, multipartKeyInfo, multipartPartKeysToDelete);
   }
 
   @Override

@@ -32,6 +32,8 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.NodeState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Test OMNodeDetails.
@@ -91,6 +93,19 @@ public class TestOMNodeDetails {
     assertEquals(OM_NODE_ID, nodeDetails.getNodeId());
     assertEquals(RPC_PORT, nodeDetails.getRpcPort());
     assertEquals(RATIS_PORT, nodeDetails.getRatisPort());
+  }
+
+  @Test
+  public void testIpv6HostAddress() {
+    OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
+        .setOMServiceId(OM_SERVICE_ID)
+        .setOMNodeId(OM_NODE_ID)
+        .setHostAddress("2001:db8::10")
+        .setRpcPort(RPC_PORT)
+        .setRatisPort(RATIS_PORT)
+        .build();
+
+    assertEquals(new InetSocketAddress("2001:db8::10", RPC_PORT), nodeDetails.getRpcAddress());
   }
 
   /**
@@ -343,6 +358,59 @@ public class TestOMNodeDetails {
   }
 
   /**
+   * The full checkpoint URL, as the leader's servlet sees it.
+   */
+  @ParameterizedTest
+  @CsvSource({
+      "localhost, true, true, false, http://localhost:9874/v2/dbCheckpoint"
+          + "?includeSnapshotData=true&flushBeforeCheckpoint=false",
+      "localhost, true, false, true, https://localhost:9875/v2/dbCheckpoint"
+          + "?includeSnapshotData=true&flushBeforeCheckpoint=true",
+      "localhost, false, true, true, http://localhost:9874/dbCheckpoint"
+          + "?includeSnapshotData=true&flushBeforeCheckpoint=true",
+      "[::1], true, false, false, https://[::1]:9875/v2/dbCheckpoint"
+          + "?includeSnapshotData=true&flushBeforeCheckpoint=false",
+  })
+  public void testGetOMDBCheckpointEndpointUrlExact(String host, boolean useV2, boolean isHttp, boolean flush,
+      String expected) throws IOException {
+    OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
+        .setOMServiceId(OM_SERVICE_ID)
+        .setOMNodeId(OM_NODE_ID)
+        .setHostAddress(HOST_ADDRESS)
+        .setRpcPort(RPC_PORT)
+        .setRatisPort(RATIS_PORT)
+        .setHttpAddress(host + ":9874")
+        .setHttpsAddress(host + ":9875")
+        .build();
+
+    assertEquals(expected, nodeDetails.getOMDBCheckpointEndpointUrl(useV2, isHttp, flush).toString());
+  }
+
+  /**
+   * Test getOMDBCheckpointEndpointUrl with useV2 parameter.
+   */
+  @Test
+  public void testGetOMDBCheckpointEndpointUrlUseV2() throws IOException {
+    OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
+        .setOMServiceId(OM_SERVICE_ID)
+        .setOMNodeId(OM_NODE_ID)
+        .setHostAddress(HOST_ADDRESS)
+        .setRpcPort(RPC_PORT)
+        .setRatisPort(RATIS_PORT)
+        .setHttpAddress(HOST_ADDRESS + ":9874")
+        .setHttpsAddress(HOST_ADDRESS + ":9875")
+        .build();
+
+    URL urlV2 = nodeDetails.getOMDBCheckpointEndpointUrl(true, true, false);
+    assertNotNull(urlV2);
+    assertTrue(urlV2.getPath().endsWith("/v2/dbCheckpoint"));
+
+    URL urlV1 = nodeDetails.getOMDBCheckpointEndpointUrl(false, true, false);
+    assertNotNull(urlV1);
+    assertTrue(urlV1.getPath().endsWith("/dbCheckpoint"));
+  }
+
+  /**
    * Test getOMNodeAddressFromConf.
    */
   @Test
@@ -412,7 +480,8 @@ public class TestOMNodeDetails {
    */
   @Test
   public void testSetRatisAddress() {
-    InetSocketAddress ratisAddr = new InetSocketAddress("192.168.1.100", 9873);
+    // Unresolved, so getHostName() does not do a reverse DNS lookup, which some CI runners answer.
+    InetSocketAddress ratisAddr = InetSocketAddress.createUnresolved("192.168.1.100", 9873);
     
     OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
         .setOMServiceId(OM_SERVICE_ID)
@@ -425,5 +494,24 @@ public class TestOMNodeDetails {
 
     assertEquals("192.168.1.100", nodeDetails.getHostAddress());
     assertEquals(9873, nodeDetails.getRatisPort());
+  }
+
+  /**
+   * An advertised peer identity has to bracket an IPv6 literal, or a reader
+   * takes the last group of the address for the port.
+   */
+  @Test
+  public void testRpcAddressStringBracketsIPv6Literal() {
+    OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
+        .setOMServiceId(OM_SERVICE_ID)
+        .setOMNodeId(OM_NODE_ID)
+        .setRpcAddress(InetSocketAddress.createUnresolved("2001:db8::1", RPC_PORT))
+        .setRatisPort(RATIS_PORT)
+        .setHttpAddress(HTTP_ADDRESS)
+        .setHttpsAddress(HTTPS_ADDRESS)
+        .setIsListener(false)
+        .build();
+
+    assertEquals("[2001:db8::1]:" + RPC_PORT, nodeDetails.getRpcAddressString());
   }
 }

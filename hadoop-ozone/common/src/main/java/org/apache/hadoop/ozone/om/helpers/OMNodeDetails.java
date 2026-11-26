@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
@@ -27,9 +28,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Collection;
+import java.util.StringJoiner;
 import org.apache.hadoop.hdds.NodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
@@ -37,7 +40,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.NodeState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
-import org.apache.http.client.utils.URIBuilder;
 
 /**
  * This class stores OM node details.
@@ -182,19 +184,31 @@ public final class OMNodeDetails extends NodeDetails {
     }
   }
 
+  /**
+   * Returns v2 endpoint URL. Use {@link #getOMDBCheckpointEndpointUrl(boolean, boolean, boolean)}
+   * for configurable v1/v2 selection.
+   */
   public URL getOMDBCheckpointEndpointUrl(boolean isHttp, boolean flush)
       throws IOException {
+    return getOMDBCheckpointEndpointUrl(true, isHttp, flush);
+  }
+
+  /**
+   * @param useV2 when true use /v2/dbCheckpoint, when false use /dbCheckpoint
+   */
+  public URL getOMDBCheckpointEndpointUrl(boolean useV2, boolean isHttp,
+      boolean flush) throws IOException {
+    String path = useV2 ? OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2
+        : OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     URL url;
     try {
-      URIBuilder urlBuilder = new URIBuilder().
-          setScheme(isHttp ? "http" : "https").
-          setHost(isHttp ? getHttpAddress() : getHttpsAddress()).
-          setPath(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2).
-          addParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA, "true").
-          addParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH,
-              flush ? "true" : "false");
-
-      url = urlBuilder.build().toURL();
+      String scheme = isHttp ? "http" : "https";
+      String address = isHttp ? getHttpAddress() : getHttpsAddress();
+      String query = new StringJoiner("&")
+          .add(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA + "=true")
+          .add(OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=" + flush)
+          .toString();
+      url = new URI(scheme, address, path, query, null).toURL();
     } catch (URISyntaxException | MalformedURLException e) {
       throw new IOException("Could not get OM DB Checkpoint Endpoint Url", e);
     }

@@ -24,15 +24,18 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import java.io.File;
 import java.io.IOException;
 import java.util.Objects;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.hdds.server.StartupProgress;
+import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -40,6 +43,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,10 +82,19 @@ public class ContainerReader implements Runnable {
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
   private final boolean shouldDelete;
+  private final StartupProgress.Step progress;
 
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
       ConfigurationSource conf, boolean shouldDelete) {
+    this(volSet, volume, cset, conf, shouldDelete, null);
+  }
+
+  /**
+   * @param progress if not null, tracks the number of containers read from the volume
+   */
+  public ContainerReader(MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset, ConfigurationSource conf,
+      boolean shouldDelete, StartupProgress.Step progress) {
     Objects.requireNonNull(volume,  "volume == null");
     this.hddsVolume = volume;
     this.hddsVolumeDir = hddsVolume.getHddsRootDir();
@@ -89,16 +102,47 @@ public class ContainerReader implements Runnable {
     this.config = conf;
     this.volumeSet = volSet;
     this.shouldDelete = shouldDelete;
+    this.progress = progress;
   }
 
   @Override
   public void run() {
     try {
+      if (shouldDelete) {
+        cleanupContainerCopyDir();
+      }
       readVolume(hddsVolumeDir);
     } catch (Throwable t) {
-      LOG.error("Caught an exception during reading container files" +
-          " from Volume {} {}", hddsVolumeDir, t);
+      LOG.error("Could not read container files from the volume {}. " +
+          "Marking the volume as failed", hddsVolumeDir, t);
       volumeSet.failVolume(hddsVolumeDir.getPath());
+    } finally {
+      if (progress != null) {
+        if (hddsVolume.isFailed()) {
+          progress.fail();
+        } else {
+          progress.end();
+        }
+      }
+    }
+  }
+
+  private void cleanupContainerCopyDir() {
+    // Startup loads containers before starting the replication server, so no imports can be in progress here.
+    File copyDir = ContainerImporter.getUntarDirectory(hddsVolume).toFile();
+    if (copyDir.exists()) {
+      File[] files = copyDir.listFiles();
+      if (files == null) {
+        LOG.warn("Failed to list files in container import directory: {}", copyDir);
+        return;
+      }
+      for (File file : files) {
+        try {
+          FileUtils.forceDelete(file);
+        } catch (IOException | RuntimeException e) {
+          LOG.warn("Failed to remove leftover container import file {}", file.getAbsolutePath());
+        }
+      }
     }
   }
 
@@ -119,34 +163,24 @@ public class ContainerReader implements Runnable {
     // by HddsUtil#checkVolume once we have a cluster ID from SCM. No
     // operations to perform here in that case.
     if (storageDirs.length > 0) {
-      File clusterIDDir = new File(hddsVolumeRootDir,
-          hddsVolume.getClusterID());
-      // The subdirectory we should verify containers within.
-      // If this volume was formatted pre SCM HA, this will be the SCM ID.
-      // A cluster ID symlink will exist in this case only if this cluster is
-      // finalized for SCM HA.
-      // If the volume was formatted post SCM HA, this will be the cluster ID.
-      File idDir = clusterIDDir;
-      if (storageDirs.length == 1 && !clusterIDDir.exists()) {
-        // If the one directory is not the cluster ID directory, assume it is
-        // the old SCM ID directory used before SCM HA.
-        idDir = storageDirs[0];
-      } else {
-        // There are 1 or more storage directories. We only care about the
-        // cluster ID directory.
-        if (!clusterIDDir.exists()) {
-          LOG.error("Volume {} is in an inconsistent state. Expected " +
-              "clusterID directory {} not found.", hddsVolumeRootDir,
-              clusterIDDir);
-          volumeSet.failVolume(hddsVolumeRootDir.getPath());
-          return;
-        }
+      File currentDir;
+      try {
+        currentDir = StorageVolumeUtil.resolveContainerCurrentDir(hddsVolumeRootDir, 
+            hddsVolume.getClusterID(), storageDirs);
+      } catch (InconsistentStorageStateException e) {
+        LOG.error("Volume {} is in an inconsistent state. Expected " +
+                "clusterID directory {} not found.", hddsVolumeRootDir,
+            new File(hddsVolumeRootDir, hddsVolume.getClusterID()));
+        volumeSet.failVolume(hddsVolumeRootDir.getPath());
+        return;
       }
 
       LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
-      File currentDir = new File(idDir, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null && containerTopDirs.length > 0) {
+        if (progress != null) {
+          progress.setTotal(countContainerDirs(containerTopDirs));
+        }
         for (File containerTopDir : containerTopDirs) {
           if (containerTopDir.isDirectory()) {
             File[] containerDirs = containerTopDir.listFiles();
@@ -167,6 +201,9 @@ public class ContainerReader implements Runnable {
                   LOG.error("Failed to load container from {}",
                       containerDir.getAbsolutePath(), e);
                 }
+                if (progress != null) {
+                  progress.increment();
+                }
               }
             }
           }
@@ -174,6 +211,18 @@ public class ContainerReader implements Runnable {
       }
     }
     LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
+  }
+
+  private static long countContainerDirs(File[] containerTopDirs) {
+    long count = 0;
+    for (File containerTopDir : containerTopDirs) {
+      // null if not a directory
+      String[] containerDirs = containerTopDir.list();
+      if (containerDirs != null) {
+        count += containerDirs.length;
+      }
+    }
+    return count;
   }
 
   private void verifyContainerFile(long containerID,

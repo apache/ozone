@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
@@ -56,9 +58,10 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 /**
  * This class tests OneReplicaPipelineSafeModeRule.
@@ -100,7 +103,7 @@ public class TestOneReplicaPipelineSafeModeRule {
         eventQueue,
         scmContext,
         serviceManager,
-        new TestClock(Instant.now(), ZoneOffset.UTC));
+        new MockClock(Instant.now(), ZoneOffset.UTC));
 
     PipelineProvider<RatisReplicationConfig> mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
@@ -189,6 +192,46 @@ public class TestOneReplicaPipelineSafeModeRule {
             pipelineCountThree));
 
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
+  }
+
+  @Test
+  public void testOneReplicaPipelineRuleWithReportProcessingFalse() {
+    EventQueue localEventQueue = new EventQueue();
+    PipelineManager mockedPipelineManager = mock(PipelineManager.class);
+    SCMSafeModeManager mockedSafeModeManager = mock(SCMSafeModeManager.class);
+    SafeModeMetrics mockedMetrics = mock(SafeModeMetrics.class);
+    when(mockedSafeModeManager.getSafeModeMetrics()).thenReturn(mockedMetrics);
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    PipelineID pipelineID = PipelineID.randomId();
+    Pipeline mockedPipeline = mock(Pipeline.class);
+    when(mockedPipeline.getId()).thenReturn(pipelineID);
+
+    // First validate(): pipeline has no nodes -> not counted as reported.
+    // Second validate(): pipeline has at least one node -> counted as reported.
+    when(mockedPipeline.getNodeSet())
+        .thenReturn(java.util.Collections.emptySet(),
+            new java.util.HashSet<>(
+                java.util.Collections.singletonList(mock(DatanodeDetails.class))));
+
+    when(mockedPipelineManager.getPipelines(
+        Mockito.any(),
+        Mockito.eq(Pipeline.PipelineState.OPEN)))
+        .thenReturn(java.util.Collections.singletonList(mockedPipeline));
+
+    OneReplicaPipelineSafeModeRule localRule =
+        new OneReplicaPipelineSafeModeRule(localEventQueue, mockedPipelineManager,
+            mockedSafeModeManager, conf);
+
+    localRule.setValidateBasedOnReportProcessing(false);
+
+    // With no nodes in the pipeline, the rule should not be satisfied.
+    assertFalse(localRule.validate());
+
+    // After at least one node is present in the pipeline, the rule should pass.
+    assertTrue(localRule.validate());
+    assertTrue(localRule.getReportedPipelineIDSet().contains(pipelineID));
   }
 
   private void createPipelines(int count,

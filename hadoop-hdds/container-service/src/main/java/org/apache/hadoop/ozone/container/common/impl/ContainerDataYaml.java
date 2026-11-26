@@ -294,8 +294,7 @@ public final class ContainerDataYaml {
     private class ConstructLong extends AbstractConstruct {
       @Override
       public Object construct(Node node) {
-        String value = constructScalar((ScalarNode) node).toString()
-            .replaceAll("_", "");
+        String value = constructScalar((ScalarNode) node).replaceAll("_", "");
         int sign = +1;
         char first = value.charAt(0);
         if (first == '-') {

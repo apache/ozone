@@ -24,6 +24,8 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.ScheduledReporter;
 import com.codahale.metrics.Slf4jReporter;
 import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.LinkedList;
@@ -44,7 +46,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.TimeDurationUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -164,8 +166,18 @@ public class BaseFreonGenerator implements FreonSubcommand {
    * tasks in a loop until completion or failure.
    */
   private void startTaskRunners(TaskProvider provider) {
+    Context parentContext = Context.current();
     for (int i = 0; i < threadNo; i++) {
-      executor.execute(() -> taskLoop(provider));
+      executor.execute(() -> taskLoop(provider, parentContext));
+    }
+  }
+
+  /**
+   * Wrapper to set up tracing context before entering runTaskLoop.
+   */
+  private void taskLoop(TaskProvider provider, Context parentContext) {
+    try (Scope ignored = parentContext.makeCurrent()) {
+      runTaskLoop(provider);
     }
   }
 
@@ -173,7 +185,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
    * Runs test tasks in a loop until completion or failure.  This is executed
    * concurrently in {@code executor}.
    */
-  private void taskLoop(TaskProvider provider) {
+  private void runTaskLoop(TaskProvider provider) {
     threadSequenceId.set(id.getAndIncrement());
     while (!completed.get()) {
       long counter = attemptCounter.getAndIncrement();
@@ -184,7 +196,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
           break;
         }
       } else {
-        //in case of an other failed test, we shouldn't execute more tasks.
+        //in case of another failed test, we shouldn't execute more tasks.
         if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
           completed.set(true);
           break;
@@ -432,14 +444,14 @@ public class BaseFreonGenerator implements FreonSubcommand {
     return new OzoneManagerProtocolClientSideTranslatorPB(transport, clientId);
   }
 
-  public StorageContainerLocationProtocol createStorageContainerLocationClient(
+  public StorageContainerLocationInternalInterface createStorageContainerLocationClient(
       OzoneConfiguration ozoneConf) throws IOException {
     return HAUtils.getScmContainerClient(ozoneConf);
   }
 
   @SuppressWarnings("java:S3864") // Stream.peek (for debug)
   public static Pipeline findPipelineForTest(String pipelineId,
-      StorageContainerLocationProtocol client, Logger log) throws IOException {
+      StorageContainerLocationInternalInterface client, Logger log) throws IOException {
     Stream<Pipeline> pipelines = client.listPipelines().stream();
     Pipeline pipeline;
     if (log.isDebugEnabled()) {

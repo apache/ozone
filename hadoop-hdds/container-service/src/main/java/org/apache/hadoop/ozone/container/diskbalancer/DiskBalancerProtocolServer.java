@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfo
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
@@ -70,18 +71,21 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
     DatanodeDetails datanodeDetails = datanodeStateMachine.getDatanodeDetails();
 
     return DatanodeDiskBalancerInfoProto.newBuilder()
-        .setNode(datanodeDetails.toProto(request.getClientVersion()))
+        .setNode(datanodeDetails.toProto(ClientVersion.deserialize(request.getClientVersion())))
         .setCurrentVolumeDensitySum(info.getVolumeDataDensity())
         .setDiskBalancerConf(DiskBalancerConfigurationProto.newBuilder()
                 .setThreshold(info.getThreshold())
                 .setDiskBandwidthInMB(info.getBandwidthInMB())
                 .setParallelThread(info.getParallelThread())
-                .setStopAfterDiskEven(info.isStopAfterDiskEven()))
+                .setStopAfterDiskEven(info.isStopAfterDiskEven())
+                .setContainerStates(info.getContainerStates()))
         .setSuccessMoveCount(info.getSuccessCount())
         .setFailureMoveCount(info.getFailureCount())
         .setBytesToMove(info.getBytesToMove())
         .setBytesMoved(info.getBalancedBytes())
         .setRunningStatus(info.getOperationalState())
+        .setIdealUsage(info.getIdealUsage())
+        .addAllVolumeInfo(info.getVolumeInfo())
         .build();
   }
 

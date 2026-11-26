@@ -72,8 +72,8 @@ LOG4J2.PROPERTIES_appender.console.layout.type=PatternLayout
 LOG4J2.PROPERTIES_appender.console.layout.pattern=%d{DEFAULT} | %-5level | %c{1} | %msg | %throwable{3} %n
 LOG4J2.PROPERTIES_appender.rolling.type=RollingFile
 LOG4J2.PROPERTIES_appender.rolling.name=RollingFile
-LOG4J2.PROPERTIES_appender.rolling.fileName=${sys:hadoop.log.dir}/om-audit-${hostName}.log
-LOG4J2.PROPERTIES_appender.rolling.filePattern=${sys:hadoop.log.dir}/om-audit-${hostName}-%d{yyyy-MM-dd}-%i.log.gz
+LOG4J2.PROPERTIES_appender.rolling.fileName=$${sys:hadoop.log.dir}/om-audit-$${hostName}.log
+LOG4J2.PROPERTIES_appender.rolling.filePattern=$${sys:hadoop.log.dir}/om-audit-$${hostName}-%d{yyyy-MM-dd}-%i.log.gz
 LOG4J2.PROPERTIES_appender.rolling.layout.type=PatternLayout
 LOG4J2.PROPERTIES_appender.rolling.layout.pattern=%d{DEFAULT} | %-5level | %c{1} | %msg | %throwable{3} %n
 LOG4J2.PROPERTIES_appender.rolling.policies.type=Policies
@@ -99,3 +99,6 @@ no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
 
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
+
+# Revert when HDDS-17350 is merged. (lazy client tracing init)
+OZONE-SITE.XML_ozone.tracing.client.application-aware=false

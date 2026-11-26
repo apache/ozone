@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
@@ -149,13 +150,14 @@ public class TestClosedWithUnhealthyReplicasHandler {
         .build();
 
     assertTrue(handler.handle(request));
+    // Handler sets UNHEALTHY_OVER_REPLICATED (not just OVER_REPLICATED)
     assertEquals(1, request.getReport().getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNHEALTHY_OVER_REPLICATED));
 
     assertTrue(handler.handle(readRequest));
     // Same report object is incremented again
     assertEquals(2, request.getReport().getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+        SimplifiedContainerHealthStateForReporting.UNHEALTHY_OVER_REPLICATED));
 
     // Only a single delete should be sent, as the read request should not have
     // triggered one.

@@ -25,14 +25,15 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.io_.retry.RetryPolicies;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
@@ -44,6 +45,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.Co
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.CompactResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetPeerUpgradeStatusRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetPeerUpgradeStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
@@ -110,13 +113,7 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
         (int) OmUtils.getOMClientRpcTimeOut(conf), connectionRetryPolicy)
         .getProxy();
 
-    RetryPolicy retryPolicy = RetryPolicies.retryUpToMaximumCountWithFixedSleep(
-        10, 1000, TimeUnit.MILLISECONDS);
-
-    OMAdminProtocolPB rpcProxy = (OMAdminProtocolPB) RetryProxy.create(
-        OMAdminProtocolPB.class, proxy, retryPolicy);
-
-    return new OMAdminProtocolClientSideImpl(rpcProxy,
+    return new OMAdminProtocolClientSideImpl(proxy,
         omNodeDetails.getOMPrintInfo());
   }
 
@@ -216,9 +213,10 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
   }
 
   @Override
-  public void compactOMDB(String columnFamily) throws IOException {
+  public void compactOMDB(String columnFamily, int bottommostLevelCompaction) throws IOException {
     CompactRequest compactRequest = CompactRequest.newBuilder()
         .setColumnFamily(columnFamily)
+        .setBottommostLevelCompaction(bottommostLevelCompaction)
         .build();
     CompactResponse response;
     try {
@@ -256,6 +254,17 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
           ". This likely indicates a server error.");
       // Unreachable, required for compilation
       return false;
+    }
+  }
+
+  @Override
+  public OzoneManagerVersion getPeerUpgradeStatus() throws IOException {
+    try {
+      GetPeerUpgradeStatusResponse response = rpcProxy.getPeerUpgradeStatus(
+          NULL_RPC_CONTROLLER, GetPeerUpgradeStatusRequest.newBuilder().build());
+      return OzoneManagerVersion.deserialize(response.getOmSoftwareVersion());
+    } catch (ServiceException e) {
+      throw ProtobufHelper.getRemoteException(e);
     }
   }
 

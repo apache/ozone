@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
+import java.util.LinkedList;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -24,14 +27,20 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.util.MetricUtil;
+import org.apache.hadoop.util.Time;
 
 /**
  * This class is for maintaining StorageContainerManager statistics.
  */
 @Metrics(about = "Storage Container Manager Metrics", context = "dfs")
-public class SCMMetrics {
+public final class SCMMetrics {
   public static final String SOURCE_NAME =
       SCMMetrics.class.getSimpleName();
+
+  private final LinkedList<String> ratisEvents = new LinkedList<>();
+  private final int maxRatisEvents;
+  private final String sourceName;
 
   /**
    * Container stat metrics, the meaning of following metrics
@@ -59,14 +68,25 @@ public class SCMMetrics {
     return dbCheckpointMetrics;
   }
 
-  public SCMMetrics() {
+  private SCMMetrics(String sourceName, int maxRatisEvents) {
+    this.sourceName = sourceName;
     dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics");
+    this.maxRatisEvents = maxRatisEvents;
   }
 
-  public static SCMMetrics create() {
+  public static SCMMetrics create(String scmId) {
+    return create(scmId, null);
+  }
+
+  public static SCMMetrics create(String scmId, ConfigurationSource conf) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "Storage Container Manager Metrics",
-        new SCMMetrics());
+    int maxRatisEvents = conf == null
+        ? ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
+        : conf.getInt(ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT,
+        ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, scmId);
+    return ms.register(sourceName, "Storage Container Manager Metrics",
+        new SCMMetrics(sourceName, maxRatisEvents));
   }
 
   public void setLastContainerReportSize(long size) {
@@ -155,8 +175,26 @@ public class SCMMetrics {
     this.containerReportWriteCount.incr(-1 * deltaStat.getWriteCount().get());
   }
 
+  public void addRatisEvent(String event) {
+    synchronized (ratisEvents) {
+      if (ratisEvents.size() >= maxRatisEvents) {
+        ratisEvents.removeFirst();
+      }
+      ratisEvents.add(Time.formatTime(Time.now()) + "|" + event);
+    }
+  }
+
+  // Ratis state machine events are multi-line logs, which should not be
+  // published as time-series metrics to metrics systems like Prometheus.
+  // Instead, they are exposed via JMX / MXBean endpoints.
+  public String getRatisEvents() {
+    synchronized (ratisEvents) {
+      return String.join("\n", ratisEvents);
+    }
+  }
+
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 }

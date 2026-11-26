@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.server.JsonUtils.toJsonStringWithDefaultPre
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.io.PrintWriter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -31,11 +30,13 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import picocli.CommandLine;
 
 /**
@@ -63,9 +64,9 @@ public class SnapshotDiffHandler extends Handler {
   @CommandLine.Option(names = {"-p", "--page-size"},
       description = "number of diff entries to be returned in the response. " +
           "Note the effective page size will also be bound by " +
-          "the server-side page size limit, see config:\n" +
+          "the server-side page size limit, see config:%n" +
           "  ozone.om.snapshot.diff.max.page.size",
-      defaultValue = "1000",
+      defaultValue = "5000",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS
   )
   private int pageSize;
@@ -82,11 +83,22 @@ public class SnapshotDiffHandler extends Handler {
       defaultValue = "false")
   private boolean cancel;
 
+  @CommandLine.Option(names = {"-r", "--get-report"},
+      description = "Get the snapshot diff report if available; " +
+          "does not submit a diff job if there is no job in progress.",
+      defaultValue = "false")
+  private boolean getReport;
+
   @CommandLine.Option(names = {"--dnld", "--disable-native-libs-diff"},
       description = "perform diff of snapshot without using" +
           " native libs (optional)",
       hidden = true)
   private boolean diffDisableNativeLibs;
+
+  @CommandLine.Option(names = {"--ordered"},
+      description = "emit FSO snapshot diff report entries in dependency order",
+      defaultValue = "false")
+  private boolean orderedReport;
 
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",
@@ -109,29 +121,50 @@ public class SnapshotDiffHandler extends Handler {
 
     if (cancel) {
       cancelSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
-    } else {
+    } else if (getReport) {
       getSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
+    } else {
+      submitSnapshotDiff(client.getObjectStore(), volumeName, bucketName);
+    }
+  }
+
+  private void submitSnapshotDiff(ObjectStore store, String volumeName,
+                               String bucketName) throws IOException {
+    SubmitSnapshotDiffResponse response;
+    try {
+      response = store.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+          forceFullDiff, diffDisableNativeLibs, orderedReport);
+    } catch (OMException ex) {
+      // submit snapshot diff falls back to legacy snapshotDiff is server does not support it.
+      if (ex.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+        SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+            token, pageSize, forceFullDiff, diffDisableNativeLibs);
+        printResponse(diffResponse);
+        return;
+      }
+      throw ex;
+    }
+    out().println(response);
+  }
+
+  private void printResponse(SnapshotDiffResponse diffResponse) throws IOException {
+    if (json) {
+      out().println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
+    } else {
+      out().println(diffResponse);
     }
   }
 
   private void getSnapshotDiff(ObjectStore store, String volumeName,
                                String bucketName) throws IOException {
     SnapshotDiffResponse diffResponse = store.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        token, pageSize, forceFullDiff, diffDisableNativeLibs);
-    try (PrintWriter writer = out()) {
-      if (json) {
-        writer.println(toJsonStringWithDefaultPrettyPrinter(getJsonObject(diffResponse)));
-      } else {
-        writer.println(diffResponse);
-      }
-    }
+        token, pageSize);
+    printResponse(diffResponse);
   }
 
   private void cancelSnapshotDiff(ObjectStore store, String volumeName,
                                   String bucketName) throws IOException {
-    try (PrintWriter writer = out()) {
-      writer.println(store.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot));
-    }
+    out().println(store.cancelSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot));
   }
 
   private ObjectNode getJsonObject(SnapshotDiffResponse diffResponse) {
@@ -143,6 +176,13 @@ public class SnapshotDiffHandler extends Handler {
     }
     if (StringUtils.isNotEmpty(diffResponse.getReason())) {
       diffResponseNode.put("reason", diffResponse.getReason());
+    }
+    if (diffResponse.getSubStatus() != null) {
+      SnapshotDiffResponse.SubStatus sub = diffResponse.getSubStatus();
+      diffResponseNode.put("subStatus", sub.name());
+      if (sub.hasProgress()) {
+        diffResponseNode.put("progressPercent", diffResponse.getProgressPercent());
+      }
     }
     return diffResponseNode;
   }

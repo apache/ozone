@@ -19,10 +19,6 @@
 export const overviewLocators = {
   'datanodeRow': 'overview-Health-Datanodes',
   'containersRow': 'overview-Health-Containers',
-  'capacityOzoneUsed': 'capacity-ozone-used',
-  'capacityNonOzoneUsed': 'capacity-non-ozone-used',
-  'capacityRemaining': 'capacity-remaining',
-  'capacityPreAllocated': 'capacity-pre-allocated',
   'volumesCard': 'overview-Volumes',
   'bucketsCard': 'overview-Buckets',
   'keysCard': 'overview-Keys',
@@ -52,6 +48,11 @@ export const pipelineLocators = {
   'pipelineTable': 'pipelines-table',
   'pipelineRowRegex': /pipelinetable-/,
   pipelineTableRow: (uuid: string) => `pipelinetable-${uuid}`
+}
+
+export const containerLocators = {
+  containerRowRegex: /containerstable-/,
+  containerTableRow: (containerId: number) => `containerstable-${containerId}`,
 }
 
 export const autoReloadPanelLocators = {

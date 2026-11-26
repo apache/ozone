@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.util.Collections;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -35,7 +34,6 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -55,10 +53,8 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
   private DatanodeStateMachine dsm;
   private OzoneConfiguration conf;
-  private static final String CLUSTER_ID = "clusterID";
 
   private RPC.Server scmRpcServer;
-  private InetSocketAddress address;
 
   private void initTests() throws Exception {
     conf = new OzoneConfiguration();
@@ -66,8 +62,6 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   }
 
   private void setup() throws Exception {
-    address = SCMTestUtils.getReuseableAddress();
-    conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempFolder.toString());
   }
@@ -87,10 +81,11 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   public void testContainerTableAccessBeforeAndAfterUpgrade() throws Exception {
     initTests();
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf, new ScmTestMock(CLUSTER_ID), address, 10);
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.HBASE_SUPPORT.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
 
@@ -109,8 +104,8 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     // close container to allow upgrade.
     UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
 
-    dsm.finalizeUpgrade();
-    assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
+    dsm.getVersionManager().finalizeUpgrade();
+    assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
     assertEquals(WitnessedContainerDBDefinition.CONTAINER_CREATE_INFO_TABLE_DEF.getName(),
         metadataStore.getContainerCreateInfoTable().getName());
     ContainerCreateInfo containerCreateInfo = metadataStore.getContainerCreateInfoTable().get(
@@ -123,10 +118,11 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   public void testContainerTableFinalizeRetry() throws Exception {
     initTests();
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf, new ScmTestMock(CLUSTER_ID), address, 10);
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.HBASE_SUPPORT.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
 
@@ -166,8 +162,8 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     }
 
     // trigger another upgrade which will update metainfo for upgrade
-    dsm.finalizeUpgrade();
-    assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
+    dsm.getVersionManager().finalizeUpgrade();
+    assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
     assertEquals(WitnessedContainerDBDefinition.CONTAINER_CREATE_INFO_TABLE_DEF.getName(),
         metadataStore.getContainerCreateInfoTable().getName());
     ContainerCreateInfo containerCreateInfo

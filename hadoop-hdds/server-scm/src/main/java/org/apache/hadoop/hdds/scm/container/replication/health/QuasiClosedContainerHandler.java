@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.slf4j.Logger;
@@ -76,9 +76,7 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
     } else {
       LOG.debug("Container {} cannot be force closed and is stuck in " +
               "QUASI_CLOSED", containerInfo);
-      request.getReport().incrementAndSample(
-          ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK,
-          containerInfo.containerID());
+      request.setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK);
     }
     // Always return false, even if commands were sent. That way, under and
     // over replication handlers can to check for other issues in the container.

@@ -19,13 +19,16 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.inject.Injector;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.ReconGuiceServletContextListener;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -137,6 +140,27 @@ public class TestNSSummaryAggregatedTotalsUpgrade {
   }
 
   @Test
+  public void testExecuteIsIdempotentWhenRebuildRunning() {
+    try (MockedStatic<ReconGuiceServletContextListener> mockedListener =
+             Mockito.mockStatic(ReconGuiceServletContextListener.class);
+         MockedStatic<NSSummaryTask> mockedNSSummary = Mockito.mockStatic(NSSummaryTask.class)) {
+
+      mockedListener.when(ReconGuiceServletContextListener::getGlobalInjector)
+          .thenReturn(mockInjector);
+
+      when(mockInjector.getInstance(ReconTaskController.class))
+          .thenReturn(mockReconTaskController);
+
+      mockedNSSummary.when(NSSummaryTask::getRebuildState)
+          .thenReturn(NSSummaryTask.RebuildState.RUNNING);
+
+      assertDoesNotThrow(() -> upgradeAction.execute(mockDataSource));
+
+      verify(mockReconTaskController, never()).queueReInitializationEvent(any());
+    }
+  }
+
+  @Test
   public void testExecuteWithInjectorException() throws Exception {
     try (MockedStatic<ReconGuiceServletContextListener> mockedListener = 
          Mockito.mockStatic(ReconGuiceServletContextListener.class)) {
@@ -151,10 +175,5 @@ public class TestNSSummaryAggregatedTotalsUpgrade {
 
       verify(mockInjector).getInstance(ReconTaskController.class);
     }
-  }
-
-  @Test
-  public void testGetType() {
-    assert upgradeAction.getType() == ReconUpgradeAction.UpgradeActionType.FINALIZE;
   }
 }

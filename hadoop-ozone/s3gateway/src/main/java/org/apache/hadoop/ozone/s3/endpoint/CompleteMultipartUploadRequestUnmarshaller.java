@@ -18,12 +18,16 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapOS3Exception;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PushbackInputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
+import javax.inject.Singleton;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
@@ -33,6 +37,7 @@ import javax.ws.rs.ext.Provider;
  * Custom unmarshaller to read CompleteMultipartUploadRequest wo namespace.
  */
 @Provider
+@Singleton
 public class CompleteMultipartUploadRequestUnmarshaller
     extends MessageUnmarshaller<CompleteMultipartUploadRequest> {
 
@@ -47,12 +52,21 @@ public class CompleteMultipartUploadRequestUnmarshaller
       MultivaluedMap<String, String> multivaluedMap,
       InputStream inputStream) throws WebApplicationException {
     try {
-      if (inputStream.available() == 0) {
-        throw wrapOS3Exception(INVALID_REQUEST.withMessage("You must specify at least one part"));
+      // Detect an empty request body by trying to read a single byte rather
+      // than relying on InputStream#available(), which may return 0 even when
+      // the body is not yet buffered (e.g. with Expect: 100-continue). See
+      // HDDS-14760.
+      PushbackInputStream pushbackStream = new PushbackInputStream(inputStream);
+      int firstByte = pushbackStream.read();
+      if (firstByte == -1) {
+        // An empty body is a malformed CompleteMultipartUpload request.
+        throw wrapOS3Exception(newError(MALFORMED_XML));
       }
-      return super.readFrom(aClass, type, annotations, mediaType, multivaluedMap, inputStream);
+      pushbackStream.unread(firstByte);
+      return super.readFrom(aClass, type, annotations, mediaType, multivaluedMap, pushbackStream);
     } catch (IOException e) {
-      throw wrapOS3Exception(INVALID_REQUEST.withMessage(e.getMessage()));
+      throw wrapOS3Exception(newError(INVALID_REQUEST, e)
+          .withMessage(e.getMessage()));
     }
   }
 

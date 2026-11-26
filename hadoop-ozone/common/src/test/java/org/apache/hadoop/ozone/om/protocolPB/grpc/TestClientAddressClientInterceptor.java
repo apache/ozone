@@ -23,13 +23,13 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.grpc.CallOptions;
-import io.grpc.Channel;
-import io.grpc.ClientCall;
-import io.grpc.ClientInterceptor;
-import io.grpc.Context;
-import io.grpc.Metadata;
-import io.grpc.MethodDescriptor;
+import org.apache.ratis.thirdparty.io.grpc.CallOptions;
+import org.apache.ratis.thirdparty.io.grpc.Channel;
+import org.apache.ratis.thirdparty.io.grpc.ClientCall;
+import org.apache.ratis.thirdparty.io.grpc.ClientInterceptor;
+import org.apache.ratis.thirdparty.io.grpc.Context;
+import org.apache.ratis.thirdparty.io.grpc.Metadata;
+import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
@@ -39,6 +39,7 @@ import org.mockito.MockedStatic;
 public class TestClientAddressClientInterceptor {
 
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testClientAddressEntriesInRequestHeaders() {
     try (MockedStatic<Context> grpcContextStaticMock =
              mockStatic(Context.class)) {

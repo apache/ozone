@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -48,11 +49,10 @@ import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -89,7 +89,7 @@ public class TestMultiBlockWritesWithDnFailures {
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(30));
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(10));
     ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
     conf.setFromObject(ratisClientConfig);
 
@@ -98,13 +98,12 @@ public class TestMultiBlockWritesWithDnFailures {
         1, TimeUnit.SECONDS);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
-    conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(datanodes)
         .build();
     cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getRpcClient(conf);
+    // Tests on the shared client lose the majority of the pipeline, so retrying the write cannot succeed.
+    client = OzoneClientFactory.getRpcClient(RatisTestHelper.withShortWriteRequestTimeout(conf));
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "datanodefailurehandlingtest";
@@ -164,7 +163,6 @@ public class TestMultiBlockWritesWithDnFailures {
     validateData(keyName, data.concat(data).getBytes(UTF_8));
   }
 
-  @Flaky("HDDS-11355")
   @Test
   public void testMultiBlockWritesWithIntermittentDnFailures()
       throws Exception {
@@ -219,12 +217,12 @@ public class TestMultiBlockWritesWithDnFailures {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
                                       long size) throws Exception {
-    return TestHelper
+    return OzoneTestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    TestHelper
+    OzoneTestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 

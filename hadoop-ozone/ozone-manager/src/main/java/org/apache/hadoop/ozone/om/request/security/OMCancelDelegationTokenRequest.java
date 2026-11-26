@@ -59,7 +59,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     // We need to populate user info in our request object.
-    OMRequest request =  super.preExecute(ozoneManager);
+    final OMRequest request = super.preExecute(ozoneManager);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     Map<String, String> auditMap = null;

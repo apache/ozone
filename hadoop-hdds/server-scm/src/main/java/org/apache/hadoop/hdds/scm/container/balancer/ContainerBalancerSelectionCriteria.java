@@ -21,10 +21,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -33,6 +36,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -46,6 +50,7 @@ import org.slf4j.LoggerFactory;
 public class ContainerBalancerSelectionCriteria {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerSelectionCriteria.class);
+  private static final int MAX_EXCLUDED_CONTAINERS_TO_LOG = 50;
 
   private ContainerBalancerConfiguration balancerConfiguration;
   private NodeManager nodeManager;
@@ -53,9 +58,17 @@ public class ContainerBalancerSelectionCriteria {
   private ContainerManager containerManager;
   private Map<ContainerID, DatanodeDetails> containerToSourceMap;
   private Set<ContainerID> excludeContainers;
-  private Set<ContainerID> excludeContainersDueToFailure;
+  private Set<ContainerID> includeContainers;
+  // excludeContainersDueToFailure: Containers excluded for current iteration only.
+  // excludeContainersNotFound: Container exclusions persist across iterations.
+  private final Set<ContainerID> excludeContainersDueToFailure;
+  private final Set<ContainerID> excludeContainersNotFound;
+  private final Map<ContainerID, ContainerHealthResult.HealthState> excludeContainersDueToHealth;
   private FindSourceStrategy findSourceStrategy;
   private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
+
+  // Capped to avoid unbounded growth in long-running or unlimited-iteration runs.
+  private static final int MAX_NOT_FOUND_CONTAINERS = 10_000;
 
   public ContainerBalancerSelectionCriteria(
       ContainerBalancerConfiguration balancerConfiguration,
@@ -64,19 +77,35 @@ public class ContainerBalancerSelectionCriteria {
       ContainerManager containerManager,
       FindSourceStrategy findSourceStrategy,
       Map<ContainerID, DatanodeDetails> containerToSourceMap) {
+    this(balancerConfiguration, nodeManager, replicationManager, containerManager,
+        findSourceStrategy, containerToSourceMap, new HashSet<>());
+  }
+
+  public ContainerBalancerSelectionCriteria(
+      ContainerBalancerConfiguration balancerConfiguration,
+      NodeManager nodeManager,
+      ReplicationManager replicationManager,
+      ContainerManager containerManager,
+      FindSourceStrategy findSourceStrategy,
+      Map<ContainerID, DatanodeDetails> containerToSourceMap,
+      Set<ContainerID> excludeContainersNotFound) {
     this.balancerConfiguration = balancerConfiguration;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
     this.containerManager = containerManager;
     this.containerToSourceMap = containerToSourceMap;
-    excludeContainersDueToFailure = new HashSet<>();
+    this.excludeContainersDueToFailure = new HashSet<>();
+    this.excludeContainersNotFound = excludeContainersNotFound;
+    this.excludeContainersDueToHealth = new LinkedHashMap<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
+    includeContainers = balancerConfiguration.getIncludeContainers();
     this.findSourceStrategy = findSourceStrategy;
     this.setMap = new HashMap<>();
   }
 
   /**
-   * Checks whether container is currently undergoing replication or deletion.
+   * Checks whether container is currently undergoing replication or deletion by checking if there's an add or delete
+   * scheduled for it.
    *
    * @param containerID Container to check.
    * @return true if container is replicating or deleting, otherwise false.
@@ -150,26 +179,60 @@ public class ContainerBalancerSelectionCriteria {
    * 3. Container size should be closer to 5GB.
    * 4. Container must not be in the configured exclude containers list.
    * 5. Container should be closed.
+   * <p>
+   * If {@link ContainerBalancerConfiguration#getIncludeNonStandardContainers()}
+   * is enabled, non-standard containers will also be included:
+   * - OVER_REPLICATED CLOSED containers (subject to minimum CLOSED replica checks)
+   * - OVER_REPLICATED and HEALTHY QUASI_CLOSED containers (subject to all QUASI_CLOSED 
+   *   replica checks and non-empty source replicas)
    * @param node DatanodeDetails for which to find candidate containers.
    * @return true if the container should be excluded, else false
    */
   public boolean shouldBeExcluded(ContainerID containerID,
       DatanodeDetails node, long sizeMovedAlready) {
     ContainerInfo container;
+    //If includeContainers is specified, exclude containers not in the include list
+    if (!includeContainers.isEmpty() && !includeContainers.contains(containerID)) {
+      return true;
+    }
     try {
       container = containerManager.getContainer(containerID);
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not find Container {} to check if it should be a " +
           "candidate container. Excluding it.", containerID);
+      addToExcludeNotFoundContainers(containerID);
       return true;
     }
-    return excludeContainers.contains(containerID) || excludeContainersDueToFailure.contains(containerID) ||
+
+    if (excludeContainers.contains(containerID) ||
+        excludeContainersDueToFailure.contains(containerID) ||
+        excludeContainersNotFound.contains(containerID) ||
         containerToSourceMap.containsKey(containerID) ||
-        !isContainerClosed(container, node) ||
-        isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
         || breaksMaxSizeToMoveLimit(container.containerID(),
-        container.getUsedBytes(), sizeMovedAlready);
+        container.getUsedBytes(), sizeMovedAlready)) {
+      return true;
+    }
+
+    Set<ContainerReplica> replicas;
+    try {
+      replicas = containerManager.getContainerReplicas(container.containerID());
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
+          "this container.", container.getContainerID(), e);
+      addToExcludeNotFoundContainers(containerID);
+      return true;
+    }
+
+    if (balancerConfiguration.getIncludeNonStandardContainers()) {
+      return !isContainerClosedRelaxed(container, node, replicas) ||
+          !isContainerHealthyForMoveRelaxed(container, replicas) ||
+          isContainerReplicatingOrDeleting(containerID);
+    } else {
+      return !isContainerClosed(container, node, replicas) ||
+          !isContainerHealthyForMove(container, replicas) ||
+          isContainerReplicatingOrDeleting(containerID);
+    }
   }
 
   /**
@@ -184,20 +247,12 @@ public class ContainerBalancerSelectionCriteria {
    * specified datanode is CLOSED, else false
    */
   private boolean isContainerClosed(ContainerInfo container,
-                                    DatanodeDetails datanodeDetails) {
+                                    DatanodeDetails datanodeDetails,
+                                    Set<ContainerReplica> replicas) {
     if (!container.getState().equals(HddsProtos.LifeCycleState.CLOSED)) {
       return false;
     }
 
-    // also check that the replica on the specified DN is closed
-    Set<ContainerReplica> replicas;
-    try {
-      replicas = containerManager.getContainerReplicas(container.containerID());
-    } catch (ContainerNotFoundException e) {
-      LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
-          "this container.", container.getContainerID(), e);
-      return false;
-    }
     for (ContainerReplica replica : replicas) {
       if (replica.getDatanodeDetails().equals(datanodeDetails)) {
         // don't consider replica if it's not closed
@@ -207,6 +262,128 @@ public class ContainerBalancerSelectionCriteria {
     }
 
     return false;
+  }
+
+  /**
+   * This asks replication manager whether a container is under/over/mis replicated. The intention is the same as
+   * isContainerReplicatingOrDeleting but the check is done in a different way to be doubly sure.
+   * @param container container to check
+   * @param replicas the container's replicas
+   * @return false if it should not be moved, true otherwise
+   */
+  private boolean isContainerHealthyForMove(ContainerInfo container, Set<ContainerReplica> replicas) {
+    ContainerHealthResult.HealthState state =
+        replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
+    if (state != ContainerHealthResult.HealthState.HEALTHY) {
+      excludeContainersDueToHealth.put(container.containerID(), state);
+      LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Relaxed version of isContainerClosed used when includeNonStandardContainers is enabled.
+   * <p>
+   * - CLOSED container, CLOSED replica: if replication health is OVER_REPLICATED, requires
+   *   minimum CLOSED replicas; otherwise allows.
+   * - CLOSED container, QUASI_CLOSED replica: requires minimum CLOSED replicas and a non-empty
+   *   replica on the source datanode.
+   * - QUASI_CLOSED container: all replicas must be QUASI_CLOSED; replica on source must be
+   *   non-empty.
+   *
+   * @param container container to check
+   * @param datanodeDetails datanode on which a replica of the container is present
+   * @param replicas all replicas of the container
+   * @return true if container and replica are eligible for balancing, else false
+   */
+  private boolean isContainerClosedRelaxed(ContainerInfo container,
+                                           DatanodeDetails datanodeDetails,
+                                           Set<ContainerReplica> replicas) {
+    ContainerHealthResult.HealthState replicationHealth =
+        replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
+    HddsProtos.LifeCycleState containerState = container.getState();
+    // Find the specific replica on this datanode
+    ContainerReplica targetReplica = replicas.stream()
+        .filter(r -> r.getDatanodeDetails().equals(datanodeDetails))
+        .findFirst()
+        .orElse(null);
+    if (targetReplica == null) {
+      return false;
+    }
+    ContainerReplicaProto.State replicaState = targetReplica.getState();
+    
+    // Case 1: Container is CLOSED
+    if (containerState == HddsProtos.LifeCycleState.CLOSED) {
+      if (replicaState == ContainerReplicaProto.State.CLOSED) {
+        if (replicationHealth == ContainerHealthResult.HealthState.OVER_REPLICATED) {
+          return hasMinClosedReplicas(container, replicas);
+        }
+        return true;
+      }
+      
+      if (replicaState == ContainerReplicaProto.State.QUASI_CLOSED) {
+        if (!hasMinClosedReplicas(container, replicas)) {
+          return false;
+        }
+        return !targetReplica.isEmpty();
+      }
+      return false;
+    }
+    
+    // Case 2: Container is QUASI_CLOSED
+    if (containerState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+      boolean allReplicasQuasiClosed = replicas.stream()
+          .allMatch(r -> r.getState() == ContainerReplicaProto.State.QUASI_CLOSED);
+      if (!allReplicasQuasiClosed) {
+        return false;
+      }
+      return !targetReplica.isEmpty();
+    }
+    return false;
+  }
+
+  private static boolean hasMinClosedReplicas(ContainerInfo container, Set<ContainerReplica> replicas) {
+    long count = replicas.stream()
+        .filter(r -> r.getState() == ContainerReplicaProto.State.CLOSED)
+        .count();
+    return count >= container.getReplicationConfig().getRequiredNodes();
+  }
+
+  /**
+   * Relaxed version of isContainerHealthyForMove used when includeNonStandardContainers is enabled.
+   * <p>
+   * - OVER_REPLICATED CLOSED and QUASI_CLOSED containers are allowed.
+   *
+   * @param container container to check
+   * @param replicas the container's replicas
+   * @return false if it should not be moved, true otherwise
+   */
+  private boolean isContainerHealthyForMoveRelaxed(ContainerInfo container, Set<ContainerReplica> replicas) {
+    ContainerHealthResult.HealthState state =
+        replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
+    if (state == ContainerHealthResult.HealthState.HEALTHY ||
+        state == ContainerHealthResult.HealthState.OVER_REPLICATED) {
+      return true;
+    }
+
+    excludeContainersDueToHealth.put(container.containerID(), state);
+    LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
+    return false;
+  }
+
+  void logExcludedContainersDueToHealth() {
+    if (excludeContainersDueToHealth.isEmpty()) {
+      return;
+    }
+
+    List<Map.Entry<ContainerID, ContainerHealthResult.HealthState>> containersToLog =
+        excludeContainersDueToHealth.entrySet().stream()
+            .limit(MAX_EXCLUDED_CONTAINERS_TO_LOG)
+            .collect(Collectors.toList());
+    LOG.info("Excluded {} containers because of their health state. Logging the first {}: {}.",
+        excludeContainersDueToHealth.size(), containersToLog.size(), containersToLog);
   }
 
   private boolean breaksMaxSizeToMoveLimit(ContainerID containerID,
@@ -231,17 +408,38 @@ public class ContainerBalancerSelectionCriteria {
     this.excludeContainersDueToFailure.add(container);
   }
 
+  Set<ContainerID> getExcludeDueToFailContainers() {
+    return excludeContainersDueToFailure;
+  }
+
+  public void addToExcludeNotFoundContainers(ContainerID container) {
+    if (excludeContainersNotFound.size() < MAX_NOT_FOUND_CONTAINERS) {
+      excludeContainersNotFound.add(container);
+    } else {
+      LOG.warn("ContainerBalancer not found exclude set has reached the cap of {}. " +
+              "Container {} will not be added, it may be retried in subsequent iterations.",
+          MAX_NOT_FOUND_CONTAINERS, container);
+    }
+  }
+
+  Set<ContainerID> getExcludeNotFoundContainers() {
+    return excludeContainersNotFound;
+  }
+
   private NavigableSet<ContainerID> getCandidateContainers(DatanodeDetails node) {
     NavigableSet<ContainerID> newSet =
         new TreeSet<>(orderContainersByUsedBytes().reversed());
     try {
       Set<ContainerID> idSet = nodeManager.getContainers(node);
+      if (includeContainers != null && !includeContainers.isEmpty()) {
+        idSet.retainAll(includeContainers);
+      }
       if (excludeContainers != null) {
         idSet.removeAll(excludeContainers);
       }
-      if (excludeContainersDueToFailure != null) {
-        idSet.removeAll(excludeContainersDueToFailure);
-      }
+      idSet.removeAll(excludeContainersDueToFailure);
+      idSet.removeAll(excludeContainersNotFound);
+
       idSet.removeAll(containerToSourceMap.keySet());
       newSet.addAll(idSet);
       return newSet;

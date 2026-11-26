@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
+import static org.apache.hadoop.ozone.ClientVersion.CURRENT;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.test.HATests;
+import org.apache.ozone.test.HACluster;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -46,7 +46,7 @@ import org.junit.jupiter.api.TestInstance;
  * Test-cases to verify SCMStateMachine.applyTransaction failure scenarios.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestScmApplyTransactionFailure implements HATests.TestCase {
+public abstract class TestScmApplyTransactionFailure implements HACluster.TestCase {
 
   private ContainerManager containerManager;
   private PipelineManagerImpl pipelineManager;
@@ -94,7 +94,7 @@ public abstract class TestScmApplyTransactionFailure implements HATests.TestCase
         replication, PipelineState.OPEN).get(0);
 
     HddsProtos.Pipeline pipelineToCreate =
-        existing.getProtobufMessage(CURRENT_VERSION);
+        existing.getProtobufMessage(CURRENT);
     Throwable ex = assertThrows(SCMException.class,
         () -> pipelineManager.getStateManager().addPipeline(
             pipelineToCreate));

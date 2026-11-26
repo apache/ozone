@@ -22,7 +22,6 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.stream.Collectors;
-import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
@@ -31,6 +30,7 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
+import org.apache.hadoop.util.XMLUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -48,8 +48,7 @@ public class ConfigFileAppender {
 
   public ConfigFileAppender() {
     try {
-      DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-      factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      DocumentBuilderFactory factory = XMLUtils.newSecureDocumentBuilderFactory();
       builder = factory.newDocumentBuilder();
     } catch (Exception ex) {
       throw new ConfigurationException("Can initialize new configuration", ex);
@@ -113,8 +112,7 @@ public class ConfigFileAppender {
    */
   public void write(Writer writer) {
     try {
-      TransformerFactory factory = TransformerFactory.newInstance();
-      factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      TransformerFactory factory = XMLUtils.newSecureTransformerFactory();
       Transformer transformer = factory.newTransformer();
 
       transformer.setOutputProperty(OutputKeys.ENCODING,

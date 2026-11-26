@@ -29,14 +29,14 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
  * A simple test that asserts that list status output is sorted.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestListStatus implements NonHATests.TestCase {
+public abstract class TestListStatus implements ClusterForTests.TestCase {
   private static final Logger LOG = LoggerFactory.getLogger(TestListStatus.class);
 
   private OzoneBucket fsoOzoneBucket;
@@ -65,7 +65,7 @@ public abstract class TestListStatus implements NonHATests.TestCase {
     client = OzoneClientFactory.getRpcClient(conf);
 
     // create a volume and a LEGACY bucket
-    fsoOzoneBucket = TestDataUtil
+    fsoOzoneBucket = DataTestUtil
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     buildNameSpaceTree(fsoOzoneBucket);

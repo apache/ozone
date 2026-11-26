@@ -134,6 +134,19 @@ public class VolumeIOStats {
   }
 
   /**
+   * Record a read operation with timing and bytes read.
+   * This is a convenience method that updates read time, operation count, and bytes read.
+   * @param startTime the start time of the read operation in milliseconds
+   * @param bytesRead the number of bytes read
+   */
+  public void recordReadOperation(long startTime, long bytesRead) {
+    long endTime = org.apache.hadoop.util.Time.monotonicNow();
+    incReadTime(endTime - startTime);
+    incReadOpCount();
+    incReadBytes(bytesRead);
+  }
+
+  /**
    * Increment the time taken by write operation on the volume.
    * @param time
    */

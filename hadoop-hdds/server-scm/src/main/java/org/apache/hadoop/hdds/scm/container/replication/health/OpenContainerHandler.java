@@ -23,7 +23,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.slf4j.Logger;
@@ -63,10 +63,10 @@ public class OpenContainerHandler extends AbstractCheck {
         LOG.info("Container {} is open but {}. Triggering close.",
             containerInfo, noPipeline ? "has no Pipeline" : "unhealthy");
 
-        request.getReport().incrementAndSample(noPipeline ?
-                ReplicationManagerReport.HealthState.OPEN_WITHOUT_PIPELINE :
-                ReplicationManagerReport.HealthState.OPEN_UNHEALTHY,
-            containerInfo.containerID());
+        SimplifiedContainerHealthStateForReporting openHealthState = noPipeline ?
+            SimplifiedContainerHealthStateForReporting.OPEN_WITHOUT_PIPELINE :
+            SimplifiedContainerHealthStateForReporting.OPEN_UNHEALTHY;
+        request.setSimplifiedHealthStateForReporting(openHealthState);
 
         if (!request.isReadOnly()) {
           replicationManager

@@ -48,8 +48,8 @@ public class DecommissionSubCommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     List<String> hosts = hostNameParams.getHostNames();
     List<DatanodeAdminError> errors = scmClient.decommissionNodes(hosts, force);
-    System.out.println("Started decommissioning datanode(s):\n" +
-        String.join("\n", hosts));
+    System.out.println("Started decommissioning datanode(s):");
+    hosts.forEach(System.out::println);
     showErrors(errors, "Some nodes could not enter the decommission workflow");
   }
 

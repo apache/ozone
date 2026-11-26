@@ -39,7 +39,6 @@ import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -66,7 +65,7 @@ public class ContainerChecksumTreeManager {
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
   public ContainerChecksumTreeManager(ConfigurationSource conf) {
-    fileLocks = SimpleStriped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
+    fileLocks = Striped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
         () -> new ReentrantLock(true));
     metrics = ContainerMerkleTreeMetrics.create();
   }
@@ -235,7 +234,7 @@ public class ContainerChecksumTreeManager {
         // thisTree = Unhealthy, peerTree = Unhealthy -> Do Nothing as both are corrupt.
         if (thisChunkMerkleTree.getDataChecksum() != peerChunkMerkleTree.getDataChecksum() &&
             !thisChunkMerkleTree.getChecksumMatches()) {
-          reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTree, report::addCorruptChunk);
+          reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTree, report, report::addCorruptChunk);
         }
         thisIdx++;
         peerIdx++;
@@ -245,14 +244,15 @@ public class ContainerChecksumTreeManager {
         thisIdx++;
       } else {
         // Peer chunk's offset is smaller; record missing chunk and advance peerIdx
-        reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTree, report::addMissingChunk);
+        reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTree, report, report::addMissingChunk);
         peerIdx++;
       }
     }
 
     // Step 2: Process remaining chunks in the peer list
     while (peerIdx < peerChunkMerkleTreeList.size()) {
-      reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTreeList.get(peerIdx), report::addMissingChunk);
+      reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTreeList.get(peerIdx), report,
+          report::addMissingChunk);
       peerIdx++;
     }
 
@@ -261,10 +261,13 @@ public class ContainerChecksumTreeManager {
   }
 
   private void reportChunkIfHealthy(long containerID, long blockID, ContainerProtos.ChunkMerkleTree peerTree,
-      BiConsumer<Long, ContainerProtos.ChunkMerkleTree> addToReport) {
+      ContainerDiffReport report, BiConsumer<Long, ContainerProtos.ChunkMerkleTree> addToReport) {
     if (peerTree.getChecksumMatches()) {
       addToReport.accept(blockID, peerTree);
     } else {
+      // Record the drop on the report: a block whose only differences are dropped here never enters the
+      // repair lists, so this counter is the round's only evidence that the diff was incomplete.
+      report.incrementUnhealthyChunksFiltered();
       LOG.warn("Skipping chunk at offset {} in block {} of container {} since peer reported it as " +
           "unhealthy.", peerTree.getOffset(), blockID, containerID);
     }

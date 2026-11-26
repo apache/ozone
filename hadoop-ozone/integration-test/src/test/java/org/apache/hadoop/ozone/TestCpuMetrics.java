@@ -26,7 +26,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -35,14 +35,17 @@ import org.junit.jupiter.api.Test;
  *  <p>jvm_metrics_cpu_system_load</p>
  *  <p>jvm_metrics_cpu_jvm_load</p>
  */
-public abstract class TestCpuMetrics implements NonHATests.TestCase {
+public abstract class TestCpuMetrics implements ClusterForTests.TestCase {
 
   private final OkHttpClient httpClient = new OkHttpClient();
 
   @Test
   public void testCpuMetrics() throws IOException {
     // given
-    String scmHttpServerUrl = "http://localhost:" +
+    // Use the IPv4 loopback literal rather than "localhost": the SCM HTTP
+    // server binds to the IPv4 wildcard 0.0.0.0, but on macOS "localhost"
+    // resolves to IPv6 ::1 first, which the server does not accept.
+    String scmHttpServerUrl = "http://127.0.0.1:" +
         HddsUtils.getPortNumberFromConfigKeys(cluster().getConf(),
                 OZONE_SCM_HTTP_ADDRESS_KEY).getAsInt();
     Request prometheusMetricsRequest = new Request.Builder()

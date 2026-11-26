@@ -27,12 +27,12 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -44,7 +44,7 @@ import org.junit.jupiter.api.TestInstance;
  * missing for some reason.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneFileSystemMissingParent implements NonHATests.TestCase {
+public abstract class TestOzoneFileSystemMissingParent implements ClusterForTests.TestCase {
 
   private Path bucketPath;
   private FileSystem fs;
@@ -54,7 +54,7 @@ public abstract class TestOzoneFileSystemMissingParent implements NonHATests.Tes
   void init() throws Exception {
     client = cluster().newClient();
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client);
 
     String volumeName = bucket.getVolumeName();
     Path volumePath = new Path(OZONE_URI_DELIMITER, volumeName);

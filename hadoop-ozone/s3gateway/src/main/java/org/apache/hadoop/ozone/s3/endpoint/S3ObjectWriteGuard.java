@@ -1,0 +1,152 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.s3.endpoint;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import javax.xml.bind.DatatypeConverter;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.AwsChunkedInputStream;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.ratis.util.function.CheckedRunnable;
+
+/**
+ * Tracks bytes written for a write request and guards close-time commit.
+ */
+class S3ObjectWriteGuard implements AutoCloseable {
+
+  private final OutputStream outputStream;
+  private final long expectedLength;
+  private final String keyPath;
+  private final List<CheckedRunnable<IOException>> preCommits =
+      new ArrayList<>();
+  private long writtenLength;
+  private boolean transferComplete;
+
+  S3ObjectWriteGuard(
+      OzoneOutputStream outputStream, long expectedLength, String keyPath) {
+    this.outputStream = outputStream;
+    this.expectedLength = expectedLength;
+    this.keyPath = keyPath;
+    addCommitGuard();
+    outputStream.setPreCommits(getPreCommits());
+  }
+
+  protected S3ObjectWriteGuard(
+      OutputStream outputStream, long expectedLength, String keyPath) {
+    this.outputStream = outputStream;
+    this.expectedLength = expectedLength;
+    this.keyPath = keyPath;
+    addCommitGuard();
+  }
+
+  private void addCommitGuard() {
+    preCommits.add(this::validateBeforeCommit);
+  }
+
+  private void validateBeforeCommit() throws IOException {
+    if (!transferComplete) {
+      throw new IOException("S3 object transfer did not complete before commit: " + keyPath);
+    }
+    EndpointBase.validateContentLength(expectedLength, writtenLength, keyPath).run();
+  }
+
+  protected List<CheckedRunnable<IOException>> getPreCommits() {
+    return preCommits;
+  }
+
+  void addPreCommit(CheckedRunnable<IOException> preCommit) {
+    preCommits.add(preCommit);
+  }
+
+  /**
+   * Allows close() to commit the key. Call last, after the metadata and all pre-commit checks are registered.
+   */
+  void markTransferComplete() {
+    transferComplete = true;
+  }
+
+  void checkContentSha256(MultiDigestInputStream body, String expectedSha256) {
+    // A digest is present only when x-amz-content-sha256 contains a payload hash.
+    MessageDigest sha256Digest = body.getMessageDigest(OzoneConsts.FILE_HASH);
+    if (sha256Digest != null) {
+      final String actualSha256 = DatatypeConverter.printHexBinary(sha256Digest.digest()).toLowerCase();
+      addPreCommit(() -> {
+        if (!expectedSha256.equalsIgnoreCase(actualSha256)) {
+          throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
+        }
+      });
+    }
+  }
+
+  void onKeyOpened(Consumer<ByteBuffer> action) {
+    action.accept(getDerivedKey());
+  }
+
+  long copyFrom(InputStream body, int bufferSize) throws IOException {
+    byte[] buffer = new byte[bufferSize];
+    while (writtenLength < expectedLength) {
+      int toRead = Math.toIntExact(
+          Math.min(bufferSize, expectedLength - writtenLength));
+      int readLength = body.read(buffer, 0, toRead);
+      if (readLength == -1) {
+        break;
+      }
+      write(buffer, 0, readLength);
+      writtenLength += readLength;
+    }
+    verifyChunksComplete(body);
+    return writtenLength;
+  }
+
+  static void verifyChunksComplete(InputStream body) throws IOException {
+    InputStream chunks = body instanceof MultiDigestInputStream
+        ? ((MultiDigestInputStream) body).getWrappedStream() : body;
+    if (chunks instanceof AwsChunkedInputStream) {
+      ((AwsChunkedInputStream) chunks).verifyComplete();
+    }
+  }
+
+  protected void write(byte[] buffer, int offset, int length)
+      throws IOException {
+    outputStream.write(buffer, offset, length);
+  }
+
+  public Map<String, String> getMetadata() {
+    return ((OzoneOutputStream) outputStream).getMetadata();
+  }
+
+  /** @return the signing key OM derived for chunk verification, or null. */
+  public ByteBuffer getDerivedKey() {
+    return ((OzoneOutputStream) outputStream).getDerivedKey();
+  }
+
+  @Override
+  public void close() throws IOException {
+    outputStream.close();
+  }
+}

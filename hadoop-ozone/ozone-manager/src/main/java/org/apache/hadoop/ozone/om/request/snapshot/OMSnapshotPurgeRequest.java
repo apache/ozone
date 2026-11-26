@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,10 +32,12 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -73,6 +76,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    OMMetrics omMetrics = ozoneManager.getMetrics();
     OmSnapshotInternalMetrics omSnapshotIntMetrics = ozoneManager.getOmSnapshotIntMetrics();
 
     final long trxnLogIndex = context.getIndex();
@@ -92,7 +96,10 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     List<String> snapshotDbKeys = snapshotPurgeRequest
         .getSnapshotDBKeysList();
     TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
+    boolean stateChanged = false;
     try {
+      List<String> purgedSnapshotsForLog = new ArrayList<>();
+      long numDeletedSnapshotsPurged = 0;
 
       // Each snapshot purge operation does three things:
       //  1. Update the deep clean flag for the next active snapshot (So that it can be
@@ -109,9 +116,11 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
               "Snapshot purge request.", snapTableKey);
           continue;
         }
+        purgedSnapshotsForLog.add(formatSnapshotForLog(fromSnapshot));
         SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
         SnapshotInfo nextToNextSnapshot = nextSnapshot == null ? null : SnapshotUtils.getNextSnapshot(ozoneManager,
             snapshotChainManager, nextSnapshot);
+        stateChanged = true;
         // Step 1: Update the deep clean flag for the next snapshot
         updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager, trxnLogIndex);
         updateSnapshotInfoAndCache(nextToNextSnapshot, omMetadataManager, trxnLogIndex);
@@ -121,6 +130,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         omMetadataManager.getSnapshotInfoTable()
             .addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()), CacheValue.get(trxnLogIndex));
         updatedSnapshotInfos.remove(fromSnapshot.getTableKey());
+        if (fromSnapshot.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
+          numDeletedSnapshotsPurged++;
+        }
       }
       // Update the snapshotInfo lastTransactionInfo.
       for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
@@ -133,8 +145,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
           transactionInfo);
 
       omSnapshotIntMetrics.incNumSnapshotPurges();
-      LOG.info("Successfully executed snapshotPurgeRequest: {{}} along with updating snapshots:{}.",
-          snapshotPurgeRequest, updatedSnapshotInfos);
+      omMetrics.decNumSnapshotDeleted(numDeletedSnapshotsPurged);
+      LOG.info("Successfully executed snapshotPurgeRequest for snapshots: {} along with updating snapshots: {}.",
+          purgedSnapshotsForLog, updatedSnapshotInfos);
       if (LOG.isDebugEnabled()) {
         Map<String, String> auditParams = new LinkedHashMap<>();
         auditParams.put(AUDIT_PARAM_SNAPSHOT_DB_KEYS, snapshotDbKeys.toString());
@@ -142,8 +155,13 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.SNAPSHOT_PURGE, auditParams));
       }
     } catch (IOException ex) {
-      omClientResponse = new OMSnapshotPurgeResponse(
-          createErrorOMResponse(omResponse, ex));
+      // Cache and snapshot chain updates made before the failure cannot be rolled back, so report INTERNAL_ERROR
+      // to terminate OM instead of continuing with a partially purged state.
+      IOException reported = stateChanged && ex instanceof OMException
+          ? new OMException("Snapshot purge at transaction index " + trxnLogIndex
+              + " failed after partially updating the snapshot cache and chain: " + ex.getMessage(), ex,
+              OMException.ResultCodes.INTERNAL_ERROR) : ex;
+      omClientResponse = new OMSnapshotPurgeResponse(createErrorOMResponse(omResponse, reported));
       omSnapshotIntMetrics.incNumSnapshotPurgeFails();
       LOG.error("Failed to execute snapshotPurgeRequest:{{}}.", snapshotPurgeRequest, ex);
       if (LOG.isDebugEnabled()) {
@@ -254,5 +272,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       }
     }
     return snapshotInfo;
+  }
+
+  private static String formatSnapshotForLog(SnapshotInfo snapshotInfo) {
+    return snapshotInfo.getTableKey() + " (snapshotId='" + snapshotInfo.getSnapshotId() + "')";
   }
 }

@@ -26,6 +26,8 @@ public final class ReconConstants {
 
   public static final String RECON_CONTAINER_KEY_DB = "recon-container-key.db";
 
+  public static final String RECON_REPLICA_HISTORY_DB = "recon-container-replica-history.db";
+
   public static final String CONTAINER_COUNT_KEY = "containerCount";
 
   public static final String RECON_OM_SNAPSHOT_DB = "om.snapshot.db";
@@ -63,6 +65,13 @@ public final class ReconConstants {
   public static final String RECON_QUERY_BUCKET = "bucket";
   public static final String RECON_QUERY_FILE_SIZE = "fileSize";
   public static final String RECON_QUERY_CONTAINER_SIZE = "containerSize";
+  public static final String RECON_QUERY_CONTAINER_STATE = "state";
+  public static final String RECON_QUERY_REPLICATION_TYPE = "replicationType";
+  public static final String RECON_QUERY_CREATION_DATE = "creationDate";
+  public static final String RECON_QUERY_KEY_SIZE = "keySize";
+  public static final String RECON_NAMESPACE_USAGE_FILES = "files";
+  public static final String RECON_NAMESPACE_USAGE_REPLICA = "replica";
+  public static final String RECON_NAMESPACE_USAGE_SORT_SUB_PATHS = "sortSubPaths";
   public static final String RECON_ENTITY_PATH = "path";
   public static final String RECON_ENTITY_TYPE = "entityType";
   public static final String RECON_ACCESS_METADATA_START_DATE = "startDate";

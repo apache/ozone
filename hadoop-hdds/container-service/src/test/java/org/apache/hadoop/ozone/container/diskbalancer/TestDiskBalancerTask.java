@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DISK_BALANCER_DIR;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -39,6 +41,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -47,32 +50,41 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -84,6 +96,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.MockClock;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -114,6 +127,7 @@ public class TestDiskBalancerTask {
   private HddsVolume sourceVolume;
   private HddsVolume destVolume;
   private DiskBalancerServiceTestImpl diskBalancerService;
+  private MockClock clock;
 
   private static final long CONTAINER_ID = 1L;
   private static final long CONTAINER_SIZE = 1024L * 1024L; // 1 MB
@@ -244,9 +258,10 @@ public class TestDiskBalancerTask {
     DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
     diskBalancerConfiguration.setDiskBalancerShouldRun(true);
     conf.setFromObject(diskBalancerConfiguration);
+    clock = MockClock.newInstance();
     diskBalancerService = new DiskBalancerServiceTestImpl(ozoneContainer,
-        100, conf, 1);
-    DiskBalancerService.setReplicaDeletionDelayMills(0);
+        100, conf, 1, clock);
+    diskBalancerService.setReplicaDeletionDelay(0);
     KeyValueContainer.setInjector(kvFaultInjector);
   }
 
@@ -267,7 +282,6 @@ public class TestDiskBalancerTask {
     kvFaultInjector.reset();
     KeyValueContainer.setInjector(null);
     DiskBalancerService.setInjector(null);
-    DefaultContainerChoosingPolicy.setTest(false);
   }
 
   @ParameterizedTest
@@ -290,9 +304,6 @@ public class TestDiskBalancerTask {
     assertFalse(containerIterator.hasNext());
 
     String oldContainerPath = container.getContainerData().getContainerPath();
-    if (containerState == State.QUASI_CLOSED) {
-      DefaultContainerChoosingPolicy.setTest(true);
-    }
     DiskBalancerService.DiskBalancerTask task = getTask();
     task.call();
     assertEquals(State.DELETED, container.getContainerState());
@@ -317,6 +328,48 @@ public class TestDiskBalancerTask {
     containerIterator = destVolume.getContainerIterator();
     assertTrue(containerIterator.hasNext());
     assertEquals(CONTAINER_ID, containerIterator.next());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void moveKeepsContainerReport(ContainerTestVersionInfo versionInfo) throws IOException {
+    setLayoutAndSchemaForTest(versionInfo);
+    KeyValueContainer container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    KeyValueContainerData data = container.getContainerData();
+    try (DBHandle db = BlockUtils.getDB(data, conf)) {
+      db.getStore().getBlockDataTable().put(data.getBlockKey(1L), new BlockData(new BlockID(CONTAINER_ID, 1L)));
+      db.getStore().getMetadataTable().put(data.getBlockCountKey(), 1L);
+      db.getStore().getMetadataTable().put(data.getBytesUsedKey(), CONTAINER_SIZE);
+    }
+    ozoneContainer.getController().updateContainerChecksum(CONTAINER_ID, buildTestTree(conf));
+    // Load the in-memory container data from disk, as a datanode start does.
+    KeyValueContainerUtil.parseKVContainerData(data, conf);
+    ContainerReplicaProto reportBeforeMove = container.getContainerReport();
+    assertThat(reportBeforeMove.getDataChecksum()).isNotZero();
+
+    getTask().call();
+
+    Container<?> newContainer = containerSet.getContainer(CONTAINER_ID);
+    assertThat(newContainer).isNotSameAs(container);
+    assertThat(newContainer.getContainerData().getVolume()).isEqualTo(destVolume);
+    // The container has seen no I/O, so the next container report must be the same as before.
+    assertThat(newContainer.getContainerReport()).isEqualTo(reportBeforeMove);
+    assertThat(ContainerDataYaml.readContainerFile(newContainer.getContainerFile()).getState()).isEqualTo(State.CLOSED);
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void moveOfContainerWithoutDataChecksum(ContainerTestVersionInfo versionInfo) throws IOException {
+    setLayoutAndSchemaForTest(versionInfo);
+    createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+
+    getTask().call();
+
+    Container<?> newContainer = containerSet.getContainer(CONTAINER_ID);
+    assertThat(newContainer.getContainerData().getVolume()).isEqualTo(destVolume);
+    // No merkle tree was written yet, so the checksum stays unset for the scanner to fill in.
+    assertThat(newContainer.getContainerData().needsDataChecksum()).isTrue();
+    assertThat(newContainer.getContainerReport().getDataChecksum()).isZero();
+    // The container has no blocks, which the import detects as a datanode start does.
+    assertThat(newContainer.getContainerData().isEmpty()).isTrue();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -460,7 +513,6 @@ public class TestDiskBalancerTask {
         .when(spyContainerSet).updateContainer(any(Container.class));
     when(ozoneContainer.getContainerSet()).thenReturn(spyContainerSet);
 
-    DefaultContainerChoosingPolicy.setTest(true);
     DiskBalancerService.DiskBalancerTask task = getTask();
     CompletableFuture completableFuture = CompletableFuture.runAsync(() -> task.call());
 
@@ -499,6 +551,115 @@ public class TestDiskBalancerTask {
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
+  }
+
+  /**
+   * When markContainerForDelete fails after import and ContainerSet update,
+   * the move is still reported as success, the destination replica is active, the source
+   * replica is queued for lazy deletion, and cleanup removes it after the delay.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void moveSucceedsWhenMarkContainerForDeleteFails(
+      ContainerTestVersionInfo versionInfo)
+      throws IOException, InterruptedException, TimeoutException {
+    setLayoutAndSchemaForTest(versionInfo);
+    long delay = 2_000L;
+    diskBalancerService.setReplicaDeletionDelay(delay);
+
+    KeyValueContainer container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    File oldContainerDir = new File(container.getContainerData().getContainerPath());
+    Path destDirPath = Paths.get(
+        KeyValueContainerLocationUtil.getBaseContainerLocation(
+            destVolume.getHddsRootDir().toString(), scmId, CONTAINER_ID));
+    assertThat(destDirPath.toFile())
+        .as("Destination container should not exist before task execution")
+        .doesNotExist();
+
+    KeyValueContainer spyContainer = spy(container);
+    containerSet.removeContainer(CONTAINER_ID);
+    containerSet.addContainer(spyContainer);
+    doThrow(new RuntimeException("simulated markContainerForDelete failure"))
+        .when(spyContainer).markContainerForDelete();
+
+    LogCapturer serviceLog = GenericTestUtils.LogCapturer.captureLogs(DiskBalancerService.class);
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    task.call();
+
+    assertThat(serviceLog.getOutput())
+        .contains("Failed to mark the old container " + CONTAINER_ID + " for delete");
+    assertThat(serviceLog.getOutput())
+        .as("move should not roll back when markContainerForDelete fails")
+        .doesNotContain("Rolling back move");
+
+    assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
+
+    Container activeReplica = containerSet.getContainer(CONTAINER_ID);
+    assertThat(activeReplica).isNotSameAs(spyContainer);
+    assertEquals(destVolume, activeReplica.getContainerData().getVolume());
+    assertThat(new File(activeReplica.getContainerData().getContainerPath())).exists();
+    assertThat(oldContainerDir)
+        .as("Source replica should remain on disk until lazy deletion runs")
+        .exists();
+    assertEquals(1, diskBalancerService.getPendingDeletionQueueSize(),
+        "Source replica should be queued for lazy deletion after mark failure");
+
+    clock.fastForward(delay);
+    diskBalancerService.cleanupPendingDeletionContainers();
+
+    assertThat(oldContainerDir)
+        .as("Source replica should be removed after lazy deletion delay")
+        .doesNotExist();
+    assertEquals(0, diskBalancerService.getPendingDeletionQueueSize());
+  }
+
+  /**
+   * When lazy deletion fails, the pending queue entry is dropped and
+   * the source replica is not retried for deletion.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void lazyDeletionFailureDoesNotRetry(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    long delay = 2_000L;
+    diskBalancerService.setReplicaDeletionDelay(delay);
+
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    File oldContainerDir = new File(container.getContainerData().getContainerPath());
+
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    task.call();
+
+    assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(1, diskBalancerService.getPendingDeletionQueueSize());
+    assertThat(oldContainerDir).exists();
+
+    clock.fastForward(delay);
+
+    LogCapturer serviceLog = GenericTestUtils.LogCapturer.captureLogs(DiskBalancerService.class);
+    try (MockedStatic<KeyValueContainerUtil> mockedUtil =
+             mockStatic(KeyValueContainerUtil.class, Mockito.CALLS_REAL_METHODS)) {
+      mockedUtil.when(() -> KeyValueContainerUtil.removeContainer(
+              any(KeyValueContainerData.class), any(OzoneConfiguration.class)))
+          .thenThrow(new IOException("simulated lazy deletion failure"));
+
+      diskBalancerService.cleanupPendingDeletionContainers();
+
+      assertThat(oldContainerDir)
+          .as("Source replica should remain when lazy deletion fails")
+          .exists();
+      assertEquals(0, diskBalancerService.getPendingDeletionQueueSize(),
+          "Failed deletion should be removed from the pending queue");
+      assertThat(serviceLog.getOutput())
+          .contains("Failed to delete old container " + CONTAINER_ID);
+      assertThat(serviceLog.getOutput()).contains("background scanners");
+    }
+
+    diskBalancerService.cleanupPendingDeletionContainers();
+    assertThat(oldContainerDir)
+        .as("Source replica should not be retried after lazy deletion failure")
+        .exists();
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -564,11 +725,8 @@ public class TestDiskBalancerTask {
 
     GenericTestUtils.LogCapturer serviceLog = GenericTestUtils.LogCapturer.captureLogs(DiskBalancerService.class);
     DiskBalancerService.DiskBalancerTask task = getTask();
-    long defaultContainerSize = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    // verify committed space is reserved for destination volume
-    assertEquals(defaultContainerSize, destVolume.getCommittedBytes() - initialDestCommitted);
+    // verify committed space is reserved for destination volume (uses actual container size)
+    assertEquals(CONTAINER_SIZE, destVolume.getCommittedBytes() - initialDestCommitted);
 
     // delete the container from containerSet to simulate a failure
     containerSet.removeContainer(CONTAINER_ID);
@@ -589,10 +747,10 @@ public class TestDiskBalancerTask {
 
   @ContainerTestVersionInfo.ContainerTest
   public void testOldReplicaDelayedDeletion(ContainerTestVersionInfo versionInfo)
-      throws IOException, InterruptedException {
+      throws IOException, InterruptedException, TimeoutException {
     setLayoutAndSchemaForTest(versionInfo);
     long delay = 2000L; // 2 second delay
-    DiskBalancerService.setReplicaDeletionDelayMills(delay);
+    diskBalancerService.setReplicaDeletionDelay(delay);
 
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     KeyValueContainerData keyValueContainerData = (KeyValueContainerData) container.getContainerData();
@@ -608,25 +766,23 @@ public class TestDiskBalancerTask {
     // create another container to trigger the deletion of old replicas
     createContainer(CONTAINER_ID + 1, sourceVolume, State.CLOSED);
     task = getTask();
-    // Wait for the delay to pass
-    Thread.sleep(delay);
+    // Advance the injected clock until the delayed deletion is eligible.
+    clock.fastForward(delay);
     task.call();
     // Verify that the old container is deleted
     assertFalse(oldContainerDir.exists());
   }
 
   /**
-   * Testing that invalid states (including QUASI_CLOSED in production mode) are correctly rejected.
-   * Here, with QUASI_CLOSED state, we ensure that the test runs in production mode
-   * where QUASI_CLOSED is not allowed for move.
+   * Testing that invalid states are correctly rejected.
    */
   @ParameterizedTest
-  @EnumSource(names = {"OPEN", "CLOSING", "QUASI_CLOSED", "UNHEALTHY", "INVALID", "DELETED", "RECOVERING"})
+  @EnumSource(names = {"OPEN", "CLOSING", "UNHEALTHY", "INVALID", "DELETED", "RECOVERING"})
   public void testMoveSkippedWhenContainerStateChanged(State invalidState)
       throws IOException, InterruptedException, TimeoutException {
     LogCapturer serviceLog = LogCapturer.captureLogs(DiskBalancerService.class);
 
-    // Create a CLOSED container which will be selected by DefaultContainerChoosingPolicy
+    // Create a CLOSED container which will be selected by DefaultVolumeContainerChoosingPolicy
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
@@ -686,6 +842,81 @@ public class TestDiskBalancerTask {
 
     // Verify delta sizes are restored
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPendingDeletionDoesNotDropReplicasOnSameMillisecondKey(
+      ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+
+    long delayMs = 2_000L;
+    diskBalancerService.setReplicaDeletionDelay(delayMs);
+
+    long id1 = CONTAINER_ID;
+    long id2 = CONTAINER_ID + 1;
+    long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
+
+    Container c1 = createContainer(id1, sourceVolume, State.CLOSED);
+    Container c2 = createContainer(id2, sourceVolume, State.CLOSED);
+
+    File oldDir1 = new File(c1.getContainerData().getContainerPath());
+    File oldDir2 = new File(c2.getContainerData().getContainerPath());
+    assertTrue(oldDir1.exists());
+    assertTrue(oldDir2.exists());
+
+    // Reserve dest space like the choosing policy would.
+    destVolume.incCommittedBytes(c1.getContainerData().getBytesUsed());
+    destVolume.incCommittedBytes(c2.getContainerData().getBytesUsed());
+
+    // Schedule two moves (parallelThread default is 5 in config).
+    BackgroundTaskQueue queue = diskBalancerService.getTasks();
+    assertEquals(2, queue.size());
+    DiskBalancerService.DiskBalancerTask task1 =
+        (DiskBalancerService.DiskBalancerTask) queue.poll();
+    DiskBalancerService.DiskBalancerTask task2 =
+        (DiskBalancerService.DiskBalancerTask) queue.poll();
+    assertNotNull(task1);
+    assertNotNull(task2);
+
+    // Run both moves concurrently; fixed MockClock => same deadline key.
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try {
+      List<Future<BackgroundTaskResult>> futures = pool.invokeAll(Arrays.asList(
+          task1::call,
+          task2::call));
+      for (Future<BackgroundTaskResult> future : futures) {
+        future.get(30, TimeUnit.SECONDS);
+      }
+    } finally {
+      pool.shutdownNow();
+    }
+
+    assertEquals(2, diskBalancerService.getMetrics().getSuccessCount());
+
+    assertEquals(1, diskBalancerService.getPendingDeletionDeadlineCount(),
+        "both moves should share one deadline key");
+    assertEquals(2, diskBalancerService.getPendingDeletionQueueSize(),
+        "both container replicas should be queued for deletion");
+
+    // Not deleted yet — delay has not elapsed.
+    assertTrue(oldDir1.exists());
+    assertTrue(oldDir2.exists());
+
+    clock.fastForward(delayMs);
+    diskBalancerService.cleanupPendingDeletionContainers();
+
+    assertEquals(0, diskBalancerService.getPendingDeletionQueueSize());
+    assertFalse(oldDir1.exists());
+    assertFalse(oldDir2.exists());
+    assertFalse(sourceVolume.getContainerIterator().hasNext(),
+        "source volume should have no containers after delayed deletion");
+    assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace(),
+        "source volume used space should return to pre-move level after old replicas are deleted");
+
+    // New replicas live on dest volume.
+    assertTrue(new File(containerSet.getContainer(id1).getContainerData().getContainerPath()).exists());
+    assertTrue(new File(containerSet.getContainer(id2).getContainerData().getContainerPath()).exists());
   }
 
   private KeyValueContainer createContainer(long containerId, HddsVolume vol, State state)

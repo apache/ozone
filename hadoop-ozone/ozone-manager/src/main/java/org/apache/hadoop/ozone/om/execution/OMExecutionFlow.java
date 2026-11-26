@@ -21,18 +21,34 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Set;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
 
 /**
  * entry for execution flow for write request.
  */
 public class OMExecutionFlow {
+
+  // Issued by OM's own services only, which submit them to Ratis directly instead of going through this flow.
+  // A new service-only type must be added here and to testInternalRequestRejectedFromClient.
+  private static final Set<Type> INTERNAL_CMD_TYPES = EnumSet.of(Type.PurgeKeys, Type.PurgeDirectories,
+      Type.DeleteOpenKeys, Type.AbortExpiredMultiPartUploads, Type.SnapshotMoveDeletedKeys,
+      Type.SnapshotMoveTableKeys, Type.SnapshotPurge, Type.SetSnapshotProperty, Type.SetRangerServiceVersion,
+      Type.QuotaRepair, Type.DeleteRevokedSTSTokens, Type.SaveLifecycleScanState, Type.CompleteFinalizeUpgrade);
+
+  // Types whose OMClientRequest overrides postExecute.  The retry cache hits of other types skip creating the request.
+  // A new override must be added here, which TestOMExecutionFlow#postExecuteCmdTypesMatchOverrides enforces.
+  private static final Set<Type> POST_EXECUTE_CMD_TYPES = EnumSet.of(Type.RecoverLease);
 
   private final OzoneManager ozoneManager;
   private final OMPerformanceMetrics perfMetrics;
@@ -60,11 +76,12 @@ public class OMExecutionFlow {
     final OMRequest requestToSubmit;
     if (isWrite) {
       try {
-        omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, ozoneManager);
-        assert (omClientRequest != null);
+        omClientRequest = createClientRequest(request);
         final OMClientRequest finalOmClientRequest = omClientRequest;
-        requestToSubmit = captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
+        OMRequest preExecuted = captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
             () -> finalOmClientRequest.preExecute(ozoneManager));
+        requestToSubmit = preExecuted.hasAssumeS3Context()
+            ? preExecuted.toBuilder().clearAssumeS3Context().build() : preExecuted;
       } catch (IOException ex) {
         if (omClientRequest != null) {
           OMAuditLogger.log(omClientRequest.getAuditBuilder());
@@ -73,14 +90,81 @@ public class OMExecutionFlow {
         return OzoneManagerRatisUtils.createErrorResponse(request, ex);
       }
     } else {
-      requestToSubmit = request;
+      try {
+        requestToSubmit = captureReadContext(request);
+      } catch (IOException ex) {
+        return OzoneManagerRatisUtils.createErrorResponse(request, ex);
+      }
     }
 
     // 2. submit request to ratis
     OMResponse response = ozoneManager.getOmRatisServer().submitRequest(requestToSubmit, isWrite);
-    if (!response.getSuccess() && omClientRequest != null) {
-      omClientRequest.handleRequestFailure(ozoneManager);
+    if (omClientRequest != null) {
+      if (!response.getSuccess()) {
+        omClientRequest.handleRequestFailure(ozoneManager);
+      } else {
+        return postExecute(omClientRequest, request, response);
+      }
     }
     return response;
+  }
+
+  /**
+   * Runs post-execute steps on a successful write response served from the Ratis retry cache.
+   */
+  public OMResponse postExecute(OMRequest request, OMResponse response) {
+    if (!hasPostExecute(request.getCmdType())) {
+      return response;
+    }
+    final OMClientRequest omClientRequest;
+    try {
+      omClientRequest = createClientRequest(request);
+    } catch (IOException ex) {
+      // Creating the request handler may look up current metadata (such as bucket layout) that was deleted after the
+      // request was applied. Return the cached response instead of failing an already-applied request.
+      return response;
+    }
+    return postExecute(omClientRequest, request, response);
+  }
+
+  private OMResponse postExecute(OMClientRequest omClientRequest, OMRequest request, OMResponse response) {
+    try {
+      return omClientRequest.postExecute(ozoneManager, response);
+    } catch (IOException ex) {
+      return createPostExecuteErrorResponse(request, response, ex);
+    }
+  }
+
+  static boolean hasPostExecute(Type cmdType) {
+    return POST_EXECUTE_CMD_TYPES.contains(cmdType);
+  }
+
+  private OMClientRequest createClientRequest(OMRequest request) throws IOException {
+    if (INTERNAL_CMD_TYPES.contains(request.getCmdType())) {
+      throw new OMException(
+          request.getCmdType() + " requests are not accepted from clients.", OMException.ResultCodes.PERMISSION_DENIED);
+    }
+    final OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, ozoneManager);
+    assert (omClientRequest != null);
+    return omClientRequest;
+  }
+
+  private static OMResponse createPostExecuteErrorResponse(OMRequest request, OMResponse response, IOException ex) {
+    final OMResponse errorResponse = OzoneManagerRatisUtils.createErrorResponse(request, ex);
+    return response.hasOmLockDetails() ?
+        errorResponse.toBuilder().setOmLockDetails(response.getOmLockDetails()).build() : errorResponse;
+  }
+
+  /**
+   * Captures authenticated request context on the RPC thread before submitting a read request to Ratis.
+   */
+  private OMRequest captureReadContext(OMRequest request) throws IOException {
+    OMRequest.Builder requestBuilder = request.toBuilder()
+        .setUserInfo(OMClientRequest.getAuthenticatedUserInfo(request));
+    if (requestBuilder.hasS3Authentication()) {
+      requestBuilder.setS3Authentication(
+          STSSecurityUtil.resolveS3Authentication(requestBuilder.getS3Authentication(), ozoneManager));
+    }
+    return requestBuilder.build();
   }
 }

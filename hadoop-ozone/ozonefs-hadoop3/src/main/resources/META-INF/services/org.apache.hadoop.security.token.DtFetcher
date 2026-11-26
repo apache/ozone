@@ -17,3 +17,5 @@
 #
 
 org.apache.hadoop.fs.ozone.O3fsDtFetcher
+org.apache.hadoop.fs.ozone.OfsDtFetcher
+org.apache.hadoop.fs.ozone.O3DtFetcher

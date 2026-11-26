@@ -42,7 +42,7 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 - author: [Verifies](../hadoop-ozone/dev-support/checks/author.sh) none of the Java files contain the @author annotation
 - bats: [Checks](../hadoop-ozone/dev-support/checks/bats.sh) bash scripts, (using the [Bash Automated Testing System](https://github.com/bats-core/bats-core#bats-core-bash-automated-testing-system-2018))
 - checkstyle: [Runs](../hadoop-ozone/dev-support/checks/checkstyle.sh) 'mvn checkstyle' plugin to confirm Java source abides by Ozone coding conventions
-- docs: [Builds](../hadoop-ozone/dev-support/checks/docs.sh) website with [Hugo](https://gohugo.io/)
+- errorprone: [Runs](../hadoop-ozone/dev-support/checks/errorprone.sh) Error Prone static analysis during Java compilation. All diagnostics go to `diagnostics.txt`; `summary.txt` contains only errors or a fallback for a non-diagnostic Maven failure.
 - findbugs: [Runs](../hadoop-ozone/dev-support/checks/findbugs.sh) spotbugs static analysis on bytecode
 - pmd: [Runs](../hadoop-ozone/dev-support/checks/pmd.sh) PMD static analysis on project's source code
 - rat (release audit tool): [Confirms](../hadoop-ozone/dev-support/checks/rat.sh) source files include licenses
@@ -59,7 +59,7 @@ Performs unit tests (if necessary) in two parts:
 If they don't match, it describes how to make the updates to include the changes, (if they are intentional).  Otherwise, the changes should be removed.
 
 #### acceptance job
-[Runs](../hadoop-ozone/dev-support/checks/acceptance.sh) smoketests using robot framework and a real docker compose cluster.  There are three iterations, "secure", "unsecure", and "misc", each running in parallel, as different matrix configs.
+[Runs](../hadoop-ozone/dev-support/checks/acceptance.sh) smoketests using robot framework and a real docker compose cluster.
 
 #### kubernetes job
 [Runs](../hadoop-ozone/dev-support/checks/kubernetes.sh) k8s tests
@@ -75,13 +75,6 @@ If they don't match, it describes how to make the updates to include the changes
 
 ### close-stale-prs Workflow
 [This](./workflows/close-stale-prs.yml) workflow is scheduled each night at midnight and uses the [actions/stale](https://github.com/actions/stale) to automatically manage inactive PRs. It marks PRs as stale after 21 days of inactivity and closes them 7 days later. If a stale PR receives any updates or comments, the stale label is automatically removed.
-
-### comment-commands Workflow
-[This](./workflows/comments.yaml) workflow is triggered each time a comment is added/edited to a PR.  It checks to see if the body of the comment begins with one of the following strings and, if so, invokes the corresponding command.
-- /help : [Show](./comment-commands/help.sh) all the available comment commands
-- /label : [Add](./comment-commands/label.sh) new label to the issue: /label "label"
-- /retest : [Provide](./comment-commands/retest.sh) help on how to trigger new CI build
-
 
 ## Old/Deprecated Workflows
 The following workflows no longer run but still exist on the [actions](https://github.com/apache/ozone/actions) page for historical reasons:
