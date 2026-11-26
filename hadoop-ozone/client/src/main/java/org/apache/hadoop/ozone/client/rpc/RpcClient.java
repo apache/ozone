@@ -664,7 +664,7 @@ public class RpcClient implements ClientProtocol {
       }
     }
     if (bucketArgs.getStoragePolicy() != null || bucketArgs.getAllowFallbackStoragePolicy() != null) {
-      checkStoragePolicySupported();
+      checkBucketStoragePolicySupported();
     }
 
     final String owner;
@@ -1281,7 +1281,7 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     Objects.requireNonNull(storagePolicy, "storagePolicy == null");
-    checkStoragePolicySupported();
+    checkBucketStoragePolicySupported();
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -1294,7 +1294,7 @@ public class RpcClient implements ClientProtocol {
     Objects.requireNonNull(args, "args == null");
     verifyVolumeName(args.getVolumeName());
     verifyBucketName(args.getBucketName());
-    checkStoragePolicySupported();
+    checkBucketStoragePolicySupported();
     ozoneManagerClient.setBucketProperty(args);
   }
 
@@ -1667,13 +1667,23 @@ public class RpcClient implements ClientProtocol {
   }
 
   /**
-   * Rejects storage policy arguments when OM does not support them. NOT_SUPPORTED_OPERATION lets S3 Gateway answer
-   * 501 NotImplemented instead of 500 InternalError.
+   * Rejects storage policy arguments on object writes when OM does not support them. NOT_SUPPORTED_OPERATION lets
+   * S3 Gateway answer 501 NotImplemented instead of 500 InternalError.
    */
   private void checkStoragePolicySupported() throws IOException {
     if (!OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(getOmVersion())) {
       throw new OMException("OzoneManager does not support storage policy",
           OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+  }
+
+  /**
+   * Rejects bucket storage policy arguments when OM does not support them. Bucket create/set-property is not an S3
+   * object write, so this keeps the plain IOException of the pre-existing ZDU gate rather than NOT_SUPPORTED_OPERATION.
+   */
+  private void checkBucketStoragePolicySupported() throws IOException {
+    if (!OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(getOmVersion())) {
+      throw new IOException("OzoneManager does not support storage policy");
     }
   }
 
