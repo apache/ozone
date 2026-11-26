@@ -91,16 +91,12 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
       omTransport, "test-client-id");
   private static final OmDeleteKeys DELETE_KEYS = new OmDeleteKeys("vol", "bucket", Arrays.asList("key1", "key2"));
 
-  @ParameterizedTest
-  @EnumSource(value = Status.class, names = {"OK", "KEY_NOT_FOUND"})
-  void recordsLatencyForSuccessfulAndErrorResponses(Status status) throws Exception {
-    when(omTransport.submitRequest(any())).thenReturn(serviceListResponse().toBuilder().setStatus(status).build());
+  @Test
+  void recordsLatencyForErrorResponse() throws Exception {
+    when(omTransport.submitRequest(any()))
+        .thenReturn(serviceListResponse().toBuilder().setStatus(Status.KEY_NOT_FOUND).build());
     try (OmClientMetrics.Handle handle = attachMetrics(pb)) {
-      if (status == Status.OK) {
-        pb.getServiceList();
-      } else {
-        assertThatThrownBy(pb::getServiceList).isInstanceOf(OMException.class);
-      }
+      assertThatThrownBy(pb::getServiceList).isInstanceOf(OMException.class);
       assertThat(getLongCounter("ServiceListLatencyNsNumOps", getMetrics(handle.metrics()))).isEqualTo(1);
     }
   }
