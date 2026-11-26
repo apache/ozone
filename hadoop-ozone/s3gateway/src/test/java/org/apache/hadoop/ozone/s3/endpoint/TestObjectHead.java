@@ -408,6 +408,22 @@ public class TestObjectHead {
         response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "cache-control-custom"));
   }
 
+  @Test
+  public void testHeadAppliesResponseHeaderOverrides() throws Exception {
+    String keyName = "head-response-overrides";
+    when(headers.getHeaderString(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE)).thenReturn("video/mp4");
+    when(headers.getHeaderString(HttpHeaders.CACHE_CONTROL)).thenReturn("max-age=60");
+    assertSucceeds(() -> put(keyEndpoint, bucketName, keyName, "body"));
+
+    keyEndpoint.queryParamsForTest().set("response-content-type", "text/plain");
+    keyEndpoint.queryParamsForTest().set("response-cache-control", "no-store");
+
+    Response response = keyEndpoint.head(bucketName, keyName);
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    assertEquals("text/plain", response.getHeaderString(HttpHeaders.CONTENT_TYPE));
+    assertEquals("no-store", response.getHeaderString(HttpHeaders.CACHE_CONTROL));
+  }
+
   private static Stream<Arguments> reservedMetadataCollisionCases() {
     return Stream.of(
         Arguments.of(HttpHeaders.CONTENT_TYPE, CONTENT_TYPE_CUSTOM, "image/jpeg", "user/custom-type"),
