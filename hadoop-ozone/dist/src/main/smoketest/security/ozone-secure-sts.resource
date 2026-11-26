@@ -19,6 +19,7 @@ Library             String
 Library             BuiltIn
 Library             DateTime
 Library             Collections
+Library             ./aws_profile.py
 Resource            ../admincli/lib.resource
 Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
@@ -39,11 +40,7 @@ Configure AWS Profile
     [Arguments]                   ${profile}  ${access_key}  ${secret_key}  ${session_token}=${EMPTY}  ${region}=us-east-1
     Run Keyword                   Install aws cli
     # Use v4 signatures so presign URL will work (Ozone rejects v2 signatures)
-    Execute                       aws configure set s3.signature_version s3v4 --profile ${profile}
-    Execute                       aws configure set aws_access_key_id ${access_key} --profile ${profile}
-    Execute                       aws configure set aws_secret_access_key ${secret_key} --profile ${profile}
-    Execute                       aws configure set region ${region} --profile ${profile}
-    Run Keyword If                '${session_token}' != '${EMPTY}'    Execute  aws configure set aws_session_token ${session_token} --profile ${profile}
+    Write AWS Profile             ${profile}  ${access_key}  ${secret_key}  ${session_token}  ${region}
 
 Configure STS Profile
     [Arguments]                   ${access_key}  ${secret_key}  ${session_token}
@@ -272,8 +269,8 @@ Assign User To Tenant And Get Credentials
     [Arguments]                   ${user}  ${tenant}
     ${output} =                   Execute                       ozone tenant --verbose user assign ${user} --tenant=${tenant}
     Should Contain                ${output}                     Assigned '${user}' to '${tenant}'
-    @{access_key_matches} =       Get Regexp Matches            ${output}    (?m)(?<=export AWS_ACCESS_KEY_ID=).*$
-    @{secret_key_matches} =       Get Regexp Matches            ${output}    (?m)(?<=export AWS_SECRET_ACCESS_KEY=).*$
+    @{access_key_matches} =       Get Regexp Matches            ${output}    (?m)(?<=export AWS_ACCESS_KEY_ID=')[^']*
+    @{secret_key_matches} =       Get Regexp Matches            ${output}    (?m)(?<=export AWS_SECRET_ACCESS_KEY=')[^']*
     ${access_key_id} =            Strip String                  ${access_key_matches[0]}
     ${secret_key} =               Strip String                  ${secret_key_matches[0]}
     [Return]                      ${access_key_id}              ${secret_key}
