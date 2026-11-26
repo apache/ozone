@@ -111,7 +111,7 @@ public interface ContainerStateManager extends SCMHandler {
    * @param count the size limit
    * @return a list of {@link ContainerID};
    */
-  List<ContainerID> getContainerIDs(LifeCycleState state, ContainerHealthState healthState, 
+  List<ContainerID> getContainerIDs(LifeCycleState state, SimplifiedContainerHealthStateForReporting healthState, 
        ContainerID start, int count);
 
   /**

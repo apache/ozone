@@ -35,7 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.sqlite.SQLiteConfig;
 
@@ -403,7 +403,7 @@ public class ContainerDatanodeDatabase {
     }
 
     Set<String> healthStates = new HashSet<>();
-    for (ContainerHealthState state : ContainerHealthState.values()) {
+    for (SimplifiedContainerHealthStateForReporting state : SimplifiedContainerHealthStateForReporting.values()) {
       healthStates.add(state.name());
     }
 
@@ -428,10 +428,10 @@ public class ContainerDatanodeDatabase {
       
       if (healthStates.contains(state.toUpperCase())) {
 
-        ContainerHealthState healthState =
-            ContainerHealthState.valueOf(state.toUpperCase());
+        SimplifiedContainerHealthStateForReporting healthState =
+            SimplifiedContainerHealthStateForReporting.valueOf(state.toUpperCase());
 
-        if (healthState == ContainerHealthState.UNHEALTHY) {
+        if (healthState == SimplifiedContainerHealthStateForReporting.UNHEALTHY) {
           unhealthyReplicas.add(datanodeId);
         }
 
