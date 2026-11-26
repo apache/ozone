@@ -105,6 +105,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "so file system clients no longer need the client-side InfoBucket "
           + "layout check for rename"),
 
+  SNAPSHOT_LOCAL_DATA_ZSTD(107,
+      "OzoneManager version that writes snapshot local data YAML files compressed with zstd"),
+
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
 

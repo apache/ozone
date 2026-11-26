@@ -17,11 +17,19 @@
 
 package org.apache.hadoop.ozone.om;
 
+import com.github.luben.zstd.ZstdInputStream;
+import com.github.luben.zstd.ZstdOutputStream;
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.lang.annotation.Annotation;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
@@ -36,6 +45,8 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
+import org.apache.ratis.util.AtomicFileOutputStream;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.TypeDescription;
@@ -81,7 +92,83 @@ public final class OmSnapshotLocalDataYaml {
   // For the ASCII snapshot local data YAML this is effectively the maximum file size in bytes.
   public static final int SNAPSHOT_LOCAL_DATA_YAML_CODE_POINT_LIMIT = 128 * 1024 * 1024;
 
+  // zstd frame magic number 0xFD2FB528 in the little-endian byte order it is written in. YAML never starts with it.
+  private static final byte[] ZSTD_MAGIC = {0x28, (byte) 0xB5, 0x2F, (byte) 0xFD};
+  // On snapshot local data YAML files, level 1 compresses smaller and faster than the default level 3.
+  private static final int ZSTD_LEVEL = 1;
+
   private OmSnapshotLocalDataYaml() {
+  }
+
+  /**
+   * Opens a snapshot local data YAML file for reading, decompressing it if it is zstd compressed.
+   */
+  public static InputStream newInputStream(File yamlFile) throws IOException {
+    InputStream in = new BufferedInputStream(Files.newInputStream(yamlFile.toPath()));
+    try {
+      return isZstd(in) ? new ZstdInputStream(in) : in;
+    } catch (Throwable t) {
+      in.close();
+      throw t;
+    }
+  }
+
+  /**
+   * Returns true if the snapshot local data YAML file is zstd compressed.
+   */
+  public static boolean isCompressed(File yamlFile) throws IOException {
+    try (InputStream in = new BufferedInputStream(Files.newInputStream(yamlFile.toPath()))) {
+      return isZstd(in);
+    }
+  }
+
+  private static boolean isZstd(InputStream in) throws IOException {
+    byte[] head = new byte[ZSTD_MAGIC.length];
+    in.mark(head.length);
+    int read = IOUtils.read(in, head);
+    in.reset();
+    return read == head.length && Arrays.equals(head, ZSTD_MAGIC);
+  }
+
+  /**
+   * Writes the snapshot local data to a zstd compressed YAML file, replacing the file atomically.
+   */
+  public static void dumpCompressed(Yaml yaml, OmSnapshotLocalData data, File yamlFile) throws IOException {
+    writeCompressed(yamlFile, out -> {
+      Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
+      yaml.dump(data, writer);
+      writer.flush();
+    });
+  }
+
+  /**
+   * Compresses an uncompressed snapshot local data YAML file in place without parsing it, so the content and
+   * checksum stay the same. The caller must hold the snapshot local data write lock of the snapshot.
+   */
+  public static void compress(File yamlFile) throws IOException {
+    writeCompressed(yamlFile, out -> {
+      try (InputStream in = Files.newInputStream(yamlFile.toPath())) {
+        IOUtils.copy(in, out);
+      }
+    });
+  }
+
+  private static void writeCompressed(File yamlFile, CheckedConsumer<OutputStream, IOException> content)
+      throws IOException {
+    AtomicFileOutputStream atomicOut = new AtomicFileOutputStream(yamlFile);
+    OutputStream out = null;
+    try {
+      out = new ZstdOutputStream(atomicOut, ZSTD_LEVEL);
+      content.accept(out);
+      // Finishes the zstd frame and moves the file into place.
+      out.close();
+    } catch (Throwable t) {
+      // AtomicFileOutputStream#close would move the partially written file into place.
+      atomicOut.abort();
+      // Frees the native zstd context; the file is already discarded.
+      IOUtils.closeQuietly(out);
+      throw t;
+    }
   }
 
   /**
@@ -92,7 +179,7 @@ public final class OmSnapshotLocalDataYaml {
    * The returned object has empty SST file lists, no transaction info and no checksum, so it must not be saved.
    */
   public static OmSnapshotLocalData loadWithoutSstFiles(File yamlFile) throws IOException {
-    try (InputStream in = Files.newInputStream(yamlFile.toPath())) {
+    try (InputStream in = newInputStream(yamlFile)) {
       Parser parser = new ParserImpl(new StreamReader(new UnicodeReader(in)),
           SnapshotLocalDataConstructor.createLoaderOptions());
       nextEvent(parser, StreamStartEvent.class);

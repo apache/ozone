@@ -34,6 +34,7 @@ Test Timeout        20 minutes
 ${DEFRAG_POLL_TIMEOUT}       10 minutes
 ${DEFRAG_POLL_INTERVAL}      5 seconds
 ${DEFRAG_FALLBACK_SECONDS}    65
+${ZSTD_CAT_JAVA}    class ZstdCat { public static void main(String[] a) throws Exception { try (java.io.InputStream in = new com.github.luben.zstd.ZstdInputStream(new java.io.FileInputStream(a[0]))) { in.transferTo(System.out); } } }
 
 *** Test Cases ***
 Read Snapshot Data Right After Create
@@ -147,6 +148,7 @@ Snapshot Local YAML Should Show Defragged
     [Arguments]    ${snapshot_name}
     ${yaml} =          Get Snapshot Local YAML Path    ${snapshot_name}
     Execute            test -f '${yaml}'
+    ${yaml} =          Decompress Snapshot Local YAML    ${yaml}
     ${version} =       Execute    awk '/^[[:space:]]*version:/ {print $2; exit}' '${yaml}'
     ${version} =       Strip String    ${version}
     ${v} =             Convert To Integer    ${version}
@@ -154,6 +156,16 @@ Snapshot Local YAML Should Show Defragged
     ${needs_defrag} =  Execute    awk '/^[[:space:]]*needsDefrag:/ {print $2; exit}' '${yaml}'
     ${needs_defrag} =  Strip String    ${needs_defrag}
     Should Be Equal    ${needs_defrag}    false
+
+Decompress Snapshot Local YAML
+    [Arguments]    ${yaml}
+    [Documentation]    Returns a plain text copy of the YAML. OM writes it zstd compressed once
+    ...                SNAPSHOT_LOCAL_DATA_ZSTD is finalized, and the runner image has no zstd CLI,
+    ...                so this decompresses it with zstd-jni from the Ozone lib directory.
+    ${text} =          Set Variable    /tmp/snapshot-local-data.yaml
+    Execute            echo '${ZSTD_CAT_JAVA}' > /tmp/ZstdCat.java
+    Execute            if [ "$(head -c 4 '${yaml}' | od -An -tx1 | tr -d ' \n')" = 28b52ffd ]; then java -cp "$(ls /opt/hadoop/share/ozone/lib/zstd-jni-*.jar)" /tmp/ZstdCat.java '${yaml}' > ${text}; else cp '${yaml}' ${text}; fi
+    [Return]           ${text}
 
 Wait Until Snapshot Local YAML Shows Defragged
     [Arguments]    ${snapshot_name}

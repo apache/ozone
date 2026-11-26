@@ -71,9 +71,16 @@ public abstract class YamlSerializer<T extends WithChecksum<T>> implements Objec
   @Override
   public T load(File yamlFile) throws IOException {
     Objects.requireNonNull(yamlFile, "yamlFile cannot be null");
-    try (InputStream inputFileStream = Files.newInputStream(yamlFile.toPath())) {
+    try (InputStream inputFileStream = newInputStream(yamlFile)) {
       return load(inputFileStream);
     }
+  }
+
+  /**
+   * Opens the given file for {@link #load(File)}. Subclasses can override this to read an encoded file.
+   */
+  protected InputStream newInputStream(File yamlFile) throws IOException {
+    return Files.newInputStream(yamlFile.toPath());
   }
 
   /**
@@ -142,8 +149,16 @@ public abstract class YamlSerializer<T extends WithChecksum<T>> implements Objec
       // Compute Checksum and update SnapshotData
       computeAndSetChecksum(yaml.get(), data);
       // Write the object with checksum to Yaml file.
-      YamlUtils.dump(yaml.get(), data, yamlFile, LOG);
+      dump(yaml.get(), data, yamlFile);
     }
+  }
+
+  /**
+   * Writes the given data to the file for {@link #save(File, WithChecksum)}. Subclasses can override this to write
+   * an encoded file.
+   */
+  protected void dump(Yaml yaml, T data, File yamlFile) throws IOException {
+    YamlUtils.dump(yaml, data, yamlFile, LOG);
   }
 
   /**

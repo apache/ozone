@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
+import static org.apache.hadoop.ozone.OzoneManagerVersion.SNAPSHOT_LOCAL_DATA_ZSTD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
@@ -1090,6 +1091,49 @@ public class TestOmSnapshotLocalDataManager {
       }
     } else {
       assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMapUnmodifiable().keySet());
+    }
+  }
+
+  @Test
+  public void testYamlCompressedOnlyAfterFinalization() throws IOException {
+    when(omVersionManager.isAllowed(SNAPSHOT_LOCAL_DATA_ZSTD)).thenReturn(false);
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> oldSnapshots = createSnapshotLocalData(localDataManager, 3);
+    Map<UUID, String> checksums = new HashMap<>();
+    for (UUID snapshotId : oldSnapshots) {
+      assertFalse(OmSnapshotLocalDataYaml.isCompressed(getYamlFile(snapshotId)));
+      checksums.put(snapshotId, getChecksum(snapshotId));
+    }
+    // Not finalized yet, so the files stay readable by older OMs.
+    localDataManager.compressSnapshotLocalDataFiles();
+    for (UUID snapshotId : oldSnapshots) {
+      assertFalse(OmSnapshotLocalDataYaml.isCompressed(getYamlFile(snapshotId)));
+    }
+
+    when(omVersionManager.isAllowed(SNAPSHOT_LOCAL_DATA_ZSTD)).thenReturn(true);
+    UUID newSnapshot = createSnapshotLocalData(localDataManager, 1).get(0);
+    assertTrue(OmSnapshotLocalDataYaml.isCompressed(getYamlFile(newSnapshot)));
+
+    // A new manager reads both plain and compressed files at startup.
+    localDataManager.close();
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    assertThat(localDataManager.getVersionNodeMapUnmodifiable().keySet()).containsAll(oldSnapshots)
+        .contains(newSnapshot);
+
+    localDataManager.compressSnapshotLocalDataFiles();
+    for (UUID snapshotId : oldSnapshots) {
+      assertTrue(OmSnapshotLocalDataYaml.isCompressed(getYamlFile(snapshotId)));
+      assertEquals(checksums.get(snapshotId), getChecksum(snapshotId));
+    }
+  }
+
+  private File getYamlFile(UUID snapshotId) {
+    return new File(localDataManager.getSnapshotLocalPropertyYamlPath(snapshotId));
+  }
+
+  private String getChecksum(UUID snapshotId) throws IOException {
+    try (ReadableOmSnapshotLocalDataProvider provider = localDataManager.getOmSnapshotLocalData(snapshotId)) {
+      return provider.getSnapshotLocalData().getChecksum();
     }
   }
 

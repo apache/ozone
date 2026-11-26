@@ -5369,7 +5369,8 @@
   <property>
     <name>ozone.om.snapshot.local.data.manager.service.interval</name>
     <value>5m</value>
-    <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
+    <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots,
+      and for compressing snapshot local data YAML files written before finalization</description>
   </property>
 
   <property>

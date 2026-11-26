@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.ozone.OzoneManagerVersion.SNAPSHOT_LOCAL_DATA_ZSTD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
@@ -32,6 +33,7 @@ import com.google.common.graph.MutableGraph;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -122,6 +124,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   // Locks should be always acquired by iterating through the snapshot chain to avoid deadlocks.
   private HierarchicalResourceLockManager locks;
   private Map<UUID, Integer> snapshotToBeCheckedForOrphans;
+  private final OMVersionManager omVersionManager;
+  // Set once the YAML files written before SNAPSHOT_LOCAL_DATA_ZSTD was finalized have been compressed.
   private Scheduler scheduler;
   private volatile boolean closed;
 
@@ -131,6 +135,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       OzoneConfiguration configuration) throws IOException {
     this.localDataGraph = GraphBuilder.directed().build();
     this.omMetadataManager = omMetadataManager;
+    this.omVersionManager = omVersionManager;
     this.snapshotLocalDataSerializer = new YamlSerializer<OmSnapshotLocalData>(
         new OmSnapshotLocalDataYaml.YamlFactory()) {
 
@@ -138,10 +143,25 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       public void computeAndSetChecksum(Yaml yaml, OmSnapshotLocalData data) throws IOException {
         data.computeAndSetChecksum(yaml);
       }
+
+      @Override
+      protected InputStream newInputStream(File yamlFile) throws IOException {
+        return OmSnapshotLocalDataYaml.newInputStream(yamlFile);
+      }
+
+      @Override
+      protected void dump(Yaml yaml, OmSnapshotLocalData data, File yamlFile) throws IOException {
+        // Older OMs cannot read compressed files, so compress only after finalization.
+        if (omVersionManager.isAllowed(SNAPSHOT_LOCAL_DATA_ZSTD)) {
+          OmSnapshotLocalDataYaml.dumpCompressed(yaml, data, yamlFile);
+        } else {
+          super.dump(yaml, data, yamlFile);
+        }
+      }
     };
     this.versionNodeMap = new ConcurrentHashMap<>();
     this.internalLock = new ReentrantReadWriteLock();
-    init(configuration, snapshotChainManager, omVersionManager, defaultSnapProvider);
+    init(configuration, snapshotChainManager, defaultSnapProvider);
   }
 
   public Map<UUID, SnapshotVersionsMeta> getVersionNodeMapUnmodifiable() {
@@ -413,7 +433,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   private void init(OzoneConfiguration configuration, SnapshotChainManager chainManager,
-      OMVersionManager omVersionManager,
       CheckedFunction<SnapshotInfo, OmMetadataManagerImpl, IOException> defaultSnapProvider) throws IOException {
     this.locks = omMetadataManager.getHierarchicalLockManager();
     this.snapshotToBeCheckedForOrphans = new ConcurrentHashMap<>();
@@ -458,6 +477,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
               checkOrphanSnapshotVersions(omMetadataManager, chainManager);
             } catch (Exception e) {
               LOG.error("Exception while checking orphan snapshot versions", e);
+            }
+            try {
+              compressSnapshotLocalDataFiles();
+            } catch (Throwable t) {
+              // Also catches a zstd-jni LinkageError, which would otherwise cancel this task.
+              LOG.error("Exception while compressing snapshot local data YAML files", t);
             }
           }, snapshotLocalDataManagerServiceInterval, snapshotLocalDataManagerServiceInterval, TimeUnit.MILLISECONDS);
     }
@@ -530,6 +555,37 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         continue;
       }
       decrementOrphanCheckCount(snapshotId, countBeforeCheck);
+    }
+  }
+
+  /**
+   * Once {@link org.apache.hadoop.ozone.OzoneManagerVersion#SNAPSHOT_LOCAL_DATA_ZSTD} is finalized, compresses the
+   * snapshot local data YAML files written before it. Files written after it are already compressed.
+   */
+  void compressSnapshotLocalDataFiles() {
+    if (!omVersionManager.isAllowed(SNAPSHOT_LOCAL_DATA_ZSTD)) {
+      return;
+    }
+    int compressed = 0;
+    int failed = 0;
+    for (UUID snapshotId : versionNodeMap.keySet()) {
+      if (closed || Thread.currentThread().isInterrupted()) {
+        return;
+      }
+      File yamlFile = new File(getSnapshotLocalPropertyYamlPath(snapshotId));
+      try (HierarchicalResourceLock ignored = acquireLock(snapshotId, false)) {
+        if (yamlFile.exists() && !OmSnapshotLocalDataYaml.isCompressed(yamlFile)) {
+          OmSnapshotLocalDataYaml.compress(yamlFile);
+          compressed++;
+        }
+      } catch (IOException e) {
+        failed++;
+        LOG.warn("Failed to compress snapshot local data YAML file {}", yamlFile, e);
+      }
+    }
+    // Every run checks all files, so a plain file written while finalization was in progress is not missed.
+    if (compressed > 0 || failed > 0) {
+      LOG.info("Compressed {} snapshot local data YAML files, {} failed", compressed, failed);
     }
   }
 
