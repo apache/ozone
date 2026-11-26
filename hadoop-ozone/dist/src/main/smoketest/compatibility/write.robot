@@ -19,36 +19,99 @@ Resource            ../ozone-lib/shell.robot
 Resource            setup.robot
 Resource            ../lib/fs.robot
 Resource            ../ozone-lib/freon.robot
+Resource            ../ozone-lib/batch.robot
+Resource            ../ozone-lib/batch-shell.robot
+Suite Setup         Setup Suite
+Suite Teardown      Teardown Suite
 Test Timeout        5 minutes
 
 *** Variables ***
 ${ENCRYPTION_KEY}    key1
+${FSO_BUCKET}        vol1/fso-bucket-${CLIENT_VERSION}
+${SNAPSHOT1}         snapshot-1-${CLIENT_VERSION}
+${SNAPSHOT2}         snapshot-2-${CLIENT_VERSION}
+${SNAPSHOT3}         snapshot-3-${CLIENT_VERSION}
+${SNAPSHOT_KEY1}     snapdiff-key1-${CLIENT_VERSION}
+${SNAPSHOT_KEY2}     snapdiff-key2-${CLIENT_VERSION}
+
+
+*** Keywords ***
+Expected Snapshot Diff Output
+    IF   '${CLUSTER_VERSION}' < '${SNAPSHOT_DIFF_SUBMIT_VERSION}' or '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_SUBMIT_VERSION}'
+        RETURN    Snapshot diff job is IN_PROGRESS
+    ELSE
+        RETURN    Submitting a new job
+    END
 
 
 *** Test Cases ***
 Create Bucket With Replication Type
     Pass Execution If    '${CLIENT_VERSION}' < '${EC_VERSION}'    Client does not support EC
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    Execute             ozone sh bucket create --replication 3 --type RATIS /vol1/ratis-${CLIENT_VERSION}
-    Execute             ozone sh bucket create --replication rs-3-2-1024k --type EC /vol1/ecbucket-${CLIENT_VERSION}
+    Execute Later and Expect No Output For ozone sh    bucket create --replication 3 --type RATIS /vol1/ratis-${CLIENT_VERSION}
+    Execute Later and Expect No Output For ozone sh    bucket create --replication rs-3-2-1024k --type EC /vol1/ecbucket-${CLIENT_VERSION}
 
 Create Encrypted Bucket
-    Execute    ozone sh bucket create -k ${ENCRYPTION_KEY} /vol1/encrypted-${CLIENT_VERSION}
+    Execute Later and Expect No Output For ozone sh    bucket create -k ${ENCRYPTION_KEY} /vol1/encrypted-${CLIENT_VERSION}
 
 Create Key in Encrypted Bucket
-    Execute    ozone sh key put /vol1/encrypted-${CLIENT_VERSION}/key ${TESTFILE}
+    Execute Later and Expect No Output For ozone sh    key put /vol1/encrypted-${CLIENT_VERSION}/key ${TESTFILE}
 
 Key Can Be Written
-    Create Key    /vol1/bucket1/key-${CLIENT_VERSION}    ${TESTFILE}
+    Execute Later and Expect No Output For ozone sh    key put /vol1/bucket1/key-${CLIENT_VERSION} ${TESTFILE}
 
 Key Can Be Written To Bucket With Replication Type
     Pass Execution If    '${CLUSTER_VERSION}' < '${EC_VERSION}'   Cluster does not support EC
-    Execute         ozone sh key put /vol1/ratis-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
-    Execute         ozone sh key put /vol1/ecbucket-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
+    Execute Later and Expect No Output For ozone sh    key put /vol1/ratis-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
+    Execute Later and Expect No Output For ozone sh    key put /vol1/ecbucket-${CLUSTER_VERSION}/key-${CLIENT_VERSION} ${TESTFILE}
 
 Key Can Be Deleted
-    Create Key    /vol1/bucket1/to-be-deleted-${CLIENT_VERSION}    ${TESTFILE}
-    Execute       ozone sh key delete /vol1/bucket1/to-be-deleted-${CLIENT_VERSION}
+    Execute Later and Expect No Output For ozone sh    key put /vol1/bucket1/to-be-deleted-${CLIENT_VERSION} ${TESTFILE}
+    Execute Later and Expect No Output For ozone sh    key delete /vol1/bucket1/to-be-deleted-${CLIENT_VERSION}
+
+FSO Bucket Can Be Created
+    Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
+    Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
+    Execute Later and Expect No Output For ozone sh    bucket create --layout FILE_SYSTEM_OPTIMIZED ${FSO_BUCKET}
+
+Snapshot Can Be Created
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Client does not support snapshots
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Cluster does not support snapshots
+
+    Execute Later ozone sh    snapshot create ${FSO_BUCKET} ${SNAPSHOT1}
+    Execute Later and Expect No Output For ozone sh    key put ${FSO_BUCKET}/${SNAPSHOT_KEY1} ${TESTFILE}
+    Execute Later ozone sh    snapshot create ${FSO_BUCKET} ${SNAPSHOT2}
+    Execute Later and Expect No Output For ozone sh    key put ${FSO_BUCKET}/${SNAPSHOT_KEY2} ${TESTFILE}
+    Execute Later ozone sh    snapshot create ${FSO_BUCKET} ${SNAPSHOT3}
+
+Snapshot Diff Can Be Requested
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Client does not support snapshots
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Cluster does not support snapshots
+
+    ${output} =    Execute Later ozone sh    snapshot diff ${FSO_BUCKET} ${SNAPSHOT1} ${SNAPSHOT2}
+    ${expected} =    Expected Snapshot Diff Output
+    Assert Later    File ${output} Should    Contain    ${expected}
+
+Snapshot Diff --get-report Submits Job On Old Cluster
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Client does not support snapshot diff submit
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Cluster does not support snapshots
+    Pass Execution If    '${CLUSTER_VERSION}' >= '${SNAPSHOT_DIFF_SUBMIT_VERSION}'    Cluster supports snapshot diff submit, no fallback
+
+    ${output} =    Execute Later ozone sh    snapshot diff --get-report ${FSO_BUCKET} ${SNAPSHOT2} ${SNAPSHOT3}
+    ${expected} =    Expected Snapshot Diff Output
+    Assert Later    File ${output} Should    Contain    ${expected}
+
+Snapshot Diff Can Be --ordered
+    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_DIFF_ORDERED_VERSION}'    Client does not support ordered snapshots
+    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'                Cluster does not support snapshots
+
+    ${output} =    Execute Later ozone sh    snapshot diff --ordered ${FSO_BUCKET} ${SNAPSHOT1} ${SNAPSHOT3}
+    ${expected} =    Expected Snapshot Diff Output
+    Assert Later    File ${output} Should    Contain    ${expected}
+
+# execute batch before any ozone fs or other non-sh commands
+Execute Batch Shell
+    Execute Batch
 
 Dir Can Be Created
     Execute    ozone fs -mkdir o3fs://bucket1.vol1/dir-${CLIENT_VERSION}
@@ -65,12 +128,11 @@ File Can Be Deleted
     Execute    ozone fs -put ${TESTFILE} o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted
     Execute    ozone fs -rm -skipTrash o3fs://bucket1.vol1/dir-${CLIENT_VERSION}/to-be-deleted
 
-FSO Bucket Can Be Created and Used
+FSO Bucket Can Be Written To
     Pass Execution If    '${CLIENT_VERSION}' < '${FSO_VERSION}'    Client does not support FSO
     Pass Execution If    '${CLUSTER_VERSION}' < '${FSO_VERSION}'   Cluster does not support FSO
-    Execute    ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED /vol1/fso-bucket-${CLIENT_VERSION}
-    Execute    ozone fs -mkdir -p ofs://om/vol1/fso-bucket-${CLIENT_VERSION}/dir/subdir
-    Execute    ozone fs -put ${TESTFILE} ofs://om/vol1/fso-bucket-${CLIENT_VERSION}/dir/subdir/file
+    Execute    ozone fs -mkdir -p ofs://om/${FSO_BUCKET}/dir/subdir
+    Execute    ozone fs -put ${TESTFILE} ofs://om/${FSO_BUCKET}/dir/subdir/file
 
 HSync Can Be Used To Create Keys
     Pass Execution If    '${CLIENT_VERSION}' < '${HSYNC_VERSION}'    Client does not support HSYNC
@@ -79,68 +141,3 @@ HSync Can Be Used To Create Keys
     Freon DFSG      sync=HSYNC    n=1    path=${o3fspath}
     ${pfspath} =    Format FS URL         ofs      $vol1    bucket1
     Freon DFSG      sync=HSYNC    n=1    path=${pfspath}
-
-Snapshot Diff RPC Is Compatible
-    # Snapshot diff requires snapshot support in these tests.
-    Pass Execution If    '${CLIENT_VERSION}' < '${SNAPSHOT_VERSION}'    Snapshot CLI not supported by this client
-    Pass Execution If    '${CLUSTER_VERSION}' < '${SNAPSHOT_VERSION}'   Snapshot CLI not supported by this client
-
-    ${bucket} =      Set Variable    snapdiff-${CLIENT_VERSION}
-    ${fromSnap} =    Set Variable    snapdiff-from-${CLIENT_VERSION}
-    ${toSnap} =      Set Variable    snapdiff-to-${CLIENT_VERSION}
-    ${key1} =        Set Variable    snapdiff-key1-${CLIENT_VERSION}
-    ${key2} =        Set Variable    snapdiff-key2-${CLIENT_VERSION}
-
-    Execute          ozone sh bucket create --layout FILE_SYSTEM_OPTIMIZED /vol1/${bucket}
-    Execute          ozone sh key put /vol1/${bucket}/base ${TESTFILE}
-    Execute          ozone sh snapshot create /vol1/${bucket} ${fromSnap}
-    Execute          ozone sh key put /vol1/${bucket}/${key1} ${TESTFILE}
-    Execute          ozone sh key put /vol1/${bucket}/${key2} ${TESTFILE}
-    Execute          ozone sh snapshot create /vol1/${bucket} ${toSnap}
-
-    Snapshot Diff Report Should Contain Created Keys
-    ...    /vol1/${bucket}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
-
-*** Keywords ***
-Snapshot Diff Report Should Contain Created Keys
-    [Arguments]    ${bucketPath}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
-
-    # New clients support --get-report. Old clients don't; fall back to the legacy call.
-    ${status}    ${output} =    Run Keyword And Ignore Error
-    ...    Execute    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
-
-    IF    '${status}' == 'PASS'
-        # On newer servers, --get-report does not submit jobs. If the job is not
-        # found, submit it first (this keeps new-client/new-server behavior).
-        ${notFound} =    Run Keyword And Return Status
-        ...    Should Contain    ${output}    No snapshot diff job found
-        IF    ${notFound}
-            ${output} =    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
-                           Should Contain    ${output}    Submitting a new job
-        ELSE
-        # On older servers, --get-report falls back to the legacy snapshot diff command.
-        # Ensure the submit path succeeds without failing the test.
-            ${submitStatus}    ${submitOutput} =    Run Keyword And Ignore Error
-            ...    Execute    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
-            Run Keyword If    '${submitStatus}' == 'FAIL'
-            ...    Fail    Snapshot diff submit failed: ${submitOutput}
-        END
-        Wait Until Keyword Succeeds    2min    5sec
-        ...    Snapshot Diff Command Should Contain Created Keys
-        ...    ozone sh snapshot diff --get-report ${bucketPath} ${fromSnap} ${toSnap}
-        ...    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
-    ELSE
-        # old client, which does not support --get-report.
-        # The snapshot diff command should return the report, submitting a job if necessary.
-        Wait Until Keyword Succeeds    2min    5sec
-        ...    Snapshot Diff Command Should Contain Created Keys
-        ...    ozone sh snapshot diff ${bucketPath} ${fromSnap} ${toSnap}
-        ...    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
-    END
-
-Snapshot Diff Command Should Contain Created Keys
-    [Arguments]    ${command}    ${fromSnap}    ${toSnap}    ${key1}    ${key2}
-    ${output} =    Execute    ${command}
-    Should Contain    ${output}    Difference between snapshot: ${fromSnap} and snapshot: ${toSnap}
-    Should Contain    ${output}    ${key1}
-    Should Contain    ${output}    ${key2}

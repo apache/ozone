@@ -26,8 +26,10 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CERTIFICATE_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CRYPTO_SIGNATURE_VERIFICATION_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CRYPTO_SIGN_ERROR;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.RENEW_ERROR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.ROLLBACK_ERROR;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getValidInetsForCurrentHost;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -35,6 +37,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -563,9 +566,24 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   public CertificateSignRequest.Builder configureCSRBuilder() throws SCMSecurityException {
     return new CertificateSignRequest.Builder()
         .setConfiguration(securityConfig)
-        .addInetAddresses()
+        .addInetAddresses(getLocalInetAddresses())
         .setDigitalEncryption(true)
         .setDigitalSignature(true);
+  }
+
+  /**
+   * Returns the local addresses that go into the SAN extension of this client's CSR.
+   * Resolving them is as slow as the host's resolver, so tests override this.
+   *
+   * @return the addresses of the host this client runs on
+   */
+  protected List<InetAddress> getLocalInetAddresses() throws SCMSecurityException {
+    try {
+      return getValidInetsForCurrentHost();
+    } catch (IOException e) {
+      throw new CertificateException("Error while getting Inet addresses " +
+          "for the CSR builder", e, CSR_ERROR);
+    }
   }
 
   /**

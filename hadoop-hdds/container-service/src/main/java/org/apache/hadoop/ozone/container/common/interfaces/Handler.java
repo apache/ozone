@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Collection;
@@ -32,12 +31,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.ReadBlockContext;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
@@ -284,9 +283,6 @@ public abstract class Handler {
     this.clusterId = clusterID;
   }
 
-  public abstract RandomAccessFile getBlockFile(ContainerCommandRequestProto request)
-      throws IOException;
-
   /**
    * Copy container to the destination path.
    */
@@ -301,6 +297,6 @@ public abstract class Handler {
 
   public abstract ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto msg, Container container,
-      RandomAccessFileChannel blockFile,
+      ReadBlockContext readBlockContext,
       StreamObserver<ContainerCommandResponseProto> streamObserver);
 }

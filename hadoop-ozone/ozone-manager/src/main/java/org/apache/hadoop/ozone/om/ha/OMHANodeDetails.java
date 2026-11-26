@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.slf4j.Logger;
@@ -60,6 +61,7 @@ public class OMHANodeDetails {
       OMConfigKeys.OZONE_OM_HTTPS_BIND_HOST_KEY,
       OMConfigKeys.OZONE_OM_DB_DIRS,
       OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+      OmConfig.Keys.BIND_HOST,
   };
 
   private static final Logger LOG =

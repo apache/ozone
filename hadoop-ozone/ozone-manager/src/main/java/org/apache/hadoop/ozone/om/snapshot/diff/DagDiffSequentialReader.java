@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.DoubleConsumer;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.IteratorType;
@@ -62,6 +63,10 @@ import org.apache.hadoop.ozone.util.ClosableIterator;
  */
 public class DagDiffSequentialReader {
 
+  private static final double DIRECTORY_DELTA_PROGRESS_END = 0.33;
+  private static final double DIRECTORY_FROM_PROGRESS_END = 0.66;
+  private static final double DIRECTORY_TO_PROGRESS_END = 1.0;
+
   private final SnapDiffJobStore store;
   private final long exclusiveMinSequenceNumber;
 
@@ -85,14 +90,18 @@ public class DagDiffSequentialReader {
    * @param fromFileTable raw {@code fromSnapshot}'s file or key table
    */
   public void scanFileTables(byte[] keyPrefix, Collection<Path> deltaSstFiles,
-      Table<byte[], byte[]> fromFileTable) throws IOException {
+      Table<byte[], byte[]> fromFileTable, DoubleConsumer progress,
+      long estimatedDeltaKeys) throws IOException {
     if (deltaSstFiles.isEmpty()) {
+      if (progress != null) {
+        progress.accept(1.0);
+      }
       return;
     }
     try (LatestVersionedKWayMergeIterator iterator =
         LatestVersionedKWayMergeIterator.overRawSstFilesFromSequence(deltaSstFiles,
             exclusiveMinSequenceNumber, keyPrefix, prefixUpperBoundExclusive(keyPrefix))) {
-      scanFileDeltaEntries(iterator, fromFileTable);
+      scanFileDeltaEntries(iterator, fromFileTable, progress, estimatedDeltaKeys);
     }
   }
 
@@ -106,42 +115,53 @@ public class DagDiffSequentialReader {
    * @param fromDirectoryTable raw {@code fromSnapshot.directoryTable}
    * @param toDirectoryTable   raw {@code toSnapshot.directoryTable}
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public void scanDirectoryTables(byte[] keyPrefix, Collection<Path> deltaSstFiles,
-      Table<byte[], byte[]> fromDirectoryTable,
-      Table<byte[], byte[]> toDirectoryTable) throws IOException {
+      Table<byte[], byte[]> fromDirectoryTable, Table<byte[], byte[]> toDirectoryTable,
+      DoubleConsumer progress, long estimatedDeltaKeys, long estimatedFromDirectoryKeys,
+      long estimatedToDirectoryKeys) throws IOException {
     if (!deltaSstFiles.isEmpty()) {
       try (LatestVersionedKWayMergeIterator iterator =
           LatestVersionedKWayMergeIterator.overRawSstFilesFromSequence(deltaSstFiles,
               exclusiveMinSequenceNumber, keyPrefix, prefixUpperBoundExclusive(keyPrefix))) {
-        scanDirectoryDeltaEntries(iterator);
+        scanDirectoryDeltaEntries(iterator, progress, estimatedDeltaKeys);
       }
+    } else if (progress != null) {
+      progress.accept(DIRECTORY_DELTA_PROGRESS_END);
     }
-    scanFromDirectoryTable(fromDirectoryTable, keyPrefix);
-    scanToDirectoryTable(toDirectoryTable, keyPrefix);
+    scanFromDirectoryTable(fromDirectoryTable, keyPrefix, progress, estimatedFromDirectoryKeys);
+    scanToDirectoryTable(toDirectoryTable, keyPrefix, progress, estimatedToDirectoryKeys);
   }
 
   @VisibleForTesting
   void scanFileTablesFromDelta(ClosableIterator<MergedKeyValue> deltaEntries,
       Table<byte[], byte[]> fromFileTable) throws IOException {
-    scanFileDeltaEntries(deltaEntries, fromFileTable);
+    scanFileDeltaEntries(deltaEntries, fromFileTable, null, 1L);
   }
 
   @VisibleForTesting
   void scanDirectoryTablesFromDelta(ClosableIterator<MergedKeyValue> deltaEntries, byte[] keyPrefix,
-      Table<byte[], byte[]> fromDirectoryTable,
-      Table<byte[], byte[]> toDirectoryTable) throws IOException {
-    scanDirectoryDeltaEntries(deltaEntries);
-    scanFromDirectoryTable(fromDirectoryTable, keyPrefix);
-    scanToDirectoryTable(toDirectoryTable, keyPrefix);
+      Table<byte[], byte[]> fromDirectoryTable, Table<byte[], byte[]> toDirectoryTable)
+      throws IOException {
+    scanDirectoryDeltaEntries(deltaEntries, null, 1L);
+    scanFromDirectoryTable(fromDirectoryTable, keyPrefix, null, 1L);
+    scanToDirectoryTable(toDirectoryTable, keyPrefix, null, 1L);
   }
 
   private void scanFileDeltaEntries(ClosableIterator<MergedKeyValue> entries,
-      Table<byte[], byte[]> fromFileTable) throws IOException {
+      Table<byte[], byte[]> fromFileTable, DoubleConsumer progress,
+      long estimatedDeltaKeys) throws IOException {
     int batchSize = store.getWriteBatchSize();
     List<byte[]> lookupBatch = new ArrayList<>(batchSize);
+    long processedDeltaKeys = 0L;
+    SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+        new SnapDiffProgressHelper.TenPercentCheckpoint();
     try {
       while (entries.hasNext()) {
         MergedKeyValue entry = entries.next();
+        processedDeltaKeys++;
+        SnapDiffProgressHelper.reportEveryTenPercentInSlice(
+            progress, 0.0, 1.0, processedDeltaKeys, estimatedDeltaKeys, checkpoint);
         lookupBatch.add(entry.getUserKey());
         if (!entry.isTombstone()) {
           byte[] value = entry.getValue();
@@ -162,12 +182,22 @@ public class DagDiffSequentialReader {
       multiGetAndPutOldList(lookupBatch, fromFileTable);
     }
     store.flushWrites();
+    if (progress != null) {
+      progress.accept(1.0);
+    }
   }
 
-  private void scanDirectoryDeltaEntries(ClosableIterator<MergedKeyValue> entries) throws IOException {
+  private void scanDirectoryDeltaEntries(ClosableIterator<MergedKeyValue> entries,
+      DoubleConsumer progress, long estimatedDeltaKeys) throws IOException {
+    long processedDeltaKeys = 0L;
+    SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+        new SnapDiffProgressHelper.TenPercentCheckpoint();
     try {
       while (entries.hasNext()) {
         MergedKeyValue entry = entries.next();
+        processedDeltaKeys++;
+        SnapDiffProgressHelper.reportEveryTenPercentInSlice(progress, 0.0, DIRECTORY_DELTA_PROGRESS_END,
+            processedDeltaKeys, estimatedDeltaKeys, checkpoint);
         if (entry.isTombstone()) {
           store.addDirTombstoneKey(entry.getUserKey());
           continue;
@@ -183,10 +213,17 @@ public class DagDiffSequentialReader {
       entries.close();
       store.flushWrites();
     }
+    if (progress != null) {
+      progress.accept(DIRECTORY_DELTA_PROGRESS_END);
+    }
   }
 
-  private void scanFromDirectoryTable(Table<byte[], byte[]> table, byte[] keyPrefix) throws IOException {
+  private void scanFromDirectoryTable(Table<byte[], byte[]> table, byte[] keyPrefix,
+      DoubleConsumer progress, long estimatedDirectoryKeys) throws IOException {
     store.flushWrites();
+    long processedRows = 0L;
+    SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+        new SnapDiffProgressHelper.TenPercentCheckpoint();
     try (Table.KeyValueIterator<byte[], byte[]> iterator =
         table.iterator(keyPrefix, IteratorType.KEY_AND_VALUE)) {
       while (iterator.hasNext()) {
@@ -202,6 +239,9 @@ public class DagDiffSequentialReader {
           store.putOldList(objectId,
               new EntryValue(info.getParentId(), info.getName(), true, signature).toBytes());
         }
+        processedRows++;
+        SnapDiffProgressHelper.reportEveryTenPercentInSlice(progress, DIRECTORY_DELTA_PROGRESS_END,
+            DIRECTORY_FROM_PROGRESS_END, processedRows, estimatedDirectoryKeys, checkpoint);
       }
     } catch (RocksDatabaseException | CodecException e) {
       throw new IOException(e);
@@ -209,20 +249,33 @@ public class DagDiffSequentialReader {
     store.clearDiffCandidates();
     store.clearDirTombstoneKeys();
     store.flushWrites();
+    if (progress != null) {
+      progress.accept(DIRECTORY_FROM_PROGRESS_END);
+    }
   }
 
-  private void scanToDirectoryTable(Table<byte[], byte[]> table, byte[] keyPrefix) throws IOException {
+  private void scanToDirectoryTable(Table<byte[], byte[]> table, byte[] keyPrefix,
+      DoubleConsumer progress, long estimatedDirectoryKeys) throws IOException {
+    long processedRows = 0L;
+    SnapDiffProgressHelper.TenPercentCheckpoint checkpoint =
+        new SnapDiffProgressHelper.TenPercentCheckpoint();
     try (Table.KeyValueIterator<byte[], byte[]> iterator =
         table.iterator(keyPrefix, IteratorType.VALUE_ONLY)) {
       while (iterator.hasNext()) {
         byte[] value = iterator.next().getValue();
         SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, true);
         store.putToEdge(info.getParentId(), info.getObjectId(), nameBytes(info.getName()));
+        processedRows++;
+        SnapDiffProgressHelper.reportEveryTenPercentInSlice(progress, DIRECTORY_FROM_PROGRESS_END,
+            DIRECTORY_TO_PROGRESS_END, processedRows, estimatedDirectoryKeys, checkpoint);
       }
     } catch (RocksDatabaseException | CodecException e) {
       throw new IOException(e);
     }
     store.flushWrites();
+    if (progress != null) {
+      progress.accept(DIRECTORY_TO_PROGRESS_END);
+    }
   }
 
   private void multiGetAndPutOldList(List<byte[]> keys, Table<byte[], byte[]> fromFileTable)

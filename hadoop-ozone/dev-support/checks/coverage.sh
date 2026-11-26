@@ -26,10 +26,11 @@ REPORT_DIR="$DIR/../../../target/coverage"
 
 mkdir -p "$REPORT_DIR"
 
-JACOCO_VERSION=$(mvn help:evaluate -Dexpression=jacoco.version -q -DforceStdout -Dscan=false)
+source "${DIR}/_lib.sh"
+JACOCO_VERSION=$(get_version jacoco)
 
 #Install jacoco cli
-mvn --non-recursive --no-transfer-progress -Dscan=false \
+./mvnw --non-recursive -Dscan=false \
   org.apache.maven.plugins:maven-dependency-plugin:copy \
   -Dartifact=org.jacoco:org.jacoco.cli:${JACOCO_VERSION}:jar:nodeps
 
@@ -49,7 +50,7 @@ find hadoop-ozone/dist/target/*/share/ozone/lib -name 'hdds-*.jar' -or -name 'oz
     xargs -n1 unzip -o -q -d target/coverage-classes
 
 #Exclude some classes from the coverage
-find target/coverage-classes -type d \( -name proto -or -name codegen -or -name generated -or -name v1 -or -name freon \) \
+find target/coverage-classes -type d \( -name proto -or -name protobuf -or -name codegen -or -name generated \) \
   | xargs rm -rf
 
 #generate the reports

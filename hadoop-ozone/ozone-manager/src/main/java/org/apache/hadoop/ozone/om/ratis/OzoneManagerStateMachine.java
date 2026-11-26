@@ -203,6 +203,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
+  public void notifyLogFailed(Throwable cause, RaftProtos.LogEntryProto failedEntry) {
+    // Ratis fails every later write to this log until restart, so the OM could neither lead nor catch up.
+    final String entry = failedEntry == null ? "a log segment" : String.valueOf(TermIndex.valueOf(failedEntry));
+    ExitUtils.terminate(1, "OM Ratis log failed at " + entry + ", terminating OM.", cause, LOG);
+  }
+
+  @Override
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries) {
     LOG.info("current leader OM steps down.");
     OMMetrics metrics = ozoneManager.getMetrics();
@@ -780,13 +787,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @VisibleForTesting
-  public void setHandler(OzoneManagerRequestHandler handler) {
+  public void setHandler(RequestHandler handler) {
     this.handler = handler;
   }
 
   @VisibleForTesting
-  public OzoneManagerRequestHandler getHandler() {
-    return (OzoneManagerRequestHandler) this.handler;
+  public RequestHandler getHandler() {
+    return this.handler;
   }
 
   public void stop() {

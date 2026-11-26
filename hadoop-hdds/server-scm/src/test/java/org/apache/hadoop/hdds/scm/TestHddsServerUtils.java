@@ -262,6 +262,22 @@ public class TestHddsServerUtils {
   }
 
   @Test
+  public void testGetReconHeartbeatInterval() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, "5s");
+    conf.set(OZONE_SCM_STALENODE_INTERVAL, "30s");
+
+    conf.set(HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL, "8s");
+    assertEquals(8000, HddsServerUtil.getReconHeartbeatInterval(conf));
+    // At most a third of the stale node interval
+    conf.set(HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL, "5m");
+    assertEquals(10000, HddsServerUtil.getReconHeartbeatInterval(conf));
+    // At least the SCM heartbeat interval
+    conf.set(HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL, "1s");
+    assertEquals(5000, HddsServerUtil.getReconHeartbeatInterval(conf));
+  }
+
+  @Test
   public void testGetDatanodeIdFilePath() {
     final File testDir = PathUtils.getTestDir(TestHddsServerUtils.class);
     final File metaDir = new File(testDir, "metaDir");

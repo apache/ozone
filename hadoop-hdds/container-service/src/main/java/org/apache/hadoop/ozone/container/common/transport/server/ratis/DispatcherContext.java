@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import java.io.RandomAccessFile;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.HDDSVersion;
@@ -60,6 +61,8 @@ public final class DispatcherContext {
 
   private final boolean releaseSupported;
   private volatile Runnable releaseMethod;
+  // block file opened for a short-circuit GetBlock; set and read on the same Receiver task thread
+  private RandomAccessFile shortCircuitBlockFile;
 
   private final long startTime = Time.monotonicNowNanos();
 
@@ -107,6 +110,7 @@ public final class DispatcherContext {
     HANDLE_WRITE_CHUNK,
     HANDLE_GET_SMALL_FILE,
     HANDLE_PUT_SMALL_FILE,
+    HANDLE_SHORT_CIRCUIT_READ,
 
     READ_STATE_MACHINE_DATA,
     WRITE_STATE_MACHINE_DATA,
@@ -125,8 +129,6 @@ public final class DispatcherContext {
       case APPLY_TRANSACTION:
       case WRITE_STATE_MACHINE_DATA:
       case READ_STATE_MACHINE_DATA:
-      case STREAM_LINK:
-      case STREAM_COMMAND:
         return false;
       default:
         return true;
@@ -194,6 +196,15 @@ public final class DispatcherContext {
     if (releaseMethod != null) {
       releaseMethod.run();
     }
+  }
+
+  public RandomAccessFile getShortCircuitBlockFile() {
+    return shortCircuitBlockFile;
+  }
+
+  public void setShortCircuitBlockFile(RandomAccessFile file) {
+    Preconditions.assertTrue(op == Op.HANDLE_SHORT_CIRCUIT_READ, "Unsupported short-circuit block file");
+    this.shortCircuitBlockFile = file;
   }
 
   @Override

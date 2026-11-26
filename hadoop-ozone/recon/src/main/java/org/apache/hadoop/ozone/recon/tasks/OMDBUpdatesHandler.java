@@ -171,6 +171,12 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
           }
         }
       } else if (action.equals(DELETE)) {
+        if (latestEvent != null && latestEvent.getAction() == DELETE) {
+          // The key was already deleted earlier in this delta, so there is nothing left to delete. This happens
+          // when OM re-creates and deletes the key in one flush: its batch keeps only the last write, the DELETE.
+          // Emitting it would reuse the stale row of the earlier DELETE and make the tasks subtract the key twice.
+          return;
+        }
         if (null == oldValue) {
           String keyStr = (key instanceof String) ? key.toString() : "";
           if (keyStr.isEmpty()) {

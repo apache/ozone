@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerClusterSnapshot.NodeUtilization;
@@ -208,14 +209,19 @@ public final class ContainerBalancerClusterAnalyzer {
    */
   public static boolean shouldExcludeDatanode(DatanodeDetails datanode,
                                               Set<String> excludeNodes, Set<String> includeNodes) {
-    if (excludeNodes.contains(datanode.getHostName()) ||
-        excludeNodes.contains(datanode.getIpAddress())) {
+    if (containsAddress(excludeNodes, datanode.getHostName()) ||
+        containsAddress(excludeNodes, datanode.getIpAddress())) {
       return true;
     } else if (!includeNodes.isEmpty()) {
-      return !includeNodes.contains(datanode.getHostName()) &&
-          !includeNodes.contains(datanode.getIpAddress());
+      return !containsAddress(includeNodes, datanode.getHostName()) &&
+          !containsAddress(includeNodes, datanode.getIpAddress());
     }
     return false;
+  }
+
+  private static boolean containsAddress(Set<String> addresses, String address) {
+    return addresses.contains(address) || addresses.stream()
+        .anyMatch(candidate -> HddsUtils.isSameIpAddress(address, candidate));
   }
 
   static double calculateNodeUtilization(DatanodeUsageInfoProto node) {

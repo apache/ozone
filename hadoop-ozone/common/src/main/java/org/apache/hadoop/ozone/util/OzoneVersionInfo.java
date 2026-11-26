@@ -84,8 +84,6 @@ public final class OzoneVersionInfo {
     System.out.println(
         "Compiled with protoc " + OZONE_VERSION_INFO.getProtoVersions());
     System.out.println(
-        "From source with checksum " + OZONE_VERSION_INFO.getSrcChecksum());
-    System.out.println(
         "With Apache Ratis: " + RATIS_VERSION_INFO.getBuildVersion());
     System.out.println(
         "Compiled on platform " + OZONE_VERSION_INFO.getCompilePlatform());

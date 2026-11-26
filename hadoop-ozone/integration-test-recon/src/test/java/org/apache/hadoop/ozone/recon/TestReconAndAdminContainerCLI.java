@@ -57,11 +57,11 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeTestUtil;
@@ -70,7 +70,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
@@ -214,7 +214,7 @@ class TestReconAndAdminContainerCLI {
     GenericTestUtils.waitFor(() -> {
       try {
         return scmClient.getReplicationManagerReport()
-                   .getStat(ContainerHealthState.MISSING) == 1;
+                   .getStat(SimplifiedContainerHealthStateForReporting.MISSING) == 1;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -351,10 +351,14 @@ class TestReconAndAdminContainerCLI {
       reconResponse = ReconEndpointTestUtil
           .getUnhealthyContainersFromRecon(CONF, state);
 
-      assertEquals(rmReport.getStat(ContainerHealthState.MISSING), reconResponse.getMissingCount());
-      assertEquals(rmReport.getStat(ContainerHealthState.UNDER_REPLICATED), reconResponse.getUnderReplicatedCount());
-      assertEquals(rmReport.getStat(ContainerHealthState.OVER_REPLICATED), reconResponse.getOverReplicatedCount());
-      assertEquals(rmReport.getStat(ContainerHealthState.MIS_REPLICATED), reconResponse.getMisReplicatedCount());
+      assertEquals(rmReport.getStat(SimplifiedContainerHealthStateForReporting.MISSING),
+          reconResponse.getMissingCount());
+      assertEquals(rmReport.getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED),
+          reconResponse.getUnderReplicatedCount());
+      assertEquals(rmReport.getStat(SimplifiedContainerHealthStateForReporting.OVER_REPLICATED),
+          reconResponse.getOverReplicatedCount());
+      assertEquals(rmReport.getStat(SimplifiedContainerHealthStateForReporting.MIS_REPLICATED),
+          reconResponse.getMisReplicatedCount());
     } catch (IOException e) {
       LOG.info("Error getting report", e);
       return false;
@@ -366,20 +370,20 @@ class TestReconAndAdminContainerCLI {
     // Recon's UnhealthyContainerResponse contains a list of containers
     // for a particular state. Check if RMs sample of containers can be
     // found in Recon's list of containers for a particular state.
-    ContainerHealthState rmState = ContainerHealthState.UNHEALTHY;
+    SimplifiedContainerHealthStateForReporting rmState = SimplifiedContainerHealthStateForReporting.UNHEALTHY;
 
     if (state.equals(UnHealthyContainerStates.MISSING) &&
         reconResponse.getMissingCount() > 0) {
-      rmState = ContainerHealthState.MISSING;
+      rmState = SimplifiedContainerHealthStateForReporting.MISSING;
     } else if (state.equals(UnHealthyContainerStates.UNDER_REPLICATED) &&
                reconResponse.getUnderReplicatedCount() > 0) {
-      rmState = ContainerHealthState.UNDER_REPLICATED;
+      rmState = SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED;
     } else if (state.equals(UnHealthyContainerStates.OVER_REPLICATED) &&
                reconResponse.getOverReplicatedCount() > 0) {
-      rmState = ContainerHealthState.OVER_REPLICATED;
+      rmState = SimplifiedContainerHealthStateForReporting.OVER_REPLICATED;
     } else if (state.equals(UnHealthyContainerStates.MIS_REPLICATED) &&
                reconResponse.getMisReplicatedCount() > 0) {
-      rmState = ContainerHealthState.MIS_REPLICATED;
+      rmState = SimplifiedContainerHealthStateForReporting.MIS_REPLICATED;
     }
 
     List<ContainerID> rmContainerIDs = rmReport.getSample(rmState);
@@ -410,9 +414,9 @@ class TestReconAndAdminContainerCLI {
     assertEquals(1, containerIDs.size());
     long containerID = containerIDs.get(0);
 
-    // Verify Recon picked up the new container.
-    assertEquals(scmContainerManager.getContainers(),
-        reconContainerManager.getContainers());
+    // Wait for Recon to pick up the new container, the datanode reports it to Recon on the next Recon heartbeat.
+    GenericTestUtils.waitFor(() -> scmContainerManager.getContainers().equals(reconContainerManager.getContainers()),
+        100, 20000);
 
     ReconContainerMetadataManager reconContainerMetadataManager =
         reconService.getReconServer().getReconContainerMetadataManager();
@@ -471,9 +475,7 @@ class TestReconAndAdminContainerCLI {
         0, SECONDS);
     // Configure multiple task threads for concurrent task execution
     CONF.setInt("ozone.recon.task.thread.count", 6);
-    CONF.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
-    CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
-    CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
+    OzoneTestUtils.setFastPipelineScrub(CONF);
 
     CONF.setTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
         1, TimeUnit.SECONDS);

@@ -20,14 +20,22 @@ package org.apache.hadoop.ozone.om.execution;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Modifier;
 import java.net.InetAddress;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
@@ -35,6 +43,10 @@ import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.file.OMRecoverLeaseRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
@@ -49,6 +61,10 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.reflections.Reflections;
+import org.reflections.scanners.Scanners;
+import org.reflections.util.ClasspathHelper;
+import org.reflections.util.ConfigurationBuilder;
 
 class TestOMExecutionFlow {
 
@@ -168,6 +184,56 @@ class TestOMExecutionFlow {
     new OMExecutionFlow(ozoneManager).submit(request, true);
 
     assertFalse(submittedRequest.get().hasAssumeS3Context());
+  }
+
+  @Test
+  void postExecuteCmdTypesMatchOverrides() {
+    final Map<Type, Class<? extends OMClientRequest>> postExecuteRequests = Map.of(
+        Type.RecoverLease, OMRecoverLeaseRequest.class);
+    final Set<Class<? extends OMClientRequest>> overriding = new Reflections(
+        new ConfigurationBuilder()
+            .setUrls(ClasspathHelper.forClass(OMClientRequest.class))
+            .setScanners(Scanners.SubTypes))
+        .getSubTypesOf(OMClientRequest.class)
+        .stream()
+        .filter(c -> !Modifier.isAbstract(c.getModifiers()) && overridesPostExecute(c))
+        .collect(Collectors.toSet());
+
+    assertEquals(
+        new HashSet<>(postExecuteRequests.values()), overriding,
+        "A request overriding postExecute must have its type in OMExecutionFlow.POST_EXECUTE_CMD_TYPES and this test");
+    for (Type cmdType : Type.values()) {
+      assertEquals(postExecuteRequests.containsKey(cmdType), OMExecutionFlow.hasPostExecute(cmdType), cmdType::name);
+    }
+  }
+
+  @Test
+  void postExecuteSkipsRequestCreationForTypesWithoutOverride() {
+    final OzoneManager ozoneManager = mock(OzoneManager.class);
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.DeleteKey)
+        .setClientId("client-id")
+        .setDeleteKeyRequest(
+            DeleteKeyRequest.newBuilder()
+            .setKeyArgs(
+                KeyArgs.newBuilder()
+                    .setVolumeName("volume")
+                    .setBucketName("bucket")
+                    .setKeyName("key")))
+        .build();
+    final OMResponse cached = successResponse();
+
+    assertSame(cached, new OMExecutionFlow(ozoneManager).postExecute(request, cached));
+    verify(ozoneManager, never()).getMetadataManager();
+  }
+
+  private static boolean overridesPostExecute(Class<? extends OMClientRequest> requestClass) {
+    try {
+      return requestClass.getMethod(
+          "postExecute", OzoneManager.class, OMResponse.class).getDeclaringClass() != OMClientRequest.class;
+    } catch (NoSuchMethodException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   private static Server.Call createCall(UserGroupInformation user, InetAddress remoteAddress) {

@@ -553,6 +553,16 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       return;
     }
 
+    // A batch that failed both attempts only raises tasksFailed. The next sync drains this buffer and
+    // rebuilds from a checkpoint that already contains every queued batch. Applying the batches still
+    // waiting would move the task cursor up to the OmDeltaRequest cursor, so a restart before that
+    // rebuild would find nothing to redo and the failed batch would be lost.
+    if (hasTasksFailed()) {
+      LOG.debug("Skipping buffered OM update batch ending at sequence {} because a task has failed and " +
+          "reinitialization is pending.", events.getLastSequenceNumber());
+      return;
+    }
+
     Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
     List<ReconOmTask.TaskResult> failedTasks = new ArrayList<>();
 
@@ -622,6 +632,15 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
     if (reason == ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_OM_DB_REBUILD) {
       lastRetryTimestamp.set(0);
+    }
+
+    // Before the OM metadata manager is set (e.g. during Recon upgrade finalization) no checkpoint can be created.
+    // Defer to the next OM sync without counting a retry, so the startup reinitialization is not throttled.
+    if (currentOMMetadataManager == null) {
+      LOG.warn("OM metadata manager is not set yet; deferring reinitialization due to {} to the next OM sync.",
+          reason);
+      tasksFailed.compareAndSet(false, true);
+      return ReInitializationResult.RETRY_LATER;
     }
 
     ReInitializationResult reInitializationResult = validateRetryCountAndDelay();

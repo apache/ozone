@@ -27,18 +27,17 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
@@ -122,14 +121,11 @@ public final class DatanodeAdminMonitorTestUtil {
   public static ContainerReplicaCount generateECReplicaCount(
       ContainerID containerID, ECReplicationConfig repConfig,
       HddsProtos.LifeCycleState containerState,
-      Triple<HddsProtos.NodeOperationalState, DatanodeDetails,
-          Integer>...states) {
+      ECReplicaSpec... states) {
 
     Set<ContainerReplica> replicas = new HashSet<>();
-    for (Triple<HddsProtos.NodeOperationalState, DatanodeDetails, Integer> t
-        : states) {
-      replicas.add(generateReplica(containerID, t.getLeft(), CLOSED,
-          t.getRight(), t.getMiddle()));
+    for (ECReplicaSpec s : states) {
+      replicas.add(generateReplica(containerID, s.nodeState(), CLOSED, s.replicaIndex(), s.datanode()));
     }
     ContainerInfo container = new ContainerInfo.Builder()
         .setContainerID(containerID.getIdForTesting())
@@ -184,8 +180,7 @@ public final class DatanodeAdminMonitorTestUtil {
       boolean underReplicated,
       HddsProtos.LifeCycleState containerState,
       ECReplicationConfig repConfig,
-      Triple<HddsProtos.NodeOperationalState, DatanodeDetails,
-          Integer>...replicaStates)
+      ECReplicaSpec... replicaStates)
       throws ContainerNotFoundException {
     reset(repManager);
     mockReplicationManagerConfig(repManager);
@@ -205,7 +200,7 @@ public final class DatanodeAdminMonitorTestUtil {
         .then(invocation -> {
           ReplicationManagerReport report = invocation.getArgument(1);
           if (underReplicated) {
-            report.increment(ContainerHealthState.UNDER_REPLICATED);
+            report.increment(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED);
             return true;
           }
           return false;
@@ -240,4 +235,10 @@ public final class DatanodeAdminMonitorTestUtil {
       return invocation.get();
     }
   }
+
+  /**
+   * A datanode grouped together with its operational state and the EC replica index it hosts,
+   * used to build the replicas of a mocked EC container.
+   */
+  record ECReplicaSpec(HddsProtos.NodeOperationalState nodeState, DatanodeDetails datanode, int replicaIndex) { }
 }

@@ -25,9 +25,9 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
@@ -150,7 +150,7 @@ public class ReportSubcommand extends ScmSubcommand {
 
   private void outputContainerHealthStats(ReplicationManagerReport report) {
     outputHeading("Container Health Summary");
-    for (ContainerHealthState state : ContainerHealthState.values()) {
+    for (SimplifiedContainerHealthStateForReporting state : SimplifiedContainerHealthStateForReporting.values()) {
       long stat = report.getStat(state);
       if (stat != -1) {
         output(state + ": " + stat);
@@ -159,7 +159,7 @@ public class ReportSubcommand extends ScmSubcommand {
   }
 
   private void outputContainerSamples(ReplicationManagerReport report) {
-    for (ContainerHealthState state : ContainerHealthState.values()) {
+    for (SimplifiedContainerHealthStateForReporting state : SimplifiedContainerHealthStateForReporting.values()) {
       List<ContainerID> containers = report.getSample(state);
       if (!containers.isEmpty()) {
         output("First " + report.getSampleLimit() + " " +

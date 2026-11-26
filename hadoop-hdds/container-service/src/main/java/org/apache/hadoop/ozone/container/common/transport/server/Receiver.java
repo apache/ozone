@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.scm.OzoneClientConfig.DATA_TRANSFER_MAGIC_C
 import static org.apache.hadoop.hdds.scm.OzoneClientConfig.DATA_TRANSFER_VERSION;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getBlockMapKey;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getRequestKey;
 
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Scope;
@@ -52,7 +53,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.util.LimitInputStream;
 import org.apache.ratis.thirdparty.com.google.protobuf.CodedInputStream;
 import org.slf4j.Logger;
@@ -110,8 +111,10 @@ final class Receiver implements Runnable {
         } catch (SocketTimeoutException | EOFException | ClosedChannelException e) {
           // Since we optimistically expect the next request, it's quite normal to
           // get EOF here.
-          LOG.info("{} is closed with {} after received {} ops and handled {} ops.",
-              peer, e.getClass().getName(), opsReceived, opsHandled.get());
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("{} is closed with {} after received {} ops and handled {} ops.",
+                peer, e.getClass().getName(), opsReceived, opsHandled.get());
+          }
           throw e;
         }
 
@@ -198,17 +201,19 @@ final class Receiver implements Runnable {
           request.getTraceID());
       try (Scope ignore = span.makeCurrent()) {
         ContainerCommandResponseProto responseProto;
+        final DispatcherContext context =
+            DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_SHORT_CIRCUIT_READ).build();
         if (isSupportedCmdType(type)) {
-          responseProto = dispatcher.dispatch(request, null);
+          responseProto = dispatcher.dispatch(request, context);
         } else {
           responseProto = getContainerCommandResponse(request, ContainerProtos.Result.UNSUPPORTED_REQUEST,
               "This command is not supported through DomainSocket channel.")
               .build();
         }
-        if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock) {
+        if (responseProto.getResult() == ContainerProtos.Result.SUCCESS && type == ContainerProtos.Type.GetBlock
+            && responseProto.getGetBlock().getShortCircuitAccessGranted()) {
           // get FileDescriptor
-          Handler handler = dispatcher.getHandler(ContainerProtos.ContainerType.KeyValueContainer);
-          RandomAccessFile file = handler.getBlockFile(request);
+          RandomAccessFile file = context.getShortCircuitBlockFile();
           Objects.requireNonNull(file,
               "Failed to get block file for block " + request.getGetBlock().getBlockID());
           entry.setFile(file);
@@ -239,7 +244,7 @@ final class Receiver implements Runnable {
       responseProto.writeDelimitedTo(output);
       if (LOG.isDebugEnabled()) {
         LOG.debug("send response size {} for request {} through {}", responseProto.getSerializedSize(),
-            getBlockMapKey(entry.getRequest()), peer.getDomainSocket());
+            getRequestKey(entry.getRequest()), peer.getDomainSocket());
       }
       output.flush();
       if (file != null) {
@@ -255,18 +260,22 @@ final class Receiver implements Runnable {
       }
     } catch (Throwable e) {
       LOG.error("Failed to send response {} {}", responseProto.getCmdType(), peer.getDomainSocket(), e);
+      // A partial response frame may already be on the wire; close the peer so the next response is not appended to it.
+      IOUtils.closeStream(peer);
     } finally {
       lock.unlock();
       entry.setSendFinishTimeNs();
-      try {
-        entry.getFile().close();
-      } catch (IOException e) {
-        LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+      if (entry.getFile() != null) {
+        try {
+          entry.getFile().close();
+        } catch (IOException e) {
+          LOG.warn("Failed to close block file for {}", getBlockMapKey(entry.getRequest()), e);
+        }
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Request {} {}:{}, receive {} ns, in queue {} ns, " +
-                " handle {} ns, send out {} ns, total {} ns", type, responseProto.getClientId().toStringUtf8(),
-            responseProto.getCallId(), entry.getReceiveTimeNs(), entry.getInQueueTimeNs(),
+        LOG.debug("Request {} {}, receive {} ns, in queue {} ns, " +
+                " handle {} ns, send out {} ns, total {} ns", type, getRequestKey(entry.getRequest()),
+            entry.getReceiveTimeNs(), entry.getInQueueTimeNs(),
             entry.getProcessTimeNs(), entry.getSendTimeNs(), entry.getTotalTimeNs());
       }
       if (isSupportedCmdType(type)) {

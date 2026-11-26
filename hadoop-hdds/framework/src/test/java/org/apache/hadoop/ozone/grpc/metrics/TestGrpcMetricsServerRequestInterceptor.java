@@ -26,15 +26,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.grpc.Metadata;
-import io.grpc.ServerCall;
-import io.grpc.ServerCallHandler;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.UserInfo;
 import org.apache.hadoop.metrics2.lib.MetricsAnnotations;
+import org.apache.ratis.thirdparty.io.grpc.Metadata;
+import org.apache.ratis.thirdparty.io.grpc.ServerCall;
+import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;

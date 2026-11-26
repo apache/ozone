@@ -59,11 +59,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-docs</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-rocks-native</artifactId>
       <scope>runtime</scope>
     </dependency>
@@ -90,6 +85,11 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-cli-local</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-other</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -155,11 +155,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-s3gateway</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-tools</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>

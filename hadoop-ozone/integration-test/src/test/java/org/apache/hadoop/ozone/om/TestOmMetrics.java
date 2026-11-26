@@ -56,7 +56,6 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -83,6 +82,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.HddsWhiteboxTestUtils;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -400,7 +400,7 @@ public class TestOmMetrics {
       writeClient.commitKey(keyArgs, keySession.getId());
     } catch (Exception e) {
       //Expected Failure in preExecute due to not enough datanode
-      assertThat(e.getMessage()).contains("No enough datanodes to choose");
+      assertThat(e.getMessage()).contains("Not enough datanodes to choose");
     }
 
     omMetrics = getMetrics("OMMetrics");

@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -50,7 +50,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * with/without versioning.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestOzoneRpcClientWithKeyLatestVersion implements NonHATests.TestCase {
+public abstract class TestOzoneRpcClientWithKeyLatestVersion implements ClusterForTests.TestCase {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})

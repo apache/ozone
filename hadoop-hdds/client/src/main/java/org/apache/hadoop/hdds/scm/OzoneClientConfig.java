@@ -336,10 +336,14 @@ public class OzoneClientConfig {
           tags = ConfigTag.CLIENT)
   private boolean enablePutblockPiggybacking = false;
 
-  @Config(key = "ozone.client.datastream.putblock.without.raft.enabled",
+  static final String OZONE_CLIENT_DATASTREAM_PUTBLOCK_WITHOUT_RAFT_ENABLED
+      = "ozone.client.datastream.putblock.without.raft.enabled";
+  @Config(key = OZONE_CLIENT_DATASTREAM_PUTBLOCK_WITHOUT_RAFT_ENABLED,
+      experimental = true,
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
-      description = "When enabled, the PutBlock of a Ratis data stream is committed through the data stream " +
+      description = "WARNING: This is an experimental feature; use at your own risk. " +
+          "When enabled, the PutBlock of a Ratis data stream is committed through the data stream " +
           "instead of a separate WriteAsync PutBlock, so that it does not go through the Raft log: " +
           "StreamInitWithPutBlock is used so that datanodes commit PutBlock when the data stream closes, " +
           "and the PutBlock triggered by a flush in the middle of the stream is sent as a data stream command. " +
@@ -370,7 +374,9 @@ public class OzoneClientConfig {
       defaultValue = "1048576",
       type = ConfigType.INT,
       tags = {ConfigTag.CLIENT},
-      description = "Chunk size of streaming read responses from datanodes.")
+      description = "Amount of block data the datanode sends in each streaming read response. "
+          + "A response must fit in the 32 MB gRPC message limit, and 1 MB of that is reserved for metadata "
+          + "such as checksums, so the datanode caps this value at 31 MB.")
   private int streamReadResponseDataSize = 1 << 20;
 
   @Config(key = "ozone.client.stream.read.timeout",
@@ -379,6 +385,34 @@ public class OzoneClientConfig {
       tags = {ConfigTag.CLIENT},
       description = "Timeout for receiving streaming read responses.")
   private Duration streamReadTimeout = Duration.ofSeconds(10);
+
+  @Config(key = "ozone.client.stream.read.max-concurrent-streams",
+      defaultValue = "-1",
+      type = ConfigType.INT,
+      tags = {ConfigTag.CLIENT},
+      description = "Maximum number of concurrently open streaming read block streams per pipeline client. "
+          + "Each open block input stream holds one slot until it is closed; opening a stream beyond the limit "
+          + "waits up to ozone.client.stream.read.timeout for a slot; a wait that times out is retried under the "
+          + "read retry policy (ozone.client.read.max.retries) before the read fails. A positioned read and every "
+          + "block a key input stream has seeked into each hold a slot, so the limit must exceed the number of "
+          + "block streams one reader keeps open at once. Each open stream can buffer up to "
+          + "ozone.client.stream.read.pre-read-size bytes, so this limit also bounds client memory per pipeline. "
+          + "Any non-positive value (the default) makes the limit follow "
+          + "hdds.ratis.raft.client.async.outstanding-requests.max, preserving the capacity streaming reads "
+          + "had when they were counted against the request limit. Streaming reads no longer consume permits "
+          + "from hdds.ratis.raft.client.async.outstanding-requests.max; that limit now applies to unary "
+          + "requests only.")
+  private int streamReadMaxConcurrentStreams = -1;
+
+  @Config(key = "ozone.client.netty.warmup.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.CLIENT},
+      description = "When the client is created, initialize Netty, and netty-tcnative (BoringSSL) if gRPC TLS is " +
+          "enabled, on a background thread, so the first datanode connection does not wait for them. This takes " +
+          "about 0.1 s in a new JVM, so it matters for short-lived clients such as YARN containers and CLI " +
+          "commands. It needs a spare CPU core to help.")
+  private boolean nettyWarmUpEnabled = true;
 
   @PostConstruct
   public void validate() {
@@ -471,6 +505,14 @@ public class OzoneClientConfig {
 
   public boolean isShortCircuitEnabled() {
     return shortCircuitEnabled;
+  }
+
+  public boolean isNettyWarmUpEnabled() {
+    return nettyWarmUpEnabled;
+  }
+
+  public void setNettyWarmUpEnabled(boolean nettyWarmUpEnabled) {
+    this.nettyWarmUpEnabled = nettyWarmUpEnabled;
   }
 
   public void setShortCircuit(boolean enabled) {
@@ -751,6 +793,14 @@ public class OzoneClientConfig {
 
   public void setStreamReadTimeout(Duration streamReadTimeout) {
     this.streamReadTimeout = streamReadTimeout;
+  }
+
+  public int getStreamReadMaxConcurrentStreams() {
+    return streamReadMaxConcurrentStreams;
+  }
+
+  public void setStreamReadMaxConcurrentStreams(int streamReadMaxConcurrentStreams) {
+    this.streamReadMaxConcurrentStreams = streamReadMaxConcurrentStreams;
   }
 
   public boolean isDatastreamPutBlockWithoutRaftEnabled() {

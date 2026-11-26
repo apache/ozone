@@ -71,7 +71,7 @@ public interface ContainerManager {
    * @return a list of container IDs.
    */
   List<ContainerID> getContainerIDs(ContainerID startID, int count, LifeCycleState state, 
-      ContainerHealthState healthState);
+      SimplifiedContainerHealthStateForReporting healthState);
 
   /**
    * Returns containers under certain conditions.

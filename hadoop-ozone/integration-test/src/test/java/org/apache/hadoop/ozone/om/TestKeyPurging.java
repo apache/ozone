@@ -65,7 +65,6 @@ public class TestKeyPurging {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setQuietMode(false);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)

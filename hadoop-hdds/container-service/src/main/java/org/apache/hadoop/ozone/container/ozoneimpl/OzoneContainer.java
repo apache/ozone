@@ -526,19 +526,22 @@ public class OzoneContainer {
    * Stop the scanner thread and wait for thread to die.
    */
   private void stopContainerScrub() {
-    if (metadataScanner == null) {
-      return;
+    if (metadataScanner != null) {
+      metadataScanner.shutdown();
+      metadataScanner = null;
     }
-    metadataScanner.shutdown();
-    metadataScanner = null;
 
-    if (dataScanners == null) {
-      return;
+    if (dataScanners != null) {
+      for (BackgroundContainerDataScanner s : dataScanners) {
+        s.shutdown();
+      }
+      dataScanners = null;
     }
-    for (BackgroundContainerDataScanner s : dataScanners) {
-      s.shutdown();
+
+    if (onDemandScanner != null) {
+      onDemandScanner.shutdown();
+      onDemandScanner = null;
     }
-    onDemandScanner.shutdown();
   }
 
   @VisibleForTesting

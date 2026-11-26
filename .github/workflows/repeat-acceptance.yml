@@ -43,12 +43,13 @@ on:
         default: false
         required: true
 env:
+  # JAVA_VERSION, MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
+  JAVA_VERSION: 25
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
   MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   OZONE_ACCEPTANCE_SUITE: ${{ github.event.inputs.test-suite}}
   OZONE_TEST_SELECTOR: ${{ github.event.inputs.test-filter }}
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
-  JAVA_VERSION: 25
   SPLITS: ${{ github.event.inputs.splits }}
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}[{1}]-{2}', inputs.test-suite || inputs.test-filter, inputs.ref, inputs.splits) || '' }}
 permissions: { }
@@ -89,31 +90,17 @@ jobs:
           persist-credentials: false
           ref: ${{ github.event.inputs.ref }}
       - name: Cache for npm dependencies
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.pnpm-store
-            **/node_modules
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
-      - name: Cache for maven dependencies
         uses: actions/cache/restore@v6
         with:
           path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ env.JAVA_VERSION }}
+            ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}
-            maven-repo-
+            ${{ runner.os }}-pnpm-
       - name: Setup java
-        uses: actions/setup-java@v6
-        with:
-          distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
+        uses: $/.github/actions/setup-java-with-cache
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Dmaven.javadoc.skip=true
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
       - name: Store binaries for tests
@@ -149,6 +136,8 @@ jobs:
           tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
           rm ozone*.tar.gz
           sudo chmod -R a+rwX hadoop-ozone/dist/target
+      - name: Setup java
+        uses: $/.github/actions/setup-java-with-cache
       - name: Execute tests
         run: |
           ./hadoop-ozone/dev-support/checks/acceptance.sh

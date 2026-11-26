@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.BUFFER_SIZE;
 import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
@@ -40,12 +41,15 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
@@ -72,7 +76,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.stubbing.OngoingStubbing;
 import org.slf4j.event.Level;
 
@@ -473,6 +479,39 @@ public class TestBlockInputStream {
     }
   }
 
+  @Test
+  public void testUpdateBlockLengthUsesLengthFromDatanodeForUnderConstructionBlock() throws Exception {
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    BlockLocationInfo blockInfo =
+        new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize - CHUNK_SIZE));
+    blockInfo.setUnderConstruction(true);
+    try (BlockInputStream subject = new BlockInputStream(blockInfo, MockPipeline.createSingleNodePipeline(), null,
+        mock(XceiverClientFactory.class), refreshFunction, clientConfig) {
+      @Override
+      protected ContainerProtos.BlockData getBlockData() {
+        return ContainerProtos.BlockData.newBuilder().setBlockID(getBlockID().getDatanodeBlockIDProtobuf())
+            .addAllChunks(chunks).setSize(blockSize).build();
+      }
+    }) {
+      subject.updateBlockLength();
+      assertEquals(blockSize, subject.getLength());
+    }
+  }
+
+  @Test
+  public void testPositionedReadOfClosedUninitializedStreamFailsWithIOException() throws IOException {
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    BlockInputStream subject = new BlockInputStream(
+        new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize)),
+        MockPipeline.createSingleNodePipeline(), null, mock(XceiverClientFactory.class), refreshFunction,
+        clientConfig);
+    subject.close();
+
+    // the stream has no client to initialize with, which must be reported as an IOException
+    IOException e = assertThrows(IOException.class, () -> subject.read(0, ByteBuffer.allocate(10)));
+    assertThat(e).hasMessageContaining("closed");
+  }
+
   @ParameterizedTest
   @MethodSource("exceptionsTriggersRefresh")
   public void testRefreshOnReadFailureAfterUnbuffer(IOException ex)
@@ -527,6 +566,89 @@ public class TestBlockInputStream {
     } finally {
       subject.close();
     }
+  }
+
+  /**
+   * The second read first returns the bytes left in the buffer by the first read (none when the first read ends on
+   * a checksum boundary), then needs another ReadChunk, which fails once and is retried.
+   */
+  @ParameterizedTest
+  @CsvSource({"1, false", "1, true", "20, false", "20, true"})
+  void retriedReadReturnsContiguousData(int firstReadLength, boolean byteBuffer) throws Exception {
+    final int readLength = 30;
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    AtomicInteger readChunkFailures = new AtomicInteger();
+
+    try (BlockInputStream subject = createSubjectWithFailingReadChunk(blockID, readChunkFailures)) {
+      assertEquals(firstReadLength, subject.read(new byte[firstReadLength], 0, firstReadLength));
+      readChunkFailures.set(1);
+
+      byte[] b = new byte[readLength];
+      int bytesRead = byteBuffer ? subject.read(ByteBuffer.wrap(b)) : subject.read(b, 0, readLength);
+
+      assertEquals(0, readChunkFailures.get());
+      verify(refreshFunction).apply(blockID);
+      assertEquals(readLength, bytesRead);
+      assertThat(b).containsExactly(Arrays.copyOfRange(blockData, firstReadLength, firstReadLength + readLength));
+      assertEquals(firstReadLength + readLength, subject.getPos());
+    }
+  }
+
+  /**
+   * Same as above, but the ReadChunk keeps failing until the retries are exhausted. The failed read must leave the
+   * stream and the buffer where it started, so that a later read continues with the right bytes.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void failedReadLeavesPositionUnchanged(boolean byteBuffer) throws Exception {
+    final int firstReadLength = 1;
+    final int readLength = 30;
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    AtomicInteger readChunkFailures = new AtomicInteger();
+
+    try (BlockInputStream subject = createSubjectWithFailingReadChunk(blockID, readChunkFailures)) {
+      assertEquals(firstReadLength, subject.read(new byte[firstReadLength], 0, firstReadLength));
+      readChunkFailures.set(Integer.MAX_VALUE);
+
+      byte[] b = new byte[readLength];
+      ByteBuffer buffer = ByteBuffer.wrap(b);
+      Callable<Integer> read = () -> byteBuffer ? subject.read(buffer) : subject.read(b, 0, readLength);
+      assertThrows(StorageContainerException.class, read::call);
+      assertEquals(firstReadLength, subject.getPos());
+      assertEquals(0, buffer.position());
+
+      readChunkFailures.set(0);
+      assertEquals(readLength, read.call());
+      assertThat(b).containsExactly(Arrays.copyOfRange(blockData, firstReadLength, firstReadLength + readLength));
+    }
+  }
+
+  /**
+   * A block of two chunks with 20 bytes per checksum, read through real {@link ChunkInputStream}s whose ReadChunk
+   * fails while {@code readChunkFailures} is positive.
+   */
+  private BlockInputStream createSubjectWithFailingReadChunk(BlockID blockID, AtomicInteger readChunkFailures)
+      throws Exception {
+    blockSize = 0;
+    checksum = new Checksum(ChecksumType.CRC32, 20);
+    createChunkList(2);
+    return new DummyBlockInputStream(blockID, blockSize,
+        MockPipeline.createSingleNodePipeline(), null, null, refreshFunction, chunks, chunkDataMap, clientConfig) {
+      @Override
+      protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
+        // verifyChecksum = true (the default) makes ReadChunk cover whole checksum ranges
+        byte[] data = chunkDataMap.get(chunkInfo.getChunkName());
+        return new DummyChunkInputStream(chunkInfo, null, null, true, data, null) {
+          @Override
+          protected void readChunkDataIntoBuffers(ChunkInfo readChunkInfo) throws IOException {
+            if (readChunkFailures.getAndUpdate(n -> Math.max(n - 1, 0)) > 0) {
+              throw new StorageContainerException("Block token verification failed", BLOCK_TOKEN_VERIFICATION_FAILED);
+            }
+            super.readChunkDataIntoBuffers(readChunkInfo);
+          }
+        };
+      }
+    };
   }
 
   private static Stream<Arguments> exceptionsTriggersRefresh() {
