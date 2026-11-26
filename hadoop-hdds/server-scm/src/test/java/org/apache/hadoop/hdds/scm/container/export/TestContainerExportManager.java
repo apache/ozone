@@ -52,9 +52,9 @@ import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.ozone.test.GenericTestUtils;
@@ -104,7 +104,7 @@ public class TestContainerExportManager {
     exportManager.shutdown();
     exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_MAX_RETAINED, () -> false);
     SCMException e = assertThrows(SCMException.class, () ->
-        submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
+        submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING));
     assertEquals(SCMException.ResultCodes.SCM_NOT_LEADER, e.getResult());
   }
 
@@ -112,7 +112,7 @@ public class TestContainerExportManager {
   public void testRejectSubmitAfterShutdown() {
     exportManager.shutdown();
     IOException e = assertThrows(IOException.class, () ->
-        submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
+        submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING));
     assertTrue(e.getMessage().contains("shut down"));
   }
 
@@ -137,19 +137,19 @@ public class TestContainerExportManager {
   @Test
   public void testRejectConcurrentExport() throws Exception {
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(ids(1));
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(2)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(2)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenAnswer(invocation -> {
           Thread.sleep(60_000);
           return Collections.emptyList();
         });
 
-    ExportJob first = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob first = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertNotNull(first);
     IOException e = assertThrows(IOException.class, () ->
-        submit(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
+        submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.EMPTY));
     assertTrue(e.getMessage().contains("already running"));
   }
 
@@ -173,54 +173,54 @@ public class TestContainerExportManager {
     });
 
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(ids(1));
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(2)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(2)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenAnswer(invocation -> {
           allIdsWritten.set(true);
           return Collections.emptyList();
         });
 
-    ExportJob first = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob first = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertTrue(archivingStarted.await(30, TimeUnit.SECONDS));
     assertFalse(exportManager.getExportStatus(first.getId()).isDone());
 
     IOException e = assertThrows(IOException.class, () ->
-        submit(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
+        submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.EMPTY));
     assertTrue(e.getMessage().contains("already running"));
 
     releaseArchiving.countDown();
     ExportJob.Status status = waitForDone(first.getId());
     assertNull(status.getException());
     assertTrue(archiveFile(first).exists());
-    assertNotNull(submit(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
+    assertNotNull(submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.EMPTY));
   }
 
   @Test
   public void testNullStartDefaultsToZeroCursor() throws Exception {
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = submit(null, null, ContainerHealthState.MISSING);
+    ExportJob job = submit(null, null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertNotNull(job);
     waitForDone(job.getId());
 
     verify(containerManager).getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING));
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING));
   }
 
   @Test
   public void testExportStartsFromRequestedCursor() throws Exception {
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(ids(5, 6));
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(7)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(7)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = submit(ContainerID.valueOf(5), null, ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(5), null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -228,7 +228,7 @@ public class TestContainerExportManager {
     assertEquals(2, status.getIdsWritten());
 
     verify(containerManager).getContainerIDs(
-        eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(ContainerHealthState.MISSING));
+        eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING));
   }
 
   @Test
@@ -251,10 +251,10 @@ public class TestContainerExportManager {
   @Test
   public void testZeroMatchesSucceedsWithoutArchive() throws Exception {
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -269,13 +269,13 @@ public class TestContainerExportManager {
     exportManager = newExportManager(100, TEST_BATCH_SIZE, TEST_MAX_RETAINED, () -> true);
 
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(ids(1, 2, 3, 4));
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -289,22 +289,22 @@ public class TestContainerExportManager {
   public void testMultiPartExportCreatesTar() throws Exception {
     // partSize=3, batchSize=2: part 1 ends mid-batch (after 3), part 2 ends exactly where batch (5,6) runs out.
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(ids(1, 2));
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(3)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(3)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(ids(3, 4));
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(ids(5, 6));
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(7)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(7)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(ids(7));
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(8)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(8)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -345,7 +345,7 @@ public class TestContainerExportManager {
   @Test
   public void testLeadershipLostWhileArchivingLeavesNoArchive() throws Exception {
     ExportFileManager fileManager = new ExportFileManager(tempDir.getAbsolutePath());
-    ExportJob job = new ExportJob(ExportScope.of(null, ContainerHealthState.MISSING),
+    ExportJob job = new ExportJob(ExportScope.of(null, SimplifiedContainerHealthStateForReporting.MISSING),
         ContainerID.valueOf(0), new ExportSizing(0, TEST_BATCH_SIZE, TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_PART_SIZE));
     fileManager.createJobDirectory(job.getId());
     try (OutputStream out = fileManager.newPartOutputStream(job.getId(), job.partFileName(1))) {
@@ -371,7 +371,7 @@ public class TestContainerExportManager {
     final CountDownLatch workerBusy = new CountDownLatch(1);
     final CountDownLatch releaseWorker = new CountDownLatch(1);
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenAnswer(invocation -> {
           workerBusy.countDown();
           try {
@@ -383,7 +383,7 @@ public class TestContainerExportManager {
           return Collections.emptyList();
         });
 
-    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertTrue(workerBusy.await(30, TimeUnit.SECONDS));
 
     // Returns after the 5s timeout while the worker is still running.
@@ -406,12 +406,12 @@ public class TestContainerExportManager {
 
   @Test
   public void testOldestFinishedJobAndArchiveEvictedOverCap() throws Exception {
-    final ExportJob first = exportOneContainer(ContainerHealthState.MISSING, 1);
-    final ExportJob second = exportOneContainer(ContainerHealthState.EMPTY, 10);
+    final ExportJob first = exportOneContainer(SimplifiedContainerHealthStateForReporting.MISSING, 1);
+    final ExportJob second = exportOneContainer(SimplifiedContainerHealthStateForReporting.EMPTY, 10);
     assertTrue(archiveFile(first).exists());
     assertTrue(archiveFile(second).exists());
 
-    final ExportJob third = exportOneContainer(ContainerHealthState.UNDER_REPLICATED, 20);
+    final ExportJob third = exportOneContainer(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED, 20);
 
     assertNull(exportManager.getExportStatus(first.getId()));
     assertFalse(archiveFile(first).exists());
@@ -423,15 +423,15 @@ public class TestContainerExportManager {
 
   @Test
   public void testFailedJobsDoNotEvictArchives() throws Exception {
-    final ExportJob archived = exportOneContainer(ContainerHealthState.MISSING, 1);
+    final ExportJob archived = exportOneContainer(SimplifiedContainerHealthStateForReporting.MISSING, 1);
 
     // More failed jobs than the cap: their records are evicted, but they own no archive to push out the first one.
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.EMPTY)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.EMPTY)))
         .thenThrow(new RuntimeException("listing failed"));
     final List<ExportJob> failed = new ArrayList<>();
     for (int i = 0; i < TEST_MAX_RETAINED + 1; i++) {
-      final ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY);
+      final ExportJob job = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.EMPTY);
       assertNotNull(waitForDone(job.getId()).getException());
       failed.add(job);
     }
@@ -444,15 +444,17 @@ public class TestContainerExportManager {
 
   @Test
   public void testCompletedArchivesTrimmedAndOthersKeptOnRestart() throws Exception {
-    final ExportJob first = exportOneContainer(ContainerHealthState.MISSING, 1);
-    final ExportJob second = exportOneContainer(ContainerHealthState.EMPTY, 10);
+    final ExportJob first = exportOneContainer(SimplifiedContainerHealthStateForReporting.MISSING, 1);
+    final ExportJob second = exportOneContainer(SimplifiedContainerHealthStateForReporting.EMPTY, 10);
     exportManager.shutdown();
 
     // Two more archives left by earlier runs, plus a file that is not an export archive.
     final File oldest = new File(tempDir, ExportFileManager.archiveFileName(
-        ExportScope.of(null, ContainerHealthState.MISSING), "2020-01-01-00-00-00", ExportJob.Id.newId()));
+        ExportScope.of(null, SimplifiedContainerHealthStateForReporting.MISSING), "2020-01-01-00-00-00",
+        ExportJob.Id.newId()));
     final File newest = new File(tempDir, ExportFileManager.archiveFileName(
-        ExportScope.of(null, ContainerHealthState.MISSING), "2099-01-01-00-00-00", ExportJob.Id.newId()));
+        ExportScope.of(null, SimplifiedContainerHealthStateForReporting.MISSING), "2099-01-01-00-00-00",
+        ExportJob.Id.newId()));
     final List<File> unrelated = Arrays.asList(
         new File(tempDir, "notes.tar.gz"),
         // Same shape as an archive name, but no export prefix.
@@ -478,22 +480,22 @@ public class TestContainerExportManager {
   @Test
   public void testSubmitAfterPreviousJobCompletes() throws Exception {
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(ids(1));
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(2)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(2)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenReturn(Collections.emptyList());
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.EMPTY)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.EMPTY)))
         .thenReturn(ids(10));
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(11)), anyInt(), isNull(), eq(ContainerHealthState.EMPTY)))
+        eq(ContainerID.valueOf(11)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.EMPTY)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob first = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob first = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING);
     waitForDone(first.getId());
 
-    ExportJob second = submit(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY);
+    ExportJob second = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.EMPTY);
     assertNotNull(second);
     ExportJob.Status status = waitForDone(second.getId());
     assertNull(status.getException());
@@ -507,13 +509,13 @@ public class TestContainerExportManager {
     exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_MAX_RETAINED, leader::get);
 
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenAnswer(invocation -> {
           leader.set(false);
           return ids(1);
         });
 
-    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -524,10 +526,10 @@ public class TestContainerExportManager {
   @Test
   public void testFailsWhenContainerManagerThrows() throws Exception {
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenThrow(new RuntimeException("container listing failed"));
 
-    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -539,13 +541,13 @@ public class TestContainerExportManager {
   @Test
   public void testShutdownCancelsRunningExport() throws Exception {
     when(containerManager.getContainerIDs(
-        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(SimplifiedContainerHealthStateForReporting.MISSING)))
         .thenAnswer(invocation -> {
           Thread.sleep(60_000);
           return Collections.emptyList();
         });
 
-    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, SimplifiedContainerHealthStateForReporting.MISSING);
     assertNotNull(job);
 
     exportManager.shutdown();
@@ -554,8 +556,8 @@ public class TestContainerExportManager {
     exportManager = null;
   }
   
-  private ExportJob submit(ContainerID start, LifeCycleState lifeCycle, ContainerHealthState health)
-      throws IOException {
+  private ExportJob submit(ContainerID start, LifeCycleState lifeCycle,
+      SimplifiedContainerHealthStateForReporting health) throws IOException {
     return exportManager.submitJob(start, lifeCycle, health, 0, 0, 0);
   }
 
@@ -572,7 +574,8 @@ public class TestContainerExportManager {
   }
 
   /** Runs an export that matches exactly one container, so it produces an archive. */
-  private ExportJob exportOneContainer(ContainerHealthState health, long containerId) throws Exception {
+  private ExportJob exportOneContainer(SimplifiedContainerHealthStateForReporting health, long containerId)
+      throws Exception {
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(health))).thenReturn(ids(containerId));
     when(containerManager.getContainerIDs(

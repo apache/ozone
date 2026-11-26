@@ -41,7 +41,9 @@ public class GrpcMetricsServerTransportFilter extends ServerTransportFilter {
 
   @Override
   public void transportTerminated(Attributes transportAttrs) {
-    grpcMetrics.decrNumOpenClientConnections();
+    if (transportAttrs != null) {
+      grpcMetrics.decrNumOpenClientConnections();
+    }
     super.transportTerminated(transportAttrs);
   }
 }

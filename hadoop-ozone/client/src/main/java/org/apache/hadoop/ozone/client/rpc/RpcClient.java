@@ -2721,6 +2721,7 @@ public class RpcClient implements ClientProtocol {
       String keyName, CreateFileOptions options) throws IOException {
     Objects.requireNonNull(options, "options == null");
     final ReplicationConfig replicationConfig = options.getReplicationConfig();
+    final StoragePolicy storagePolicy = options.getStoragePolicy();
     if (!OzoneManagerVersion.ERASURE_CODED_STORAGE_SUPPORT.isSupportedBy(getOmVersion())) {
       if (replicationConfig != null &&
           replicationConfig.getReplicationType()
@@ -2729,6 +2730,9 @@ public class RpcClient implements ClientProtocol {
             + " Erasure Coded replication, as OzoneManager does not support"
             + " Erasure Coded replication.");
       }
+    }
+    if (storagePolicy != null) {
+      checkStoragePolicySupported();
     }
     String ownerName = getRealUserInfo().getShortUserName();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -2739,6 +2743,7 @@ public class RpcClient implements ClientProtocol {
         .setReplicationConfig(replicationConfig)
         .setLatestVersionLocation(getLatestVersionLocation)
         .setOwnerName(ownerName)
+        .setStoragePolicy(storagePolicy)
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, options.isOverWrite(), options.isRecursive());

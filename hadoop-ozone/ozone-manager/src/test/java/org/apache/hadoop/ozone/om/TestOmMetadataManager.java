@@ -568,6 +568,51 @@ public class TestOmMetadataManager {
     assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, "dir1bi", "dir1bh", 100));
   }
 
+  /**
+   * keyPrefix "/" maps to the DB prefix of the bucket, so it also matches keys that sort before "/",
+   * and pagination must not restart from the first key.
+   */
+  @Test
+  public void testListKeysWithSlashPrefixAndStartKeyBeforeSlash() throws Exception {
+    String volumeName = "volumeA";
+    String bucketName = "slashPrefix";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    // Even index keys go to the DB and odd index keys to the cache.
+    addKeysToOM(volumeName, bucketName, ".cache/0", 0);
+    addKeysToOM(volumeName, bucketName, ".cache/1", 1);
+    addKeysToOM(volumeName, bucketName, ".cache/2", 2);
+    addKeysToOM(volumeName, bucketName, "/keep", 3);
+
+    List<String> expected = Arrays.asList(".cache/0", ".cache/1", ".cache/2", "/keep");
+
+    assertEquals(expected.subList(0, 2), listKeyNames(volumeName, bucketName, null, "/", 2));
+    assertEquals(expected.subList(2, 4), listKeyNames(volumeName, bucketName, ".cache/1", "/", 2));
+    assertEquals(Collections.emptyList(), listKeyNames(volumeName, bucketName, "/keep", "/", 2));
+  }
+
+  /**
+   * A whitespace-only key is a valid startKey, so pagination must not restart from the first key.
+   */
+  @Test
+  public void testListKeysWithWhitespaceStartKey() throws Exception {
+    String volumeName = "volumeA";
+    String bucketName = "whitespaceStartKey";
+    OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
+    addBucketsToCache(volumeName, bucketName);
+
+    // Even index keys go to the DB and odd index keys to the cache.
+    addKeysToOM(volumeName, bucketName, " ", 0);
+    addKeysToOM(volumeName, bucketName, "  x", 1);
+    addKeysToOM(volumeName, bucketName, "k", 2);
+
+    List<String> expected = Arrays.asList(" ", "  x", "k");
+
+    assertEquals(expected.subList(0, 1), listKeyNames(volumeName, bucketName, null, null, 1));
+    assertEquals(expected.subList(1, 3), listKeyNames(volumeName, bucketName, " ", null, 2));
+  }
+
   private List<String> listKeyNames(String volumeName, String bucketName, String startKey, String keyPrefix,
       int maxKeys) throws IOException {
     return omMetadataManager.listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys).getKeys().stream()

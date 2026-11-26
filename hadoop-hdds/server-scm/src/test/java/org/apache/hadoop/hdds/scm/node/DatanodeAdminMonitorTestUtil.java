@@ -32,12 +32,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
@@ -200,7 +200,7 @@ public final class DatanodeAdminMonitorTestUtil {
         .then(invocation -> {
           ReplicationManagerReport report = invocation.getArgument(1);
           if (underReplicated) {
-            report.increment(ContainerHealthState.UNDER_REPLICATED);
+            report.increment(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED);
             return true;
           }
           return false;
