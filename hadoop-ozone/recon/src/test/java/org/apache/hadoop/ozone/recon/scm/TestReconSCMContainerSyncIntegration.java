@@ -192,6 +192,14 @@ public class TestReconSCMContainerSyncIntegration
    * Seeds Recon with {@code count} OPEN containers and then transitions each
    * one to CLOSING so that Pass 1 can exercise the CLOSING→CLOSED correction.
    */
+  private void seedReconAsClosing(long startId, int count) throws Exception {
+    seedRecon(startId, count, OPEN);
+    ReconContainerManager cm = getContainerManager();
+    for (long id = startId; id < startId + count; id++) {
+      cm.updateContainerState(ContainerID.valueOf(id), FINALIZE);
+    }
+  }
+
   /** Seeds a container Recon retired to DELETED while a datanode still reported a replica of it. */
   private ContainerID seedDeletedWithReplica(long id) throws Exception {
     seedRecon(id, 1, CLOSED);
@@ -214,14 +222,6 @@ public class TestReconSCMContainerSyncIntegration
         .thenReturn(Collections.singletonList(containerID));
     when(mockScm.getListOfContainerInfos(eq(containerID), eq(1), eq(CLOSED)))
         .thenReturn(Collections.singletonList(containerInfo(containerID.getId(), CLOSED)));
-  }
-
-  private void seedReconAsClosing(long startId, int count) throws Exception {
-    seedRecon(startId, count, OPEN);
-    ReconContainerManager cm = getContainerManager();
-    for (long id = startId; id < startId + count; id++) {
-      cm.updateContainerState(ContainerID.valueOf(id), FINALIZE);
-    }
   }
 
   /** Returns a list of ContainerIDs for IDs in [{@code start}, {@code end}). */
