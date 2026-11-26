@@ -36,22 +36,34 @@ public final class RetentionUtil {
   public static void validateBucketRetention(BucketRetention retention) {
     RetentionDuration duration = retention.getDuration();
     RetentionDuration eventHold = retention.getDefaultEventHold();
+    if (duration == null && eventHold == null) {
+      throw new IllegalArgumentException("Default retention requires a duration or event hold");
+    }
     if (duration != null) {
       validateRule(duration);
     }
     if (eventHold != null) {
       validateEventHoldRule(eventHold);
-      if (duration != null && daysForComparison(eventHold) > daysForComparison(duration)) {
+      if (duration != null && exceedsDefaultDuration(eventHold, duration)) {
         throw new IllegalArgumentException("Event hold duration must not exceed default retention duration");
       }
     }
   }
 
-  private static long daysForComparison(RetentionDuration rule) {
-    // Cap at the maximum event hold duration to avoid overflow for large defaults.
-    return rule.getTimeUnit() == RetentionTimeUnit.YEARS
-        ? Math.min(rule.getDuration(), MAX_EVENT_HOLD_YEARS) * DAYS_PER_YEAR
-        : Math.min(rule.getDuration(), MAX_EVENT_HOLD_DAYS);
+  private static boolean exceedsDefaultDuration(RetentionDuration eventHold, RetentionDuration duration) {
+    long hold = eventHold.getDuration();
+    long defaultDuration = duration.getDuration();
+    if (eventHold.getTimeUnit() == duration.getTimeUnit()) {
+      return hold > defaultDuration;
+    }
+    if (eventHold.getTimeUnit() == RetentionTimeUnit.YEARS) {
+      // At most one leap day per four years, rounded up for the longest UTC interval.
+      return hold * DAYS_PER_YEAR + (hold + 3) / 4 > defaultDuration;
+    }
+    // A default of 100 years already covers any hold in days. Capping also avoids overflow.
+    long years = Math.min(defaultDuration, MAX_EVENT_HOLD_YEARS);
+    // The shortest interval can lose one leap day at a non-leap century.
+    return hold > years * DAYS_PER_YEAR + Math.max(0, years / 4 - 1);
   }
 
   /**

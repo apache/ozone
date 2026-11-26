@@ -59,7 +59,8 @@ class TestRetentionUtil {
 
   @Test
   void validatesBucketRetentionDuration() {
-    RetentionUtil.validateBucketRetention(new BucketRetention(RetentionMode.GOVERNANCE, null, null));
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateBucketRetention(
+        new BucketRetention(RetentionMode.GOVERNANCE, null, null)));
     RetentionUtil.validateBucketRetention(
         new BucketRetention(RetentionMode.GOVERNANCE, rule(RetentionTimeUnit.DAYS, 1), null));
     assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateBucketRetention(
@@ -79,6 +80,28 @@ class TestRetentionUtil {
         new BucketRetention(RetentionMode.GOVERNANCE, oneYear, rule(RetentionTimeUnit.DAYS, 365)));
     assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateBucketRetention(
         new BucketRetention(RetentionMode.GOVERNANCE, oneYear, rule(RetentionTimeUnit.DAYS, 366))));
+  }
+
+  @Test
+  void validatesYearEventHoldAgainstDayRetentionAcrossLeapYear() {
+    long start = Instant.parse("2024-01-01T00:00:00Z").toEpochMilli();
+    RetentionDuration oneYear = rule(RetentionTimeUnit.YEARS, 1);
+    RetentionDuration days365 = rule(RetentionTimeUnit.DAYS, 365);
+    RetentionDuration days366 = rule(RetentionTimeUnit.DAYS, 366);
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateBucketRetention(
+        new BucketRetention(RetentionMode.GOVERNANCE, days365, oneYear)));
+    RetentionUtil.validateBucketRetention(new BucketRetention(RetentionMode.GOVERNANCE, days366, oneYear));
+    RetentionUtil.validateObjectRetention(new ObjectRetention(RetentionMode.GOVERNANCE,
+        RetentionUtil.calculateRetainUntilDate(days366, start), new EventHold(true, oneYear)), start);
+  }
+
+  @Test
+  void validatesDayEventHoldAgainstYearRetentionAcrossNonLeapCentury() {
+    RetentionDuration fourYears = rule(RetentionTimeUnit.YEARS, 4);
+    RetentionUtil.validateBucketRetention(
+        new BucketRetention(RetentionMode.GOVERNANCE, fourYears, rule(RetentionTimeUnit.DAYS, 1460)));
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateBucketRetention(
+        new BucketRetention(RetentionMode.GOVERNANCE, fourYears, rule(RetentionTimeUnit.DAYS, 1461))));
   }
 
   @Test
