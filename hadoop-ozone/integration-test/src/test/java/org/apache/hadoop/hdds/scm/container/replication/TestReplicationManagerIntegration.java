@@ -57,13 +57,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -309,9 +309,9 @@ class TestReplicationManagerIntegration {
     assertEquals(HEALTHY_REPLICA_NUM + 1, containerManager.getContainerReplicas(containerId).size());
     ReplicationManagerReport report = new ReplicationManagerReport(replicationConf.getContainerSampleLimit());
     replicationManager.checkContainerStatus(containerInfo, report);
-    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ContainerHealthState.MIS_REPLICATED));
-    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.MIS_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
   }
 
   @Test
@@ -356,9 +356,9 @@ class TestReplicationManagerIntegration {
     assertEquals(HEALTHY_REPLICA_NUM + 2, containerManager.getContainerReplicas(containerId).size());
     ReplicationManagerReport report = new ReplicationManagerReport(replicationConf.getContainerSampleLimit());
     replicationManager.checkContainerStatus(containerInfo, report);
-    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ContainerHealthState.MIS_REPLICATED));
-    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.MIS_REPLICATED));
+    assertEquals(0, report.getStat(SimplifiedContainerHealthStateForReporting.OVER_REPLICATED));
   }
 
   /**

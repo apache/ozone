@@ -17,16 +17,14 @@
 
 source "$TEST_DIR"/testlib.sh
 
-
-### CALLBACKS ###
-
 with_this_version_pre_finalized() {
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include pre-finalized upgrade/non-rolling/check-finalization.robot
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-snapshot" --include pre-finalized-snapshot-tests snapshot/upgrade-snapshot-check.robot
+  # New layout features were added in this version, so OM and SCM should be
+  # pre-finalized.
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include pre-finalized upgrade/non-rolling/check-finalization.robot
+  # Test that EC is disabled when pre-finalized.
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-ec" --include pre-finalized-ec-tests ec/upgrade-ec-check.robot
 }
 
 with_this_version_finalized() {
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/non-rolling/check-finalization.robot
-  execute_robot_test "$SCM" -N "${OUTPUT_NAME}-snapshot" snapshot/snapshot-sh.robot
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-ec" --include post-finalized-ec-tests ec/upgrade-ec-check.robot
 }
-

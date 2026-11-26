@@ -22,8 +22,11 @@ import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getFutureDateString;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Instant;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
 import org.junit.jupiter.api.Test;
@@ -170,6 +173,24 @@ class TestOmLCExpiration {
     OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:00+01:00");
     assertOMException(() -> exp5.build().valid(currentTime), INVALID_REQUEST, "'Date' must represent midnight UTC");
+  }
+
+  @Test
+  public void testIsExpiredWithDate() throws OMException {
+    long now = System.currentTimeMillis();
+    long beforeDate = Instant.parse("2019-12-31T00:00:00Z").toEpochMilli();
+
+    // The date has not arrived yet, so no key is expired, no matter when it was modified.
+    OmLCExpiration futureDate = new OmLCExpiration.Builder().setDate("2099-10-10T00:00:00Z").build();
+    futureDate.valid(now);
+    assertFalse(futureDate.isExpired(beforeDate));
+    assertFalse(futureDate.isExpired(now));
+
+    // The date has passed, so every key is expired, including keys modified after the date.
+    OmLCExpiration pastDate = new OmLCExpiration.Builder().setDate("2020-01-01T00:00:00Z").build();
+    pastDate.valid(beforeDate);
+    assertTrue(pastDate.isExpired(beforeDate));
+    assertTrue(pastDate.isExpired(now));
   }
 
   @Test

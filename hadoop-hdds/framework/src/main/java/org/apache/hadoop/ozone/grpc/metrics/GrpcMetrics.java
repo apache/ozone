@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -89,7 +90,7 @@ public class GrpcMetrics implements MetricsSource {
   private MutableQuantiles[] grpcProcessingTimeNanosQuantiles;
 
   @Metric("Number of active clients connected")
-  private MutableCounterLong numOpenClientConnections;
+  private MutableGaugeLong numOpenClientConnections;
 
   public GrpcMetrics(Configuration conf) {
     this.registry = new MetricsRegistry("grpc");
