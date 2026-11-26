@@ -70,6 +70,17 @@ class TestRetentionUtil {
   }
 
   @Test
+  void rejectsBucketRetentionDurationOverflow() {
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateBucketRetention(
+        new BucketRetention(RetentionMode.GOVERNANCE, rule(RetentionTimeUnit.YEARS, 300_000_000), null)));
+    long maxDays = Long.MAX_VALUE / 86_400_000;
+    RetentionUtil.validateBucketRetention(
+        new BucketRetention(RetentionMode.GOVERNANCE, rule(RetentionTimeUnit.DAYS, maxDays), null));
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateBucketRetention(
+        new BucketRetention(RetentionMode.GOVERNANCE, rule(RetentionTimeUnit.DAYS, maxDays + 1), null)));
+  }
+
+  @Test
   void validatesDefaultEventHoldAgainstRetentionDuration() {
     RetentionDuration thirtyDays = rule(RetentionTimeUnit.DAYS, 30);
     RetentionUtil.validateBucketRetention(new BucketRetention(RetentionMode.GOVERNANCE, thirtyDays, thirtyDays));

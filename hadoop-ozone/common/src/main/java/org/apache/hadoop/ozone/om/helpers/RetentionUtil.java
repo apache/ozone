@@ -40,7 +40,7 @@ public final class RetentionUtil {
       throw new IllegalArgumentException("Default retention requires a duration or event hold");
     }
     if (duration != null) {
-      validateRule(duration);
+      calculateRetainUntilDate(duration, 0);
     }
     if (eventHold != null) {
       validateEventHoldRule(eventHold);
