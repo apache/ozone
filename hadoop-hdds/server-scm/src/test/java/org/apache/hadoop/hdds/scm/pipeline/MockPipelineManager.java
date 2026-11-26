@@ -101,7 +101,7 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public Pipeline buildECPipeline(ReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes) {
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes, StorageTier storageTier) {
     final List<DatanodeDetails> nodes = Stream.generate(
             MockDatanodeDetails::randomDatanodeDetails)
         .limit(replicationConfig.getRequiredNodes())
@@ -111,6 +111,7 @@ public class MockPipelineManager implements PipelineManager {
         .setReplicationConfig(replicationConfig)
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.OPEN)
+        .setSupportedStorageTier(storageTier)
         .build();
     return pipeline;
   }

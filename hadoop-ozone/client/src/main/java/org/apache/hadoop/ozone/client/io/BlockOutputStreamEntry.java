@@ -403,6 +403,10 @@ public class BlockOutputStreamEntry extends OutputStream {
     return this.bufferPool;
   }
 
+  public StorageType getStorageType() {
+    return storageType;
+  }
+
   /**
    * Builder class for ChunkGroupOutputStreamEntry.
    * */

@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -83,10 +84,11 @@ public class ECBlockOutputStream extends BlockOutputStream {
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
-      Supplier<ExecutorService> executorServiceSupplier
+      Supplier<ExecutorService> executorServiceSupplier,
+      StorageType storageType
   ) throws IOException {
     this(blockID, xceiverClientManager, pipeline, bufferPool, config, token, clientMetrics,
-        streamBufferArgs, executorServiceSupplier, true);
+        streamBufferArgs, executorServiceSupplier, storageType, true);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -99,13 +101,12 @@ public class ECBlockOutputStream extends BlockOutputStream {
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
       Supplier<ExecutorService> executorServiceSupplier,
+      StorageType storageType,
       boolean containerAutoCreate
   ) throws IOException {
-    // EC keys do not carry a per-block storage type yet; null leaves the datanode
-    // free to pick any volume. EC storage policy support is tracked separately.
     super(blockID, -1, xceiverClientManager,
         pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs, executorServiceSupplier,
-        null);
+        storageType);
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
     this.containerAutoCreate = containerAutoCreate;

@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
@@ -42,10 +43,12 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
@@ -293,6 +296,59 @@ class TestBlockOutputStreamCorrectness {
   }
 
   /**
+   * The storage type SCM chose for the block must reach the datanode in both the WriteChunk and the
+   * PutBlock request, so that the datanode creates the container on a volume of that type.
+   */
+  @Test
+  public void testEcStreamSendsStorageTypeToDatanode() throws Exception {
+    MockXceiverClientSpi client = writeAndPutBlockWithEcStream(StorageType.SSD);
+
+    List<ContainerCommandRequestProto> writeChunks = client.getRequests(Type.WriteChunk);
+    List<ContainerCommandRequestProto> putBlocks = client.getRequests(Type.PutBlock);
+    int expectedId = StorageTypeUtils.getID(StorageType.SSD);
+    assertThat(writeChunks).hasSize(1);
+    assertThat(writeChunks.get(0).getWriteChunk().getBlockID().getStorageTypeID()).isEqualTo(expectedId);
+    assertThat(putBlocks).hasSize(1);
+    assertThat(putBlocks.get(0).getPutBlock().getBlockData().getBlockID().getStorageTypeID()).isEqualTo(expectedId);
+  }
+
+  /**
+   * Without a storage type, no storage type is sent and the datanode keeps choosing the volume itself.
+   */
+  @Test
+  public void testEcStreamWithoutStorageTypeSendsNone() throws Exception {
+    MockXceiverClientSpi client = writeAndPutBlockWithEcStream(null);
+
+    List<ContainerCommandRequestProto> writeChunks = client.getRequests(Type.WriteChunk);
+    List<ContainerCommandRequestProto> putBlocks = client.getRequests(Type.PutBlock);
+    assertThat(writeChunks).hasSize(1);
+    assertThat(writeChunks.get(0).getWriteChunk().getBlockID().hasStorageTypeID()).isFalse();
+    assertThat(putBlocks).hasSize(1);
+    assertThat(putBlocks.get(0).getPutBlock().getBlockData().getBlockID().hasStorageTypeID()).isFalse();
+  }
+
+  private MockXceiverClientSpi writeAndPutBlockWithEcStream(StorageType storageType) throws Exception {
+    OzoneClientConfig config = new OzoneClientConfig();
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(datanodeDetails.getID())
+        .setReplicationConfig(replicationConfig)
+        .setNodes(ImmutableList.of(datanodeDetails))
+        .setState(Pipeline.PipelineState.OPEN)
+        .setReplicaIndexes(ImmutableMap.of(datanodeDetails, 2))
+        .build();
+    MockXceiverClientSpi client = new MockXceiverClientSpi(pipeline);
+
+    try (ECBlockOutputStream ecBlockOutputStream = createECBlockOutputStream(config, replicationConfig,
+        new BlockID(1, 1), client, storageType, true)) {
+      ecBlockOutputStream.write(DATA, 0, 1024);
+      ecBlockOutputStream.executePutBlock(true, true).get();
+    }
+    return client;
+  }
+
+  /**
    * Creates a BlockData array with {@link ECReplicationConfig#getRequiredNodes()} number of elements.
    */
   private BlockData[] createBlockDataWithoutStripeChecksum(BlockID blockID, ECReplicationConfig replicationConfig) {
@@ -359,6 +415,12 @@ class TestBlockOutputStreamCorrectness {
   private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
       ECReplicationConfig repConfig, BlockID blockID, XceiverClientSpi xceiverClient,
       boolean containerAutoCreate) throws IOException {
+    return createECBlockOutputStream(clientConfig, repConfig, blockID, xceiverClient, null, containerAutoCreate);
+  }
+
+  private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
+      ECReplicationConfig repConfig, BlockID blockID, XceiverClientSpi xceiverClient,
+      StorageType storageType, boolean containerAutoCreate) throws IOException {
     final Pipeline pipeline = xceiverClient.getPipeline();
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
     when(xcm.acquireClient(any()))
@@ -369,7 +431,7 @@ class TestBlockOutputStreamCorrectness {
         StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, clientConfig);
 
     return new ECBlockOutputStream(blockID, xcm, pipeline, BufferPool.empty(), clientConfig, null,
-        clientMetrics, streamBufferArgs, () -> newFixedThreadPool(2), containerAutoCreate);
+        clientMetrics, streamBufferArgs, () -> newFixedThreadPool(2), storageType, containerAutoCreate);
   }
 
   private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
@@ -388,10 +450,15 @@ class TestBlockOutputStreamCorrectness {
     private int i;
     private Result replyResult = Result.SUCCESS;
     private long lastPutBlockIndex;
+    private final List<ContainerCommandRequestProto> requests = new ArrayList<>();
 
     MockXceiverClientSpi(Pipeline pipeline) {
       super();
       this.pipeline = pipeline;
+    }
+
+    List<ContainerCommandRequestProto> getRequests(Type type) {
+      return requests.stream().filter(r -> r.getCmdType() == type).collect(Collectors.toList());
     }
 
     @Override
@@ -412,6 +479,7 @@ class TestBlockOutputStreamCorrectness {
     @Override
     public XceiverClientReply sendCommandAsync(ContainerCommandRequestProto request) {
 
+      requests.add(request);
       if (!request.hasVersion()) {
         request = ContainerCommandRequestProto.newBuilder(request)
             .setVersion(ClientVersion.CURRENT.serialize()).build();

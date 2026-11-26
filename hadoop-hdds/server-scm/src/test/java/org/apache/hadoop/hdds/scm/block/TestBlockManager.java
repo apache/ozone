@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -48,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -114,6 +116,7 @@ public class TestBlockManager {
   private int numContainerPerOwnerInPipeline;
   private SCMMetadataStore scmMetadataStore;
   private ReplicationConfig replicationConfig;
+  private ReplicationConfig ecReplicationConfig;
   private List<StorageType> storageTypes;
 
   @BeforeEach
@@ -131,9 +134,10 @@ public class TestBlockManager {
     // Override the default Node Manager and SCMHAManager
     // in SCM with the Mock one.
     storageTypes = Arrays.asList(StorageType.SSD, StorageType.DISK, StorageType.ARCHIVE);
-    // Each StorageType have  3 + 1 = 4 nodes, so if we exclude 1 DN,
-    // the remaining DNs still can create a three replication Pipeline for each StorageType
-    nodeManager = new MockNodeManager(true, storageTypes.size() * (ReplicationFactor.THREE.getNumber() + 1));
+    ecReplicationConfig = new ECReplicationConfig("RS-3-2-1024k");
+    // Each StorageType has enough nodes (EC data + parity + 1) for an EC pipeline, so if we exclude 1 DN,
+    // the remaining DNs still can create an EC (and so also a three replication) Pipeline for each StorageType
+    nodeManager = new MockNodeManager(true, storageTypes.size() * (ecReplicationConfig.getRequiredNodes() + 1));
     List<DatanodeDetails> dns = nodeManager.getNodes(NodeStatus.inServiceHealthy());
     for (int i = 0; i < dns.size(); i++) {
       StorageType storageType = storageTypes.get(i % storageTypes.size());
@@ -290,6 +294,65 @@ public class TestBlockManager {
       assertNotNull(block);
       assertThat(excludeList.getPipelineIds()).contains(block.getPipeline().getId());
     }
+  }
+
+  /**
+   * EC blocks must land on a pipeline of the storage policy's creation tier, also once the
+   * EC pipeline limit has been reached for another tier, and must respect the exclude list.
+   */
+  @Test
+  public void testECAllocateBlockUsesStoragePolicyTier() throws Exception {
+    // More requests than the default EC pipeline limit, so later requests must reuse a pipeline of their own tier.
+    int requests = 8;
+    for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
+      StorageTier tier = storagePolicy.getCreationTier();
+      PipelineID excludedPipeline = null;
+      for (int i = 0; i < requests; i++) {
+        ExcludeList excludeList = new ExcludeList();
+        if (excludedPipeline != null) {
+          excludeList.addPipeline(excludedPipeline);
+        }
+        AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, ecReplicationConfig,
+            OzoneConsts.OZONE, excludeList, storagePolicy, false);
+        assertThat(block).isNotNull();
+        assertThat(block.getStorageTier()).isEqualTo(tier);
+        assertThat(block.getPipeline().getSupportedStorageTier()).isEqualTo(tier);
+        assertThat(block.getPipeline().getId()).isNotEqualTo(excludedPipeline);
+        excludedPipeline = block.getPipeline().getId();
+      }
+    }
+  }
+
+  /**
+   * Same as {@link #testAllocateBlockWithStoragePolicy()} for EC: when no datanode of the policy's creation tier
+   * is usable, a block is only allocated if falling back is allowed and the policy has a fallback tier.
+   */
+  @Test
+  public void testECAllocateBlockWithStoragePolicyFallback() throws Exception {
+    // Only HOT has a fallback StorageTier: SSD -> DISK
+    OzoneStoragePolicy storagePolicy = OzoneStoragePolicy.HOT;
+
+    // Exclude all the SSD datanodes, so that no EC pipeline can be created on SSD.
+    // (The EC placement of the mock cluster does not skip stale datanodes, so they cannot be used for this.)
+    ExcludeList excludeList = new ExcludeList();
+    for (DatanodeDetails dn : nodeManager.getNodes(NodeStatus.inServiceHealthy())) {
+      if (nodeManager.getDatanodeInfo(dn).getStorageReports().get(0).getStorageType() ==
+          StorageTypeUtils.getStorageTypeProto(StorageType.SSD)) {
+        excludeList.addDatanode(dn);
+      }
+    }
+    // Without fallback, no block can be allocated
+    assertThatThrownBy(() -> blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, ecReplicationConfig,
+        OzoneConsts.OZONE, excludeList, storagePolicy, false))
+        .isInstanceOf(IOException.class);
+
+    // With fallback, the block is allocated on a DISK pipeline
+    AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, ecReplicationConfig,
+        OzoneConsts.OZONE, excludeList, storagePolicy, true);
+    assertThat(block).isNotNull();
+    assertThat(block.getStorageTier()).isEqualTo(StorageTier.DISK);
+    assertThat(block.getPipeline().getSupportedStorageTier()).isEqualTo(StorageTier.DISK);
+    assertThat(block.isFallBack()).isTrue();
   }
 
   @Test
