@@ -154,10 +154,12 @@ public class ReplicationManagerReport {
    * Returns whether the report contains under-replicated containers, including combined states.
    */
   public boolean hasUnderReplicatedContainers() {
-    return getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED) > 0
-        || getStat(SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED) > 0
-        || getStat(SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED) > 0
-        || getStat(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_UNDER_REPLICATED) > 0;
+    for (SimplifiedContainerHealthStateForReporting state : SimplifiedContainerHealthStateForReporting.values()) {
+      if (state.isUnderReplicated() && getStat(state) > 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public List<ContainerID> getSample(SimplifiedContainerHealthStateForReporting stat) {
