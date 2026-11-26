@@ -33,14 +33,17 @@ public final class RetentionUtil {
   private RetentionUtil() {
   }
 
-  public static void validateBucketRetention(BucketRetention retention) {
+  /**
+   * Validate bucket retention submitted by a write request at the given time in epoch milliseconds.
+   */
+  public static void validateBucketRetention(BucketRetention retention, long currentTime) {
     RetentionDuration duration = retention.getDuration();
     RetentionDuration eventHold = retention.getDefaultEventHold();
     if (duration == null && eventHold == null) {
       throw new IllegalArgumentException("Default retention requires a duration or event hold");
     }
     if (duration != null) {
-      calculateRetainUntilDate(duration, 0);
+      calculateRetainUntilDate(duration, currentTime);
     }
     if (eventHold != null) {
       validateEventHoldRule(eventHold);
