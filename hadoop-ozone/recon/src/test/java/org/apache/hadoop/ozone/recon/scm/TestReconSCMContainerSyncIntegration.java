@@ -70,6 +70,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -215,13 +216,13 @@ public class TestReconSCMContainerSyncIntegration
     return containerID;
   }
 
-  /** Stubs SCM's CLOSED list to contain exactly the given container. */
-  private void stubClosedInScm(ContainerID containerID) throws IOException {
-    when(mockScm.getContainerCount(CLOSED)).thenReturn(1L);
-    when(mockScm.getListOfContainerIDs(eq(ContainerID.valueOf(1L)), eq(1), eq(CLOSED)))
+  /** Stubs SCM's list for {@code state} to contain exactly the given container. */
+  private void stubInScm(ContainerID containerID, LifeCycleState state) throws IOException {
+    when(mockScm.getContainerCount(state)).thenReturn(1L);
+    when(mockScm.getListOfContainerIDs(eq(ContainerID.valueOf(1L)), eq(1), eq(state)))
         .thenReturn(Collections.singletonList(containerID));
-    when(mockScm.getListOfContainerInfos(eq(containerID), eq(1), eq(CLOSED)))
-        .thenReturn(Collections.singletonList(containerInfo(containerID.getId(), CLOSED)));
+    when(mockScm.getListOfContainerInfos(eq(containerID), eq(1), eq(state)))
+        .thenReturn(Collections.singletonList(containerInfo(containerID.getId(), state)));
   }
 
   /** Returns a list of ContainerIDs for IDs in [{@code start}, {@code end}). */
@@ -326,22 +327,23 @@ public class TestReconSCMContainerSyncIntegration
       assertEquals(CLOSED, getContainerManager().getContainer(cid).getState());
     }
 
-    @Test
-    void containerDeletedInReconButClosedInScmKeepsReplicas() throws Exception {
-      // SCM moved the container back from DELETED to CLOSED. Recon must follow without losing the
-      // replica it already knows.
+    @ParameterizedTest
+    @EnumSource(value = LifeCycleState.class, names = {"CLOSED", "QUASI_CLOSED"})
+    void containerDeletedInReconButLiveInScmKeepsReplicas(LifeCycleState scmState) throws Exception {
+      // SCM moved the container back from DELETED to CLOSED or QUASI_CLOSED. Recon must follow
+      // without losing the replica it already knows. Both states take the same move-back path.
       ContainerID cid = seedDeletedWithReplica(40L);
-      stubClosedInScm(cid);
+      stubInScm(cid, scmState);
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());
-      assertThat(getContainerManager().getContainer(cid).getState()).isEqualTo(CLOSED);
+      assertThat(getContainerManager().getContainer(cid).getState()).isEqualTo(scmState);
       assertThat(getContainerManager().getContainerReplicas(cid)).hasSize(1);
     }
 
     @Test
     void failedCorrectionFromDeletedKeepsContainerInRecon() throws Exception {
       ContainerID cid = seedDeletedWithReplica(41L);
-      stubClosedInScm(cid);
+      stubInScm(cid, CLOSED);
       ReconContainerManager failingManager = spy(getContainerManager());
       doThrow(new IOException("injected")).when(failingManager)
           .transitionDeletingOrDeletedToTargetState(any(), any());

@@ -286,7 +286,7 @@ class ReconStorageContainerSyncHelper {
                                      HddsProtos.LifeCycleState reconState) {
     try {
       if (reconState == HddsProtos.LifeCycleState.DELETED) {
-        return rebuildContainerFromScm(containerID,
+        return moveDeletedBackToScmState(containerID,
             HddsProtos.LifeCycleState.QUASI_CLOSED);
       }
       if (reconState == HddsProtos.LifeCycleState.OPEN) {
@@ -313,7 +313,7 @@ class ReconStorageContainerSyncHelper {
                                 HddsProtos.LifeCycleState reconState) {
     try {
       if (reconState == HddsProtos.LifeCycleState.DELETED) {
-        return rebuildContainerFromScm(containerID, HddsProtos.LifeCycleState.CLOSED);
+        return moveDeletedBackToScmState(containerID, HddsProtos.LifeCycleState.CLOSED);
       }
       if (reconState == HddsProtos.LifeCycleState.OPEN) {
         containerManager.transitionOpenToClosing(containerID, reconContainer);
@@ -339,13 +339,13 @@ class ReconStorageContainerSyncHelper {
     return 0;
   }
 
-  private int rebuildContainerFromScm(ContainerID containerID,
-                                      HddsProtos.LifeCycleState scmState) {
+  private int moveDeletedBackToScmState(ContainerID containerID,
+                                        HddsProtos.LifeCycleState scmState) {
     try {
       List<ContainerInfo> infos = scmServiceProvider.getListOfContainerInfos(
           containerID, 1, scmState);
       if (infos.isEmpty() || !infos.get(0).containerID().equals(containerID)) {
-        LOG.debug("Container {} no longer in SCM state {}; skipping rebuild.",
+        LOG.debug("Container {} no longer in SCM state {}; skipping move back.",
             containerID, scmState);
         return 0;
       }
@@ -356,7 +356,7 @@ class ReconStorageContainerSyncHelper {
           containerID, scmState);
       return 1;
     } catch (IOException e) {
-      LOG.warn("Failed to rebuild container {} from SCM state {}.",
+      LOG.warn("Failed to move container {} from DELETED back to SCM state {}.",
           containerID, scmState, e);
       return 0;
     }
