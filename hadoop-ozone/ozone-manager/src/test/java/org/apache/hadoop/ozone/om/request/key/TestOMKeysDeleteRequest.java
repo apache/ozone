@@ -44,6 +44,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
@@ -113,25 +114,23 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
     verify(ozoneManager, times(assumeS3Context ? 1 : 0)).getS3VolumeContext();
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testS3DeleteRequiresBucketReadBeforeDeleting(boolean assumeS3Context) throws Exception {
+  @Test
+  public void testS3DeletePermissionDeniedIsAudited() throws Exception {
+    createPreRequisites();
+    OMRequest original = getOmRequest().toBuilder().setAssumeS3Context(true).build();
+    assertPreExecuteAclDenialIsAudited(getOmKeysDeleteRequest(original), OMAction.DELETE_KEYS);
+  }
+
+  @Test
+  public void testDeleteWithoutS3ContextSkipsBucketReadCheck() throws Exception {
     createPreRequisites();
     when(ozoneManager.getAclsEnabled()).thenReturn(true);
-    OMRequest original = getOmRequest().toBuilder().setAssumeS3Context(assumeS3Context).build();
-    OMKeysDeleteRequest request = spy(getOmKeysDeleteRequest(original));
+    OMKeysDeleteRequest request = spy(getOmKeysDeleteRequest(getOmRequest()));
     doThrow(new OMException("Bucket READ denied", OMException.ResultCodes.ACCESS_DENIED)).when(request)
         .checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET, OzoneObj.StoreType.OZONE,
             IAccessAuthorizer.ACLType.READ, volumeName, bucketName, null);
 
-    if (assumeS3Context) {
-      OMException exception = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
-      assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.ACCESS_DENIED);
-    } else {
-      assertDoesNotThrow(() -> request.preExecute(ozoneManager));
-    }
-    verify(request, times(assumeS3Context ? 1 : 0)).checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-        OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.READ, volumeName, bucketName, null);
+    assertDoesNotThrow(() -> request.preExecute(ozoneManager));
   }
 
   @ParameterizedTest
