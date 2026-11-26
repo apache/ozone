@@ -139,7 +139,7 @@ class TestS3ClientProtocol {
   }
 
   @ParameterizedTest
-  @EnumSource(value = OzoneManagerVersion.class, names = {"ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
+  @EnumSource(value = OzoneManagerVersion.class, names = {"LIST_STATUS_REJECTS_OBS", "S3_VOLUME_CONTEXT_RESOLUTION"})
   void resolvesBatchVolumeForOlderOm(OzoneManagerVersion version) throws Exception {
     List<String> keys = Collections.singletonList("key");
     OzoneBucket bucket = mock(OzoneBucket.class);
