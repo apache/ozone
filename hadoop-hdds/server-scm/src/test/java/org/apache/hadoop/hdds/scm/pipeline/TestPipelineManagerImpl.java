@@ -252,7 +252,6 @@ public class TestPipelineManagerImpl {
       TracingUtil.executeInNewSpan("request", () -> pipelineManager.createPipeline(
           RatisReplicationConfig.getInstance(ReplicationFactor.THREE)));
 
-      collector.assertParent("PipelineManagerImpl.acquireWriteLock", "request");
       collector.assertParent("PipelineManagerImpl.createPipeline", "request");
       collector.assertNotError("PipelineManagerImpl.createPipeline");
     }
