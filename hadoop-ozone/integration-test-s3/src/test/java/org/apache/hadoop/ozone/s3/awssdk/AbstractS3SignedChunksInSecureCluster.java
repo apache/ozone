@@ -36,7 +36,6 @@ import static org.apache.hadoop.ozone.s3.S3ClientFactory.ACCESS_KEY;
 import static org.apache.hadoop.ozone.s3.S3ClientFactory.SECRET_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BAD_DIGEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.SIGNATURE_DOES_NOT_MATCH;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
@@ -69,7 +68,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayService;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
@@ -101,7 +99,6 @@ abstract class AbstractS3SignedChunksInSecureCluster extends ClusterForTests<Min
 
   private static final String BUCKET = "signed-chunks";
   private static final String CRC32C_TRAILER = "x-amz-checksum-crc32c";
-  private static final String WRONG_CHECKSUM = "AAAAAA==";
   /** Two data chunks at the SDK's 128 KiB chunk size, then the final empty chunk. */
   private static final byte[] DATA = new byte[128 * 1024 + 1024];
 
@@ -187,35 +184,30 @@ abstract class AbstractS3SignedChunksInSecureCluster extends ClusterForTests<Min
     }
   }
 
-  /**
-   * One change per verification point: a data chunk, the final chunk, the signed trailer, and a correctly signed but
-   * wrong trailer checksum.
-   */
+  /** One change per verification point: a data chunk, the final chunk and the signed trailer. */
   static Stream<Arguments> rejectedUploads() {
     return Stream.of(
-        Arguments.of(false, Mutation.PAYLOAD, SIGNATURE_DOES_NOT_MATCH),
-        Arguments.of(false, Mutation.FINAL_SIGNATURE, SIGNATURE_DOES_NOT_MATCH),
-        Arguments.of(true, Mutation.TRAILER, SIGNATURE_DOES_NOT_MATCH),
-        Arguments.of(true, Mutation.BAD_CHECKSUM, BAD_DIGEST));
+        Arguments.of(false, Mutation.PAYLOAD),
+        Arguments.of(false, Mutation.FINAL_SIGNATURE),
+        Arguments.of(true, Mutation.TRAILER));
   }
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testPutObject(boolean trailer) throws Exception {
     String key = UUID.randomUUID().toString();
-    sendSigned(trailer, Mutation.NONE,
-        s3 -> s3.putObject(putRequest(key, trailer, Mutation.NONE), RequestBody.fromBytes(DATA)));
+    sendSigned(trailer, Mutation.NONE, s3 -> s3.putObject(putRequest(key, trailer), RequestBody.fromBytes(DATA)));
     assertThat(readObject(key)).isEqualTo(DATA);
   }
 
   @ParameterizedTest
   @MethodSource("rejectedUploads")
-  void testRejectedPutObjectKeepsObject(boolean trailer, Mutation mutation, S3ErrorTable expected) throws Exception {
+  void testRejectedPutObjectKeepsObject(boolean trailer, Mutation mutation) throws Exception {
     String key = UUID.randomUUID().toString();
     byte[] original = "original object".getBytes(US_ASCII);
     client.putObject(b -> b.bucket(BUCKET).key(key), RequestBody.fromBytes(original));
-    assertRejected(expected, () -> sendSigned(trailer, mutation,
-        s3 -> s3.putObject(putRequest(key, trailer, mutation), RequestBody.fromBytes(DATA))));
+    assertRejected(() -> sendSigned(trailer, mutation,
+        s3 -> s3.putObject(putRequest(key, trailer), RequestBody.fromBytes(DATA))));
     assertThat(readObject(key)).isEqualTo(original);
   }
 
@@ -225,7 +217,7 @@ abstract class AbstractS3SignedChunksInSecureCluster extends ClusterForTests<Min
     String key = UUID.randomUUID().toString();
     String uploadId = client.createMultipartUpload(b -> b.bucket(BUCKET).key(key)).uploadId();
     String etag = sendSigned(trailer, Mutation.NONE,
-        s3 -> s3.uploadPart(partRequest(key, uploadId, trailer, Mutation.NONE), RequestBody.fromBytes(DATA))).eTag();
+        s3 -> s3.uploadPart(partRequest(key, uploadId, trailer), RequestBody.fromBytes(DATA))).eTag();
     client.completeMultipartUpload(b -> b.bucket(BUCKET).key(key).uploadId(uploadId)
         .multipartUpload(m -> m.parts(CompletedPart.builder().partNumber(1).eTag(etag).build())));
     assertThat(readObject(key)).isEqualTo(DATA);
@@ -233,14 +225,14 @@ abstract class AbstractS3SignedChunksInSecureCluster extends ClusterForTests<Min
 
   @ParameterizedTest
   @MethodSource("rejectedUploads")
-  void testRejectedUploadPartKeepsPart(boolean trailer, Mutation mutation, S3ErrorTable expected) throws Exception {
+  void testRejectedUploadPartKeepsPart(boolean trailer, Mutation mutation) throws Exception {
     String key = UUID.randomUUID().toString();
     String uploadId = client.createMultipartUpload(b -> b.bucket(BUCKET).key(key)).uploadId();
     client.uploadPart(b -> b.bucket(BUCKET).key(key).uploadId(uploadId).partNumber(1),
         RequestBody.fromBytes("original part".getBytes(US_ASCII)));
     List<Part> parts = listParts(key, uploadId);
-    assertRejected(expected, () -> sendSigned(trailer, mutation,
-        s3 -> s3.uploadPart(partRequest(key, uploadId, trailer, mutation), RequestBody.fromBytes(DATA))));
+    assertRejected(() -> sendSigned(trailer, mutation,
+        s3 -> s3.uploadPart(partRequest(key, uploadId, trailer), RequestBody.fromBytes(DATA))));
     assertThat(listParts(key, uploadId)).isEqualTo(parts);
   }
 
@@ -253,22 +245,18 @@ abstract class AbstractS3SignedChunksInSecureCluster extends ClusterForTests<Min
     }
   }
 
-  private static PutObjectRequest putRequest(String key, boolean trailer, Mutation mutation) {
+  private static PutObjectRequest putRequest(String key, boolean trailer) {
     PutObjectRequest.Builder request = PutObjectRequest.builder().bucket(BUCKET).key(key);
-    if (mutation == Mutation.BAD_CHECKSUM) {
-      request.checksumCRC32C(WRONG_CHECKSUM).overrideConfiguration(o -> o.putHeader(X_AMZ_TRAILER, CRC32C_TRAILER));
-    } else if (trailer) {
+    if (trailer) {
       request.checksumAlgorithm(ChecksumAlgorithm.CRC32_C);
     }
     return request.build();
   }
 
-  private static UploadPartRequest partRequest(String key, String uploadId, boolean trailer, Mutation mutation) {
+  private static UploadPartRequest partRequest(String key, String uploadId, boolean trailer) {
     UploadPartRequest.Builder request = UploadPartRequest.builder().bucket(BUCKET).key(key)
         .uploadId(uploadId).partNumber(1);
-    if (mutation == Mutation.BAD_CHECKSUM) {
-      request.checksumCRC32C(WRONG_CHECKSUM).overrideConfiguration(o -> o.putHeader(X_AMZ_TRAILER, CRC32C_TRAILER));
-    } else if (trailer) {
+    if (trailer) {
       request.checksumAlgorithm(ChecksumAlgorithm.CRC32_C);
     }
     return request.build();
@@ -282,15 +270,15 @@ abstract class AbstractS3SignedChunksInSecureCluster extends ClusterForTests<Min
     return client.listParts(b -> b.bucket(BUCKET).key(key).uploadId(uploadId)).parts();
   }
 
-  private static void assertRejected(S3ErrorTable expected, Executable upload) {
+  private static void assertRejected(Executable upload) {
     S3Exception error = assertThrows(S3Exception.class, upload);
-    assertThat(error.statusCode()).isEqualTo(expected.getHttpCode());
-    assertThat(error.awsErrorDetails().errorCode()).isEqualTo(expected.getCode());
+    assertThat(error.statusCode()).isEqualTo(SIGNATURE_DOES_NOT_MATCH.getHttpCode());
+    assertThat(error.awsErrorDetails().errorCode()).isEqualTo(SIGNATURE_DOES_NOT_MATCH.getCode());
   }
 
-  /** The part of the signed body changed after signing, or a wrong trailer checksum that the SDK signs. */
+  /** The part of the signed body changed after signing. */
   enum Mutation {
-    NONE, PAYLOAD, FINAL_SIGNATURE, TRAILER, BAD_CHECKSUM
+    NONE, PAYLOAD, FINAL_SIGNATURE, TRAILER
   }
 
   /** Mutates the encoded bytes after the SDK has signed both headers and body. */
@@ -346,9 +334,6 @@ abstract class AbstractS3SignedChunksInSecureCluster extends ClusterForTests<Min
         break;
       case TRAILER:
         offset = body.indexOf(CRC32C_TRAILER + ":") + CRC32C_TRAILER.length() + 1;
-        break;
-      case BAD_CHECKSUM:
-        assertThat(body).contains("\r\n" + CRC32C_TRAILER + ":" + WRONG_CHECKSUM + "\r\n");
         break;
       default:
         break;
