@@ -474,8 +474,8 @@ public class TestOzoneStoragePolicy {
   }
 
   /**
-   * EC keys honour their storage policy, for both bucket layouts. One cluster is shared by all the checks,
-   * because each check uses its own bucket.
+   * EC keys and files honour their storage policy, for every bucket layout. One cluster is shared by all the
+   * checks, because each check uses its own bucket.
    */
   @Test
   public void testEcStoragePolicy() throws Exception {
@@ -483,6 +483,9 @@ public class TestOzoneStoragePolicy {
     for (BucketLayout layout : new BucketLayout[] {BucketLayout.OBJECT_STORE, BucketLayout.FILE_SYSTEM_OPTIMIZED}) {
       verifyEcKeyStoragePolicy(layout);
       verifyEcMultipartUploadStoragePolicy(layout);
+    }
+    for (BucketLayout layout : FILE_BUCKET_LAYOUTS) {
+      verifyEcFileStoragePolicy(layout);
     }
   }
 
@@ -492,20 +495,42 @@ public class TestOzoneStoragePolicy {
    * volumes of that tier.
    */
   private void verifyEcKeyStoragePolicy(BucketLayout layout) throws Exception {
-    // One full stripe, so that every datanode of the block group receives a cell.
-    byte[] data = new byte[EC_RS_3_2.getData() * EC_RS_3_2.getEcChunkSize()];
-    Arrays.fill(data, (byte) 'e');
+    byte[] data = ecStripeData();
 
     for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
       OzoneBucket bucket = createBucket(null, layout);
       String keyName = UUID.randomUUID().toString();
       writeKey(bucket, keyName, storagePolicy, EC_RS_3_2, data);
-      OmKeyInfo keyInfo = lookupKey(bucket, keyName);
-
-      assertKeyInfo(keyInfo, storagePolicy, EC_RS_3_2);
-      assertScmContainerAndPipeline(keyInfo, storagePolicy.getCreationTier(), EC_RS_3_2);
-      assertEcDatanodeContainers(keyInfo, storagePolicy.getCreationTier(), EC_RS_3_2.getRequiredNodes());
+      assertEcKeyOnTier(lookupKey(bucket, keyName), storagePolicy);
     }
+  }
+
+  /**
+   * An EC file created through createFile honours its storage policy in the same way as an EC key created
+   * through createKey.
+   */
+  private void verifyEcFileStoragePolicy(BucketLayout layout) throws Exception {
+    byte[] data = ecStripeData();
+
+    for (OzoneStoragePolicy storagePolicy : OzoneStoragePolicy.values()) {
+      OzoneBucket bucket = createBucket(null, layout);
+      String keyName = UUID.randomUUID().toString();
+      writeFile(bucket, keyName, data, data.length, false, storagePolicy, EC_RS_3_2);
+      assertEcKeyOnTier(lookupKey(bucket, keyName), storagePolicy);
+    }
+  }
+
+  /** One full stripe, so that every datanode of the block group receives a cell. */
+  private static byte[] ecStripeData() {
+    byte[] data = new byte[EC_RS_3_2.getData() * EC_RS_3_2.getEcChunkSize()];
+    Arrays.fill(data, (byte) 'e');
+    return data;
+  }
+
+  private void assertEcKeyOnTier(OmKeyInfo keyInfo, OzoneStoragePolicy storagePolicy) throws IOException {
+    assertKeyInfo(keyInfo, storagePolicy, EC_RS_3_2);
+    assertScmContainerAndPipeline(keyInfo, storagePolicy.getCreationTier(), EC_RS_3_2);
+    assertEcDatanodeContainers(keyInfo, storagePolicy.getCreationTier(), EC_RS_3_2.getRequiredNodes());
   }
 
   /**
@@ -912,9 +937,14 @@ public class TestOzoneStoragePolicy {
 
   private void writeFile(OzoneBucket bucket, String keyName, byte[] data, long size, boolean overWrite,
       OzoneStoragePolicy storagePolicy) throws IOException {
+    writeFile(bucket, keyName, data, size, overWrite, storagePolicy, RATIS_THREE);
+  }
+
+  private void writeFile(OzoneBucket bucket, String keyName, byte[] data, long size, boolean overWrite,
+      OzoneStoragePolicy storagePolicy, ReplicationConfig replicationConfig) throws IOException {
     try (OzoneOutputStream out = bucket.createFile(keyName, CreateFileOptions.builder()
         .setSize(size)
-        .setReplicationConfig(RATIS_THREE)
+        .setReplicationConfig(replicationConfig)
         .setOverWrite(overWrite)
         .setStoragePolicy(storagePolicy)
         .build())) {
