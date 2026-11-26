@@ -81,14 +81,13 @@ public class TestOmBucketInfo {
             new RetentionDuration(retention.getDuration().getTimeUnit(), 31), null))
         .build());
     assertEquals("true", bucket.toAuditMap().get(OzoneConsts.OBJECT_LOCK_ENABLED));
-    assertEquals(retention.toString(), bucket.toAuditMap().get(OzoneConsts.DEFAULT_RETENTION));
+    assertFalse(bucket.toAuditMap().containsKey(OzoneConsts.DEFAULT_RETENTION));
     assertTrue(bucket.toString().contains("objectLockEnabled=true"));
     assertTrue(bucket.toString().contains("defaultRetention=" + retention));
     assertTrue(retention.toString().contains("GOVERNANCE"));
     assertTrue(retention.toString().contains("duration: 30"));
     OmBucketInfo withoutLock = bucket.toBuilder().setObjectLockEnabled(false).setDefaultRetention(null).build();
     assertEquals("false", withoutLock.toAuditMap().get(OzoneConsts.OBJECT_LOCK_ENABLED));
-    assertNull(withoutLock.toAuditMap().get(OzoneConsts.DEFAULT_RETENTION));
   }
 
   @Test

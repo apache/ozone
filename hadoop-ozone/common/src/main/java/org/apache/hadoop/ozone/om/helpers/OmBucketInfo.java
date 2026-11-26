@@ -379,7 +379,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
         String.valueOf(this.quotaInNamespace));
     auditMap.put(OzoneConsts.OBJECT_LOCK_ENABLED, String.valueOf(objectLockEnabled));
-    auditMap.put(OzoneConsts.DEFAULT_RETENTION, defaultRetention != null ? defaultRetention.toString() : null);
     return auditMap;
   }
 
