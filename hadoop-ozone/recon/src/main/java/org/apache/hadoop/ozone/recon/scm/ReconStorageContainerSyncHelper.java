@@ -304,7 +304,7 @@ class ReconStorageContainerSyncHelper {
       // may not have copied. Recon is ahead of SCM only when it closed the container from a CLOSED replica
       // that SCM has not processed yet. DELETING here is that same move, stopped between the two steps.
       if (reconState == HddsProtos.LifeCycleState.DELETING
-          || (reconState == HddsProtos.LifeCycleState.CLOSED && !hasClosedReplica(containerID))) {
+          || (reconState == HddsProtos.LifeCycleState.CLOSED && !hasClosedReplica(reconContainer))) {
         if (reconState == HddsProtos.LifeCycleState.CLOSED) {
           containerManager.updateContainerState(containerID, DELETE);
         }
@@ -323,9 +323,17 @@ class ReconStorageContainerSyncHelper {
     return 0;
   }
 
-  private boolean hasClosedReplica(ContainerID containerID) throws ContainerNotFoundException {
-    return containerManager.getContainerReplicas(containerID).stream()
-        .anyMatch(replica -> replica.getState() == ContainerReplicaProto.State.CLOSED);
+  /**
+   * Returns true iff Recon has a CLOSED replica whose sequence ID matches the container's.
+   * A stale CLOSED replica (older sequence) is treated the same as a non-CLOSED replica: SCM
+   * would not close the container on its basis, so it cannot be evidence that Recon is ahead.
+   */
+  private boolean hasClosedReplica(ContainerInfo container) throws ContainerNotFoundException {
+    long containerSeq = container.getSequenceId();
+    return containerManager.getContainerReplicas(container.containerID()).stream()
+        .anyMatch(replica -> replica.getState() == ContainerReplicaProto.State.CLOSED
+            && replica.getSequenceId() != null
+            && replica.getSequenceId() == containerSeq);
   }
 
   private int reconcileToClosed(ContainerID containerID,
