@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyRetention;
 
 /**
  * Parses snapshot diff values without full deserialization.
@@ -112,28 +111,6 @@ public final class SnapshotDiffValueParser {
       case KeyInfo.FILECHECKSUM_FIELD_NUMBER:
       case KeyInfo.ACLS_FIELD_NUMBER:
         updateDigestWithBytes(digest, fieldNumber, input.readBytes());
-        break;
-      case KeyInfo.RETENTION_FIELD_NUMBER:
-        ByteString retentionBytes = input.readBytes();
-        KeyRetention retention = KeyRetention.parseFrom(retentionBytes);
-        boolean clearDate = retention.hasRetentionDate() && retention.getRetentionDate() == 0;
-        boolean clearEnabled = retention.getEventHold().hasEnabled() && retention.getEventHold().getEnabled();
-        if (clearDate || clearEnabled) {
-          KeyRetention.Builder builder = retention.toBuilder();
-          if (clearDate) {
-            builder.clearRetentionDate();
-          }
-          if (clearEnabled) {
-            builder.getEventHoldBuilder().clearEnabled();
-          }
-          retentionBytes = builder.build().toByteString();
-        }
-        updateDigestWithBytes(digest, fieldNumber, retentionBytes);
-        break;
-      case KeyInfo.LEGALHOLD_FIELD_NUMBER:
-        if (input.readBool()) {
-          updateDigestWithBoolean(digest, fieldNumber, true);
-        }
         break;
       case KeyInfo.TAGS_FIELD_NUMBER:
         byte[] tagDigest = parseKeyValueDigest(input.readBytes(), false, null);
