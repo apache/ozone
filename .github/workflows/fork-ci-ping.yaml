@@ -25,7 +25,13 @@ on:
       - synchronize
     branches:
       # the list should match base-branches in fork-ci-status.yaml
+      # the list should match on.pull_request.branches-ignore in post-commit.yml
       - master
+      # feature branches
+      - HDDS-11233
+      - HDDS-11541
+      - HDDS-15728
+      - HDDS-15945-worm
 
 permissions: {}
 
