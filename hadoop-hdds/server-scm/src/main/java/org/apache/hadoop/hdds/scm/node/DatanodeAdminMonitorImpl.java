@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -442,10 +441,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         ReplicationManagerReport report = new ReplicationManagerReport(
             replicationManager.getConfig().getContainerSampleLimit());
         replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
-        boolean replicatedOK = report.getStat(SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED) == 0
-            && report.getStat(SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED) == 0
-            && report.getStat(SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED) == 0
-            && report.getStat(SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_UNDER_REPLICATED) == 0;
+        boolean replicatedOK = !report.hasUnderReplicatedContainers();
 
         if (replicatedOK) {
           sufficientlyReplicated++;
