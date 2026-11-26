@@ -38,11 +38,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.metrics2.impl.MetricsRecordImpl;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -67,6 +72,7 @@ import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Class tests OMKeyCommitRequest class.
@@ -722,6 +728,8 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
         omClientResponse.getOMResponse().getStatus());
+    assertThat(storagePolicyRecords().getRecords()).isEmpty();
+    assertEquals(0, omMetrics.getDataCommittedBytes());
 
     OmBucketInfo bucketInfo = omMetadataManager.getBucketTable()
         .get(omMetadataManager.getBucketKey(volumeName, bucketName));
@@ -980,6 +988,95 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
 
     omKeyInfo = omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout()).get(ozoneKey);
     assertNotNull(omKeyInfo);
+  }
+
+  @Test
+  public void testStoragePolicyMetricsUseAcceptedAllocationEvidence() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    List<KeyLocation> clientLocations = getKeyLocation(3);
+    List<OmKeyLocationInfo> allocated = clientLocations.stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+    allocated.get(0).setStorageTier(StorageTier.SSD);
+    allocated.get(1).setStorageTier(StorageTier.DISK);
+    allocated.get(1).setIsFallBack(true);
+    allocated.get(2).setStorageTier(StorageTier.ARCHIVE);
+    allocated.get(2).setIsFallBack(true);
+    String openKey = addKeyToOpenKeyTable(allocated);
+    Table<String, OmKeyInfo> openTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+    openTable.put(openKey, openTable.get(openKey).toBuilder().setStoragePolicy(OzoneStoragePolicy.HOT).build());
+    dataSize = 400;
+    clientLocations.set(0, clientLocations.get(0).toBuilder().setLength(300).build());
+    clientLocations.set(1, clientLocations.get(1).toBuilder().setLength(100).build());
+    // The unused ARCHIVE allocation must not affect attribution. The client echoes no tier attributes.
+    OMRequest request = doPreExecute(createCommitKeyRequest(clientLocations.subList(0, 2), false));
+    OMClientResponse response = getOmKeyCommitRequest(request).validateAndUpdateCache(ozoneManager, 101L);
+    assertEquals(OK, response.getOMResponse().getStatus());
+    assertEquals(2, storagePolicyRecords().getRecords().size());
+    assertPolicyMetric("HOT", "SSD", "SSD", "preferred", 300);
+    assertPolicyMetric("HOT", "SSD", "DISK", "fallback", 100);
+    assertEquals(400, omMetrics.getDataCommittedBytes());
+    assertNull(openTable.get(openKey));
+    OmKeyInfo committed = omMetadataManager.getKeyTable(getBucketLayout()).get(getOzonePathKey());
+    assertEquals(2, committed.getLatestVersionLocations().getBlocksLatestVersionOnly().size());
+    // A second application cannot count another commit after the open key has been removed.
+    response = getOmKeyCommitRequest(request).validateAndUpdateCache(ozoneManager, 102L);
+    assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
+    assertEquals(2, storagePolicyRecords().getRecords().size());
+    assertPolicyMetric("HOT", "SSD", "SSD", "preferred", 300);
+    assertPolicyMetric("HOT", "SSD", "DISK", "fallback", 100);
+    assertEquals(400, omMetrics.getDataCommittedBytes());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testStoragePolicyMetricsCountFinalCloseOrRecoveryAfterHsync(boolean recovery) throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    List<KeyLocation> locations = getKeyLocation(1);
+    List<OmKeyLocationInfo> allocated = locations.stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+    allocated.get(0).setStorageTier(StorageTier.SSD);
+    String openKey = addKeyToOpenKeyTable(allocated);
+    Table<String, OmKeyInfo> openTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
+    openTable.put(openKey, openTable.get(openKey).toBuilder().setStoragePolicy(OzoneStoragePolicy.HOT).build());
+    dataSize = 200;
+    for (long transaction = 101; transaction <= 102; transaction++) {
+      OMRequest hsync = doPreExecute(createCommitKeyRequest(locations, true));
+      assertEquals(OK, getOmKeyCommitRequest(hsync).validateAndUpdateCache(ozoneManager, transaction)
+          .getOMResponse().getStatus());
+      assertEquals(0, storagePolicyRecords().getRecords().size());
+      assertEquals(0, omMetrics.getDataCommittedBytes());
+      assertEquals(StorageTier.SSD,
+          openTable.get(openKey).getLatestVersionLocations().getBlocksLatestVersionOnly().get(0).getStorageTier());
+    }
+    OMRequest close = createCommitKeyRequest(locations, false);
+    close = close.toBuilder()
+        .setCommitKeyRequest(close.getCommitKeyRequest().toBuilder().setRecovery(recovery)).build();
+    assertEquals(OK, getOmKeyCommitRequest(doPreExecute(close)).validateAndUpdateCache(ozoneManager, 103L)
+        .getOMResponse().getStatus());
+    assertEquals(1, storagePolicyRecords().getRecords().size());
+    assertPolicyMetric("HOT", "SSD", "SSD", "preferred", 200);
+    assertEquals(200, omMetrics.getDataCommittedBytes());
+  }
+
+  private MetricsCollectorImpl storagePolicyRecords() {
+    MetricsCollectorImpl collector = new MetricsCollectorImpl();
+    DefaultMetricsSystem.instance().getSource("OMStoragePolicyMetrics").getMetrics(collector, true);
+    return collector;
+  }
+
+  private void assertPolicyMetric(String policy, String requestedTier, String actualTier, String outcome, long bytes) {
+    MetricsCollectorImpl collector = storagePolicyRecords();
+    List<MetricsRecordImpl> matching = collector.getRecords().stream().filter(record -> {
+      Map<String, String> tags = record.tags().stream()
+          .collect(Collectors.toMap(tag -> tag.name(), tag -> tag.value()));
+      return policy.equals(tags.get("Policy")) && requestedTier.equals(tags.get("RequestedTier"))
+          && actualTier.equals(tags.get("ActualTier")) && outcome.equals(tags.get("Outcome"));
+    }).collect(Collectors.toList());
+    assertThat(matching).hasSize(1);
+    assertThat(matching.get(0).metrics()).singleElement().satisfies(metric -> {
+      assertEquals("CommittedBytes", metric.name());
+      assertEquals(bytes, metric.value().longValue());
+    });
   }
 
   /**

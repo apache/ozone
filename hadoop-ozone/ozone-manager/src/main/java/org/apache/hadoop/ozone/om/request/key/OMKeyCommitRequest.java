@@ -155,6 +155,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     Exception exception = null;
     OmKeyInfo omKeyInfo = null;
+    OmKeyInfo allocatedKeyInfo = null;
     OmBucketInfo omBucketInfo = null;
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
@@ -251,6 +252,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           keyName, writerClientId);
       omKeyInfo =
           omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
+      // Keep the allocated block tiers and fallback flags for successful-commit metrics. No copy is needed: get()
+      // returns a request-private object, later steps rebuild omKeyInfo via toBuilder() (which copies the location
+      // groups) before updating locations, and this reference never enters the table cache or the response.
+      allocatedKeyInfo = omKeyInfo;
       if (omKeyInfo == null) {
         String action = isRecovery ? "recovery" : isHSync ? "hsync" : "commit";
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
@@ -437,7 +442,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       markForAudit(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
               exception, getOmRequest().getUserInfo()));
       processResult(commitKeyRequest, volumeName, bucketName, keyName,
-          omMetrics, exception, omKeyInfo, result);
+          omMetrics, exception, omKeyInfo, allocatedKeyInfo, result);
     }
 
     return omClientResponse;
@@ -472,6 +477,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
    * @param omMetrics        om metrics
    * @param exception        exception trace
    * @param omKeyInfo        omKeyInfo
+   * @param allocatedKeyInfo original open key retaining OM's allocated tiers and fallback flags
    * @param result           stores the result of the execution
    */
   @SuppressWarnings("parameternumber")
@@ -479,6 +485,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
                                String volumeName, String bucketName,
                                String keyName, OMMetrics omMetrics,
                                Exception exception, OmKeyInfo omKeyInfo,
+                               OmKeyInfo allocatedKeyInfo,
                                Result result) {
     switch (result) {
     case SUCCESS:
@@ -494,6 +501,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         omMetrics.incEcKeysTotal();
       }
       omMetrics.incDataCommittedBytes(omKeyInfo.getDataSize());
+      omMetrics.incStoragePolicyCommittedBytes(allocatedKeyInfo, omKeyInfo);
       LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
               bucketName, keyName);
       break;
