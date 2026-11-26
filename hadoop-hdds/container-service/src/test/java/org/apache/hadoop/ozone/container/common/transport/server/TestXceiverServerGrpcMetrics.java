@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server;
 
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -24,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -95,6 +98,23 @@ class TestXceiverServerGrpcMetrics {
       if (registered) {
         metrics.unregister();
       }
+    }
+  }
+
+  @Test
+  void recordsReadExecutorQueueTime() throws Exception {
+    ThreadPoolExecutor readExecutor = new ThreadPoolExecutor(1, 1, 60, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+    XceiverServerGrpcMetrics metrics = new XceiverServerGrpcMetrics(readExecutor, "test-datanode");
+    try {
+      Executor executor = metrics.timedExecutor();
+      CountDownLatch done = new CountDownLatch(2);
+      executor.execute(done::countDown);
+      executor.execute(done::countDown);
+      assertTrue(done.await(10, TimeUnit.SECONDS));
+
+      assertCounter("ReadExecutorQueueTimeNsNumOps", 2L, getMetrics(metrics));
+    } finally {
+      readExecutor.shutdownNow();
     }
   }
 

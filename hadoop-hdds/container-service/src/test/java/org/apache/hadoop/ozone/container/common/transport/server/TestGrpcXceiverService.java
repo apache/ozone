@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server;
 
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,6 +32,10 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -41,6 +47,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ReadBlockContext;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.io.grpc.Context;
+import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -58,12 +65,16 @@ class TestGrpcXceiverService {
   private Path tempDir;
 
   private GrpcXceiverService service;
+  private final ThreadPoolExecutor readExecutor = new ThreadPoolExecutor(1, 1, 60, TimeUnit.SECONDS,
+      new LinkedBlockingQueue<>());
+  private final XceiverServerGrpcMetrics metrics = new XceiverServerGrpcMetrics(readExecutor, "test-datanode");
 
   @AfterEach
   void shutdown() {
     if (service != null) {
       service.shutdown();
     }
+    readExecutor.shutdownNow();
   }
 
   private static ContainerCommandRequestProto readBlockRequest() {
@@ -172,7 +183,7 @@ class TestGrpcXceiverService {
   @Test
   void cancelledCallIsNotDispatched() {
     ContainerDispatcher dispatcher = mock(ContainerDispatcher.class);
-    service = new GrpcXceiverService(dispatcher, IDLE_TIMEOUT, "test-");
+    service = new GrpcXceiverService(dispatcher, IDLE_TIMEOUT, "test-", metrics);
     StreamObserver<ContainerCommandResponseProto> responseObserver = mock(StreamObserver.class);
     StreamObserver<ContainerCommandRequestProto> requestObserver = service.send(responseObserver);
 
@@ -184,5 +195,26 @@ class TestGrpcXceiverService {
     verify(dispatcher, never()).streamDataReadOnly(any(), any(), any(), any());
     verify(dispatcher, never()).dispatch(any(), any());
     verify(responseObserver, never()).onNext(any());
+    assertCounter("SkippedCancelledRequests", 1L, getMetrics(metrics));
+  }
+
+  @Test
+  void countsCallsEndedByDeadlineOrCancellation() {
+    service = new GrpcXceiverService(mock(ContainerDispatcher.class), IDLE_TIMEOUT, "test-", metrics);
+
+    // gRPC cancels the call context when a call ends; only the cause tells how it ended.
+    endCall(null);
+    endCall(new TimeoutException("context timed out"));
+    endCall(Status.CANCELLED.asRuntimeException());
+    endCall(Status.UNAVAILABLE.asRuntimeException());
+
+    assertCounter("DeadlineExceededCalls", 1L, getMetrics(metrics));
+    assertCounter("CancelledCalls", 2L, getMetrics(metrics));
+  }
+
+  private void endCall(Throwable cause) {
+    Context.CancellableContext call = Context.current().withCancellation();
+    call.run(() -> service.send(mock(StreamObserver.class)));
+    call.cancel(cause);
   }
 }

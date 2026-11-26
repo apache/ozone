@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server;
 
+import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -25,6 +27,10 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableQuantiles;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.ratis.thirdparty.io.grpc.Attributes;
@@ -32,7 +38,7 @@ import org.apache.ratis.thirdparty.io.grpc.ServerTransportFilter;
 
 /**
  * Metrics for the datanode read executor shared by gRPC and domain socket reads,
- * and for gRPC client connections.
+ * and for gRPC client connections and calls.
  */
 @Metrics(about = "Datanode read executor and gRPC client connection metrics", context = OzoneConsts.OZONE)
 public final class XceiverServerGrpcMetrics implements MetricsSource {
@@ -42,10 +48,22 @@ public final class XceiverServerGrpcMetrics implements MetricsSource {
   private final ThreadPoolExecutor readExecutor;
   private final AtomicLong activeClientConnections = new AtomicLong();
   private final String sourceName;
+  private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
+  private final MutableRate readExecutorQueueTime = registry.newRate("ReadExecutorQueueTimeNs",
+      "Time a gRPC task waits in the read executor queue before a thread runs it");
+  private final List<MutableQuantiles> readExecutorQueueTimeQuantiles;
+  private final MutableCounterLong skippedCancelledRequests = registry.newCounter("SkippedCancelledRequests",
+      "Requests not served because their call was cancelled or its deadline expired while they were queued", 0L);
+  private final MutableCounterLong deadlineExceededCalls = registry.newCounter("DeadlineExceededCalls",
+      "gRPC calls ended because the client deadline expired", 0L);
+  private final MutableCounterLong cancelledCalls = registry.newCounter("CancelledCalls",
+      "gRPC calls ended because the client cancelled them or the connection closed", 0L);
 
-  XceiverServerGrpcMetrics(ThreadPoolExecutor readExecutor, String datanodeUuid) {
+  XceiverServerGrpcMetrics(ThreadPoolExecutor readExecutor, String datanodeUuid, int... quantileIntervals) {
     this.readExecutor = readExecutor;
     this.sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, datanodeUuid);
+    this.readExecutorQueueTimeQuantiles = MetricUtil.createQuantiles(registry, "ReadExecutorQueueTimeNs",
+        "Time a gRPC task waits in the read executor queue", "ops", "latencyNs", quantileIntervals);
   }
 
   void register() {
@@ -55,6 +73,39 @@ public final class XceiverServerGrpcMetrics implements MetricsSource {
 
   public void unregister() {
     DefaultMetricsSystem.instance().unregisterSource(sourceName);
+    MetricUtil.stop(readExecutorQueueTimeQuantiles);
+  }
+
+  /**
+   * Wraps the read executor so that each task records how long it waited before a thread ran it.
+   */
+  Executor timedExecutor() {
+    return task -> {
+      final long submitNanos = System.nanoTime();
+      readExecutor.execute(() -> {
+        addReadExecutorQueueTime(System.nanoTime() - submitNanos);
+        task.run();
+      });
+    };
+  }
+
+  void addReadExecutorQueueTime(long nanos) {
+    readExecutorQueueTime.add(nanos);
+    for (MutableQuantiles q : readExecutorQueueTimeQuantiles) {
+      q.add(nanos);
+    }
+  }
+
+  void incSkippedCancelledRequests() {
+    skippedCancelledRequests.incr();
+  }
+
+  void incDeadlineExceededCalls() {
+    deadlineExceededCalls.incr();
+  }
+
+  void incCancelledCalls() {
+    cancelledCalls.incr();
   }
 
   ServerTransportFilter newTransportFilter() {
@@ -85,5 +136,6 @@ public final class XceiverServerGrpcMetrics implements MetricsSource {
             "Number of requests waiting in the shared read executor queue"), readExecutor.getQueue().size())
         .addGauge(Interns.info("ActiveClientConnections",
             "Number of active gRPC client connections"), activeClientConnections.get());
+    registry.snapshot(builder, all);
   }
 }

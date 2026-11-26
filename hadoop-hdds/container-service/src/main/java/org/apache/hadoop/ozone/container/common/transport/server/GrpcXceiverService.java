@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.transport.server;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.getSendMethod;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.time.Duration;
 import java.util.concurrent.Executors;
@@ -26,6 +27,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -60,13 +62,21 @@ public class GrpcXceiverService extends
   // This timer closes the file of any stream idle for longer than the timeout; the next request reopens it.
   private final long streamReadFileIdleTimeoutNanos;
   private final ScheduledExecutorService idleFileCloser;
+  private final XceiverServerGrpcMetrics metrics;
   private final ZeroCopyMessageMarshaller<ContainerCommandRequestProto>
       zeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
           ContainerCommandRequestProto.getDefaultInstance());
 
+  @VisibleForTesting
   public GrpcXceiverService(ContainerDispatcher dispatcher, Duration streamReadFileIdleTimeout,
       String threadNamePrefix) {
+    this(dispatcher, streamReadFileIdleTimeout, threadNamePrefix, null);
+  }
+
+  public GrpcXceiverService(ContainerDispatcher dispatcher, Duration streamReadFileIdleTimeout,
+      String threadNamePrefix, XceiverServerGrpcMetrics metrics) {
     this.dispatcher = dispatcher;
+    this.metrics = metrics;
     this.streamReadFileIdleTimeoutNanos = streamReadFileIdleTimeout.toNanos();
     this.idleFileCloser = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setDaemon(true)
         .setNameFormat(threadNamePrefix + "ReadBlockIdleFileCloser").build());
@@ -117,6 +127,18 @@ public class GrpcXceiverService extends
   @Override
   public StreamObserver<ContainerCommandRequestProto> send(
       StreamObserver<ContainerCommandResponseProto> responseObserver) {
+    if (metrics != null) {
+      // gRPC cancels the call context when the call ends: with no cause on success,
+      // with a TimeoutException when the deadline expires, and with another cause otherwise.
+      Context.current().addListener(call -> {
+        final Throwable cause = call.cancellationCause();
+        if (cause instanceof TimeoutException) {
+          metrics.incDeadlineExceededCalls();
+        } else if (cause != null) {
+          metrics.incCancelledCalls();
+        }
+      }, Runnable::run);
+    }
     return new StreamObserver<ContainerCommandRequestProto>() {
       private final AtomicBoolean isClosed = new AtomicBoolean(false);
       private final ReadBlockContext readBlockContext = new ReadBlockContext();
@@ -182,6 +204,9 @@ public class GrpcXceiverService extends
             // The client deadline expired, or the call was cancelled, while the request waited for a thread.
             // Nobody waits for the response, so do not spend disk I/O on it.
             LOG.debug("Skip {} of a cancelled call", request.getCmdType());
+            if (metrics != null) {
+              metrics.incSkippedCancelledRequests();
+            }
             return;
           }
           if (request.getCmdType() == Type.ReadBlock) {
