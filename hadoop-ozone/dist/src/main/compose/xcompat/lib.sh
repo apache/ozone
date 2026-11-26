@@ -15,6 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -u -o pipefail
+
+: "${BATCH_VERSION:="2.3.0"}"
+
 client() {
   if [[ "${client_version}" == "${current_version}" ]]; then
     OZONE_DIR=/opt/hadoop
@@ -69,10 +73,14 @@ _test_checkpoint_compatibility() {
 #   reader=writer
 # printing to stdout.
 #
-# A combination is tested if it is related to the current version in any way:
+# Ideally a combination should be tested if it is related to the current
+# version in any way:
 # - cluster running
 # - client who wrote the data
 # - client to read the data
+#
+# But due to `ozone` command overhead, old clients read other old writes
+# only if they support batch execution.
 get_read_version_combinations() {
   [[ -n "${cluster_version}" ]] || return 1
   [[ -n "${current_version}" ]] || return 2
@@ -81,11 +89,18 @@ get_read_version_combinations() {
   local all_versions="$old_versions $current_version"
   local reader writer
   for reader in ${all_versions}; do
+    local batch_reader=$(python3 -c "print(str('${reader}' >= '${BATCH_VERSION}').lower())")
     for writer in ${all_versions}; do
-      if [[ "${cluster_version}" == "${current_version}" ]] \
-          || [[ "${reader}" == "${current_version}" ]] \
+      if [[ "${reader}" == "${current_version}" ]] \
           || [[ "${writer}" == "${current_version}" ]]; then
         echo "$reader=$writer"
+      fi
+      if [[ "${cluster_version}" == "${current_version}" ]]; then
+        # batch reader, or own data
+        if [[ "${batch_reader}" == "true" ]] \
+            || [[ "${writer}" == "${reader}" ]]; then
+          echo "$reader=$writer"
+        fi
       fi
     done
   done | sort --reverse --unique

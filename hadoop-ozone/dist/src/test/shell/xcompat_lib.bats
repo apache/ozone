@@ -33,12 +33,12 @@ load ../../main/compose/xcompat/lib.sh
     assert_output # is not empty
 
     # old clients read new data
-    assert_line '1.2.3=7.8.9'
-    assert_line '4.5.6=7.8.9'
+    assert_line "1.2.3=${current_version}"
+    assert_line "4.5.6=${current_version}"
     # new client reads all data
-    assert_line '7.8.9=1.2.3'
-    assert_line '7.8.9=4.5.6'
-    assert_line '7.8.9=7.8.9'
+    assert_line "${current_version}=1.2.3"
+    assert_line "${current_version}=4.5.6"
+    assert_line "${current_version}=${current_version}"
 
     assert_equal "$(wc -l <<< "$output")" '5'
   done
@@ -48,18 +48,24 @@ load ../../main/compose/xcompat/lib.sh
   old_versions="1.2.3 4.5.6"
   current_version="7.8.9"
   cluster_version="${current_version}"
+  BATCH_VERSION="4.4.4"
 
   run get_read_version_combinations
   assert_output # is not empty
 
   all="${old_versions} ${current_version}"
+  batch="4.5.6 ${current_version}"
 
-  # each client reads all data
-  for r in ${all}; do
+  # old client reads own and new data
+  assert_line "1.2.3=1.2.3"
+  assert_line "1.2.3=${current_version}"
+
+  # batch client reads all data
+  for r in ${batch}; do
     for w in ${all}; do
       assert_line "$r=$w"
     done
   done
 
-  assert_equal "$(wc -l <<< "$output")" '9'
+  assert_equal "$(wc -l <<< "$output")" '8'
 }
