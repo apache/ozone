@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_RE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_OM_VERSION_REFRESH_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.getOmVersion;
 import static org.apache.hadoop.ozone.client.rpc.RpcClient.validateOmVersion;
+import static org.apache.ozone.test.MetricsAsserts.assertQuantileGauges;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -649,6 +650,21 @@ public class TestRpcClient {
       }
     }
     assertThat(DefaultMetricsSystem.instance().getSource(OmClientMetrics.SOURCE_NAME)).isNull();
+  }
+
+  @Test
+  void omMetricsUseClientPercentileIntervals() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OMClientConfig omClientConfig = conf.getObject(OMClientConfig.class);
+    omClientConfig.setMetricsPercentilesIntervals("300");
+    conf.setFromObject(omClientConfig);
+    RpcClient client = createRpcClient(new MockOmTransport(), conf);
+    try (OmClientMetrics.Handle observer = OmClientMetrics.acquireHandle(new OMClientConfig())) {
+      client.getOzoneManagerClient().getServiceInfo();
+      assertQuantileGauges("ServiceListLatencyNs300s", getMetrics(observer.metrics()), "Time");
+    } finally {
+      client.close();
+    }
   }
 
   @Test
