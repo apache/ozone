@@ -277,20 +277,28 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
   private String formatStorageTypeStatusInfo(List<ContainerBalancerStorageTypeStatusInfoProto> storageTypes) {
     StringBuilder builder = new StringBuilder();
     for (ContainerBalancerStorageTypeStatusInfoProto info : storageTypes) {
-      builder.append(String.format("%-50s %n", "Storage type: "
-          + (info.hasStorageType() ? info.getStorageType().name() : "UNKNOWN")));
-      builder.append(String.format("  %-48s %s%n", "Size scheduled to move", byteDesc(info.getSizeScheduledForMove())));
-      builder.append(String.format("  %-48s %s%n", "Moved data size", byteDesc(info.getDataSizeMoved())));
-      builder.append(String.format("  %-48s %d%n", "Scheduled to move containers", info.getContainerMovesScheduled()));
-      builder.append(String.format("  %-48s %d%n", "Already moved containers", info.getContainerMovesCompleted()));
-      builder.append(String.format("  %-48s %d%n", "Failed to move containers", info.getContainerMovesFailed()));
-      builder.append(String.format("  %-48s %d%n", "Failed to move containers by timeout",
-          info.getContainerMovesTimeout()));
-      builder.append(String.format("  %-48s %d%n", "Unique datanodes involved", info.getNumDatanodesInvolved()));
-      builder.append(String.format("  %-48s %d%n", "Unbalanced datanodes", info.getNumDatanodesUnbalanced()));
-      builder.append(String.format("  %-48s %s%n", "Imbalance data size", byteDesc(info.getDataSizeUnbalanced())));
-      builder.append(formatNodeTraffic("Entered data to nodes", " <- ", info.getSizeEnteringNodesList()));
-      builder.append(formatNodeTraffic("Exited data from nodes", " -> ", info.getSizeLeavingNodesList()));
+      builder.append(String.format("%-50s %n"
+              + "  %-48s %s%n"
+              + "  %-48s %s%n"
+              + "  %-48s %d%n"
+              + "  %-48s %d%n"
+              + "  %-48s %d%n"
+              + "  %-48s %d%n"
+              + "  %-48s %d%n"
+              + "  %-48s %d%n"
+              + "  %-48s %s%n",
+              "Storage type: " + (info.hasStorageType() ? info.getStorageType().name() : "UNKNOWN"),
+              "Size scheduled to move", byteDesc(info.getSizeScheduledForMove()),
+              "Moved data size", byteDesc(info.getDataSizeMoved()),
+              "Scheduled to move containers", info.getContainerMovesScheduled(),
+              "Already moved containers", info.getContainerMovesCompleted(),
+              "Failed to move containers", info.getContainerMovesFailed(),
+              "Failed to move containers by timeout", info.getContainerMovesTimeout(),
+              "Unique datanodes involved", info.getNumDatanodesInvolved(),
+              "Unbalanced datanodes", info.getNumDatanodesUnbalanced(),
+              "Imbalance data size", byteDesc(info.getDataSizeUnbalanced())))
+          .append(formatNodeTraffic("Entered data to nodes", " <- ", info.getSizeEnteringNodesList()))
+          .append(formatNodeTraffic("Exited data from nodes", " -> ", info.getSizeLeavingNodesList()));
     }
     return builder.toString();
   }
