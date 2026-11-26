@@ -97,6 +97,7 @@ public final class MetricsLeakAssertion {
       "SCMContainerManagerMetrics",
       "SafeModeMetrics",
       "ContainerBalancerMetrics",
+      "ContainerBalancerStorageTypeMetrics", // companion of ContainerBalancerMetrics, registered in the same create()
       "NodeDecommissionMetrics",
       "SCMDatanodeProtocol",
       "ScmBlockLocationProtocol",
