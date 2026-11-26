@@ -119,6 +119,14 @@ public final class RegisterEndpointTask implements
         Preconditions.assertTrue(!StringUtils.isBlank(response.getClusterID()),
             "Invalid cluster ID in the response.");
         if (response.getErrorCode() == errorNodeNotPermitted) {
+          if (rpcEndPoint.isPassive()) {
+            // Recon is a passive observability component; its rejection does not block
+            // datanode operation. Stay in REGISTER so the next cycle retries.
+            LOG.warn("Recon at {} rejected this datanode's registration. " +
+                "This does not affect the datanode's operation. " +
+                "Check Recon logs for details.", rpcEndPoint.getAddressString());
+            return rpcEndPoint.getState();
+          }
           LOG.error("SCM rejected this datanode's registration " +
               "with software version {} and apparent version {}. " +
               "This datanode will shut down. Check SCM logs for details and verify that the " +

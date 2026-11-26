@@ -88,7 +88,16 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckAcls(ozoneManager, newKeyArgs);
+    KeyArgs resolvedArgs;
+    try {
+      resolvedArgs = resolveBucketAndCheckAcls(ozoneManager, newKeyArgs);
+    } catch (IOException ex) {
+      markForAudit(ozoneManager.getAuditLogger(),
+          buildAuditMessage(OMAction.DELETE_KEY,
+              buildLightKeyArgsAuditMap(resolveBucketLinkForAudit(ozoneManager, newKeyArgs.build())), ex,
+              getOmRequest().getUserInfo()));
+      throw ex;
+    }
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
             .setKeyArgs(resolvedArgs))
@@ -147,6 +156,11 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       }
 
       validateIfMatchETag(keyArgs, omKeyInfo);
+      if (deleteKeyRequest.hasUpdateID() && omKeyInfo.getUpdateID() != deleteKeyRequest.getUpdateID()) {
+        throw new OMException("UpdateID does not match. Key: " + keyName +
+            ", Expected UpdateID: " + omKeyInfo.getUpdateID() +
+            ", Given UpdateID: " + deleteKeyRequest.getUpdateID(), OMException.ResultCodes.UPDATE_ID_NOT_MATCH);
+      }
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()

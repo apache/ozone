@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -120,16 +121,18 @@ public final class MoveManager implements
    * @param containerInfo The container for which to move a replica
    * @param src source datanode to copy the replica from
    * @param tgt target datanode to copy the replica to
+   * @param ret completion future for the move
+   * @param storageType selected destination type, or null for a legacy untyped copy
    */
   private void startMove(
       final ContainerInfo containerInfo, final DatanodeDetails src,
-      final DatanodeDetails tgt, final CompletableFuture<MoveResult> ret) {
+      final DatanodeDetails tgt, final CompletableFuture<MoveResult> ret, StorageType storageType) {
     MoveOperation move = pendingMoves.putIfAbsent(containerInfo.containerID(),
         new MoveOperation(ret, new MoveDataNodePair(src, tgt)));
     if (move == null) {
       // A move for this container did not exist, so send a replicate command
       try {
-        sendReplicateCommand(containerInfo, tgt, src);
+        sendReplicateCommand(containerInfo, tgt, src, storageType);
       } catch (Exception e) {
         LOG.error("Unable to schedule the replication command for container {}",
             containerInfo, e);
@@ -157,6 +160,13 @@ public final class MoveManager implements
       ContainerID cid, DatanodeDetails src, DatanodeDetails tgt)
       throws ContainerNotFoundException, NodeNotFoundException,
       ContainerReplicaNotFoundException {
+    return move(cid, src, tgt, null);
+  }
+
+  /** Moves a replica onto the selected storage type; null retains the legacy untyped copy. */
+  CompletableFuture<MoveResult> move(ContainerID cid, DatanodeDetails src, DatanodeDetails tgt,
+      StorageType storageType)
+      throws ContainerNotFoundException, NodeNotFoundException, ContainerReplicaNotFoundException {
     CompletableFuture<MoveResult> ret = new CompletableFuture<>();
 
     // Ensure src and tgt are IN_SERVICE and HEALTHY
@@ -192,6 +202,14 @@ public final class MoveManager implements
       }
       if (srcReplica == null) {
         ret.complete(MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE);
+        return ret;
+      }
+
+      if (storageType != null && (srcReplica.getTargetStorageTypeForCopy() != storageType
+          || srcReplica.hasConflictingStorageTypes())) {
+        LOG.warn("Cannot move container {} from {} to {} on {}: source reports replica type {} and volume type {}",
+            cid, src, tgt, storageType, srcReplica.getStorageType(), srcReplica.getVolumeStorageType());
+        ret.complete(MoveResult.REPLICATION_FAIL_STORAGE_TYPE_MISMATCH);
         return ret;
       }
 
@@ -266,7 +284,7 @@ public final class MoveManager implements
         ret.complete(afterHealth);
         return ret;
       }
-      startMove(containerInfo, src, tgt, ret);
+      startMove(containerInfo, src, tgt, ret, storageType);
       LOG.debug("Processed a move request for container {}, from {} to {}",
           cid, src, tgt);
       return ret;
@@ -457,17 +475,23 @@ public final class MoveManager implements
    * @param containerInfo ContainerInfo to be replicated
    * @param tgt The destination datanode to replicate to
    * @param src The source node to replicate from
+   * @param storageType selected destination type, or null for a legacy untyped copy
    */
   private void sendReplicateCommand(
       final ContainerInfo containerInfo, final DatanodeDetails tgt,
-      final DatanodeDetails src)
+      final DatanodeDetails src, StorageType storageType)
       throws ContainerReplicaNotFoundException, ContainerNotFoundException,
       NotLeaderException {
     int replicaIndex = getContainerReplicaIndex(
         containerInfo.containerID(), src);
     long now = clock.millis();
-    replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-        replicaIndex, src, tgt, now + replicationTimeout);
+    if (storageType == null) {
+      replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
+          replicaIndex, src, tgt, now + replicationTimeout);
+    } else {
+      replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
+          replicaIndex, src, tgt, now + replicationTimeout, storageType);
+    }
     pendingMoves.get(containerInfo.containerID()).setMoveStartTime(now);
   }
 
@@ -573,6 +597,8 @@ public final class MoveManager implements
     FAIL_LEADER_NOT_READY,
     // replication fail because the container does not exist in src
     REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
+    /** Source type changed or is incompatible with the selected destination type. */
+    REPLICATION_FAIL_STORAGE_TYPE_MISMATCH,
     // replication fail because the container exists in target
     REPLICATION_FAIL_EXIST_IN_TARGET,
     // replication fail because the container is not cloesed

@@ -18,26 +18,31 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.protobuf.RpcController;
-import io.grpc.Status;
-import java.io.IOException;
+import com.google.protobuf.ServiceException;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OMGrpcError;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.OzoneManagerServiceGrpcBinding;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc.OzoneManagerServiceImplBase;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.util.UUIDUtil;
+import org.apache.ratis.thirdparty.io.grpc.BindableService;
+import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Grpc Service for handling S3 gateway OzoneManagerProtocol client requests.
  */
-public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
+public class OzoneManagerServiceGrpc implements BindableService {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerServiceGrpc.class);
   /**
@@ -65,9 +70,11 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
   }
 
   @Override
-  public void submitRequest(OMRequest request,
-                            io.grpc.stub.StreamObserver<OMResponse>
-                                responseObserver) {
+  public ServerServiceDefinition bindService() {
+    return OzoneManagerServiceGrpcBinding.bindService(this::submitRequest);
+  }
+
+  public void submitRequest(OMRequest request, StreamObserver<OMResponse> responseObserver) {
     LOG.debug("OzoneManagerServiceGrpc: OzoneManagerServiceImplBase " +
         "processing s3g client submit request - for command {}",
         request.getCmdType().name());
@@ -108,10 +115,9 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
       responseObserver.onNext(omResponse);
     } catch (Throwable e) {
       LOG.error("Failed to submit request", e);
-      IOException ex = new IOException(e.getCause());
-      responseObserver.onError(
-          Status.INTERNAL.withDescription(ex.getMessage())
-              .asRuntimeException());
+      Throwable omException =
+          e instanceof ServiceException ? ProtobufHelper.getRemoteException((ServiceException) e) : e;
+      responseObserver.onError(OMGrpcError.toStatusRuntimeException(omException));
       return;
     }
     responseObserver.onCompleted();

@@ -47,6 +47,7 @@
     <module>integration-test-recon</module>
     <module>integration-test-s3</module>
     <module>integration-test-tools</module>
+    <module>integration-test-utils</module>
     <module>interface-client</module>
     <module>interface-storage</module>
     <module>mini-cluster</module>
@@ -121,13 +122,6 @@
       <modules>
         <module>ozonefs-hadoop2</module>
         <module>ozonefs-hadoop3</module>
-        <module>ozonefs-shaded</module>
-      </modules>
-    </profile>
-    <profile>
-      <id>go-offline</id>
-      <modules>
-        <module>ozonefs-hadoop2</module>
         <module>ozonefs-shaded</module>
       </modules>
     </profile>

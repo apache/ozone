@@ -21,14 +21,38 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests for {@link ContainerReplica}.
  */
 class TestContainerReplica {
+
+  @ParameterizedTest
+  @CsvSource(value = {"SSD,SSD,SSD", "SSD,DISK,SSD", "SSD,NULL,SSD", "NULL,SSD,SSD", "NULL,NULL,NULL"},
+      nullValues = "NULL")
+  void resolvesCopyTypeWithoutReplacingRecordedIntent(StorageType recorded, StorageType volume, StorageType expected) {
+    ContainerReplica replica = ContainerReplica.newBuilder().setContainerID(ContainerID.valueOf(1))
+        .setContainerState(CLOSED).setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+        .setStorageType(recorded).setVolumeStorageType(volume).build();
+    assertEquals(expected, replica.getTargetStorageTypeForCopy());
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {"SSD,DISK,true", "SSD,SSD,false", "SSD,NULL,false", "NULL,SSD,false", "NULL,NULL,false"},
+      nullValues = "NULL")
+  void detectsConflictOnlyWhenBothTypesAreKnownAndDiffer(StorageType recorded, StorageType volume,
+      boolean expected) {
+    ContainerReplica replica = ContainerReplica.newBuilder().setContainerID(ContainerID.valueOf(1))
+        .setContainerState(CLOSED).setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+        .setStorageType(recorded).setVolumeStorageType(volume).build();
+    assertEquals(expected, replica.hasConflictingStorageTypes());
+  }
 
   @Test
   void toBuilder() {

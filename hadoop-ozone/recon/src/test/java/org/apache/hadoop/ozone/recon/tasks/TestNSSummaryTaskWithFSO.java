@@ -34,7 +34,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -42,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskDbEventHandler.ProcessResult;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -230,7 +230,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
   @Nested
   public class TestProcess {
 
-    private Pair<Integer, Boolean> result;
+    private ProcessResult result;
 
     @BeforeEach
     public void setUp() throws IOException {
@@ -409,6 +409,69 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
       // after renaming dir1, check its new name
       assertEquals(DIR_ONE_RENAME, nsSummaryForDir1.getDirName());
+
+      // the deleted dir 3 must still be unlinked from its parent
+      NSSummary nsSummaryForDir3 = getReconNamespaceSummaryManager().getNSSummary(DIR_THREE_OBJECT_ID);
+      assertNotNull(nsSummaryForDir3);
+      assertEquals(0, nsSummaryForDir3.getParentId());
+    }
+
+    @Test
+    public void testProcessDirRenameInEitherEventOrder() throws IOException {
+      // rename dir2 within dir1 and to bucket 2, with the PUT of the new key processed before and after the DELETE
+      assertDirTwoRename(DIR_ONE_OBJECT_ID, "dir2_new", true);
+      assertDirTwoRename(DIR_ONE_OBJECT_ID, "dir2_new", false);
+      assertDirTwoRename(BUCKET_TWO_OBJECT_ID, DIR_TWO, true);
+      assertDirTwoRename(BUCKET_TWO_OBJECT_ID, DIR_TWO, false);
+    }
+
+    private void assertDirTwoRename(long newParentId, String newName, boolean putFirst) throws IOException {
+      getReconNamespaceSummaryManager().clearNSSummaryTable();
+      nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager());
+      long oldParentId = DIR_ONE_OBJECT_ID;
+      boolean sameParent = newParentId == oldParentId;
+      NSSummary oldParentBefore = getReconNamespaceSummaryManager().getNSSummary(oldParentId);
+      NSSummary newParentBefore = getReconNamespaceSummaryManager().getNSSummary(newParentId);
+      int oldParentFiles = oldParentBefore.getNumOfFiles();
+      long oldParentSize = oldParentBefore.getSizeOfFiles();
+      int newParentFiles = newParentBefore.getNumOfFiles();
+      long newParentSize = newParentBefore.getSizeOfFiles();
+
+      OMDBUpdateEvent deleteEvent = new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(oldParentId + OM_KEY_PREFIX + DIR_TWO)
+          .setValue(buildOmDirInfo(DIR_TWO, DIR_TWO_OBJECT_ID, oldParentId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build();
+      OMDBUpdateEvent putEvent = new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(newParentId + OM_KEY_PREFIX + newName)
+          .setValue(buildOmDirInfo(newName, DIR_TWO_OBJECT_ID, newParentId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build();
+      List<OMDBUpdateEvent> events = putFirst ? Arrays.asList(putEvent, deleteEvent)
+          : Arrays.asList(deleteEvent, putEvent);
+      ProcessResult renameResult = nSSummaryTaskWithFso.processWithFSO(new OMUpdateEventBatch(events, 0L), 0);
+      Assertions.assertTrue(renameResult.success());
+
+      String desc = "newParent=" + newParentId + ", newName=" + newName + ", putFirst=" + putFirst;
+      NSSummary dirTwo = getReconNamespaceSummaryManager().getNSSummary(DIR_TWO_OBJECT_ID);
+      assertEquals(newParentId, dirTwo.getParentId(), desc);
+      assertEquals(newName, dirTwo.getDirName(), desc);
+
+      NSSummary oldParent = getReconNamespaceSummaryManager().getNSSummary(oldParentId);
+      NSSummary newParent = getReconNamespaceSummaryManager().getNSSummary(newParentId);
+      assertEquals(sameParent, oldParent.getChildDir().contains(DIR_TWO_OBJECT_ID), desc);
+      Assertions.assertTrue(newParent.getChildDir().contains(DIR_TWO_OBJECT_ID), desc);
+      if (sameParent) {
+        assertEquals(oldParentFiles, oldParent.getNumOfFiles(), desc);
+        assertEquals(oldParentSize, oldParent.getSizeOfFiles(), desc);
+      } else {
+        assertEquals(oldParentFiles - 1, oldParent.getNumOfFiles(), desc);
+        assertEquals(oldParentSize - KEY_THREE_SIZE, oldParent.getSizeOfFiles(), desc);
+        assertEquals(newParentFiles + 1, newParent.getNumOfFiles(), desc);
+        assertEquals(newParentSize + KEY_THREE_SIZE, newParent.getSizeOfFiles(), desc);
+      }
     }
 
     @Test
@@ -437,13 +500,10 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
       // Assertions
       Assertions.assertNotNull(result, "Result should not be null");
-      // Why seekPos should be 7 ? because we have threshold value for flush is set as 3,
-      // and we have total 7 events, so nsSummaryMap will be flushed in 2 batches and
-      // during second batch flush, eventCounter will be 6, then last event7 alone will
-      // be flushed out of loop as remaining event. At every batch flush based on threshold,
-      // seekPos is set as equal to eventCounter + 1, so  seekPos will be 7.
-      Assertions.assertEquals(7, result.getLeft(), "seekPos should be 7");
-      Assertions.assertTrue(result.getRight(), "The processing should fail due to flush failure");
+      // Why seekPos should be 7 ? because all 7 events of the batch are committed,
+      // so a retry has nothing left to apply.
+      Assertions.assertEquals(7, result.seekPosition(), "seekPos should be 7");
+      Assertions.assertTrue(result.success(), "The processing should fail due to flush failure");
     }
 
     @Test
@@ -513,11 +573,11 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
           .flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
 
       // Call the method under test
-      Pair<Integer, Boolean> result1 = taskSpy.processWithFSO(events, 0);
+      ProcessResult result1 = taskSpy.processWithFSO(events, 0);
 
       // Assertions
       Assertions.assertNotNull(result1, "Result should not be null");
-      Assertions.assertEquals(0, result1.getLeft(), "seekPos should be 4");
+      Assertions.assertEquals(3, result1.seekPosition(), "seekPos should be 3");
 
       // Verify interactions
       Mockito.verify(mockIterator, Mockito.times(3)).next();

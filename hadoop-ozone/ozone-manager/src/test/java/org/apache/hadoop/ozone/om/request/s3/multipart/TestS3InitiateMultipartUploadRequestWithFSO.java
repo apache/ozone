@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -28,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -40,6 +43,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests S3 Initiate Multipart Upload request.
@@ -144,6 +149,34 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
             .getKeyArgs().getModificationTime(),
         omKeyInfo
             .getCreationTime());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"file/child", "file/missing/child", "file"})
+  public void testInitiateMultipartUploadWithExistingFile(String keyName) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    OmKeyInfo fileInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "file",
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setParentObjectID(bucketId).build();
+    OMRequestTestUtils.addFileToKeyTable(false, false, "file", fileInfo, 0L, 0L, omMetadataManager);
+
+    OMRequest request = doPreExecuteInitiateMPUWithFSO(volumeName, bucketName, keyName);
+    OMClientResponse response = getS3InitiateMultipartUploadReq(request).validateAndUpdateCache(ozoneManager, 100L);
+    boolean overwrite = keyName.equals("file");
+    assertEquals(overwrite ? OzoneManagerProtocolProtos.Status.OK : OzoneManagerProtocolProtos.Status.NOT_A_FILE,
+        response.getOMResponse().getStatus());
+    if (!overwrite) {
+      String uploadId = request.getInitiateMultiPartUploadRequest().getKeyArgs().getMultipartUploadID();
+      assertNull(omMetadataManager.getMultipartInfoTable()
+          .get(omMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadId)));
+      assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout()).get(omMetadataManager.getMultipartKey(
+          omMetadataManager.getVolumeId(volumeName), bucketId, bucketId, "child", uploadId)));
+      assertEquals(0L, omMetadataManager.getBucketTable()
+          .get(omMetadataManager.getBucketKey(volumeName, bucketName)).getUsedNamespace());
+    }
   }
 
   private long verifyDirectoriesInDB(List<String> dirs, final long volumeId,

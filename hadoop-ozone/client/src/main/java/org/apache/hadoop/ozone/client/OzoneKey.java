@@ -72,6 +72,11 @@ public class OzoneKey {
   private final boolean isFile;
 
   /**
+   * Name of the KMS key the data is encrypted with, null if the key is not encrypted or it is not known.
+   */
+  private String encryptionKeyName;
+
+  /**
    * Storage policy the key was created with. Null for keys written before storage
    * policy support.
    */
@@ -241,6 +246,14 @@ public class OzoneKey {
   }
 
   /**
+   * Returns the name of the KMS key the data is encrypted with, null if the key is not encrypted or it is not known.
+   */
+  @JsonIgnore
+  public String getEncryptionKeyName() {
+    return encryptionKeyName;
+  }
+
+  /**
    * Returns the storage policy the key was created with, or null when the key
    * predates storage policy support.
    */
@@ -253,11 +266,15 @@ public class OzoneKey {
    *
    */
   public static OzoneKey fromKeyInfo(OmKeyInfo keyInfo) {
-    return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
+    final OzoneKey key = new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
         keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getOwnerName(),
         keyInfo.getTags(), keyInfo.getStoragePolicy());
+    if (keyInfo.getFileEncryptionInfo() != null) {
+      key.encryptionKeyName = keyInfo.getFileEncryptionInfo().getKeyName();
+    }
+    return key;
   }
 
 }

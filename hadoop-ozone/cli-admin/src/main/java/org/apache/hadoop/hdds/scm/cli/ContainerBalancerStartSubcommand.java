@@ -31,7 +31,8 @@ import picocli.CommandLine.Option;
  */
 @Command(
     name = "start",
-    description = "Start ContainerBalancer",
+    description = "Start ContainerBalancer. With complete storage-type usage reports, balance replicas " +
+        "within each storage type while sharing iteration and datanode limits.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerStartSubcommand extends ScmSubcommand {

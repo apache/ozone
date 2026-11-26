@@ -31,7 +31,10 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.ozone.test.ClusterForTests;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
@@ -43,6 +46,7 @@ import software.amazon.awssdk.services.s3.model.UploadPartResponse;
  * S3 writes that request a storage class record the class's storage policy on the key. Every datanode has DISK, SSD
  * and ARCHIVE volumes, so a COLD key can be placed.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestS3StorageClassWrite extends ClusterForTests<MiniOzoneCluster> {
 
   private static final ReplicationConfig RATIS_THREE =
@@ -50,6 +54,16 @@ class TestS3StorageClassWrite extends ClusterForTests<MiniOzoneCluster> {
   private static final String CONTENT = "storage-class";
 
   private final S3GatewayService s3g = new S3GatewayService();
+
+  @BeforeAll
+  void beforeAll() throws Exception {
+    startCluster();
+  }
+
+  @AfterAll
+  void afterAll() {
+    shutdownCluster();
+  }
 
   @Override
   protected MiniOzoneCluster createCluster() throws Exception {

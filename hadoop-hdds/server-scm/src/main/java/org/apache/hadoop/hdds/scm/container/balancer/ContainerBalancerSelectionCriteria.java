@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import jakarta.annotation.Nullable;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -28,6 +30,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -60,12 +63,15 @@ public class ContainerBalancerSelectionCriteria {
   private Set<ContainerID> excludeContainers;
   private Set<ContainerID> includeContainers;
   // excludeContainersDueToFailure: Containers excluded for current iteration only.
+  // excludeContainersDueToStorageTypeMismatch: Excluded for current iteration only, and only for the storage type whose
+  // source replica no longer matched, so the container's replicas on other storage types can still be balanced.
   // excludeContainersNotFound: Container exclusions persist across iterations.
   private final Set<ContainerID> excludeContainersDueToFailure;
+  private final Map<StorageType, Set<ContainerID>> excludeContainersDueToStorageTypeMismatch;
   private final Set<ContainerID> excludeContainersNotFound;
   private final Map<ContainerID, ContainerHealthResult.HealthState> excludeContainersDueToHealth;
   private FindSourceStrategy findSourceStrategy;
-  private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
+  private Map<DatanodeDetails, Map<StorageType, NavigableSet<ContainerID>>> setMap;
 
   // Capped to avoid unbounded growth in long-running or unlimited-iteration runs.
   private static final int MAX_NOT_FOUND_CONTAINERS = 10_000;
@@ -95,6 +101,7 @@ public class ContainerBalancerSelectionCriteria {
     this.containerManager = containerManager;
     this.containerToSourceMap = containerToSourceMap;
     this.excludeContainersDueToFailure = new HashSet<>();
+    this.excludeContainersDueToStorageTypeMismatch = new EnumMap<>(StorageType.class);
     this.excludeContainersNotFound = excludeContainersNotFound;
     this.excludeContainersDueToHealth = new LinkedHashMap<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
@@ -122,12 +129,20 @@ public class ContainerBalancerSelectionCriteria {
    * @return cached Navigable ContainerID Set
    */
   public Set<ContainerID> getContainerIDSet(DatanodeDetails node) {
+    return getContainerIDSet(node, null);
+  }
+
+  /**
+   * Returns candidates cached separately for each source and storage type, so pruning one type cannot affect another.
+   * A null storage type retains the legacy candidate set for all storage types.
+   */
+  public Set<ContainerID> getContainerIDSet(DatanodeDetails node, @Nullable StorageType storageType) {
     // Check if the node is registered at the beginning
     if (!nodeManager.isNodeRegistered(node)) {
       return Collections.emptySet();
     }
-    Set<ContainerID> containers = setMap.computeIfAbsent(node,
-        this::getCandidateContainers);
+    Set<ContainerID> containers = setMap.computeIfAbsent(node, ignored -> new HashMap<>())
+        .computeIfAbsent(storageType, ignored -> getCandidateContainers(node, storageType));
     return containers != null ? containers : Collections.emptySet();
   }
 
@@ -190,6 +205,21 @@ public class ContainerBalancerSelectionCriteria {
    */
   public boolean shouldBeExcluded(ContainerID containerID,
       DatanodeDetails node, long sizeMovedAlready) {
+    return shouldBeExcluded(containerID, node, sizeMovedAlready, null);
+  }
+
+  /**
+   * As {@link #shouldBeExcluded(ContainerID, DatanodeDetails, long)}, but also
+   * excludes containers whose replica on {@code node} is not on
+   * {@code storageType}. The balancer uses this to move data within one storage
+   * tier at a time, so a move never relocates data to a different tier.
+   *
+   * @param storageType the storage type being balanced, or null to consider
+   *                    containers on any storage type
+   */
+  public boolean shouldBeExcluded(ContainerID containerID,
+      DatanodeDetails node, long sizeMovedAlready,
+      @Nullable StorageType storageType) {
     ContainerInfo container;
     //If includeContainers is specified, exclude containers not in the include list
     if (!includeContainers.isEmpty() && !includeContainers.contains(containerID)) {
@@ -206,6 +236,7 @@ public class ContainerBalancerSelectionCriteria {
 
     if (excludeContainers.contains(containerID) ||
         excludeContainersDueToFailure.contains(containerID) ||
+        isExcludedDueToStorageTypeMismatch(containerID, storageType) ||
         excludeContainersNotFound.contains(containerID) ||
         containerToSourceMap.containsKey(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
@@ -221,6 +252,13 @@ public class ContainerBalancerSelectionCriteria {
       LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
           "this container.", container.getContainerID(), e);
       addToExcludeNotFoundContainers(containerID);
+      return true;
+    }
+
+    if (storageType != null
+        && !isReplicaOnStorageType(replicas, node, storageType)) {
+      // The replica on this source is not on the tier being balanced. Moving it
+      // would relocate data across tiers, so leave it for that tier's pass.
       return true;
     }
 
@@ -412,6 +450,27 @@ public class ContainerBalancerSelectionCriteria {
     return excludeContainersDueToFailure;
   }
 
+  /**
+   * Excludes the container from moves of {@code storageType} for the current iteration, after its source replica no
+   * longer matched that type. A mismatch concerns one replica, so the container stays available to other types.
+   */
+  public void addToExcludeDueToStorageTypeMismatch(ContainerID container, @Nullable StorageType storageType) {
+    if (storageType == null) {
+      // MoveManager reports a mismatch only for typed moves; without a type, exclude the container as before.
+      addToExcludeDueToFailContainers(container);
+      return;
+    }
+    excludeContainersDueToStorageTypeMismatch.computeIfAbsent(storageType, ignored -> new HashSet<>()).add(container);
+  }
+
+  Set<ContainerID> getExcludeDueToStorageTypeMismatch(StorageType storageType) {
+    return excludeContainersDueToStorageTypeMismatch.getOrDefault(storageType, Collections.emptySet());
+  }
+
+  private boolean isExcludedDueToStorageTypeMismatch(ContainerID containerID, @Nullable StorageType storageType) {
+    return storageType != null && getExcludeDueToStorageTypeMismatch(storageType).contains(containerID);
+  }
+
   public void addToExcludeNotFoundContainers(ContainerID container) {
     if (excludeContainersNotFound.size() < MAX_NOT_FOUND_CONTAINERS) {
       excludeContainersNotFound.add(container);
@@ -426,7 +485,32 @@ public class ContainerBalancerSelectionCriteria {
     return excludeContainersNotFound;
   }
 
-  private NavigableSet<ContainerID> getCandidateContainers(DatanodeDetails node) {
+  /**
+   * Whether the container's replica on {@code node} sits on {@code storageType}.
+   * Unknown types and conflicting recorded/volume types cannot participate in a typed move.
+   */
+  private static boolean isReplicaOnStorageType(Set<ContainerReplica> replicas,
+      DatanodeDetails node, StorageType storageType) {
+    for (ContainerReplica replica : replicas) {
+      if (replica.getDatanodeDetails().equals(node)) {
+        if (replica.hasConflictingStorageTypes()) {
+          LOG.debug("Skipping container {} on {}: recorded type {} differs from reported volume type {}",
+              replica.getContainerID(), node, replica.getStorageType(), replica.getVolumeStorageType());
+          return false;
+        }
+        StorageType replicaType = replica.getTargetStorageTypeForCopy();
+        if (replicaType == null) {
+          LOG.debug("Skipping container {} on {}: no replica or volume storage type was reported",
+              replica.getContainerID(), node);
+        }
+        return replicaType == storageType;
+      }
+    }
+    // No replica on this node; nothing to move from here.
+    return false;
+  }
+
+  private NavigableSet<ContainerID> getCandidateContainers(DatanodeDetails node, @Nullable StorageType storageType) {
     NavigableSet<ContainerID> newSet =
         new TreeSet<>(orderContainersByUsedBytes().reversed());
     try {
@@ -438,6 +522,9 @@ public class ContainerBalancerSelectionCriteria {
         idSet.removeAll(excludeContainers);
       }
       idSet.removeAll(excludeContainersDueToFailure);
+      if (storageType != null) {
+        idSet.removeAll(getExcludeDueToStorageTypeMismatch(storageType));
+      }
       idSet.removeAll(excludeContainersNotFound);
 
       idSet.removeAll(containerToSourceMap.keySet());
