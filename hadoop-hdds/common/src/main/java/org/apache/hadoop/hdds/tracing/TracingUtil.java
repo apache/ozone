@@ -526,7 +526,7 @@ public final class TracingUtil {
     try (Scope ignored = span.makeCurrent()) {
       return supplier.get();
     } catch (Exception ex) {
-      recordException(span, ex);
+      recordError(span, ex);
       throw ex;
     } finally {
       span.end();
@@ -541,7 +541,7 @@ public final class TracingUtil {
     try (Scope ignored = span.makeCurrent()) {
       runnable.run();
     } catch (Exception ex) {
-      recordException(span, ex);
+      recordError(span, ex);
       throw ex;
     } finally {
       span.end();
@@ -590,20 +590,20 @@ public final class TracingUtil {
     return buildSpan(spanName, spanKind);
   }
 
-  public static void recordExceptionInCurrentSpan(Throwable t) {
-    recordException(Span.current(), t);
+  public static void recordErrorInCurrentSpan(Throwable t) {
+    recordError(Span.current(), t);
   }
 
-  public static void recordException(Span span, Throwable t) {
-    if (t == null || !span.isRecording()) {
+  public static void recordError(Span span, Throwable t) {
+    if (!span.isRecording()) {
+      return;
+    }
+    if (t == null) {
+      span.setStatus(StatusCode.ERROR);
       return;
     }
     span.recordException(t);
-    if (t.getMessage() == null) {
-      span.setStatus(StatusCode.ERROR);
-    } else {
-      span.setStatus(StatusCode.ERROR, t.getMessage());
-    }
+    span.setStatus(StatusCode.ERROR, t.getMessage());
   }
 
   public static void addAttributesToCurrentSpan(String key, String value) {

@@ -70,7 +70,7 @@ public class TraceAllMethod<T> implements InvocationHandler {
     try (Scope ignored = span.makeCurrent()) {
       return invokeDelegate(method, args);
     } catch (Throwable ex) {
-      TracingUtil.recordException(span, ex);
+      TracingUtil.recordError(span, ex);
       throw ex;
     } finally {
       span.end();

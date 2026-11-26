@@ -238,7 +238,7 @@ public class PipelineManagerImpl implements PipelineManager {
       addPipelineToManager(pipeline);
       return pipeline;
     } catch (Exception e) {
-      TracingUtil.recordException(span, e);
+      TracingUtil.recordError(span, e);
       throw e;
     } finally {
       releaseWriteLock();

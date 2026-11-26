@@ -152,7 +152,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     } catch (IOException e) {
       RatisUtil.checkRatisException(e, scm.getSecurityProtocolRpcPort(),
           scm.getScmId(), scm.getHostname(), ROLE_TYPE);
-      TracingUtil.recordExceptionInCurrentSpan(e);
+      TracingUtil.recordErrorInCurrentSpan(e);
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
       TracingUtil.addAttributesToCurrentSpan(OzoneTracingAttributes.ERROR_STATUS,

@@ -194,7 +194,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     } catch (IOException e) {
       RatisUtil.checkRatisException(e, scm.getBlockProtocolRpcPort(),
           scm.getScmId(), scm.getHostname(), ROLE_TYPE);
-      TracingUtil.recordExceptionInCurrentSpan(e);
+      TracingUtil.recordErrorInCurrentSpan(e);
       response.setSuccess(false);
       response.setStatus(exceptionToResponseStatus(e));
       TracingUtil.addAttributesToCurrentSpan(OzoneTracingAttributes.ERROR_STATUS, response.getStatus().name());

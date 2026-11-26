@@ -318,7 +318,7 @@ public class SCMBlockProtocolServer implements
 
     } catch (IOException ioe) {
       e = ioe;
-      TracingUtil.recordExceptionInCurrentSpan(ioe);
+      TracingUtil.recordErrorInCurrentSpan(ioe);
       perfMetrics.updateDeleteKeyFailedBlocks(totalBlocks);
       perfMetrics.updateDeleteKeyFailureStats(keyBlocksInfoList.size(), startNanos);
       LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);

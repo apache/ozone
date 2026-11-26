@@ -218,7 +218,7 @@ public class SCMStateMachine extends BaseStateMachine {
             || ex.getResult() == ResultCodes.IO_EXCEPTION) {
           throw ex;
         }
-        TracingUtil.recordException(span, ex);
+        TracingUtil.recordError(span, ex);
         // Otherwise, it's considered as a logical rejection and is returned to
         // Ratis client, leaving SCM intact.
         applyTransactionFuture.completeExceptionally(ex);
@@ -239,7 +239,8 @@ public class SCMStateMachine extends BaseStateMachine {
       // in both places. No-op once the datanode protocol server has started.
       tryStartDNServerAndRefreshSafeMode();
     } catch (Exception ex) {
-      TracingUtil.recordException(span, ex);
+      TracingUtil.recordError(span, ex);
+      // ExitUtils.terminate() below exits the JVM so the finally block never runs; end the span here.
       span.end();
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);

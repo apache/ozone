@@ -507,7 +507,7 @@ public class TestTracingUtil {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
       Span span = TracingUtil.createInternalSpan("failing");
       try (Scope ignored = span.makeCurrent()) {
-        TracingUtil.recordExceptionInCurrentSpan(new IOException("disk failed"));
+        TracingUtil.recordErrorInCurrentSpan(new IOException("disk failed"));
       } finally {
         span.end();
       }
@@ -526,7 +526,7 @@ public class TestTracingUtil {
         try (Scope ignored2 = span.makeCurrent()) {
           throw new IOException("disk failed");
         } catch (IOException e) {
-          TracingUtil.recordException(span, e);
+          TracingUtil.recordError(span, e);
         } finally {
           span.end();
         }
@@ -546,7 +546,7 @@ public class TestTracingUtil {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
       Span span = TracingUtil.createInternalSpan("failing");
       try (Scope ignored = span.makeCurrent()) {
-        TracingUtil.recordExceptionInCurrentSpan(new IllegalStateException());
+        TracingUtil.recordErrorInCurrentSpan(new IllegalStateException());
       } finally {
         span.end();
       }
@@ -555,15 +555,15 @@ public class TestTracingUtil {
   }
 
   @Test
-  public void testRecordExceptionIgnoresNull() {
+  public void testRecordExceptionWithNullSetsError() {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
-      Span span = TracingUtil.createInternalSpan("ok");
+      Span span = TracingUtil.createInternalSpan("failing");
       try (Scope ignored = span.makeCurrent()) {
-        TracingUtil.recordExceptionInCurrentSpan(null);
+        TracingUtil.recordErrorInCurrentSpan(null);
       } finally {
         span.end();
       }
-      collector.assertNotError("ok");
+      collector.assertError("failing", "");
     }
   }
 
@@ -605,7 +605,7 @@ public class TestTracingUtil {
       TracingUtil.addAttributesToCurrentSpan("dataSize", 1L);
       TracingUtil.addAttributesToCurrentSpan("om.success", true);
       TracingUtil.addEventToCurrentSpan("event", "k", "v");
-      TracingUtil.recordExceptionInCurrentSpan(new IOException("ignored"));
+      TracingUtil.recordErrorInCurrentSpan(new IOException("ignored"));
       assertTrue(collector.getSpans().isEmpty());
     }
   }

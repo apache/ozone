@@ -252,11 +252,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       LOG.debug("request {} Reply {}", raftClientRequest, raftClientReply);
       final SCMRatisResponse response = SCMRatisResponse.decode(raftClientReply);
       if (!response.isSuccess()) {
-        TracingUtil.recordException(span, response.getException());
+        TracingUtil.recordError(span, response.getException());
       }
       return response;
     } catch (Exception e) {
-      TracingUtil.recordException(span, e);
+      TracingUtil.recordError(span, e);
       throw e;
     } finally {
       span.end();
