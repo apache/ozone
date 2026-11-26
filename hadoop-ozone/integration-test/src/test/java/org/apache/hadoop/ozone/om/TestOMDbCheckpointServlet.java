@@ -280,14 +280,17 @@ public class TestOMDbCheckpointServlet {
     omDbCheckpointServletMock.init();
     long initialCheckpointCount =
         omMetrics.getDBCheckpointMetrics().getNumCheckpoints();
+    // Durations are whole milliseconds and can be 0; -1 shows whether this request set them.
+    omMetrics.getDBCheckpointMetrics().setLastCheckpointCreationTimeTaken(-1);
+    omMetrics.getDBCheckpointMetrics().setLastCheckpointStreamingTimeTaken(-1);
 
     doEndpoint(method);
 
     assertThat(tempFile.length()).isGreaterThan(0);
     assertThat(omMetrics.getDBCheckpointMetrics().getLastCheckpointCreationTimeTaken())
-        .isGreaterThan(0);
+        .isGreaterThanOrEqualTo(0);
     assertThat(omMetrics.getDBCheckpointMetrics().getLastCheckpointStreamingTimeTaken())
-        .isGreaterThan(0);
+        .isGreaterThanOrEqualTo(0);
     assertThat(omMetrics.getDBCheckpointMetrics().getNumCheckpoints())
         .isGreaterThan(initialCheckpointCount);
 
