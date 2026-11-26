@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.MISSING_METADATA_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -535,6 +536,7 @@ public abstract class EndpointBase {
       Response.ResponseBuilder responseBuilder, OzoneKey key) {
 
     Map<String, String> metadata = key.getMetadata();
+    int missingMetadataCount = 0;
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
       String metadataKey = entry.getKey();
       // System ETag / Content-Type are returned via their own response header, the SSE algorithm via the SSE header.
@@ -542,11 +544,18 @@ public abstract class EndpointBase {
           || ServerSideEncryption.ALGORITHM_METADATA_KEY.equals(metadataKey)) {
         continue;
       }
+      if (entry.getValue().codePoints().anyMatch(Character::isISOControl)) {
+        missingMetadataCount++;
+        continue;
+      }
       // Rebuild a remapped user value (e.g. ozone-s3-internal-content-type -> content-type).
       metadataKey = REBUILT_RESERVED_KEYS.getOrDefault(metadataKey, metadataKey);
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
               encodeRfc2047MetadataValue(entry.getValue()));
+    }
+    if (missingMetadataCount > 0) {
+      responseBuilder.header(MISSING_METADATA_HEADER, missingMetadataCount);
     }
   }
 

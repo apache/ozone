@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MODIFIED_SINCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.MISSING_METADATA_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
@@ -322,28 +323,39 @@ public class TestObjectGet {
   }
 
   @Test
-  public void getKeyDecodesMultipleRfc2047EncodedWords()
-      throws IOException, OS3Exception {
-    final String keyName = "key-with-multiple-rfc2047-words";
-    final String metaValue = "=?UTF-8?Q?a?= =?UTF-8?Q?b?=";
+  public void getKeyOmitsRfc2047EncodedLineBreaks() throws IOException, OS3Exception {
+    final String keyName = "key-with-line-break-metadata";
+    final String encodedMetaValue = "=?UTF-8?B?YQ0KYg==?=";
     MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
-    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1",
-        metaValue);
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1", encodedMetaValue);
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta2", "printable");
     when(headers.getRequestHeaders()).thenReturn(requestHeaders);
 
     assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
 
-    assertEquals("ab", bucket.getKey(keyName).getMetadata().get("meta1"));
+    assertEquals("a\r\nb", bucket.getKey(keyName).getMetadata().get("meta1"));
+    Response response = get(rest, BUCKET_NAME, keyName);
+    assertNull(response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
+    assertEquals("printable", response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta2"));
+    assertEquals("1", response.getHeaderString(MISSING_METADATA_HEADER));
+
+    Response headResponse = rest.head(BUCKET_NAME, keyName);
+    assertNull(headResponse.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
+    assertEquals("printable", headResponse.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta2"));
+    assertEquals("1", headResponse.getHeaderString(MISSING_METADATA_HEADER));
   }
 
   @ParameterizedTest
   @CsvSource({
       "'=?UTF-8?Q?a?b?=', 'a?b'",
-      "'=?UTF-8?Q??=', ''"
+      "'=?UTF-8?Q??=', ''",
+      "'=?UTF-8?Q?a?= =?UTF-8?Q?b?=', 'ab'",
+      "'=?UTF-8?Q?=GZ?=', '=?UTF-8?Q?=GZ?='",
+      "'=?UNKNOWN?Q?abc?=', '=?UNKNOWN?Q?abc?='"
   })
-  public void getKeyDecodesQEncodedRfc2047Metadata(String encodedValue, String expectedValue)
+  public void getKeyDecodesRfc2047Metadata(String encodedValue, String expectedValue)
       throws IOException, OS3Exception {
-    final String keyName = "key-with-q-rfc2047-meta";
+    final String keyName = "key-with-rfc2047-meta";
     MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
     requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1", encodedValue);
     when(headers.getRequestHeaders()).thenReturn(requestHeaders);
@@ -351,20 +363,6 @@ public class TestObjectGet {
     assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
 
     assertEquals(expectedValue, bucket.getKey(keyName).getMetadata().get("meta1"));
-  }
-
-  @Test
-  public void getKeyPreservesInvalidQEncodedMetadata()
-      throws IOException, OS3Exception {
-    final String keyName = "key-with-invalid-rfc2047-meta";
-    final String metaValue = "=?UTF-8?Q?=GZ?=";
-    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
-    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1", metaValue);
-    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
-
-    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
-
-    assertEquals(metaValue, bucket.getKey(keyName).getMetadata().get("meta1"));
   }
 
   @Test

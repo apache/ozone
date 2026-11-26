@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import jakarta.mail.internet.MimeUtility;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -128,6 +129,25 @@ public class TestEndpointBase {
         "getCustomMetadataFromHeaders should fail." +
             " Expected OS3Exception not thrown");
     assertThat(e.getCode()).contains("MetadataTooLarge");
+  }
+
+  @Test
+  public void testCustomMetadataSizeUsesDecodedValue() throws Exception {
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    String metadataKey = CUSTOM_METADATA_HEADER_PREFIX + "k";
+    String metadataValue = "é".repeat(1023);
+    String encodedValue = MimeUtility.encodeText(metadataValue, "UTF-8", "Q");
+    assertTrue(encodedValue.length() > 2 * OzoneConsts.KB);
+    requestHeaders.putSingle(metadataKey, encodedValue);
+
+    EndpointBase endpointBase = new EndpointBase() {
+    };
+    assertEquals(metadataValue, endpointBase.getCustomMetadataFromHeaders(requestHeaders).get("k"));
+
+    requestHeaders.putSingle(metadataKey, MimeUtility.encodeText("é".repeat(1024), "UTF-8", "Q"));
+    OS3Exception exception = assertThrows(OS3Exception.class,
+        () -> endpointBase.getCustomMetadataFromHeaders(requestHeaders));
+    assertEquals(S3ErrorTable.METADATA_TOO_LARGE.getCode(), exception.getCode());
   }
 
   @Test
