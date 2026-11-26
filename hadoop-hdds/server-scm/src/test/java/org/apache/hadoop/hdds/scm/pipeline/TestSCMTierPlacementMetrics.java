@@ -35,6 +35,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineMetrics.PlacementFailureReason;
 import org.apache.hadoop.hdds.server.http.PrometheusMetricsSink;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricType;
@@ -68,7 +69,8 @@ class TestSCMTierPlacementMetrics {
 
   @ParameterizedTest
   @MethodSource("failureReasons")
-  void classifiesResultCodesWithoutParsingMessages(IOException failure, String reason) throws Exception {
+  void classifiesResultCodesWithoutParsingMessages(IOException failure, PlacementFailureReason reason)
+      throws Exception {
     metrics.incTierPlacementFailure(StorageTier.SSD, failure);
     String output = prometheusOutput();
     assertThat(output).contains(series("SSD", reason, 1));
@@ -77,29 +79,45 @@ class TestSCMTierPlacementMetrics {
 
   static Stream<Arguments> failureReasons() {
     return Stream.of(
-        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE), "no_space"),
-        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_CONTAINER_WITH_SPACE), "no_space"),
-        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_HEALTHY_NODES), "no_suitable_node"),
-        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_SUITABLE_NODE), "no_suitable_node"),
-        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_NODE_IN_POOL), "no_suitable_node"),
-        Arguments.of(new SCMException(ResultCodes.INTERNAL_ERROR), "other"),
-        Arguments.of(new SCMException("no space and no suitable node"), "other"),
-        Arguments.of(new IOException("FAILED_TO_FIND_NODES_WITH_SPACE"), "other"),
-        Arguments.of(null, "other"));
+        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE), PlacementFailureReason.NO_SPACE),
+        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_CONTAINER_WITH_SPACE),
+            PlacementFailureReason.NO_SPACE),
+        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_HEALTHY_NODES),
+            PlacementFailureReason.NO_SUITABLE_NODE),
+        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_SUITABLE_NODE),
+            PlacementFailureReason.NO_SUITABLE_NODE),
+        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_NODE_IN_POOL),
+            PlacementFailureReason.NO_SUITABLE_NODE),
+        Arguments.of(new SCMException(ResultCodes.FAILED_TO_FIND_ACTIVE_PIPELINE),
+            PlacementFailureReason.NO_SUITABLE_NODE),
+        Arguments.of(new SCMException(ResultCodes.INTERNAL_ERROR), PlacementFailureReason.OTHER),
+        Arguments.of(new SCMException("no space and no suitable node"), PlacementFailureReason.OTHER),
+        Arguments.of(new IOException("FAILED_TO_FIND_NODES_WITH_SPACE"), PlacementFailureReason.OTHER),
+        Arguments.of(null, PlacementFailureReason.OTHER));
+  }
+
+  @Test
+  void publishesStableReasonLabels() {
+    assertEquals("no_space", PlacementFailureReason.NO_SPACE.getLabel());
+    assertEquals("no_suitable_node", PlacementFailureReason.NO_SUITABLE_NODE.getLabel());
+    assertEquals("other", PlacementFailureReason.OTHER.getLabel());
+    assertEquals(3, PlacementFailureReason.values().length);
   }
 
   @ParameterizedTest
   @EnumSource(StorageTier.class)
   void keepsTierSeriesSeparate(StorageTier tier) throws Exception {
     metrics.incTierPlacementFailure(tier, null);
-    assertThat(prometheusOutput()).contains(series(tier == StorageTier.EMPTY ? "UNKNOWN" : tier.name(), "other", 1));
+    assertThat(prometheusOutput()).contains(
+        series(tier == StorageTier.EMPTY ? "UNKNOWN" : tier.name(), PlacementFailureReason.OTHER, 1));
     assertEquals(1, totalFailures());
   }
 
   @Test
   void missingTierIsUnknownEvenWhenDefaultIsDisk() throws Exception {
     metrics.incTierPlacementFailure(null, new SCMException(ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE));
-    assertThat(prometheusOutput()).contains(series("UNKNOWN", "no_space", 1), series("DISK", "no_space", 0));
+    assertThat(prometheusOutput()).contains(series("UNKNOWN", PlacementFailureReason.NO_SPACE, 1),
+        series("DISK", PlacementFailureReason.NO_SPACE, 0));
   }
 
   @Test
@@ -112,8 +130,9 @@ class TestSCMTierPlacementMetrics {
 
     String output = prometheusOutput();
     assertThat(output).contains("# TYPE scm_pipeline_metrics_tier_placement_failures counter",
-        series("SSD", "no_space", 1), series("SSD", "no_suitable_node", 1), series("SSD", "other", 0),
-        series("DISK", "other", 1), series("ARCHIVE", "no_space", 0), series("UNKNOWN", "other", 0),
+        series("SSD", PlacementFailureReason.NO_SPACE, 1), series("SSD", PlacementFailureReason.NO_SUITABLE_NODE, 1),
+        series("SSD", PlacementFailureReason.OTHER, 0), series("DISK", PlacementFailureReason.OTHER, 1),
+        series("ARCHIVE", PlacementFailureReason.NO_SPACE, 0), series("UNKNOWN", PlacementFailureReason.OTHER, 0),
         "scm_pipeline_metrics_num_pipeline_creation_failed{} 2");
     assertThat(output).doesNotContain("private-key", "volume=", "bucket=", "pipelineid=");
 
@@ -132,7 +151,7 @@ class TestSCMTierPlacementMetrics {
     assertEquals(12, labelledRecords);
     assertEquals(3, totalFailures());
     // Unchanged counters must still be exported on successive scrapes.
-    assertThat(prometheusOutput()).contains(series("SSD", "no_space", 1));
+    assertThat(prometheusOutput()).contains(series("SSD", PlacementFailureReason.NO_SPACE, 1));
   }
 
   @Test
@@ -161,7 +180,8 @@ class TestSCMTierPlacementMetrics {
       executor.shutdownNow();
     }
     assertEquals((long) writers * increments, totalFailures());
-    assertThat(prometheusOutput()).contains(series("SSD", "other", (long) writers * increments));
+    assertThat(prometheusOutput()).contains(
+        series("SSD", PlacementFailureReason.OTHER, (long) writers * increments));
   }
 
   @Test
@@ -205,8 +225,8 @@ class TestSCMTierPlacementMetrics {
     return writer.toString();
   }
 
-  private static String series(String tier, String reason, long value) {
+  private static String series(String tier, PlacementFailureReason reason, long value) {
     return "scm_pipeline_metrics_tier_placement_failures{requestedtier=\"" + tier
-        + "\",reason=\"" + reason + "\"} " + value;
+        + "\",reason=\"" + reason.getLabel() + "\"} " + value;
   }
 }
