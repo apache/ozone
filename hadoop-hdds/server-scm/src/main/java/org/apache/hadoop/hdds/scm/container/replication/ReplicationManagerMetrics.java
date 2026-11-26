@@ -25,8 +25,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -100,7 +100,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   private static final Map<LifeCycleState, MetricsInfo> LIFECYCLE_STATE_METRICS;
 
   // Setup metric names and descriptions for
-  private static final Map<ContainerHealthState, MetricsInfo>
+  private static final Map<SimplifiedContainerHealthStateForReporting, MetricsInfo>
       CONTAINER_HEALTH_STATE_METRICS;
 
   static {
@@ -113,8 +113,8 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     }
     LIFECYCLE_STATE_METRICS = Collections.unmodifiableMap(lifecycleStateMetrics);
 
-    Map<ContainerHealthState, MetricsInfo> containerHealthStateMetrics = new LinkedHashMap<>();
-    for (ContainerHealthState state : ContainerHealthState.values()) {
+    Map<SimplifiedContainerHealthStateForReporting, MetricsInfo> containerHealthStateMetrics = new LinkedHashMap<>();
+    for (SimplifiedContainerHealthStateForReporting state : SimplifiedContainerHealthStateForReporting.values()) {
       containerHealthStateMetrics.put(state, Interns.info(state.getMetricName(), state.getDescription()));
     }
     CONTAINER_HEALTH_STATE_METRICS = Collections.unmodifiableMap(containerHealthStateMetrics);
@@ -293,7 +293,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
         LIFECYCLE_STATE_METRICS.entrySet()) {
       builder.addGauge(e.getValue(), report.getStat(e.getKey()));
     }
-    for (Map.Entry<ContainerHealthState, MetricsInfo> e :
+    for (Map.Entry<SimplifiedContainerHealthStateForReporting, MetricsInfo> e :
         CONTAINER_HEALTH_STATE_METRICS.entrySet()) {
       builder.addGauge(e.getValue(), report.getStat(e.getKey()));
     }

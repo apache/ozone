@@ -80,6 +80,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private boolean isStarted;
   private DatanodeDetails datanodeDetails;
   private EventLoopGroup eventLoopGroup;
+  private final XceiverServerGrpcMetrics metrics;
 
   /**
    * Constructs a Grpc server class.
@@ -120,6 +121,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
                   "ChunkReader-%d")
               .build());
     }
+    metrics = new XceiverServerGrpcMetrics(readExecutors, datanodeDetails.getUuidString());
 
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setDaemon(true)
@@ -159,7 +161,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .keepAliveTimeout(30, TimeUnit.SECONDS)
         .addService(ServerInterceptors.intercept(
             xceiverService.bindServiceWithZeroCopy(),
-            new GrpcServerInterceptor()));
+            new GrpcServerInterceptor()))
+        .addTransportFilter(metrics.newTransportFilter());
 
     SecurityConfig secConf = new SecurityConfig(conf);
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
@@ -179,6 +182,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     }
     server = nettyServerBuilder.build();
     storageContainer = dispatcher;
+    metrics.register();
   }
 
   @VisibleForTesting
@@ -222,7 +226,9 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
 
   @Override
   public void stop() {
+    metrics.unregister();
     if (isStarted) {
+      isStarted = false;
       try {
         server.shutdown();
         server.awaitTermination(5, TimeUnit.SECONDS);
@@ -232,7 +238,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         LOG.error("failed to shutdown XceiverServerGrpc", e);
         Thread.currentThread().interrupt();
       }
-      isStarted = false;
     }
   }
 

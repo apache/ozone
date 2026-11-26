@@ -90,11 +90,10 @@ jobs:
           persist-credentials: false
           ref: ${{ github.event.inputs.ref }}
       - name: Cache for npm dependencies
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/.pnpm-store
-            **/node_modules
           key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-

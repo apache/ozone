@@ -39,7 +39,6 @@
     <aws-java-sdk2.version>2.55.6</aws-java-sdk2.version>
     <ban-httpcomponents.skip>true</ban-httpcomponents.skip>
     <ban-rocksdb.skip>true</ban-rocksdb.skip>
-    <ban-unshaded-grpc.skip>true</ban-unshaded-grpc.skip>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.86</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.2</build-helper-maven-plugin.version>
@@ -159,7 +158,6 @@
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
     <native.lib.tmp.dir />
-    <netty.version>4.1.139.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>24.22.1</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
@@ -236,20 +234,6 @@
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
         <version>${jackson2-bom.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-bom</artifactId>
-        <version>${io.grpc.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-bom</artifactId>
-        <version>${netty.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
@@ -843,6 +827,10 @@
             <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
           </exclusion>
@@ -907,6 +895,10 @@
             <!-- depend on jcl-over-slf4j instead -->
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
             <groupId>javax.servlet</groupId>
@@ -2159,15 +2151,14 @@
               </goals>
               <phase>validate</phase>
               <configuration>
-                <!-- enabled in the shaded filesystem module -->
-                <skip>${ban-unshaded-grpc.skip}</skip>
                 <rules>
                   <bannedDependencies>
                     <excludes>
                       <exclude>io.grpc</exclude>
                       <exclude>io.netty</exclude>
                     </excludes>
-                    <message>The Ozone filesystem jar must use Ratis's shaded gRPC and Netty, not unshaded io.grpc / io.netty</message>
+                    <message>Use Ratis's shaded gRPC and Netty, not unshaded io.grpc / io.netty</message>
+                    <searchTransitive>false</searchTransitive>
                   </bannedDependencies>
                 </rules>
               </configuration>

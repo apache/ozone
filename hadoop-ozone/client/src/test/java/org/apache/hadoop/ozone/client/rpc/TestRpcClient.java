@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -1253,6 +1254,37 @@ public class TestRpcClient {
     }
   }
 
+  /**
+   * A single CreateFileOptions carrying a storage policy and every other option must send all of them to the OM.
+   */
+  @Test
+  void testCreateFileOptionsMappedToRequest() throws IOException {
+    AtomicReference<CreateFileRequest> captured = new AtomicReference<>();
+    OmTransport transport = transportWithOmVersion(OzoneManagerVersion.STORAGE_POLICY_SUPPORT, Type.CreateFile,
+        request -> captured.set(request.getCreateFileRequest()));
+    RpcClient client = createRpcClient(transport);
+    try {
+      CreateFileOptions options = CreateFileOptions.builder()
+          .setSize(1024L)
+          .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+          .setOverWrite(true)
+          .setRecursive(true)
+          .setStoragePolicy(OzoneStoragePolicy.HOT)
+          .build();
+
+      assertThatThrownBy(() -> client.createFile("volume", "bucket", "key", options))
+          .isInstanceOf(IOException.class)
+          .hasMessage("captured");
+      assertThat(captured.get()).isNotNull();
+      assertThat(captured.get().getIsOverwrite()).isTrue();
+      assertThat(captured.get().getIsRecursive()).isTrue();
+      assertThat(captured.get().getKeyArgs().getDataSize()).isEqualTo(1024L);
+      assertThat(captured.get().getKeyArgs().getStoragePolicy()).isEqualTo(HddsProtos.StoragePolicyProto.HOT);
+    } finally {
+      client.close();
+    }
+  }
+
   @Test
   public void testCreateKeyRejectsNullOptions() throws IOException {
     RpcClient client = createRpcClient();
@@ -1407,6 +1439,40 @@ public class TestRpcClient {
   }
 
   /**
+   * A storage policy is sent only to an OM that supports it, and a request without one is never rejected.
+   */
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testCreateFileWithStoragePolicyRequiresSupportedOmVersion(OzoneManagerVersion version)
+      throws IOException {
+    List<KeyArgs> requests = new ArrayList<>();
+    OmTransport transport = transportWithOmVersion(version, Type.CreateFile,
+        request -> requests.add(request.getCreateFileRequest().getKeyArgs()));
+    RpcClient client = createRpcClient(transport);
+    try {
+      ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      CreateFileOptions.Builder options = CreateFileOptions.builder().setSize(1L).setReplicationConfig(replication);
+      IOException withoutPolicyError = assertThrows(IOException.class,
+          () -> client.createFile("vol", "bucket", "key", options.setStoragePolicy(null).build()));
+      IOException withPolicyError = assertThrows(IOException.class,
+          () -> client.createFile("vol", "bucket", "key", options.setStoragePolicy(OzoneStoragePolicy.COLD).build()));
+
+      assertThat(withoutPolicyError).hasMessage("captured");
+      assertThat(requests.get(0).hasStoragePolicy()).isFalse();
+      if (OzoneManagerVersion.STORAGE_POLICY_SUPPORT.isSupportedBy(version)) {
+        assertThat(withPolicyError).hasMessage("captured");
+        assertThat(requests).hasSize(2);
+        assertThat(requests.get(1).getStoragePolicy()).isEqualTo(OzoneStoragePolicy.toProto(OzoneStoragePolicy.COLD));
+      } else {
+        assertThat(withPolicyError).hasMessage("OzoneManager does not support storage policy");
+        assertThat(requests).hasSize(1);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
    * A storage policy field is sent only to an OM that supports it, and a request without one is never rejected.
    */
   @ParameterizedTest
@@ -1440,6 +1506,26 @@ public class TestRpcClient {
         assertThat(withFallbackError).hasMessage("OzoneManager does not support storage policy");
         assertThat(requests).hasSize(1);
       }
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * The client never picks a storage policy for the caller: the OM resolves it from the bucket.
+   */
+  @Test
+  public void testCreateFileWithoutStoragePolicyDoesNotSendOne() throws IOException {
+    List<KeyArgs> requests = new ArrayList<>();
+    OmTransport transport = transportWithOmVersion(OzoneManagerVersion.SOFTWARE_VERSION, Type.CreateFile,
+        request -> requests.add(request.getCreateFileRequest().getKeyArgs()));
+    RpcClient client = createRpcClient(transport);
+    try {
+      ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      assertThrows(IOException.class, () -> client.createFile("vol", "bucket", "key", 1L, replication, false, false));
+
+      assertThat(requests).hasSize(1);
+      assertThat(requests.get(0).hasStoragePolicy()).isFalse();
     } finally {
       client.close();
     }

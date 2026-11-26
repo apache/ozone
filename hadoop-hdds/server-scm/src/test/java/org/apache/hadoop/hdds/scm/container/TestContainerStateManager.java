@@ -467,7 +467,8 @@ public class TestContainerStateManager {
     containerStateManager.addContainer(closedContainerInfo.getProtobuf());
 
     assertEquals(1, containerStateManager.getContainerIDs(
-        HddsProtos.LifeCycleState.CLOSED, ContainerHealthState.HEALTHY, ContainerID.MIN, 10).size());
+        HddsProtos.LifeCycleState.CLOSED, SimplifiedContainerHealthStateForReporting.HEALTHY, ContainerID.MIN, 10)
+        .size());
   }
 
   @Test

@@ -33,10 +33,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,8 +85,8 @@ public class TestReportSubCommand {
       assertTrue(m.find());
     }
 
-    for (ContainerHealthState state :
-        ContainerHealthState.values()) {
+    for (SimplifiedContainerHealthStateForReporting state :
+        SimplifiedContainerHealthStateForReporting.values()) {
       p = Pattern.compile("^" + state.toString() + ": 0$", Pattern.MULTILINE);
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
@@ -133,8 +133,8 @@ public class TestReportSubCommand {
     }
 
     counter = SEED;
-    for (ContainerHealthState state :
-        ContainerHealthState.values()) {
+    for (SimplifiedContainerHealthStateForReporting state :
+        SimplifiedContainerHealthStateForReporting.values()) {
       Pattern p = Pattern.compile(
           "^" + state.toString() + ": " + counter + "$", Pattern.MULTILINE);
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
@@ -163,12 +163,12 @@ public class TestReportSubCommand {
 
     // Add samples
     counter = SEED;
-    for (ContainerHealthState state : ContainerHealthState.values()) {
+    for (SimplifiedContainerHealthStateForReporting state : SimplifiedContainerHealthStateForReporting.values()) {
       for (int i = 0; i < counter; i++) {
         // Create mock ContainerInfo for testing
         ContainerInfo mockContainer = mock(ContainerInfo.class);
         when(mockContainer.containerID()).thenReturn(ContainerID.valueOf(i));
-        when(mockContainer.getHealthState()).thenReturn(state);
+        when(mockContainer.getSimplifiedHealthStateForReporting()).thenReturn(state);
         report.incrementAndSample(state, mockContainer);
       }
       counter++;
