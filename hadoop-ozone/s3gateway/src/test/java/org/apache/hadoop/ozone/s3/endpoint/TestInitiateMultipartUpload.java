@@ -117,6 +117,29 @@ public class TestInitiateMultipartUpload {
     assertEquals(OzoneStoragePolicy.COLD, client.getObjectStore().getS3Bucket(bucket).getKey(key).getStoragePolicy());
   }
 
+  /** An OM without storage policy support rejects the initiate; the gateway answers 501 NotImplemented, not 500. */
+  @Test
+  public void testInitiateMultipartUploadWithStorageClassToOmWithoutStoragePolicy() throws Exception {
+    String bucket = OzoneConsts.S3_BUCKET;
+    String key = OzoneConsts.KEY;
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket(bucket);
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("GLACIER");
+    ObjectEndpoint rest = spy(getObjectEndpoint(client, headers));
+    ClientProtocol protocol = spy(rest.getClientProtocol());
+    OzoneBucket ozoneBucket = spy(protocol.getBucketDetails(null, bucket));
+    doReturn(protocol).when(rest).getClientProtocol();
+    doReturn(ozoneBucket).when(protocol).getBucketDetails(null, bucket);
+    OMException failure = new OMException("OzoneManager does not support storage policy",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    doThrow(failure).when(ozoneBucket).initiateMultipartUpload(eq(key), any(MultipartUploadOptions.class));
+
+    OS3Exception exception = assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED,
+        () -> rest.initializeMultipartUpload(bucket, key));
+    assertSame(failure, exception.getCause());
+  }
+
   @Test
   public void testInitiateMultipartUploadRejectsFileAncestor() throws Exception {
     String bucket = OzoneConsts.S3_BUCKET;

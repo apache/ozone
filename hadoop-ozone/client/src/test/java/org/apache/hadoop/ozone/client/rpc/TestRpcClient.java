@@ -1336,8 +1336,10 @@ public class TestRpcClient {
           .setStoragePolicy(OzoneStoragePolicy.COLD)
           .build();
 
+      // NOT_SUPPORTED_OPERATION lets S3 Gateway answer 501 NotImplemented rather than 500 InternalError.
       assertThatThrownBy(() -> operation.open(client, withPolicy))
-          .isInstanceOf(IOException.class)
+          .isInstanceOfSatisfying(OMException.class,
+              e -> assertThat(e.getResult()).isEqualTo(ResultCodes.NOT_SUPPORTED_OPERATION))
           .hasMessage("OzoneManager does not support storage policy");
       assertThat(captured.get()).isNull();
 

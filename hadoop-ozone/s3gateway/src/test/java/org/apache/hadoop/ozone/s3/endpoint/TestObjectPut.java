@@ -113,6 +113,8 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
@@ -1334,6 +1336,28 @@ class TestObjectPut {
     assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
 
     assertEquals(withHeader ? OzoneStoragePolicy.COLD : null, destBucket.getKey(DEST_KEY).getStoragePolicy());
+  }
+
+  /** An OM without storage policy support rejects the write; PUT and copy answer 501 NotImplemented, not 500. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testStorageClassWriteToOmWithoutStoragePolicyIsNotImplemented(boolean copy) throws Exception {
+    if (copy) {
+      assertSucceeds(() -> putObject(CONTENT));
+      when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    }
+    OzoneClient client = spy(objectEndpoint.getClient());
+    ClientProtocol protocol = spy(client.getProxy());
+    doThrow(new OMException("OzoneManager does not support storage policy", ResultCodes.NOT_SUPPORTED_OPERATION))
+        .when(protocol).createKey(anyString(), anyString(), anyString(), any(CreateKeyOptions.class));
+    doReturn(protocol).when(client).getProxy();
+    objectEndpoint.setClient(client);
+    // Rebuild the handler chain to use the spied client.
+    objectEndpoint.init();
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("GLACIER");
+
+    assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED,
+        () -> put(objectEndpoint, copy ? DEST_BUCKET_NAME : BUCKET_NAME, copy ? DEST_KEY : KEY_NAME, CONTENT));
   }
 
   @Test
