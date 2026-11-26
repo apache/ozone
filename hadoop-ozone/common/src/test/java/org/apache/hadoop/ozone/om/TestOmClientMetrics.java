@@ -31,7 +31,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -120,7 +119,7 @@ class TestOmClientMetrics {
   void concurrentFirstUseAndSnapshotsRetainEverySample() throws Exception {
     ExecutorService executor = Executors.newFixedThreadPool(5);
     CountDownLatch start = new CountDownLatch(1);
-    try (Handle handle = OmClientMetrics.acquireHandle(configuration("60"))) {
+    try (Handle handle = OmClientMetrics.acquireHandle(new OMClientConfig())) {
       List<Future<?>> writers = new ArrayList<>();
       for (int thread = 0; thread < 4; thread++) {
         writers.add(executor.submit(() -> {
@@ -178,12 +177,10 @@ class TestOmClientMetrics {
     }
   }
 
-  private static OzoneConfiguration configuration(String intervals) {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    OMClientConfig clientConfig = conf.getObject(OMClientConfig.class);
+  private static OMClientConfig configuration(String intervals) {
+    OMClientConfig clientConfig = new OMClientConfig();
     clientConfig.setMetricsPercentilesIntervals(intervals);
-    conf.setFromObject(clientConfig);
-    return conf;
+    return clientConfig;
   }
 
   private static Set<String> metricNames(OmClientMetrics metrics) {

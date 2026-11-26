@@ -134,6 +134,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.OmClientMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -234,6 +235,7 @@ public class RpcClient implements ClientProtocol {
   private final boolean topologyAwareReadEnabled;
   private final boolean checkKeyNameEnabled;
   private final OzoneClientConfig clientConfig;
+  private final OMClientConfig omClientConfig;
   private final ReplicationConfigValidator replicationConfigValidator;
   private final Cache<URI, KeyProvider> keyProviderCache;
   private final boolean getLatestVersionLocation;
@@ -280,6 +282,7 @@ public class RpcClient implements ClientProtocol {
         this.conf.getObject(ReplicationConfigValidator.class);
 
     this.clientConfig = conf.getObject(OzoneClientConfig.class);
+    this.omClientConfig = conf.getObject(OMClientConfig.class);
     this.ecReconstructExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
         EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE, clientConfig.getEcReconstructStripeReadPoolLimit(),
         "ec-reconstruct-reader-TID-%d"));
@@ -374,7 +377,7 @@ public class RpcClient implements ClientProtocol {
         OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT,
         TimeUnit.MILLISECONDS);
     // Acquire last so a failed client constructor cannot retain an OM metrics reference.
-    this.omClientMetricsHandle = OmClientMetrics.acquireHandle(conf);
+    this.omClientMetricsHandle = OmClientMetrics.acquireHandle(omClientConfig);
     ozoneManagerProtocolClientSideTranslatorPB.setOmClientMetrics(omClientMetricsHandle.metrics());
   }
 

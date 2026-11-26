@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -57,8 +56,8 @@ public final class OmClientMetrics implements MetricsSource {
   }
 
   /** The first active client supplies the percentile intervals until the last client closes. */
-  public static synchronized Handle acquireHandle(ConfigurationSource conf) {
-    int[] intervals = conf.getObject(OMClientConfig.class).getMetricsPercentilesIntervals();
+  public static synchronized Handle acquireHandle(OMClientConfig config) {
+    int[] intervals = config.getMetricsPercentilesIntervals();
     if (instance == null) {
       instance = DefaultMetricsSystem.instance().register(SOURCE_NAME, "OM Client Metrics",
           new OmClientMetrics(intervals));

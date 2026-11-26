@@ -35,6 +35,7 @@ import org.apache.hadoop.metrics2.MetricsRecord;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.OmClientMetrics;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -76,7 +77,7 @@ class TestS3ClientMetrics extends ClusterForTests<MiniOzoneCluster> {
   protected void onClusterReady() throws Exception {
     s3 = new S3ClientFactory(s3g.getConf()).createS3ClientV2();
     s3.createBucket(request -> request.bucket(BUCKET));
-    metricsHandle = OmClientMetrics.acquireHandle(s3g.getConf());
+    metricsHandle = OmClientMetrics.acquireHandle(new OMClientConfig());
   }
 
   @BeforeAll

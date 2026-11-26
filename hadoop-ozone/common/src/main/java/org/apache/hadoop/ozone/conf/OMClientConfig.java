@@ -69,8 +69,8 @@ public class OMClientConfig {
       description = "Comma-separated positive, distinct rollover intervals in seconds for OM client latency " +
           "percentiles. An empty value disables percentiles. Invalid values use the default interval of 60 seconds. " +
           "The first active RpcClient in a process supplies the intervals until the last client closes.")
-  private String metricsPercentilesIntervals;
-  private int[] parsedMetricsPercentilesIntervals;
+  private String metricsPercentilesIntervals = "60";
+  private int[] parsedMetricsPercentilesIntervals = {DEFAULT_METRICS_PERCENTILES_INTERVAL};
 
   public int getTrashEmptierPoolSize() {
     return trashEmptierPoolSize;

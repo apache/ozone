@@ -44,7 +44,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.io.Text;
@@ -172,11 +171,9 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
   }
 
   private static OmClientMetrics.Handle attachMetrics(OzoneManagerProtocolClientSideTranslatorPB client) {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    OMClientConfig clientConfig = conf.getObject(OMClientConfig.class);
+    OMClientConfig clientConfig = new OMClientConfig();
     clientConfig.setMetricsPercentilesIntervals("");
-    conf.setFromObject(clientConfig);
-    OmClientMetrics.Handle handle = OmClientMetrics.acquireHandle(conf);
+    OmClientMetrics.Handle handle = OmClientMetrics.acquireHandle(clientConfig);
     client.setOmClientMetrics(handle.metrics());
     return handle;
   }

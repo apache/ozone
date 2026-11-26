@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.OmClientMetrics;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -630,7 +631,7 @@ public class TestRpcClient {
     RpcClient second = null;
     try {
       second = createRpcClient(new MockOmTransport());
-      try (OmClientMetrics.Handle observer = OmClientMetrics.acquireHandle(new OzoneConfiguration())) {
+      try (OmClientMetrics.Handle observer = OmClientMetrics.acquireHandle(new OMClientConfig())) {
         metrics = observer.metrics();
       }
       // Constructor ServiceList calls precede metrics acquisition.
@@ -658,7 +659,7 @@ public class TestRpcClient {
         throw new IOException("OM unavailable during initialization");
       }
     };
-    try (OmClientMetrics.Handle observer = OmClientMetrics.acquireHandle(new OzoneConfiguration())) {
+    try (OmClientMetrics.Handle observer = OmClientMetrics.acquireHandle(new OMClientConfig())) {
       assertThatThrownBy(() -> createRpcClient(unavailable))
           .isInstanceOf(IOException.class).hasMessage("OM unavailable during initialization");
       assertThat(DefaultMetricsSystem.instance().getSource(OmClientMetrics.SOURCE_NAME)).isSameAs(observer.metrics());
