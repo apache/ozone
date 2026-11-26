@@ -20,10 +20,10 @@ package org.apache.hadoop.hdds.scm.container.replication;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 
 /**
  * Simple class to wrap the parameters needed to check a container's health
@@ -38,7 +38,8 @@ public final class ContainerCheckRequest {
   private final ReplicationManagerReport report;
   private final ReplicationQueue replicationQueue;
   private final boolean readOnly;
-  private ContainerHealthState healthState = ContainerHealthState.HEALTHY;
+  private SimplifiedContainerHealthStateForReporting simplifiedHealthStateForReporting =
+      SimplifiedContainerHealthStateForReporting.HEALTHY;
 
   private ContainerCheckRequest(Builder builder) {
     this.containerInfo = builder.containerInfo;
@@ -79,12 +80,12 @@ public final class ContainerCheckRequest {
     return readOnly;
   }
 
-  public ContainerHealthState getHealthState() {
-    return healthState;
+  public SimplifiedContainerHealthStateForReporting getSimplifiedHealthStateForReporting() {
+    return simplifiedHealthStateForReporting;
   }
 
-  public void setHealthState(ContainerHealthState state) {
-    this.healthState = state;
+  public void setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting state) {
+    this.simplifiedHealthStateForReporting = state;
     report.incrementAndSample(state, containerInfo);
   }
 

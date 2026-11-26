@@ -22,8 +22,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DE
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.HEALTHY;
-import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING;
+import static org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting.HEALTHY;
+import static org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting.MISSING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,9 +32,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -125,11 +125,11 @@ class TestContainerStateMap {
   }
 
   private static ContainerInfo buildContainerInfo(long containerID, HddsProtos.LifeCycleState state,
-      ContainerHealthState healthState) {
+      SimplifiedContainerHealthStateForReporting healthState) {
     return new ContainerInfo.Builder()
         .setContainerID(containerID)
         .setState(state)
-        .setHealthState(healthState)
+        .setSimplifiedHealthStateForReporting(healthState)
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(THREE))
         .build();
   }

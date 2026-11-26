@@ -34,7 +34,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -194,9 +193,9 @@ public class ReconGlobalMetricsService {
         keyEntityInfo.setKey(omKeyInfo.getFileName());
         keyEntityInfo.setPath(createPath(omKeyInfo));
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        Pair<Long, Long> sizeInfo = fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
-        keyEntityInfo.setSize(sizeInfo.getLeft());
-        keyEntityInfo.setReplicatedSize(sizeInfo.getRight());
+        RepeatedOmKeyInfo.TotalSize sizeInfo = fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
+        keyEntityInfo.setSize(sizeInfo.getUnreplicatedSize());
+        keyEntityInfo.setReplicatedSize(sizeInfo.getReplicatedSize());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
         deletedDirInsightInfo.setUnreplicatedDataSize(
             deletedDirInsightInfo.getUnreplicatedDataSize() +
@@ -250,7 +249,7 @@ public class ReconGlobalMetricsService {
           continue;
         }
         getOrCreateBucketEntry(buckets, dirInfo).addDir(
-            fetchSizeForDeletedDirectory(dirInfo.getObjectID()).getRight());
+            fetchSizeForDeletedDirectory(dirInfo.getObjectID()).getReplicatedSize());
       }
     }
 
@@ -304,13 +303,12 @@ public class ReconGlobalMetricsService {
     return record != null ? record.getValue() : 0L;
   }
 
-  private Pair<Long, Long> fetchSizeForDeletedDirectory(long objectId)
-      throws IOException {
+  private RepeatedOmKeyInfo.TotalSize fetchSizeForDeletedDirectory(long objectId) throws IOException {
     NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     if (nsSummary != null) {
-      return Pair.of(nsSummary.getSizeOfFiles(), nsSummary.getReplicatedSizeOfFiles());
+      return new RepeatedOmKeyInfo.TotalSize(nsSummary.getSizeOfFiles(), nsSummary.getReplicatedSizeOfFiles());
     }
-    return Pair.of(0L, 0L);
+    return new RepeatedOmKeyInfo.TotalSize(0L, 0L);
   }
 
   private String createPath(OmKeyInfo omKeyInfo) {
