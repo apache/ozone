@@ -32,7 +32,7 @@ with_service_restarted() {
 }
 
 with_old_version() {
-  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/rolling/check-finalization.robot
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized "upgrade/${EXECUTION_MODE}/check-finalization.robot"
   generate old1 "$CLIENT"
   validate old1 "$CLIENT"
 
@@ -52,13 +52,14 @@ with_this_version_pre_finalized() {
   validate new1 "$CLIENT"
 
   validate overwrite "$CLIENT"
+  # HDDS-6261: overwrite the same keys intentionally
   generate overwrite "$CLIENT" --exclude create-volume-and-bucket
 
   snapshot overwrite pre-finalized "$CLIENT" -v FROM_SNAPSHOT:original2 -v EARLIER_SNAPSHOTS:original,original2
 }
 
 with_old_version_downgraded() {
-  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/rolling/check-finalization.robot
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized "upgrade/${EXECUTION_MODE}/check-finalization.robot"
   validate old1 "$CLIENT"
   validate new1 "$CLIENT"
 
@@ -66,13 +67,15 @@ with_old_version_downgraded() {
   validate old2 "$CLIENT"
 
   validate overwrite "$CLIENT"
+  # HDDS-6261: overwrite the same keys again to trigger the precondition check
+  # that exists <= 1.1.0 OM
   generate overwrite "$CLIENT" --exclude create-volume-and-bucket
 
   snapshot overwrite downgraded "$CLIENT" -v FROM_SNAPSHOT:pre-finalized -v EARLIER_SNAPSHOTS:original,original2,pre-finalized
 }
 
 with_this_version_finalized() {
-  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/rolling/check-finalization.robot
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-check-finalization" --include finalized "upgrade/${EXECUTION_MODE}/check-finalization.robot"
   validate old1 "$CLIENT"
   validate new1 "$CLIENT"
   validate old2 "$CLIENT"

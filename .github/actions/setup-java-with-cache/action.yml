@@ -70,7 +70,6 @@ runs:
         echo "value=maven-repo-${{ hashFiles(
             '**/pom.xml',
             '.mvn/extensions.xml',
-            '.mvn/wrapper/maven-wrapper.properties',
             'dev-support/ci/populate-cache.sh'
         ) }}-$JAVA_VERSION" >> "$GITHUB_OUTPUT"
 
@@ -78,7 +77,30 @@ runs:
       id: cleanup
       shell: bash
       run: |
-        rm -frv ~/.m2/repository
+        rm -frv ~/.m2/repository ~/.m2/wrapper
+
+    - name: Restore Maven Wrapper
+      id: restore-wrapper
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/.m2/wrapper
+        key: maven-wrapper-${{ hashFiles('.mvn/wrapper/maven-wrapper.properties') }}
+
+    # Maven Wrapper is required, small, simple to get,
+    # so download and store it instead of relying on populate-cache.
+    # It also simplifies the action's outputs
+    - name: Get Maven Wrapper
+      if: steps.restore-wrapper.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        ./mvnw --version
+
+    - name: Save Maven Wrapper
+      if: steps.restore-wrapper.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ~/.m2/wrapper
+        key: ${{ steps.restore-wrapper.outputs.cache-primary-key }}
 
     - name: Restore cache with exact key
       id: exact-cache
@@ -87,7 +109,6 @@ runs:
         path: |
           ~/.m2/repository/*/*/*
           !~/.m2/repository/org/apache/ozone
-          ~/.m2/wrapper
         key: ${{ steps.cache-key.outputs.value }}
 
     - name: Exact hit?
@@ -114,7 +135,6 @@ runs:
         path: |
           ~/.m2/repository/*/*/*
           !~/.m2/repository/org/apache/ozone
-          ~/.m2/wrapper
         key: maven-repo-
 
     - name: Any hit?
