@@ -55,25 +55,29 @@ import org.junit.jupiter.api.Test;
  */
 public class TestOmKeyInfo {
 
+  private static final ObjectRetention RETENTION = new ObjectRetention(
+      OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE, 1_800_000_000_000L,
+      new EventHold(true, new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.YEARS, 1)));
+
   @Test
-  public void objectLockProtobufConversionAndCopy() throws IOException {
-    RetentionDuration rule = new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.YEARS, 1);
-    ObjectRetention retention = new ObjectRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
-        1_800_000_000_000L,
-        new EventHold(true, rule));
-    OmKeyInfo key = createOmKeyInfo(RatisReplicationConfig.getInstance(THREE)).toBuilder()
-        .setRetention(retention).setLegalHold(true).setPartIv(new byte[]{1, 2, 3}).build();
+  public void protobufConversion() throws IOException {
+    OmKeyInfo key = createOmKeyInfo(RatisReplicationConfig.getInstance(ReplicationFactor.THREE)).toBuilder()
+        .setRetention(RETENTION).setLegalHold(true).setPartIv(new byte[]{1, 2, 3}).build();
     OzoneManagerProtocolProtos.KeyInfo proto = key.getProtobuf(ClientVersion.CURRENT);
+    OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(proto);
+
+    assertNotNull(keyAfterSerialization);
+    assertEquals(key, keyAfterSerialization);
+    assertEquals(key.getFileName(), keyAfterSerialization.getFileName());
+    assertEquals(RETENTION, keyAfterSerialization.getRetention());
+    assertTrue(keyAfterSerialization.getLegalHold());
+
     OzoneManagerProtocolProtos.KeyInfoProtoLight light =
         OzoneManagerProtocolProtos.KeyInfoProtoLight.parseFrom(proto.toByteArray());
     assertEquals(proto.getRetention(), light.getRetention());
     assertTrue(light.hasLegalHold());
     assertTrue(light.getLegalHold());
-    OmKeyInfo decoded = OmKeyInfo.getFromProtobuf(proto);
-    for (OmKeyInfo value : new OmKeyInfo[]{decoded, key.copyObject(), key.toBuilder().build()}) {
-      assertEquals(retention, value.getRetention());
-      assertTrue(value.getLegalHold());
-    }
+
     OmKeyInfo legacy = OmKeyInfo.getFromProtobuf(proto.toBuilder()
         .clearRetention().clearLegalHold().build());
     assertNull(legacy.getRetention());
@@ -85,20 +89,6 @@ public class TestOmKeyInfo {
     OzoneManagerProtocolProtos.KeyInfo holdOffProto = holdOff.getProtobuf(ClientVersion.CURRENT);
     assertEquals(legacyProto, holdOffProto);
     assertFalse(OmKeyInfo.getFromProtobuf(holdOffProto.toBuilder().setLegalHold(false).build()).getLegalHold());
-  }
-
-  @Test
-  public void protobufConversion() throws IOException {
-    OmKeyInfo key = createOmKeyInfo(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-
-    OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
-        key.getProtobuf(ClientVersion.CURRENT));
-
-    assertNotNull(keyAfterSerialization);
-    assertEquals(key, keyAfterSerialization);
-    assertEquals(key.getFileName(), keyAfterSerialization.getFileName());
-
     assertFalse(key.isHsync());
     key = key.withMetadataMutations(
         metadata -> metadata.put(OzoneConsts.HSYNC_CLIENT_ID, "clientid"));
@@ -190,6 +180,8 @@ public class TestOmKeyInfo {
         .addMetadata("key2", "value2")
         .addTag("tagKey1", "tagValue1")
         .addTag("tagKey2", "tagValue2")
+        .setRetention(RETENTION)
+        .setLegalHold(true)
         .setOmKeyLocationInfos(
             Collections.singletonList(createOmKeyLocationInfoGroup(isMPU)))
         .build();
@@ -199,6 +191,8 @@ public class TestOmKeyInfo {
     // OmKeyLocationInfoGroup has now implemented equals() method.
     // assertEquals should work now.
     assertEquals(key, cloneKey);
+    assertEquals(RETENTION, cloneKey.getRetention());
+    assertTrue(cloneKey.getLegalHold());
 
     // Check each version content here.
     assertEquals(key.getKeyLocationVersions().size(),
@@ -227,6 +221,9 @@ public class TestOmKeyInfo {
             IAccessAuthorizer.ACLIdentityType.USER, "user1",
             ACCESS, IAccessAuthorizer.ACLType.WRITE)))
         .build();
+
+    assertEquals(RETENTION, key.getRetention());
+    assertTrue(key.getLegalHold());
 
     // Change acls and check.
     assertNotEquals(key, cloneKey);
