@@ -35,56 +35,12 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-api</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.code.findbugs</groupId>
-          <artifactId>jsr305</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-protobuf</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.code.findbugs</groupId>
-          <artifactId>jsr305</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-stub</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-interface-client</artifactId>
-    </dependency>
-    <dependency>
-      <!-- for generated sources, Java 11+ -->
-      <groupId>javax.annotation</groupId>
-      <artifactId>javax.annotation-api</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-codec-http2</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
-      <artifactId>netty-handler-proxy</artifactId>
-      <scope>runtime</scope>
     </dependency>
   </dependencies>
   <build>
@@ -114,13 +70,6 @@
                 <version>${protobuf.version}</version>
               </protoc>
               <outputDirectory>target/generated-sources/proto-java-protobuf-${protobuf.version}</outputDirectory>
-              <plugins>
-                <plugin kind="binary-maven">
-                  <groupId>io.grpc</groupId>
-                  <artifactId>protoc-gen-grpc-java</artifactId>
-                  <version>${io.grpc.version}</version>
-                </plugin>
-              </plugins>
             </configuration>
           </execution>
         </executions>

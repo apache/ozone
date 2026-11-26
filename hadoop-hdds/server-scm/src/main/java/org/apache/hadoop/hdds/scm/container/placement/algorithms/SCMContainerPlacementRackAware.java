@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -110,7 +112,6 @@ public final class SCMContainerPlacementRackAware
     Map<String, Long> mapSizeRequired = new HashMap<>();
     mapSizeRequired.put(META_DATA_SIZE_REQUIRED, metadataSizeRequired);
     mapSizeRequired.put(DATA_SIZE_REQUIRED, dataSizeRequired);
-
     if (!usedNodesPassed(usedNodes)) {
       // If interface is called without used nodes
       // In this case consider only exclude nodes to determine racks
@@ -122,11 +123,12 @@ public final class SCMContainerPlacementRackAware
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     int usedNodesCount = usedNodes == null ? 0 : usedNodes.size();
-    if (datanodeCount < nodesRequired + excludedNodesCount + usedNodesCount) {
-      throw new SCMException("No enough datanodes to choose. " +
-          "TotalNode = " + datanodeCount + " RequiredNode = " + nodesRequired +
-          " ExcludedNode = " + excludedNodesCount +
-          " UsedNode = " + usedNodesCount + " StorageType = " + storageType, null);
+    int unavailableNodesCount = countUnavailableNodes(usedNodes, excludedNodes);
+    if (datanodeCount < nodesRequired + unavailableNodesCount) {
+      throw new SCMException("Not enough datanodes to choose. TotalNode = " + datanodeCount +
+          " RequiredNode = " + nodesRequired + " UnavailableNode = " + unavailableNodesCount +
+          " (UsedNode = " + usedNodesCount + ", ExcludedNode = " + excludedNodesCount + ")" +
+          " StorageType = " + storageType, null);
     }
     List<DatanodeDetails> mutableFavoredNodes = favoredNodes;
     // sanity check of favoredNodes
@@ -257,6 +259,16 @@ public final class SCMContainerPlacementRackAware
         mutableUsedNodes, favorIndex, nodesRequired, mapSizeRequired, storageType);
   }
 
+  private static int countUnavailableNodes(List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes) {
+    if (excludedNodes.isEmpty()) {
+      return usedNodes.size();
+    }
+    Set<DatanodeDetails> unavailableNodes = new HashSet<>(usedNodes.size() + excludedNodes.size(), 1);
+    unavailableNodes.addAll(usedNodes);
+    unavailableNodes.addAll(excludedNodes);
+    return unavailableNodes.size();
+  }
+
   /**
    * Called by SCM to choose datanodes.
    * There are two scenarios, one is choosing all nodes for a new pipeline.
@@ -283,7 +295,7 @@ public final class SCMContainerPlacementRackAware
     int datanodeCount = networkTopology.getNumOfLeafNode(NetConstants.ROOT);
     int excludedNodesCount = excludedNodes == null ? 0 : excludedNodes.size();
     if (datanodeCount < nodesRequired + excludedNodesCount) {
-      throw new SCMException("No enough datanodes to choose. " +
+      throw new SCMException("Not enough datanodes to choose. " +
           "TotalNode = " + datanodeCount +
           " RequiredNode = " + nodesRequired +
           " ExcludedNode = " + excludedNodesCount +

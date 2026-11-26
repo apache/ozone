@@ -65,6 +65,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
   private @Metric MutableCounterLong numPipelineCreationFailed;
   private @Metric MutableCounterLong numPipelineDestroyed;
   private @Metric MutableCounterLong numPipelineDestroyFailed;
+  private @Metric MutableCounterLong numPipelineCloseFailed;
   private @Metric MutableCounterLong numPipelineReportProcessed;
   private @Metric MutableCounterLong numPipelineReportProcessingFailed;
   private @Metric MutableCounterLong numPipelineContainSameDatanodes;
@@ -119,6 +120,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
     numPipelineCreationFailed.snapshot(recordBuilder, true);
     numPipelineDestroyed.snapshot(recordBuilder, true);
     numPipelineDestroyFailed.snapshot(recordBuilder, true);
+    numPipelineCloseFailed.snapshot(recordBuilder, true);
     numPipelineReportProcessed.snapshot(recordBuilder, true);
     numPipelineReportProcessingFailed.snapshot(recordBuilder, true);
     numPipelineContainSameDatanodes.snapshot(recordBuilder, true);
@@ -240,6 +242,13 @@ public final class SCMPipelineMetrics implements MetricsSource {
    */
   void incNumPipelineDestroyFailed() {
     numPipelineDestroyFailed.incr();
+  }
+
+  /**
+   * Increments number of failed pipeline close count.
+   */
+  void incNumPipelineCloseFailed() {
+    numPipelineCloseFailed.incr();
   }
 
   /**

@@ -756,6 +756,7 @@ public class ObjectStore {
    * @param toSnapshot The name of the ending snapshot
    * @param forceFullDiff request to force full diff, skipping DAG optimization
    * @param disableNativeDiff request to force diff to perform diffs without native lib
+   * @param orderedReport when true, FSO diff reports apply dependency ordering
    * @return the result of submitting snapshot diff job.
    * @throws IOException in case of any exception while generating snapshot diff
    */
@@ -764,10 +765,11 @@ public class ObjectStore {
                                                        String fromSnapshot,
                                                        String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     return proxy.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
-        forceFullDiff, disableNativeDiff);
+        forceFullDiff, disableNativeDiff, orderedReport);
   }
 
   /**

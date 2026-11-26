@@ -76,6 +76,7 @@ public class WritableRatisContainerProvider
 
     String failureReason = null;
     IOException allocationFailure = null;
+    PipelineNotFoundException missingPipeline = null;
 
     //TODO we need to continue the refactor to use repConfig everywhere
     //in downstream managers.
@@ -116,6 +117,13 @@ public class WritableRatisContainerProvider
         try {
           pipelineManager
                   .waitOnePipelineReady(allocatedPipelineIDs, 0);
+        } catch (PipelineNotFoundException e) {
+          allocationFailure = e;
+          LOG.warn("Waiting for one of pipelines {} to be OPEN failed. ",
+                  allocatedPipelineIDs, e);
+          failureReason = "Waiting for one of pipelines to be OPEN failed. "
+              + e.getMessage();
+          missingPipeline = e;
         } catch (IOException e) {
           allocationFailure = e;
           LOG.warn("Waiting for one of pipelines {} to be OPEN failed. ",
@@ -143,13 +151,16 @@ public class WritableRatisContainerProvider
     // we have tried all strategies we know but somehow we are not able
     // to get a container for this block. Log that info and throw an exception.
     LOG.error(
-        "Unable to allocate a block for the size: {}, repConfig: {}, storageTier: {}.",
+        "Unable to allocate a block for the size: {}, repConfig: {}, storageTier: {}",
         size, repConfig, storageTier);
     pipelineManager.getMetrics().incTierPlacementFailure(storageTier, allocationFailure);
-    throw new IOException(
-        "Unable to allocate a container to the block of size: " + size
-            + ", replicationConfig: " + repConfig
-            + " for storageTier: " + storageTier + ". " + failureReason);
+    String message = "Unable to allocate a container to the block of size: " + size
+        + ", replicationConfig: " + repConfig
+        + ", for storageTier: " + storageTier + ". " + failureReason;
+    if (missingPipeline != null) {
+      throw new SCMException(message, missingPipeline, SCMException.ResultCodes.PIPELINE_NOT_FOUND);
+    }
+    throw new IOException(message);
   }
 
   @Nullable

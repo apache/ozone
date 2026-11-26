@@ -42,6 +42,9 @@ import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.crypto.CipherSuite;
+import org.apache.hadoop.crypto.CryptoProtocolVersion;
+import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -56,6 +59,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -182,7 +186,7 @@ public final class OzoneBucketStub extends OzoneBucket {
                 size,
                 mtime,
                 mtime,
-                new ArrayList<>(), finalReplicationCon, getMetadata(), null,
+                new ArrayList<>(), finalReplicationCon, getMetadata(), fileEncryptionInfo(),
                 () -> readKey(key), true,
                 UserGroupInformation.getCurrentUser().getShortUserName(),
                 tags
@@ -198,6 +202,12 @@ public final class OzoneBucketStub extends OzoneBucket {
   public OzoneOutputStream createKey(String key, long size, ReplicationConfig rConfig,
       Map<String, String> metadata, Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
     return addDerivedKey(createKey(key, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  public OzoneOutputStream createKey(String key, CreateKeyOptions options) throws IOException {
+    return addDerivedKey(createKey(key, options.getSize(), options.getReplicationConfig(),
+        options.getMetadata(), options.getTags()), options.isDerivedKeyPiggyBacking());
   }
 
   @Override
@@ -225,7 +235,7 @@ public final class OzoneBucketStub extends OzoneBucket {
                 size,
                 mtime,
                 mtime,
-                new ArrayList<>(), finalReplicationCon, metadata, null,
+                new ArrayList<>(), finalReplicationCon, metadata, fileEncryptionInfo(),
                 () -> readKey(keyName), true, null, null
             ));
           }
@@ -338,7 +348,7 @@ public final class OzoneBucketStub extends OzoneBucket {
                 size,
                 mtime,
                 mtime,
-                new ArrayList<>(), rConfig, objectMetadata, null,
+                new ArrayList<>(), rConfig, objectMetadata, fileEncryptionInfo(),
                 () -> readKey(key), false,
                 UserGroupInformation.getCurrentUser().getShortUserName(),
                 tags
@@ -563,18 +573,28 @@ public final class OzoneBucketStub extends OzoneBucket {
         details.getGeneration()));
   }
 
-  private static OzoneKey toHeadOzoneKey(OzoneKeyDetails details, long dataSize) {
-    return new OzoneKey(details.getVolumeName(),
+  private OzoneKey toHeadOzoneKey(OzoneKeyDetails details, long dataSize) {
+    // like OzoneKey.fromKeyInfo, keep the encryption key name of an encrypted key
+    return new OzoneKeyDetails(details.getVolumeName(),
         details.getBucketName(),
         details.getName(),
         dataSize,
         details.getCreationTime().toEpochMilli(),
         details.getModificationTime().toEpochMilli(),
+        new ArrayList<>(),
         details.getReplicationConfig(),
         details.getMetadata(),
+        details.getFileEncryptionInfo(),
+        () -> readKey(details.getName()),
         details.isFile(),
         details.getOwner(),
         details.getTags());
+  }
+
+  /** Like OM, a file in an encrypted bucket is encrypted with the bucket key. */
+  private FileEncryptionInfo fileEncryptionInfo() {
+    return getEncryptionKeyName() == null ? null : new FileEncryptionInfo(CipherSuite.AES_CTR_NOPADDING,
+        CryptoProtocolVersion.ENCRYPTION_ZONES, new byte[16], new byte[16], getEncryptionKeyName(), "v1");
   }
 
   @Override
@@ -785,7 +805,7 @@ public final class OzoneBucketStub extends OzoneBucket {
           System.currentTimeMillis(),
           System.currentTimeMillis(),
           new ArrayList<>(), getReplicationConfig(),
-          metadata, null,
+          metadata, fileEncryptionInfo(),
           () -> readKey(key), true,
           UserGroupInformation.getCurrentUser().getShortUserName(),
           keyToMultipartUpload.get(key).getTags()

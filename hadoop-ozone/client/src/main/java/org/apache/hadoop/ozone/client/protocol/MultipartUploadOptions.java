@@ -41,6 +41,10 @@ public final class MultipartUploadOptions {
     this.storagePolicy = b.storagePolicy;
   }
 
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /** @return the replication config, or null to use the bucket's default. */
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
@@ -60,6 +64,12 @@ public final class MultipartUploadOptions {
   @Nullable
   public StoragePolicy getStoragePolicy() {
     return storagePolicy;
+  }
+
+  @Override
+  public String toString() {
+    return "MultipartUploadOptions{replicationConfig=" + replicationConfig
+        + ", storagePolicy=" + storagePolicy + "}";
   }
 
   /**

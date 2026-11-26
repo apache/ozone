@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,13 +55,17 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -79,9 +86,46 @@ import org.mockito.MockedStatic;
 public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
   @Test
+  public void testMissingPipelineMapsToRetryableError() throws Exception {
+    String message = "Waited pipeline disappeared";
+    SCMException cause = new SCMException(message, SCMException.ResultCodes.PIPELINE_NOT_FOUND);
+    OMException error = assertInstanceOf(OMException.class, allocateBlockWithScmFailure(cause));
+
+    assertEquals(OMException.ResultCodes.KEY_ALLOCATION_ERROR, error.getResult());
+    assertEquals(message, error.getMessage());
+  }
+
+  @Test
+  public void testScmSafeModeMappingIsPreserved() throws Exception {
+    SCMException cause = new SCMException("SCM is in safe mode", SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
+    OMException error = assertInstanceOf(OMException.class, allocateBlockWithScmFailure(cause));
+
+    assertEquals(OMException.ResultCodes.SCM_IN_SAFE_MODE, error.getResult());
+  }
+
+  @Test
+  public void testOtherScmAllocationFailureIsNotReclassified() throws Exception {
+    SCMException cause = new SCMException("No suitable datanode",
+        SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    SCMException error = assertInstanceOf(SCMException.class, allocateBlockWithScmFailure(cause));
+
+    assertSame(cause, error);
+  }
+
+  private IOException allocateBlockWithScmFailure(SCMException cause) throws Exception {
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), anyString(), any(StoragePolicy.class), anyBoolean())).thenThrow(cause);
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+    return assertThrows(IOException.class,
+        () -> request.allocateBlock(replicationConfig, new ExcludeList(), scmBlockSize, false,
+            UserInfo.newBuilder().build(), ozoneManager, OzoneStoragePolicy.getDefaultPolicy(), true));
+  }
+
+  @Test
   public void testPreExecute() throws Exception {
 
-    doPreExecute(createAllocateBlockRequest());
+    doPreExecute(createAllocateBlockRequest(OzoneStoragePolicy.getDefaultPolicy()));
 
   }
 
@@ -158,7 +202,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
 
     OMRequest modifiedOmRequest =
-        doPreExecute(createAllocateBlockRequest());
+        doPreExecute(createAllocateBlockRequest(OzoneStoragePolicy.getDefaultPolicy()));
 
     OMAllocateBlockRequest omAllocateBlockRequest =
             getOmAllocateBlockRequest(modifiedOmRequest);
@@ -176,7 +220,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
 
     OMRequest modifiedOmRequest =
-        doPreExecute(createAllocateBlockRequest());
+        doPreExecute(createAllocateBlockRequest(OzoneStoragePolicy.getDefaultPolicy()));
 
     OMAllocateBlockRequest omAllocateBlockRequest =
             getOmAllocateBlockRequest(modifiedOmRequest);
@@ -198,7 +242,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   public void testValidateAndUpdateCacheWithKeyNotFound() throws Exception {
 
     OMRequest modifiedOmRequest =
-        doPreExecute(createAllocateBlockRequest());
+        doPreExecute(createAllocateBlockRequest(OzoneStoragePolicy.getDefaultPolicy()));
 
     OMAllocateBlockRequest omAllocateBlockRequest =
             getOmAllocateBlockRequest(modifiedOmRequest);
@@ -214,6 +258,62 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
 
+  }
+
+  @Test
+  public void testPreExecuteUsesPolicyStoredOnOpenKey() throws Exception {
+    // The bucket policy changed to HOT after the key was opened with COLD.
+    addVolumeAndBucketWithPolicy(OzoneStoragePolicy.HOT, false);
+    addKeyToOpenKeyTable(volumeName, bucketName, OzoneStoragePolicy.COLD);
+
+    // The client does not send the policy back.
+    doPreExecute(createAllocateBlockRequest());
+
+    verifyPolicySentToScm(OzoneStoragePolicy.COLD, false);
+  }
+
+  @Test
+  public void testPreExecuteUsesBucketPolicyWhenOpenKeyHasNoPolicy() throws Exception {
+    // The key was opened before storage policy support was finalized, so it has no policy. The bucket policy applies.
+    addVolumeAndBucketWithPolicy(OzoneStoragePolicy.COLD, false);
+    addKeyToOpenKeyTable(volumeName, bucketName, null);
+
+    doPreExecute(createAllocateBlockRequest());
+
+    verifyPolicySentToScm(OzoneStoragePolicy.COLD, false);
+  }
+
+  @Test
+  public void testPreExecuteUsesDefaultPolicyWhenOpenKeyAndBucketHaveNoPolicy() throws Exception {
+    addVolumeAndBucketWithPolicy(null, true);
+    addKeyToOpenKeyTable(volumeName, bucketName, null);
+
+    doPreExecute(createAllocateBlockRequest());
+
+    verifyPolicySentToScm(OzoneStoragePolicy.getDefaultPolicy(), true);
+  }
+
+  @Test
+  public void testPreExecuteWithKeyNotFound() throws Exception {
+    addVolumeAndBucketWithPolicy(OzoneStoragePolicy.HOT, true);
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+
+    assertThatThrownBy(() -> request.preExecute(ozoneManager))
+        .isInstanceOfSatisfying(OMException.class,
+            e -> assertThat(e.getResult()).isEqualTo(OMException.ResultCodes.KEY_NOT_FOUND));
+    verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), any(), any(), any(),
+        any(StoragePolicy.class), anyBoolean());
+  }
+
+  @Test
+  public void testPreExecuteUsesPolicySentByClient() throws Exception {
+    // No open key is needed when the client sends the policy; the fallback flag still comes from the bucket.
+    addVolumeAndBucketWithPolicy(OzoneStoragePolicy.HOT, false);
+
+    doPreExecute(createAllocateBlockRequest(OzoneStoragePolicy.COLD));
+
+    verifyPolicySentToScm(OzoneStoragePolicy.COLD, false);
   }
 
   /**
@@ -276,7 +376,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
         any(), any(), clientMachine.capture(), any(StoragePolicy.class), anyBoolean());
     assertEquals("1.2.3.4", clientMachine.getValue());
-    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any());
+    verify(mockKeyManager, never()).resolveClientForWrite(anyString(), any());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
   }
 
   @Test
@@ -285,7 +386,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     // clientMachine even when the client requests sorted datanodes.
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
-    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any()))
+    when(mockKeyManager.resolveClientForWrite(anyString(), any())).thenReturn(mock(Node.class));
+    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
     when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
@@ -314,7 +416,111 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
         any(), any(), clientMachine.capture(), any(StoragePolicy.class), anyBoolean());
     assertEquals("1.2.3.4", clientMachine.getValue());
-    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any());
+    verify(mockKeyManager, never()).resolveClientForWrite(anyString(), any());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
+  }
+
+  @Test
+  public void testAllocateBlockFallsBackToScmWhenClientUnresolved() throws Exception {
+    // Flag on and topology available, but OM cannot place the client in its
+    // topology: OM must not sort, and SCM receives the client address so it can
+    // try with its own node manager and mapping.
+    List<DatanodeDetails> nodes = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    List<DatanodeDetails> scmOrder = new ArrayList<>(nodes);
+    Collections.reverse(scmOrder);
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes)
+        .setNodesInOrder(scmOrder)
+        .build();
+    AllocatedBlock block = new AllocatedBlock.Builder().setPipeline(pipeline)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
+    ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), clientMachine.capture(), any(StoragePolicy.class), anyBoolean()))
+        .thenReturn(Collections.singletonList(block));
+
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
+    when(mockKeyManager.resolveClientForWrite(anyString(), any())).thenReturn(null);
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+    when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+    List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
+        new ExcludeList(), scmBlockSize, true,
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager,
+        OzoneStoragePolicy.getDefaultPolicy(), true);
+
+    assertEquals("1.2.3.4", clientMachine.getValue());
+    verify(mockKeyManager, times(1)).resolveClientForWrite(eq("1.2.3.4"), any());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
+    assertEquals(1, locations.size());
+    // SCM's order is kept as-is.
+    assertEquals(scmOrder, locations.get(0).getPipeline().getNodesInOrder());
+  }
+
+  @Test
+  public void testAllocateBlockResolvesClientOnceAcrossPipelines() throws Exception {
+    // Two blocks on two different pipelines (different datanode sets): the
+    // client is resolved once for the request and reused for both sorts.
+    List<DatanodeDetails> nodes1 = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    List<DatanodeDetails> nodes2 = Arrays.asList(
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails());
+    Pipeline pipeline1 = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes1)
+        .build();
+    Pipeline pipeline2 = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes2)
+        .build();
+    AllocatedBlock block1 = new AllocatedBlock.Builder().setPipeline(pipeline1)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
+    AllocatedBlock block2 = new AllocatedBlock.Builder().setPipeline(pipeline2)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID + 1, LOCAL_ID + 1)).build();
+    ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
+        anyString(), any(ExcludeList.class), clientMachine.capture(), any(StoragePolicy.class), anyBoolean()))
+        .thenReturn(Arrays.asList(block1, block2));
+
+    Node client = mock(Node.class);
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
+    when(mockKeyManager.resolveClientForWrite(eq("1.2.3.4"), any())).thenReturn(client);
+    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+    when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+    List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
+        new ExcludeList(), 2 * scmBlockSize, true,
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager,
+        OzoneStoragePolicy.getDefaultPolicy(), true);
+
+    assertEquals(2, locations.size());
+    // OM sorts, so SCM is told not to.
+    assertEquals("", clientMachine.getValue());
+    verify(mockKeyManager, times(1)).resolveClientForWrite(eq("1.2.3.4"), any());
+    verify(mockKeyManager, times(2)).sortDatanodesForWrite(any(), eq("1.2.3.4"), eq(client), any());
   }
 
   @Test
@@ -348,9 +554,11 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
     List<DatanodeDetails> sortedOrder = new ArrayList<>(nodes);
     Collections.reverse(sortedOrder);
+    Node client = mock(Node.class);
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
-    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any()))
+    when(mockKeyManager.resolveClientForWrite(eq("1.2.3.4"), any())).thenReturn(client);
+    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any(), any()))
         .thenAnswer(inv -> sortedOrder);
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
     when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
@@ -364,7 +572,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         OzoneStoragePolicy.getDefaultPolicy(), true);
 
     // Sorted once for the shared pipeline...
-    verify(mockKeyManager, times(1)).sortDatanodesForWrite(any(), eq("1.2.3.4"), any());
+    verify(mockKeyManager, times(1)).resolveClientForWrite(eq("1.2.3.4"), any());
+    verify(mockKeyManager, times(1)).sortDatanodesForWrite(any(), eq("1.2.3.4"), eq(client), any());
     // ...and the sorted order is applied to every block's pipeline.
     assertEquals(2, locations.size());
     for (OmKeyLocationInfo location : locations) {
@@ -374,21 +583,22 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
   @Test
   public void testAllocateBlockKeepsPerPipelineOrderWhenSortSkipped() throws Exception {
-    // Two pipelines share the same datanode set but in a different order. When
-    // the sort is skipped (sortDatanodesForWrite returns the input unchanged),
-    // each pipeline must keep its own order: the unsorted result must not be
-    // cached under the node set and reused for the other pipeline.
+    // Pipelines sharing a datanode set must keep their own order when sorting is skipped.
     DatanodeDetails a = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails b = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails c = MockDatanodeDetails.randomDatanodeDetails();
     List<DatanodeDetails> nodes1 = Arrays.asList(a, b, c);
     List<DatanodeDetails> nodes2 = Arrays.asList(c, b, a);
+    // Use a different nodesInOrder to catch a skipped sort overwriting it with getNodes().
+    List<DatanodeDetails> inOrder1 = Arrays.asList(b, c, a);
+    List<DatanodeDetails> inOrder2 = Arrays.asList(a, c, b);
     Pipeline pipeline1 = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setReplicationConfig(
             StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(nodes1)
+        .setNodesInOrder(inOrder1)
         .build();
     Pipeline pipeline2 = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
@@ -396,6 +606,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         .setReplicationConfig(
             StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setNodes(nodes2)
+        .setNodesInOrder(inOrder2)
         .build();
     AllocatedBlock block1 = new AllocatedBlock.Builder().setPipeline(pipeline1)
         .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
@@ -407,9 +618,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
-    // Skip the sort: return the input list instance unchanged.
-    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any()))
-        .thenAnswer(inv -> inv.getArgument(0));
+    when(mockKeyManager.resolveClientForWrite(anyString(), any())).thenReturn(mock(Node.class));
+    when(mockKeyManager.sortDatanodesForWrite(any(), any(), any(), any())).thenReturn(null);
     when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
     when(ozoneManager.getClusterMapAllowNull()).thenReturn(mock(NetworkTopology.class));
 
@@ -421,11 +631,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         OzoneStoragePolicy.getDefaultPolicy(), true);
 
     assertEquals(2, locations.size());
-    // Each pipeline keeps its own order; the skipped-sort result is not shared.
-    assertEquals(nodes1, locations.get(0).getPipeline().getNodesInOrder());
-    assertEquals(nodes2, locations.get(1).getPipeline().getNodesInOrder());
-    // Sorted per pipeline, since the unsorted result is not cached.
-    verify(mockKeyManager, times(2)).sortDatanodesForWrite(any(), eq("1.2.3.4"), any());
+    assertEquals(inOrder1, locations.get(0).getPipeline().getNodesInOrder());
+    assertEquals(inOrder2, locations.get(1).getPipeline().getNodesInOrder());
   }
 
   @Test
@@ -464,7 +671,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         OzoneStoragePolicy.getDefaultPolicy(), true);
 
     assertEquals("", clientMachine.getValue());
-    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any());
+    verify(mockKeyManager, never()).resolveClientForWrite(anyString(), any());
+    verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
     assertEquals(1, locations.size());
     // Assert the write order (nodesInOrder), which copyWithNodesInOrder would
     // have changed had OM sorted; it must stay as the original pipeline order.
@@ -478,7 +686,16 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         MockDatanodeDetails.randomDatanodeDetails(),
         MockDatanodeDetails.randomDatanodeDetails());
     assertThrows(IllegalArgumentException.class,
-        () -> keyManager.sortDatanodesForWrite(nodes, "", mock(NetworkTopology.class)));
+        () -> keyManager.sortDatanodesForWrite(nodes, "", mock(Node.class), mock(NetworkTopology.class)));
+    assertThrows(IllegalArgumentException.class,
+        () -> keyManager.resolveClientForWrite("", mock(NetworkTopology.class)));
+  }
+
+  @Test
+  public void sortDatanodesForWriteRequiresClient() {
+    NullPointerException exception = assertThrows(NullPointerException.class,
+        () -> keyManager.sortDatanodesForWrite(Collections.emptyList(), "1.2.3.4", null, mock(NetworkTopology.class)));
+    assertEquals("client is null", exception.getMessage());
   }
 
   // Like createAllocateBlockRequest, but sets sortDatanodes so preExecute
@@ -488,6 +705,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         .setVolumeName(volumeName).setBucketName(bucketName).setKeyName(keyName)
         .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
         .setType(replicationConfig.getReplicationType())
+        .setStoragePolicy(OzoneStoragePolicy.toProto(OzoneStoragePolicy.getDefaultPolicy()))
         .setSortDatanodes(true)
         .build();
     AllocateBlockRequest allocateBlockRequest = AllocateBlockRequest.newBuilder()
@@ -510,14 +728,38 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     }
   }
 
-  protected OMRequest createAllocateBlockRequest() {
+  private void addVolumeAndBucketWithPolicy(StoragePolicy storagePolicy, boolean allowFallback) throws Exception {
+    final OmBucketInfo bucket = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+        getBucketLayout(), storagePolicy, allowFallback);
+    // OMKeyRequestTests stubs OzoneManager#getBucketInfo with an empty bucket, which preExecute reads.
+    when(ozoneManager.getBucketInfo(volumeName, bucketName)).thenReturn(bucket);
+  }
 
-    KeyArgs keyArgs = KeyArgs.newBuilder()
+  private void verifyPolicySentToScm(StoragePolicy expectedPolicy, boolean expectedAllowFallback) throws Exception {
+    ArgumentCaptor<StoragePolicy> policy = ArgumentCaptor.forClass(StoragePolicy.class);
+    ArgumentCaptor<Boolean> allowFallback = ArgumentCaptor.forClass(Boolean.class);
+    verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(), any(), any(), any(),
+        policy.capture(), allowFallback.capture());
+    assertThat(policy.getValue()).isEqualTo(expectedPolicy);
+    assertThat(allowFallback.getValue()).isEqualTo(expectedAllowFallback);
+  }
+
+  protected OMRequest createAllocateBlockRequest() {
+    return createAllocateBlockRequest(null);
+  }
+
+  /** Creates the request the way a client sends it: without a policy when {@code storagePolicy} is null. */
+  protected OMRequest createAllocateBlockRequest(StoragePolicy storagePolicy) {
+
+    KeyArgs.Builder keyArgsBuilder = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setKeyName(keyName)
         .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
-        .setType(replicationConfig.getReplicationType())
-        .build();
+        .setType(replicationConfig.getReplicationType());
+    if (storagePolicy != null) {
+      keyArgsBuilder.setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy));
+    }
+    KeyArgs keyArgs = keyArgsBuilder.build();
 
     AllocateBlockRequest allocateBlockRequest =
         AllocateBlockRequest.newBuilder().setClientID(clientID)
@@ -532,9 +774,16 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
   protected String addKeyToOpenKeyTable(String volumeName, String bucketName)
           throws Exception {
-    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName,
-        keyName, clientID, replicationConfig,
-        omMetadataManager);
+    return addKeyToOpenKeyTable(volumeName, bucketName, null);
+  }
+
+  /** Adds the open key with the given stored policy; null leaves it unset, as for a key opened before the upgrade. */
+  protected String addKeyToOpenKeyTable(String volumeName, String bucketName, StoragePolicy storagePolicy)
+          throws Exception {
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig)
+        .setStoragePolicy(storagePolicy)
+        .build();
+    OMRequestTestUtils.addKeyToTable(true, false, omKeyInfo, clientID, 0L, omMetadataManager);
     return "";
   }
 }

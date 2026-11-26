@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.s3.util.ContinueToken;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
+import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,7 +141,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       // delimited by OZONE_URI_DELIMITER
       boolean shallow = listKeysShallowEnabled && OZONE_URI_DELIMITER.equals(delimiter);
 
-      bucket = context.getVolume().getBucket(bucketName);
+      bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
 
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
@@ -322,7 +323,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     S3RequestContext context = new S3RequestContext(this, S3GAction.HEAD_BUCKET);
     long startNanos = context.getStartNanos();
     try {
-      OzoneBucket bucket = getVolume().getBucket(bucketName);
+      OzoneBucket bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       auditReadSuccess(context.getAction());
       getMetrics().updateHeadBucketSuccessStats(startNanos);
@@ -372,6 +373,8 @@ public class BucketEndpoint extends BucketOperationHandler {
       MultiDeleteRequest request
   ) throws OS3Exception, IOException {
     S3RequestContext context = new S3RequestContext(this, S3GAction.MULTI_DELETE);
+    // Content-MD5 is the integrity check for this body. Reject a mismatch before any key is deleted.
+    validateDeleteContentMD5(bucketName, request);
 
     if (request.getObjects() != null
         && request.getObjects().size() > S3Consts.S3_DELETE_OBJECTS_MAX_KEYS) {
@@ -386,7 +389,7 @@ public class BucketEndpoint extends BucketOperationHandler {
 
     final OzoneBucket bucket;
     try {
-      bucket = getVolume().getBucket(bucketName);
+      bucket = context.getBucket(bucketName);
     } catch (OMException ex) {
       throw newError(bucketName, ex);
     } catch (IOException ex) {
@@ -449,6 +452,13 @@ public class BucketEndpoint extends BucketOperationHandler {
     }
 
     return result;
+  }
+
+  private void validateDeleteContentMD5(String bucketName, MultiDeleteRequest request) throws OS3Exception {
+    String clientContentMD5 = getHeaders().getHeaderString(S3Consts.CHECKSUM_HEADER);
+    if (clientContentMD5 != null) {
+      S3Utils.validateContentMD5(clientContentMD5, request.getBodyContentMD5(), bucketName);
+    }
   }
 
   void auditMultiDeleteFailure(S3RequestContext context, List<String> deleteKeys, Throwable ex) {

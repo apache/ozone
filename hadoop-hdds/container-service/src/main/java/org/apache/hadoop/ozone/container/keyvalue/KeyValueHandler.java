@@ -144,6 +144,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.helpers.ReadBlockContext;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -175,6 +176,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
@@ -720,6 +722,9 @@ public class KeyValueHandler extends Handler {
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
       blockManager.putBlock(kvContainer, blockData, endOfBlock);
+      if (request.getPutBlock().getSync()) {
+        kvContainer.flushAndSyncDB();
+      }
 
       blockDataProto = blockData.getProtoBufMessage();
 
@@ -1500,12 +1505,12 @@ public class KeyValueHandler extends Handler {
           container.getContainerState();
       // Move the container to CLOSING state only if it's OPEN/RECOVERING
       if (HddsUtils.isOpenToWriteState(state)) {
+        container.markContainerForClose();
         if (state == RECOVERING) {
           containerSet.removeRecoveringContainer(
               container.getContainerData().getContainerID());
           ContainerLogger.logRecovered(container.getContainerData());
         }
-        container.markContainerForClose();
         stateChanged = true;
       }
     } finally {
@@ -2010,9 +2015,12 @@ public class KeyValueHandler extends Handler {
         .build();
     // Under construction is set here, during BlockInputStream#initialize() it is used to update the block length.
     blkInfo.setUnderConstruction(true);
+    // Always verify peer data before using it to repair this replica, regardless of the client setting.
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setChecksumVerify(true);
     try (BlockInputStream blockInputStream = blockInputStreamFactory.createBlockInputStream(
         blkInfo, pipeline, blockToken, dnClient.getXceiverClientManager(),
-        null, conf.getObject(OzoneClientConfig.class))) {
+        null, clientConfig)) {
       // Initialize the BlockInputStream. Gets the blockData from the peer, sets the block length and
       // initializes ChunkInputStream for each chunk.
       blockInputStream.initialize();
@@ -2319,7 +2327,7 @@ public class KeyValueHandler extends Handler {
   @Override
   public ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto request, Container kvContainer,
-      RandomAccessFileChannel blockFile,
+      ReadBlockContext readBlockContext,
       StreamObserver<ContainerCommandResponseProto> streamObserver) {
 
     if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
@@ -2336,7 +2344,7 @@ public class KeyValueHandler extends Handler {
     }
     try {
       final long startTime = Time.monotonicNow();
-      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver);
+      final long bytesRead = readBlockImpl(request, readBlockContext, kvContainer, streamObserver);
       KeyValueContainerData containerData = (KeyValueContainerData) kvContainer
           .getContainerData();
       HddsVolume volume = containerData.getVolume();
@@ -2350,6 +2358,8 @@ public class KeyValueHandler extends Handler {
       final StorageContainerException sce = new StorageContainerException(
           "Failed to readBlock " + request.getReadBlock(), ioe, IO_EXCEPTION);
       responseProto = ContainerUtils.logAndReturnError(LOG, sce, request);
+    } catch (StatusRuntimeException sre) {
+      throw sre;
     } catch (Exception e) {
       final StorageContainerException sce = new StorageContainerException(
           "Failed to readBlock " + request.getReadBlock(), e, CONTAINER_INTERNAL_ERROR);
@@ -2359,13 +2369,14 @@ public class KeyValueHandler extends Handler {
     return responseProto;
   }
 
-  private long readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
+  private long readBlockImpl(ContainerCommandRequestProto request, ReadBlockContext readBlockContext,
       Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
     final int responseDataSize = boundResponseDataSize(readBlock.getResponseDataSize());
 
     final BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
+    final RandomAccessFileChannel blockFile = readBlockContext.getBlockFile();
     if (!blockFile.isOpen()) {
       final File file = FILE_PER_BLOCK.getChunkFile(kvContainer.getContainerData(), blockID, "unused");
       blockFile.open(file);
@@ -2375,20 +2386,31 @@ public class KeyValueHandler extends Handler {
     BlockUtils.verifyReplicaIdx(kvContainer, blockID);
     BlockUtils.verifyBCSId(kvContainer, blockID);
 
-    final BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
+    if (readBlock.getOffset() < 0 || readBlock.getLength() < 0) {
+      return rejectReadBlock(readBlockContext, streamObserver, Status.INVALID_ARGUMENT.withDescription(
+          "Negative offset " + readBlock.getOffset() + " or length " + readBlock.getLength() + " for " + blockID));
+    }
+
+    // Cached per stream; re-resolve when the range reaches the cached size, since the block may have grown.
+    BlockData blockData = readBlockContext.getCachedBlockData(blockID);
+    if (blockData == null || readBlock.getLength() >= blockData.getSize() - readBlock.getOffset()) {
+      blockData = getBlockManager().getBlock(kvContainer, blockID);
+      readBlockContext.cacheBlockData(blockData);
+    }
     if (readBlock.getOffset() >= blockData.getSize()) {
-      return rejectReadBlock(blockFile, streamObserver, Status.OUT_OF_RANGE.withDescription(
+      return rejectReadBlock(readBlockContext, streamObserver, Status.OUT_OF_RANGE.withDescription(
           "Requested offset " + readBlock.getOffset() + " is beyond the end of block " + blockID + " with size "
               + blockData.getSize()));
     }
     final BlockReadCursor cursor = new BlockReadCursor(readBlock.getOffset(), readBlock.getLength(),
         responseDataSize, blockData.getChunks());
-    final ByteBuffer buffer = ByteBuffer.allocate(cursor.responseDataSize());
     long bytesRead = 0;
     while (cursor.hasNext()) {
       final BlockReadCursor.ReadRange range = cursor.next();
+      // Reused across the stream's requests: gRPC serializes the response inside onNext, before the buffer is refilled.
+      final ByteBuffer buffer = readBlockContext.getReadBuffer(range.length());
       blockFile.position(range.offset());
-      buffer.clear().limit(range.length());
+      buffer.limit(range.length());
       blockFile.read(buffer);
       if (buffer.hasRemaining()) {
         throw new EOFException("Unexpected end of block " + blockID + " at " + range.offset());
@@ -2398,7 +2420,8 @@ public class KeyValueHandler extends Handler {
       if (validateChunkChecksumData) {
         Checksum.validateChecksums(buffer, range.offset(), 0, range.chunks());
       }
-      streamObserver.onNext(getReadBlockResponse(request, range.chunks(), buffer, range.offset()));
+      streamObserver.onNext(
+          getReadBlockResponse(request, range.chunks(), buffer, range.offset(), byteBufferToByteString));
     }
     return bytesRead;
   }
@@ -2408,14 +2431,14 @@ public class KeyValueHandler extends Handler {
    * and make the dispatcher scan the container. This ends the call from the datanode side, so also close the stream's
    * block file: GrpcXceiverService closes it only when the client ends the stream or a request throws.
    */
-  private static long rejectReadBlock(RandomAccessFileChannel blockFile,
+  private static long rejectReadBlock(ReadBlockContext readBlockContext,
       StreamObserver<ContainerCommandResponseProto> streamObserver, Status status) {
-    blockFile.close();
+    readBlockContext.close();
     streamObserver.onError(status.asRuntimeException());
     return 0;
   }
 
-  /** The client chooses the response size, which is a uint32 and sizes the read buffer: bound it. */
+  /** The client chooses the response size, which is a uint32 and sizes a buffer kept for the stream: bound it. */
   @VisibleForTesting
   static int boundResponseDataSize(int responseDataSize) {
     if (responseDataSize <= 0) {

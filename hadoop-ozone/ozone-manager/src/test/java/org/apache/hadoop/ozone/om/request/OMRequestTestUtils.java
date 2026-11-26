@@ -157,6 +157,19 @@ public final class OMRequestTestUtils {
     addBucketToDB(omMetadataManager, builder);
   }
 
+  /** Adds the volume (if missing) and a bucket with the given storage policy and fallback flag to the OM DB. */
+  public static OmBucketInfo addVolumeAndBucketToDB(String volumeName, String bucketName,
+      OMMetadataManager omMetadataManager, BucketLayout bucketLayout, StoragePolicy storagePolicy,
+      boolean allowFallbackStoragePolicy) throws Exception {
+    if (!omMetadataManager.getVolumeTable().isExist(omMetadataManager.getVolumeKey(volumeName))) {
+      addVolumeToDB(volumeName, omMetadataManager);
+    }
+    return addBucketToDB(omMetadataManager,
+        OmBucketInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+            .setBucketLayout(bucketLayout)
+            .setStoragePolicy(storagePolicy).setAllowFallbackStoragePolicy(allowFallbackStoragePolicy));
+  }
+
   @SuppressWarnings("parameterNumber")
   public static void addKeyToTableAndCache(String volumeName, String bucketName,
       String keyName, long clientID, ReplicationConfig replicationConfig, long trxnLogIndex,
