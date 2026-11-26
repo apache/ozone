@@ -30,7 +30,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
@@ -136,8 +135,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    * @throws IOException if any error occurs while trying to get the proxy
    */
   protected T createOMProxy(InetSocketAddress omAddress) throws IOException {
-    Configuration hadoopConf =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
+    Configuration hadoopConf = HddsUtils.getFailoverProxyConfiguration(getConf());
 
     RPC.setProtocolEngine(hadoopConf, getInterface(), ProtobufRpcEngine.class);
 
@@ -202,12 +200,20 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     // Client will attempt up to maxFailovers number of failovers between
     // available OMs before throwing exception.
     RetryPolicy retryPolicy = new RetryPolicy() {
+      // Stores the failed OMs per request, to debounce repeatedly failed OM-suggested leaders.
+      private final ThreadLocal<Set<String>> failedOMs = ThreadLocal.withInitial(HashSet::new);
+
       @Override
       public RetryAction shouldRetry(Exception exception, int retries,
           int failovers, boolean isIdempotentOrAtMostOnce)
           throws Exception {
 
         String omNodeId = getCurrentProxyOMNodeId();
+        final Set<String> failedOMsOfRequest = failedOMs.get();
+        if (failovers == 0) {
+          failedOMsOfRequest.clear();
+        }
+        failedOMsOfRequest.add(omNodeId);
 
         if (LOG.isDebugEnabled()) {
           if (exception.getCause() != null) {
@@ -226,13 +232,10 @@ public abstract class OMFailoverProxyProviderBase<T> implements
           if (notLeaderException != null) {
             // Prepare the next OM to be tried. This will help with calculation
             // of the wait times needed get creating the retryAction.
-            String suggestedLeaderAddress =
-                notLeaderException.getSuggestedLeaderAddress();
             String suggestedNodeId =
                 notLeaderException.getSuggestedLeaderNodeId();
-            if (suggestedLeaderAddress != null &&
-                suggestedNodeId != null &&
-                omProxies.contains(suggestedNodeId, suggestedLeaderAddress)) {
+            if (suggestedNodeId != null && omProxies.get(suggestedNodeId) != null
+                && !failedOMsOfRequest.contains(suggestedNodeId)) {
               setNextOmProxy(suggestedNodeId);
               return getRetryAction(RetryDecision.FAILOVER_AND_RETRY,
                   failovers);
@@ -390,13 +393,24 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
   /**
    * Get the wait time based on
-   * 1. Is the same OM being retried based on response from OM.
-   * 2. Is this a new OM that is being used.
-   * 3. Were all the OMs visited once and retries need to be resumed after a
+   * 1. Were all the OMs visited once and retries need to be resumed after a
    * delay.
+   * 2. Is the same OM being retried based on response from OM.
+   * 3. Is this a new OM that is being used.
    * @return delay in milliseconds
    */
   public synchronized long getWaitTime() {
+    // OMs are being contacted in Round Robin way. If all the OMs have been
+    // contacted once in this attempt, clear the list. The OMs will be retried
+    // in a Round Robin fashion again after a fixed delay. This is checked first
+    // because with a single OM, Round Robin selects the same OM again, which is
+    // not a retry on the same OM based on response from OM.
+    if (attemptedOMs.containsAll(omProxies.getNodeIds())) {
+      attemptedOMs.clear();
+      numAttemptsOnSameOM = 0;
+      return waitBetweenRetries;
+    }
+
     if (omProxies.getNodeId(nextProxyIndex).equals(lastAttemptedOM)) {
       // Clear attemptedOMs list as the same OM has been selected again.
       attemptedOMs.clear();
@@ -407,19 +421,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     }
     // Reset numAttemptsOnSameOM as we failed over to a different OM.
     numAttemptsOnSameOM = 0;
-
-    // OMs are being contacted in Round Robin way. Check if all the OMs have
-    // been contacted in this attempt.
-    for (String omNodeID : omProxies.getNodeIds()) {
-      if (!attemptedOMs.contains(omNodeID)) {
-        return 0;
-      }
-    }
-    // This implies all the OMs have been contacted once. Return true and
-    // clear the list. The OMs will be retried in a Round Robin fashion again
-    // after a delay.
-    attemptedOMs.clear();
-    return waitBetweenRetries;
+    return 0;
   }
 
   public List<OMProxyInfo<T>> getOMProxies() {
@@ -439,15 +441,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    */
   public static OMLeaderNotReadyException getLeaderNotReadyException(
       Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMLeaderNotReadyException) {
-        return (OMLeaderNotReadyException) ioException;
-      }
-    }
-    return null;
+    return getCause(exception, OMLeaderNotReadyException.class);
   }
 
   /**
@@ -459,15 +453,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    */
   public static OMNotLeaderException getNotLeaderException(
       Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMNotLeaderException) {
-        return (OMNotLeaderException) ioException;
-      }
-    }
-    return null;
+    return getCause(exception, OMNotLeaderException.class);
   }
 
   /**
@@ -478,15 +464,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    *         exception is not ReadIndexException.
    */
   public static ReadIndexException getReadIndexException(Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof ReadIndexException) {
-        return (ReadIndexException) ioException;
-      }
-    }
-    return null;
+    return getCause(exception, ReadIndexException.class);
   }
 
   /**
@@ -497,15 +475,19 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    *         exception is not ReadException.
    */
   public static ReadException getReadException(Exception exception) {
+    return getCause(exception, ReadException.class);
+  }
+
+  /**
+   * @return the cause of the given exception if it has the given type, otherwise null.
+   *         A cause in a {@link RemoteException} is unwrapped first.
+   */
+  private static <T extends IOException> T getCause(Exception exception, Class<T> type) {
     Throwable cause = exception.getCause();
     if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof ReadException) {
-        return (ReadException) ioException;
-      }
+      cause = ((RemoteException) cause).unwrapRemoteException();
     }
-    return null;
+    return type.isInstance(cause) ? type.cast(cause) : null;
   }
 
   protected ConfigurationSource getConf() {

@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import React, { ChangeEvent, useState, useEffect, useCallback } from 'react';
+import React, { ChangeEvent, useState, useEffect } from 'react';
 import moment, { Moment } from 'moment';
 import { Button, Menu, Input, Dropdown, DatePicker, Form, Result, Spin } from 'antd';
 import { MenuProps } from 'antd/es/menu';
@@ -24,7 +24,7 @@ import { DownOutlined } from '@ant-design/icons';
 import { showDataFetchError } from '@/utils/common';
 import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import * as CONSTANTS from '@/v2/constants/heatmap.constants';
-import { HeatmapChild, HeatmapResponse, HeatmapState, InputPathState, InputPathValidTypes, IResponseError } from '@/v2/types/heatmap.types';
+import { HeatmapChild, HeatmapResponse, HeatmapState } from '@/v2/types/heatmap.types';
 import HeatmapPlot from '@/v2/components/plots/heatmapPlot';
 
 import './heatmap.less';
@@ -41,6 +41,15 @@ const DEFAULT_HEATMAP_RESPONSE: HeatmapResponse = {
   minAccessCount: 0
 };
 
+function buildHeatmapReadAccessUrl(startDate: string | number, path: string, entityType: string): string {
+  const params = new URLSearchParams({
+    startDate: String(startDate),
+    path,
+    entityType,
+  });
+  return `/api/v1/heatmap/readaccess?${params.toString()}`;
+}
+
 const Heatmap: React.FC<{}> = () => {
   const [state, setState] = useState<HeatmapState>({
     heatmapResponse: DEFAULT_HEATMAP_RESPONSE,
@@ -48,11 +57,7 @@ const Heatmap: React.FC<{}> = () => {
     date: CONSTANTS.TIME_PERIODS[0]
   });
 
-  const [inputPathState, setInputPathState] = useState<InputPathState>({
-    inputPath: CONSTANTS.ROOT_PATH,
-    isInputPathValid: undefined,
-    helpMessage: ''
-  });
+  const [inputPath, setInputPath] = useState<string>(CONSTANTS.ROOT_PATH);
 
   const [searchPath, setSearchPath] = useState<string>(CONSTANTS.ROOT_PATH);
   const [treeEndpointFailed, setTreeEndpointFailed] = useState<boolean>(false);
@@ -64,7 +69,7 @@ const Heatmap: React.FC<{}> = () => {
   // Use the modern hooks pattern for heatmap data - only trigger on searchPath change
   const heatmapData = useApiData<HeatmapResponse>(
     isHeatmapEnabled && state.date && searchPath && state.entityType
-      ? `/api/v1/heatmap/readaccess?startDate=${state.date}&path=${searchPath}&entityType=${state.entityType}`
+      ? buildHeatmapReadAccessUrl(state.date, searchPath, state.entityType)
       : '',
     DEFAULT_HEATMAP_RESPONSE,
     {
@@ -76,10 +81,7 @@ const Heatmap: React.FC<{}> = () => {
         }
         showDataFetchError(error.message.toString());
         setTreeEndpointFailed(true);
-        setInputPathState(prevState => ({
-          ...prevState,
-          inputPath: CONSTANTS.ROOT_PATH
-        }));
+        setInputPath(CONSTANTS.ROOT_PATH);
         setSearchPath(CONSTANTS.ROOT_PATH);
       }
     }
@@ -100,26 +102,12 @@ const Heatmap: React.FC<{}> = () => {
   }, [heatmapData.data]);
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value;
-    // Only allow letters, numbers,underscores and forward slashes and hyphen
-    const regex = /^[a-zA-Z0-9_/-]*$/;
-
-    let inputValid = undefined;
-    let helpMessage = '';
-    if (!regex.test(value)) {
-      helpMessage = 'Please enter valid path';
-      inputValid = 'error';
-    }
-    setInputPathState({
-      inputPath: value,
-      isInputPathValid: inputValid as InputPathValidTypes,
-      helpMessage: helpMessage
-    });
+    setInputPath(e.target.value);
   }
 
   function handleSubmit() {
-    if (isHeatmapEnabled && state.date && inputPathState.inputPath && state.entityType) {
-      setSearchPath(inputPathState.inputPath);
+    if (isHeatmapEnabled && state.date && inputPath && state.entityType) {
+      setSearchPath(inputPath);
     }
   }
 
@@ -148,9 +136,8 @@ const Heatmap: React.FC<{}> = () => {
 
   const updateSize = (obj: HeatmapResponse | HeatmapChild) => {
     //Normalize Size so other blocks also get visualized if size is large in bytes minimize and if size is too small make it big
-    // it will only apply on leaf level as checking color property
-    if (obj.hasOwnProperty('size') && obj.hasOwnProperty('color')) {
-
+    // Apply only to leaves.
+    if (obj.hasOwnProperty('size') && !('children' in obj && obj.children?.length)) {
       // hide block at key,volume,bucket level if size accessCount and maxAccessCount are zero apply normalized size only for leaf level
       if ((obj as HeatmapChild)?.size === 0 && (obj as HeatmapChild)?.accessCount === 0) {
         (obj as any)['normalizedSize'] = 0;
@@ -174,10 +161,7 @@ const Heatmap: React.FC<{}> = () => {
   };
 
   const updateHeatmapParent = (path: string) => {
-    setInputPathState(prevState => ({
-      ...prevState,
-      inputPath: path
-    }));
+    setInputPath(path);
     setSearchPath(path);
   }
 
@@ -213,7 +197,6 @@ const Heatmap: React.FC<{}> = () => {
   };
 
   const { date, entityType, heatmapResponse } = state;
-  const { inputPath, helpMessage, isInputPathValid } = inputPathState;
   const loading = heatmapData.loading;
 
   const menuCalendar = (
@@ -289,7 +272,7 @@ const Heatmap: React.FC<{}> = () => {
                 <div className='heatmap-filter-section'>
                   <div className='path-input-container'>
                     <h4 style={{ paddingTop: '2%' }}>Path</h4>
-                    <Form.Item className='path-input-element' validateStatus={isInputPathValid} help={helpMessage}>
+                    <Form.Item className='path-input-element'>
                       <Input.Search
                         allowClear
                         placeholder={CONSTANTS.ROOT_PATH}

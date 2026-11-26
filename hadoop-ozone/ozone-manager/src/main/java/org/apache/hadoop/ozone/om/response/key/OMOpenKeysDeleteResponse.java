@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.response.key;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -34,11 +33,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  */
 public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
 
-  private Map<String, Pair<Long, OmKeyInfo>> keysToDelete;
+  private Map<String, OpenKeyToDelete> keysToDelete;
 
   public OMOpenKeysDeleteResponse(
       @Nonnull OMResponse omResponse,
-      @Nonnull Map<String, Pair<Long, OmKeyInfo>> keysToDelete,
+      @Nonnull Map<String, OpenKeyToDelete> keysToDelete,
       @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, bucketLayout);
@@ -64,9 +63,17 @@ public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
     Table<String, OmKeyInfo> openKeyTable =
         omMetadataManager.getOpenKeyTable(getBucketLayout());
 
-    for (Map.Entry<String, Pair<Long, OmKeyInfo>> keyInfoPair : keysToDelete.entrySet()) {
+    for (Map.Entry<String, OpenKeyToDelete> openKeyEntry : keysToDelete.entrySet()) {
+      OpenKeyToDelete openKey = openKeyEntry.getValue();
       addDeletionToBatch(omMetadataManager, batchOperation, openKeyTable,
-          keyInfoPair.getKey(), keyInfoPair.getValue().getValue(), keyInfoPair.getValue().getKey(), false);
+          openKeyEntry.getKey(), openKey.keyInfo(), openKey.bucketId(), false);
     }
+  }
+
+  /**
+   * An open key's info paired with the object ID of its bucket,
+   * used as an entry to be moved from the open key table to the delete table.
+   */
+  public record OpenKeyToDelete(long bucketId, OmKeyInfo keyInfo) {
   }
 }

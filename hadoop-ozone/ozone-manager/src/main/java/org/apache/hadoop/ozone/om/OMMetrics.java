@@ -30,6 +30,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.snapshot.OMSnapshotDirectoryMetrics;
 import org.apache.hadoop.util.Time;
 
@@ -214,6 +215,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   // Metrics for total amount of data written
   private @Metric MutableCounterLong totalDataCommitted;
+  private final OMStoragePolicyMetrics storagePolicyMetrics = new OMStoragePolicyMetrics();
 
   // Metrics for total number of volumes, buckets and keys
 
@@ -276,9 +278,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
         ? OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
         : conf.getInt(OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
-    return ms.register(SOURCE_NAME,
+    OMMetrics metrics = ms.register(SOURCE_NAME,
         "Ozone Manager Metrics",
         new OMMetrics(maxRatisEvents));
+    metrics.storagePolicyMetrics.register(conf);
+    return metrics;
   }
 
   public DBCheckpointMetrics getDBCheckpointMetrics() {
@@ -309,6 +313,13 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incDataCommittedBytes(long bytesWritten) {
     totalDataCommitted.incr(bytesWritten);
+  }
+
+  /**
+   * Records final committed key bytes using allocation attributes retained before the client locations replace them.
+   */
+  public void incStoragePolicyCommittedBytes(OmKeyInfo allocatedKey, OmKeyInfo committedKey) {
+    storagePolicyMetrics.recordCommit(allocatedKey, committedKey);
   }
 
   public void incNumVolumes() {
@@ -1619,6 +1630,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void unRegister() {
+    storagePolicyMetrics.unregister();
     if (dbCheckpointMetrics != null) {
       dbCheckpointMetrics.unRegister();
     }

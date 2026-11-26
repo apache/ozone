@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.StorageType;
@@ -61,6 +62,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.metrics2.AbstractMetric;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.metrics2.impl.MetricsRecordImpl;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -169,6 +174,7 @@ public class TestOzoneStoragePolicy {
       OzoneBucket bucket = createBucket(null, BucketLayout.OBJECT_STORE);
       OmKeyInfo keyInfo = createKeyAndLookup(bucket, storagePolicy);
 
+      assertEquals(keyInfo.getDataSize(), policyBytes(storagePolicy, storagePolicy.getCreationTier(), "preferred"));
       assertKeyInfo(keyInfo, storagePolicy);
       assertScmContainerAndPipeline(keyInfo, storagePolicy.getCreationTier());
       assertDatanodeContainerAndBlock(keyInfo, storagePolicy.getCreationTier());
@@ -329,6 +335,7 @@ public class TestOzoneStoragePolicy {
         createBucket(null, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     OmKeyInfo keyInfo = createKeyAndLookup(bucket, OzoneStoragePolicy.HOT);
 
+    assertEquals(keyInfo.getDataSize(), policyBytes(OzoneStoragePolicy.HOT, StorageTier.SSD, "preferred"));
     assertKeyInfo(keyInfo, OzoneStoragePolicy.HOT);
     assertScmContainerAndPipeline(keyInfo,
         OzoneStoragePolicy.HOT.getCreationTier());
@@ -358,6 +365,7 @@ public class TestOzoneStoragePolicy {
     assertEquals(OzoneStoragePolicy.COLD, keyInfo.getStoragePolicy());
     assertTrue(keyInfo.getLatestVersionLocations()
         .getBlocksLatestVersionOnly().isEmpty());
+    assertEquals(0, policyBytes(OzoneStoragePolicy.COLD, StorageTier.ARCHIVE, "preferred"));
   }
 
   /**
@@ -400,6 +408,7 @@ public class TestOzoneStoragePolicy {
 
     // Every block, not just the first, must sit on the tier the key asked for.
     assertAllBlocksOnTier(keyInfo, OzoneStoragePolicy.COLD.getCreationTier());
+    assertEquals(data.length, policyBytes(OzoneStoragePolicy.COLD, StorageTier.ARCHIVE, "preferred"));
   }
 
   /**
@@ -430,6 +439,8 @@ public class TestOzoneStoragePolicy {
     // The recorded policy and the tier the data actually sits on must agree.
     assertEquals(OzoneStoragePolicy.COLD, overwritten.getStoragePolicy());
     assertAllBlocksOnTier(overwritten, OzoneStoragePolicy.COLD.getCreationTier());
+    assertEquals(original.getDataSize(), policyBytes(OzoneStoragePolicy.HOT, StorageTier.SSD, "preferred"));
+    assertEquals(overwritten.getDataSize(), policyBytes(OzoneStoragePolicy.COLD, StorageTier.ARCHIVE, "preferred"));
   }
 
   /**
@@ -547,6 +558,9 @@ public class TestOzoneStoragePolicy {
       OzoneBucket bucket = createBucket(null, BucketLayout.OBJECT_STORE);
       String keyName = UUID.randomUUID().toString();
       writeKey(bucket, keyName, OzoneStoragePolicy.HOT);
+      assertEquals(lookupKey(bucket, keyName).getDataSize(),
+          policyBytes(OzoneStoragePolicy.HOT, StorageTier.DISK, "fallback"));
+      assertEquals(0, policyBytes(OzoneStoragePolicy.HOT, StorageTier.SSD, "preferred"));
       OzoneKeyDetails keyDetails = bucket.getKey(keyName);
       waitForReplicaReports(scmClient, keyDetails);
 
@@ -727,6 +741,26 @@ public class TestOzoneStoragePolicy {
     }
     store.getVolume(volumeName).createBucket(bucketName, builder.build());
     return store.getVolume(volumeName).getBucket(bucketName);
+  }
+
+  private long policyBytes(OzoneStoragePolicy policy, StorageTier actualTier, String outcome) {
+    MetricsCollectorImpl collector = new MetricsCollectorImpl();
+    DefaultMetricsSystem.instance().getSource("OMStoragePolicyMetrics").getMetrics(collector, true);
+    long bytes = 0;
+    for (MetricsRecordImpl record : collector.getRecords()) {
+      Map<String, String> tags = record.tags().stream()
+          .collect(Collectors.toMap(tag -> tag.name(), tag -> tag.value()));
+      if (policy.name().equals(tags.get("Policy")) && actualTier.name().equals(tags.get("ActualTier"))
+          && outcome.equals(tags.get("Outcome"))) {
+        assertEquals(policy.getCreationTier().name(), tags.get("RequestedTier"));
+        for (AbstractMetric metric : record.metrics()) {
+          if ("CommittedBytes".equals(metric.name())) {
+            bytes += metric.value().longValue();
+          }
+        }
+      }
+    }
+    return bytes;
   }
 
   private void writeKey(OzoneBucket bucket, String keyName,

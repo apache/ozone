@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.NonHATests;
+import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -41,7 +41,7 @@ import org.junit.jupiter.api.TestInstance;
  * Tests to verify Object store without prefix enabled.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TestObjectStore implements NonHATests.TestCase {
+public abstract class TestObjectStore implements ClusterForTests.TestCase {
   private OzoneConfiguration conf;
   private OzoneClient client;
 

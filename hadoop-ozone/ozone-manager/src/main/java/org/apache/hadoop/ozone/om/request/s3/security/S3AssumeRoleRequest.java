@@ -132,7 +132,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       // The original AssumeRole request is converted to an UpdateAssumeRoleRequest with the generated
       // values. This update request will be submitted to Ratis and replicated across all OMs.
       // All OMs in HA mode therefore will have identical audit logs with the same tempAccessKeyId.
-      S3STSUtils.validateDuration(durationSeconds);
+      S3STSUtils.validateDuration(durationSeconds, ozoneManager.getS3StsMinDurationSeconds());
       S3STSUtils.validateRoleSessionName(roleSessionName);
       final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
 

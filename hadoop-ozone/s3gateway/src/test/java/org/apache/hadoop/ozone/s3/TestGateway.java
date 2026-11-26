@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STORAGE_C
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_REDUCED_REDUNDANCY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD_IA;
+import static org.apache.ozone.test.GenericTestUtils.captureErr;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -33,8 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Handler;
@@ -48,6 +47,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.ozone.s3.util.S3StorageClassResolver;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.GenericTestUtils.PrintStreamCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -112,11 +112,11 @@ public class TestGateway {
           }
         };
         gateway.getOzoneConf().set(key, value);
-        StringWriter errors = new StringWriter();
-        gateway.getCmd().setErr(new PrintWriter(errors));
 
-        assertEquals(EXECUTION_ERROR_EXIT_CODE, gateway.execute(new String[0]));
-        assertThat(errors.toString()).contains(key, value, "Expected HOT, WARM or empty.");
+        try (PrintStreamCapturer errors = captureErr()) {
+          assertEquals(EXECUTION_ERROR_EXIT_CODE, gateway.execute(new String[0]));
+          assertThat(errors.getOutput()).contains(key, value, "Expected HOT, WARM or empty.");
+        }
         assertNull(OzoneConfigurationHolder.configuration());
         assertNull(OzoneConfigurationHolder.storageClassResolver());
       }

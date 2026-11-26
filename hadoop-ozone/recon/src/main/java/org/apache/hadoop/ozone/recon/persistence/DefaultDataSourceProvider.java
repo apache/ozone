@@ -47,9 +47,7 @@ public class DefaultDataSourceProvider implements Provider<DataSource> {
   public DataSource get() {
     String jdbcUrl = configuration.getJdbcUrl();
     LOG.info("JDBC Url for Recon : {} ", jdbcUrl);
-    if (StringUtils.contains(jdbcUrl, "derby")) {
-      return new DerbyDataSourceProvider(configuration).get();
-    } else if (StringUtils.contains(jdbcUrl, "sqlite")) {
+    if (StringUtils.startsWith(jdbcUrl, "jdbc:sqlite:")) {
       return new SqliteDataSourceProvider(configuration).get();
     }
 

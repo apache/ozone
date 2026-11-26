@@ -133,6 +133,7 @@ public final class OzoneVolumeStub extends OzoneVolume {
         .setAllowFallbackStoragePolicy(bucketArgs.getAllowFallbackStoragePolicy())
         .setVersioning(bucketArgs.getVersioning())
         .setOwner(bucketArgs.getOwner())
+        .setEncryptionKeyName(bucketArgs.getEncryptionKey())
         .setCreationTime(Time.now())
         .build());
   }
