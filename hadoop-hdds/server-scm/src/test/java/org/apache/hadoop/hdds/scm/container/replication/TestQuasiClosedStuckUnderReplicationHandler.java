@@ -23,7 +23,11 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -34,7 +38,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -43,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.DatanodeCommand;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.NodeOperationalStateAndOrigin;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -51,6 +58,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -147,6 +155,60 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1);
     assertEquals(2, count);
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(replicationManager, commandsSent, new AtomicBoolean(true));
+  }
+
+  @Test
+  public void testUnderReplicationPreservesStorageTier() throws IOException {
+    container = TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RATIS_REPLICATION_CONFIG)
+        .setState(HddsProtos.LifeCycleState.QUASI_CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build();
+    DatanodeDetails firstTarget = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails secondTarget = MockDatanodeDetails.randomDatanodeDetails();
+    PlacementPolicy policy = mock(PlacementPolicy.class);
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(2), anyLong(), anyLong(), eq(StorageType.SSD)))
+        .thenReturn(List.of(firstTarget, secondTarget));
+    handler = new QuasiClosedStuckUnderReplicationHandler(policy, conf, replicationManager);
+    DatanodeID origin = DatanodeID.randomID();
+    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
+        QUASI_CLOSED, new NodeOperationalStateAndOrigin(origin, IN_SERVICE));
+
+    assertEquals(2, handler.processAndSendCommands(
+        replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1));
+
+    verify(policy).chooseDatanodes(anyList(), anyList(), any(), eq(2), anyLong(), anyLong(), eq(StorageType.SSD));
+    for (DatanodeCommand command : commandsSent) {
+      assertEquals(StorageType.SSD,
+          ((ReplicateContainerCommand) command.command()).getTargetVolumeStorageType());
+    }
+  }
+
+  @Test
+  public void testUnderReplicationFallsBackToDiskWhenSsdIsUnavailable() throws IOException {
+    container = TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RATIS_REPLICATION_CONFIG)
+        .setState(HddsProtos.LifeCycleState.QUASI_CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build();
+    PlacementPolicy policy = mock(PlacementPolicy.class);
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), any(Integer.class), anyLong(), anyLong(),
+        eq(StorageType.SSD))).thenThrow(new SCMException("No SSD target", SCMException.ResultCodes.NO_SUCH_DATANODE));
+    when(policy.chooseDatanodes(anyList(), anyList(), any(), eq(2), anyLong(), anyLong(), eq(StorageType.DISK)))
+        .thenReturn(List.of(MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails()));
+    handler = new QuasiClosedStuckUnderReplicationHandler(policy, conf, replicationManager);
+    DatanodeID origin = DatanodeID.randomID();
+    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
+        QUASI_CLOSED, new NodeOperationalStateAndOrigin(origin, IN_SERVICE));
+
+    assertEquals(2, handler.processAndSendCommands(
+        replicas, Collections.emptyList(), getUnderReplicatedHealthResult(), 1));
+    assertEquals(2, commandsSent.size());
+    for (DatanodeCommand command : commandsSent) {
+      assertEquals(StorageType.DISK, ((ReplicateContainerCommand) command.command()).getTargetVolumeStorageType());
+    }
   }
 
   @Test

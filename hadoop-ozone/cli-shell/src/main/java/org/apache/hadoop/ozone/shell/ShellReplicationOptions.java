@@ -25,6 +25,7 @@ import picocli.CommandLine.Option;
 public class ShellReplicationOptions extends ReplicationOptions {
 
   @Option(names = {"-t", "--type", "--replication-type"},
+      defaultValue = Option.NULL_VALUE,
       description = TYPE_DESCRIPTION)
   @Override
   public void setType(String type) {
@@ -32,6 +33,7 @@ public class ShellReplicationOptions extends ReplicationOptions {
   }
 
   @Option(names = {"--replication", "-r"},
+      defaultValue = Option.NULL_VALUE,
       description = REPLICATION_DESCRIPTION)
   @Override
   public void setReplication(String replication) {

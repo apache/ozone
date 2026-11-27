@@ -27,11 +27,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisResponse;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -121,8 +121,8 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
       }
 
       @Override
-      public List<ContainerID> getContainerIDs(LifeCycleState arg0, ContainerHealthState arg1, ContainerID arg2, int
-          arg3) {
+      public List<ContainerID> getContainerIDs(LifeCycleState arg0, SimplifiedContainerHealthStateForReporting arg1,
+          ContainerID arg2, int arg3) {
         return invoker.getImpl().getContainerIDs(arg0, arg1, arg2, arg3);
       }
 
@@ -249,7 +249,8 @@ public class ContainerStateManagerInvoker extends ScmInvoker<ContainerStateManag
 
     case "getContainerIDs":
       final LifeCycleState arg4 = p.length > 0 ? (LifeCycleState) p[0] : null;
-      final ContainerHealthState arg5 = p.length > 1 ? (ContainerHealthState) p[1] : null;
+      final SimplifiedContainerHealthStateForReporting arg5 = p.length > 1 ?
+          (SimplifiedContainerHealthStateForReporting) p[1] : null;
       final ContainerID arg6 = p.length > 2 ? (ContainerID) p[2] : null;
       final int arg7 = p.length > 3 ? (int) p[3] : 0;
       returnType = List.class;

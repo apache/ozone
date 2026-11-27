@@ -116,6 +116,10 @@ public abstract class MisReplicationHandlerTests {
     return replicationManager;
   }
 
+  protected void setContainerForTest(ContainerInfo containerInfo) {
+    container = containerInfo;
+  }
+
   protected ReplicationManagerMetrics getMetrics() {
     return metrics;
   }

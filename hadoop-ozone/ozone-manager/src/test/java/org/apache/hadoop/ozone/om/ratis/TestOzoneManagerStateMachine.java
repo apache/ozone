@@ -682,6 +682,21 @@ public class TestOzoneManagerStateMachine {
         () -> sm.processResponse(response));
   }
 
+  @Test
+  public void testNotifyLogFailedTerminates() {
+    IOException cause = new IOException("Raft log write failed");
+    try {
+      assertThatThrownBy(() -> sm.notifyLogFailed(cause, null))
+          .isInstanceOfSatisfying(ExitUtils.ExitException.class, e -> assertThat(e.getStatus()).isEqualTo(1))
+          .hasCause(cause);
+      assertThatThrownBy(() -> sm.notifyLogFailed(cause, LogProtoUtils.toLogEntryProto(7, 2, 7)))
+          .isInstanceOfSatisfying(ExitUtils.ExitException.class, e -> assertThat(e.getStatus()).isEqualTo(1))
+          .hasMessageContaining(TermIndex.valueOf(2, 7).toString());
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
   // --- createErrorResponse tests ---
 
   @Test

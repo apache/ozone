@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
@@ -73,7 +73,8 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
       ContainerHealthResult.UnderReplicatedHealthResult underHealth
           = ((ContainerHealthResult.UnderReplicatedHealthResult) health);
       // Container is UNHEALTHY + UNDER_REPLICATED
-      request.setHealthState(ContainerHealthState.UNHEALTHY_UNDER_REPLICATED);
+      request.setSimplifiedHealthStateForReporting(
+          SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED);
       LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending" +
               " is [{}]. isUnrecoverable is [{}]. hasHealthyReplicas is [{}].",
           container,
@@ -89,7 +90,8 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
       // Container is UNHEALTHY + OVER_REPLICATED
-      request.setHealthState(ContainerHealthState.UNHEALTHY_OVER_REPLICATED);
+      request.setSimplifiedHealthStateForReporting(
+          SimplifiedContainerHealthStateForReporting.UNHEALTHY_OVER_REPLICATED);
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending" +
@@ -105,7 +107,7 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
 
     if (health.getHealthState() == ContainerHealthResult.HealthState.UNHEALTHY) {
       // Container is UNHEALTHY + SUFFICIENTLY REPLICATED
-      request.setHealthState(ContainerHealthState.UNHEALTHY);
+      request.setSimplifiedHealthStateForReporting(SimplifiedContainerHealthStateForReporting.UNHEALTHY);
       LOG.debug("Container {} is sufficiently replicated with all unhealthy replicas", container);
     }
     

@@ -101,12 +101,23 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
     int totalRequiredReplicas = 0;
     int totalCommandsSent = 0;
     IOException firstException = null;
+    StorageType preferredStorageType = ReplicationManagerUtil.getTargetStorageType(containerInfo);
     List<ContainerReplicaOp> mutablePendingOps = new ArrayList<>(pendingOps);
     for (QuasiClosedStuckReplicaCount.MisReplicatedOrigin origin : misReplicatedOrigins) {
       totalRequiredReplicas += origin.getReplicaDelta();
       List<DatanodeDetails> targets;
+      StorageType targetStorageType = preferredStorageType;
       try {
-        targets = getTargets(containerInfo, replicas, origin.getReplicaDelta(), mutablePendingOps);
+        try {
+          targets = getTargets(containerInfo, replicas, origin.getReplicaDelta(), mutablePendingOps, targetStorageType);
+        } catch (SCMException e) {
+          StorageType fallback = ReplicationManagerUtil.getFallbackStorageType(preferredStorageType);
+          if (e.getResult() != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE || fallback == null) {
+            throw e;
+          }
+          targetStorageType = fallback;
+          targets = getTargets(containerInfo, replicas, origin.getReplicaDelta(), mutablePendingOps, targetStorageType);
+        }
       } catch (SCMException e) {
         if (firstException == null) {
           firstException = e;
@@ -121,11 +132,11 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
       for (DatanodeDetails target : targets) {
         try {
           replicationManager.sendThrottledReplicationCommand(
-              containerInfo, sourceDatanodes, target, 0);
+              containerInfo, sourceDatanodes, target, 0, targetStorageType);
           // Add the pending op, so we exclude the node for subsequent origins
           mutablePendingOps.add(new ContainerReplicaOp(
               ContainerReplicaOp.PendingOpType.ADD, target, 0,
-              null, System.currentTimeMillis(), 0, null));
+              null, System.currentTimeMillis(), 0, targetStorageType));
           totalCommandsSent++;
         } catch (CommandTargetOverloadedException e) {
           LOG.warn("Cannot replicate container {} because all sources are overloaded.", containerInfo);
@@ -152,7 +163,8 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
   }
 
   private List<DatanodeDetails> getTargets(ContainerInfo containerInfo,
-      Set<ContainerReplica> replicas, int additionalRequired, List<ContainerReplicaOp> pendingOps) throws IOException {
+      Set<ContainerReplica> replicas, int additionalRequired, List<ContainerReplicaOp> pendingOps,
+      StorageType targetStorageType) throws IOException {
     LOG.debug("Need {} target datanodes for container {}. Current replicas: {}.",
         additionalRequired, containerInfo, replicas);
 
@@ -165,9 +177,8 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
 
     LOG.debug("UsedList: {}, size {}. ExcludeList: {}, size: {}. ",
         used, used.size(), excluded, excluded.size());
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
     return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
-        additionalRequired, used, excluded, currentContainerSize, containerInfo, StorageType.DEFAULT);
+        additionalRequired, used, excluded, currentContainerSize, containerInfo, targetStorageType);
   }
 
 }
