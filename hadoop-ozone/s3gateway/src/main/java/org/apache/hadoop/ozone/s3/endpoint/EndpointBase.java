@@ -30,8 +30,6 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BU
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
@@ -88,6 +86,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -125,7 +124,7 @@ import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.ozone.s3.util.ReadConsistencyContext;
 import org.apache.hadoop.ozone.s3.util.S3ContentSha256Type;
 import org.apache.hadoop.ozone.s3.util.S3GActionIamMapper;
-import org.apache.hadoop.ozone.s3.util.S3Utils;
+import org.apache.hadoop.ozone.s3.util.S3StorageClassResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
@@ -206,6 +205,8 @@ public abstract class EndpointBase {
   protected SignatureInfo signatureInfo;
   @Inject
   private RequestIdentifier requestIdentifier;
+  @Inject
+  private S3StorageClassResolver storageClassResolver;
 
   private S3Auth s3Auth;
   private int bufferSize;
@@ -702,6 +703,18 @@ public abstract class EndpointBase {
     ozoneConfiguration = conf;
   }
 
+  void setStorageClassResolver(S3StorageClassResolver resolver) {
+    storageClassResolver = resolver;
+  }
+
+  /** The injected resolver, or one built from this endpoint's configuration when none was injected. */
+  private S3StorageClassResolver getStorageClassResolver() {
+    if (storageClassResolver == null) {
+      storageClassResolver = new S3StorageClassResolver(getOzoneConfiguration());
+    }
+    return storageClassResolver;
+  }
+
   /**
    * Copy dependencies from this endpoint to another endpoint.
    * Used for initializing handler instances.
@@ -714,6 +727,7 @@ public abstract class EndpointBase {
     target.s3Auth = s3Auth;
     target.setClient(this.client);
     target.setOzoneConfiguration(this.ozoneConfiguration);
+    target.setStorageClassResolver(this.storageClassResolver);
     target.setContext(this.context);
     target.setHeaders(this.headers);
     target.setRequestIdentifier(this.requestIdentifier);
@@ -825,17 +839,53 @@ public abstract class EndpointBase {
   }
 
   protected ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket) throws OS3Exception {
-    String storageType = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
-    String storageConfig = getHeaders().getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
+    return resolveStorageClass(ozoneBucket).getReplicationConfig();
+  }
 
+  /**
+   * Resolves the request's {@code x-amz-storage-class} header into the replication and storage policy for a write.
+   * Without the header, replication comes from the gateway's client setting, then the bucket, and no storage policy
+   * is sent, so OM applies the bucket policy or the cluster default.
+   *
+   * @throws OS3Exception with {@code INVALID_STORAGE_CLASS} if the class is unknown or its EC layout header is invalid
+   */
+  protected ResolvedStorageClass resolveStorageClass(OzoneBucket ozoneBucket) throws OS3Exception {
+    String storageClass = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
+    String storageConfig = getHeaders().getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
     ReplicationConfig clientConfiguredReplicationConfig =
         OzoneClientUtils.getClientConfiguredReplicationConfig(getOzoneConfiguration());
-    boolean standardUsesClientDefault = getOzoneConfiguration().getBoolean(
-        OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY,
-        OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT);
 
-    return S3Utils.resolveS3ClientSideReplicationConfig(storageType, storageConfig,
-        clientConfiguredReplicationConfig, ozoneBucket.getReplicationConfig(), standardUsesClientDefault);
+    S3StorageClassResolver resolver = getStorageClassResolver();
+    ReplicationConfig replicationConfig = resolver.resolveReplicationConfig(storageClass, storageConfig,
+        clientConfiguredReplicationConfig, ozoneBucket.getReplicationConfig());
+    // resolveReplicationConfig has already rejected an unknown class.
+    StoragePolicy storagePolicy = StringUtils.isEmpty(storageClass)
+        ? null : resolver.toSpec(storageClass).getStoragePolicy();
+    return new ResolvedStorageClass(replicationConfig, storagePolicy);
+  }
+
+  /** Replication and storage policy resolved from a write request's storage class header. */
+  @Immutable
+  protected static final class ResolvedStorageClass {
+    private final ReplicationConfig replicationConfig;
+    private final StoragePolicy storagePolicy;
+
+    ResolvedStorageClass(@Nullable ReplicationConfig replicationConfig, @Nullable StoragePolicy storagePolicy) {
+      this.replicationConfig = replicationConfig;
+      this.storagePolicy = storagePolicy;
+    }
+
+    /** @return the replication, or null to use the server default. */
+    @Nullable
+    public ReplicationConfig getReplicationConfig() {
+      return replicationConfig;
+    }
+
+    /** @return the storage policy to send to OM, or null to use the bucket policy or the cluster default. */
+    @Nullable
+    public StoragePolicy getStoragePolicy() {
+      return storagePolicy;
+    }
   }
 
   /**

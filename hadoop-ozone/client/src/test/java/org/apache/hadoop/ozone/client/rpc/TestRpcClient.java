@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.CreateFileOptions;
 import org.apache.hadoop.ozone.client.protocol.CreateKeyOptions;
 import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
@@ -1249,6 +1250,117 @@ public class TestRpcClient {
       assertThat(captured.get()).isNotNull();
       assertThat(captured.get().getDerivedKeyPiggyBacking()).isTrue();
       assertThat(captured.get().getKeyArgs().getStoragePolicy()).isEqualTo(HddsProtos.StoragePolicyProto.HOT);
+    } finally {
+      client.close();
+    }
+  }
+
+  /** Key write operations that take {@link CreateKeyOptions}. */
+  private enum OptionsKeyWrite {
+    CREATE, CREATE_IF_ABSENT, CREATE_IF_NONE_MATCH, REWRITE_IF_MATCH;
+
+    OzoneOutputStream open(RpcClient client, CreateKeyOptions options) throws IOException {
+      switch (this) {
+      case CREATE:
+        return client.createKey("volume", "bucket", "key", options);
+      case CREATE_IF_ABSENT:
+        return client.createKeyIfNotExists("volume", "bucket", "key", options);
+      case CREATE_IF_NONE_MATCH:
+        return client.createKeyIfNoneMatch("volume", "bucket", "key", "excluded", options);
+      case REWRITE_IF_MATCH:
+        return client.rewriteKeyIfMatch("volume", "bucket", "key", "expected", options);
+      default:
+        throw new IllegalArgumentException("Unexpected operation: " + this);
+      }
+    }
+  }
+
+  private static OmTransport captureCreateKey(OzoneManagerVersion omVersion,
+      AtomicReference<CreateKeyRequest> captured) {
+    return new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList).setStatus(Status.OK).setSuccess(true)
+              .setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(omVersion).getProtobuf()))
+              .build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          captured.set(request.getCreateKeyRequest());
+          throw new IOException("Captured CreateKey request");
+        }
+        return super.submitRequest(request);
+      }
+    };
+  }
+
+  /** Each options-based write sends the storage policy, the piggyback flag and its own condition field. */
+  @ParameterizedTest
+  @EnumSource(OptionsKeyWrite.class)
+  void testCreateKeyOptionsWriteSendsStoragePolicy(OptionsKeyWrite operation) throws IOException {
+    AtomicReference<CreateKeyRequest> captured = new AtomicReference<>();
+    RpcClient client = createRpcClient(captureCreateKey(OzoneManagerVersion.SOFTWARE_VERSION, captured));
+    try {
+      CreateKeyOptions options = CreateKeyOptions.builder()
+          .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+          .setStoragePolicy(OzoneStoragePolicy.COLD)
+          .setDerivedKeyPiggyBacking(true)
+          .build();
+
+      assertThatThrownBy(() -> operation.open(client, options))
+          .isInstanceOf(IOException.class)
+          .hasMessage("Captured CreateKey request");
+      KeyArgs keyArgs = captured.get().getKeyArgs();
+      assertThat(keyArgs.getStoragePolicy()).isEqualTo(HddsProtos.StoragePolicyProto.COLD);
+      assertThat(captured.get().getDerivedKeyPiggyBacking()).isTrue();
+      assertThat(keyArgs.hasExpectedDataGeneration()).isEqualTo(operation == OptionsKeyWrite.CREATE_IF_ABSENT);
+      assertThat(keyArgs.hasExcludedETag()).isEqualTo(operation == OptionsKeyWrite.CREATE_IF_NONE_MATCH);
+      assertThat(keyArgs.hasExpectedETag()).isEqualTo(operation == OptionsKeyWrite.REWRITE_IF_MATCH);
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * An OM that supports the write's condition but not storage policy would ignore the policy, so the client rejects
+   * the write before sending it. The same write without a policy is sent.
+   */
+  @ParameterizedTest
+  @EnumSource(OptionsKeyWrite.class)
+  void testCreateKeyOptionsWriteWithStoragePolicyRequiresSupportedOm(OptionsKeyWrite operation) throws IOException {
+    AtomicReference<CreateKeyRequest> captured = new AtomicReference<>();
+    RpcClient client = createRpcClient(captureCreateKey(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG, captured));
+    try {
+      ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+      CreateKeyOptions withPolicy = CreateKeyOptions.builder()
+          .setReplicationConfig(replication)
+          .setStoragePolicy(OzoneStoragePolicy.COLD)
+          .build();
+
+      // NOT_SUPPORTED_OPERATION lets S3 Gateway answer 501 NotImplemented rather than 500 InternalError.
+      assertThatThrownBy(() -> operation.open(client, withPolicy))
+          .isInstanceOfSatisfying(OMException.class,
+              e -> assertThat(e.getResult()).isEqualTo(ResultCodes.NOT_SUPPORTED_OPERATION))
+          .hasMessage("OzoneManager does not support storage policy");
+      assertThat(captured.get()).isNull();
+
+      assertThatThrownBy(() -> operation.open(client, CreateKeyOptions.builder().setReplicationConfig(replication)
+          .build()))
+          .hasMessage("Captured CreateKey request");
+      assertThat(captured.get().getKeyArgs().hasStoragePolicy()).isFalse();
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(OptionsKeyWrite.class)
+  void testCreateKeyOptionsWriteRejectsNullOptions(OptionsKeyWrite operation) throws IOException {
+    RpcClient client = createRpcClient();
+    try {
+      assertThatThrownBy(() -> operation.open(client, null))
+          .isInstanceOf(NullPointerException.class)
+          .hasMessage("options == null");
     } finally {
       client.close();
     }

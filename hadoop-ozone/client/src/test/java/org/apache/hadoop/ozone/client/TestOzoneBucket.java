@@ -94,6 +94,29 @@ public class TestOzoneBucket {
   }
 
   /**
+   * A null options object is rejected by the conditional writes before it reaches the client protocol.
+   */
+  @Test
+  public void conditionalCreateKeyRejectsNullOptions() {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    OzoneBucket bucket = OzoneBucket.newBuilder(new OzoneConfiguration(), proxy)
+        .setVolumeName("vol")
+        .setName("bucket")
+        .build();
+
+    assertThatThrownBy(() -> bucket.createKeyIfNotExists("key", (CreateKeyOptions) null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("options == null");
+    assertThatThrownBy(() -> bucket.createKeyIfNoneMatch("key", "etag", (CreateKeyOptions) null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("options == null");
+    assertThatThrownBy(() -> bucket.rewriteKeyIfMatch("key", "etag", (CreateKeyOptions) null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("options == null");
+    verifyNoInteractions(proxy);
+  }
+
+  /**
    * A null options object is rejected before it reaches the client protocol.
    */
   @Test

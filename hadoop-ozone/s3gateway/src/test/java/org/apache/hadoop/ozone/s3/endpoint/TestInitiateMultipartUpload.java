@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -29,7 +31,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -39,14 +40,16 @@ import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Collections;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.MultipartUploadOptions;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -94,6 +97,49 @@ public class TestInitiateMultipartUpload {
     initiateMultipartUpload(rest, bucket, key);
   }
 
+  /** The storage policy is chosen at initiate and kept on completion, even though parts do not send the header. */
+  @Test
+  public void testInitiateMultipartUploadWithStorageClass() throws Exception {
+    String bucket = OzoneConsts.S3_BUCKET;
+    String key = OzoneConsts.KEY;
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket(bucket);
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("GLACIER");
+    ObjectEndpoint rest = getObjectEndpoint(client, headers);
+
+    String uploadID = initiateMultipartUpload(rest, bucket, key);
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(null);
+    CompleteMultipartUploadRequest.Part part = uploadPart(rest, bucket, key, 1, uploadID, "content");
+    completeMultipartUpload(rest, bucket, key, uploadID, Collections.singletonList(part));
+
+    assertEquals(OzoneStoragePolicy.COLD, client.getObjectStore().getS3Bucket(bucket).getKey(key).getStoragePolicy());
+  }
+
+  /** An OM without storage policy support rejects the initiate; the gateway answers 501 NotImplemented, not 500. */
+  @Test
+  public void testInitiateMultipartUploadWithStorageClassToOmWithoutStoragePolicy() throws Exception {
+    String bucket = OzoneConsts.S3_BUCKET;
+    String key = OzoneConsts.KEY;
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket(bucket);
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("GLACIER");
+    ObjectEndpoint rest = spy(getObjectEndpoint(client, headers));
+    ClientProtocol protocol = spy(rest.getClientProtocol());
+    OzoneBucket ozoneBucket = spy(protocol.getBucketDetails(null, bucket));
+    doReturn(protocol).when(rest).getClientProtocol();
+    doReturn(ozoneBucket).when(protocol).getBucketDetails(null, bucket);
+    OMException failure = new OMException("OzoneManager does not support storage policy",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    doThrow(failure).when(ozoneBucket).initiateMultipartUpload(eq(key), any(MultipartUploadOptions.class));
+
+    OS3Exception exception = assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED,
+        () -> rest.initializeMultipartUpload(bucket, key));
+    assertSame(failure, exception.getCause());
+  }
+
   @Test
   public void testInitiateMultipartUploadRejectsFileAncestor() throws Exception {
     String bucket = OzoneConsts.S3_BUCKET;
@@ -106,7 +152,7 @@ public class TestInitiateMultipartUpload {
     doReturn(protocol).when(rest).getClientProtocol();
     doReturn(ozoneBucket).when(protocol).getBucketDetails(null, bucket);
     OMException failure = new OMException("File exists in path", OMException.ResultCodes.NOT_A_FILE);
-    doThrow(failure).when(ozoneBucket).initiateMultipartUpload(eq(key), any(), anyMap(), anyMap());
+    doThrow(failure).when(ozoneBucket).initiateMultipartUpload(eq(key), any(MultipartUploadOptions.class));
 
     OS3Exception exception = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
         () -> rest.initializeMultipartUpload(bucket, key));
@@ -147,8 +193,7 @@ public class TestInitiateMultipartUpload {
     doReturn(protocol).when(rest).getClientProtocol();
     doReturn(ozoneBucket).when(protocol).getBucketDetails(null, bucket);
     OMException failure = new OMException("Can not write to directory: " + key, OMException.ResultCodes.NOT_A_FILE);
-    doThrow(failure).when(ozoneBucket)
-        .initiateMultipartUpload(eq(key), any(ReplicationConfig.class), anyMap(), anyMap());
+    doThrow(failure).when(ozoneBucket).initiateMultipartUpload(eq(key), any(MultipartUploadOptions.class));
 
     long failureBefore = rest.getMetrics().getInitMultiPartUploadFailure();
     OS3Exception exception = assertErrorResponse(S3ErrorTable.INVALID_REQUEST,

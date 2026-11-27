@@ -505,6 +505,29 @@ public interface ClientProtocol {
       String keyName, CreateKeyOptions options) throws IOException;
 
   /**
+   * Creates a key only if it does not exist (S3 If-None-Match: * semantics).
+   * @param options Size, replication config, metadata, tags, derived key piggybacking and storage policy of the key
+   * @throws OMException with KEY_ALREADY_EXISTS if key exists
+   */
+  OzoneOutputStream createKeyIfNotExists(String volumeName, String bucketName,
+      String keyName, CreateKeyOptions options) throws IOException;
+
+  /**
+   * Creates a key if its current ETag differs from {@code excludedETag}, or if the key is absent.
+   * @param options Size, replication config, metadata, tags, derived key piggybacking and storage policy of the key
+   */
+  OzoneOutputStream createKeyIfNoneMatch(String volumeName, String bucketName,
+      String keyName, String excludedETag, CreateKeyOptions options) throws IOException;
+
+  /**
+   * Rewrites a key only if its ETag matches {@code expectedETag} (S3 If-Match semantics).
+   * @param options Size, replication config, metadata, tags, derived key piggybacking and storage policy of the key
+   * @throws OMException with ETAG_MISMATCH, ETAG_NOT_AVAILABLE, or KEY_NOT_FOUND
+   */
+  OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName,
+      String keyName, String expectedETag, CreateKeyOptions options) throws IOException;
+
+  /**
    * Writes a key in an existing bucket.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

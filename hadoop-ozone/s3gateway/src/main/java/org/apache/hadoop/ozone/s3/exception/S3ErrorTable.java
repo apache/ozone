@@ -174,8 +174,8 @@ public enum S3ErrorTable {
 
   INVALID_STORAGE_CLASS(
       "InvalidStorageClass", "The storage class that you specified is not valid. " +
-      "Provide a supported storage class[STANDARD|REDUCED_REDUNDANCY|STANDARD_IA] or " +
-      "a valid custom EC storage config for if using STANDARD_IA.",
+      "Provide a supported storage class[STANDARD|REDUCED_REDUNDANCY|STANDARD_IA|GLACIER|DEEP_ARCHIVE] or " +
+      "a valid custom EC storage config if using STANDARD_IA or DEEP_ARCHIVE.",
       HTTP_BAD_REQUEST),
 
   BUCKET_OWNER_MISMATCH(
