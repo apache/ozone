@@ -70,6 +70,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -81,6 +82,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.DatanodeCommand;
@@ -376,6 +378,53 @@ public class TestECUnderReplicationHandler {
     assertEquals(1, cmd.getReplicaIndex());
   }
 
+  @Test
+  public void testDecommissionCopyPreservesStorageTier() throws IOException {
+    container = TestContainerInfo.newBuilderForTest()
+        .setReplicationConfig(repConfig)
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build();
+    DatanodeDetails ssdTarget = MockDatanodeDetails.randomDatanodeDetails();
+    when(ecPlacementPolicy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(),
+        eq(StorageType.SSD))).thenReturn(ImmutableList.of(ssdTarget));
+
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
+    Set<DatanodeCommand> cmds = testUnderReplicationWithMissingIndexes(
+        Lists.emptyList(), availableReplicas, 1, 0, ecPlacementPolicy);
+
+    ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmds.iterator().next().command();
+    assertEquals(StorageType.SSD, cmd.getTargetVolumeStorageType());
+  }
+
+  @Test
+  public void testDecommissionCopyFallsBackSsdToDisk() throws IOException {
+    container = TestContainerInfo.newBuilderForTest()
+        .setReplicationConfig(repConfig)
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build();
+    DatanodeDetails diskTarget = MockDatanodeDetails.randomDatanodeDetails();
+    when(ecPlacementPolicy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(),
+        eq(StorageType.SSD))).thenThrow(new SCMException("No SSD target",
+            SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE));
+    when(ecPlacementPolicy.chooseDatanodes(anyList(), anyList(), any(), eq(1), anyLong(), anyLong(),
+        eq(StorageType.DISK))).thenReturn(ImmutableList.of(diskTarget));
+
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(new NodeOperationalStateAndIndex(DECOMMISSIONING, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
+    Set<DatanodeCommand> cmds = testUnderReplicationWithMissingIndexes(
+        Lists.emptyList(), availableReplicas, 1, 0, ecPlacementPolicy);
+
+    ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmds.iterator().next().command();
+    assertEquals(StorageType.DISK, cmd.getTargetVolumeStorageType());
+  }
+
 
   // Test used to reproduce the issue reported in HDDS-8171 and then adjusted
   // to ensure only a single command is sent for HDDS-8172.
@@ -426,7 +475,7 @@ public class TestECUnderReplicationHandler {
             new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(
-            any(), anyList(), any(), anyInt());
+            any(), anyList(), any(), anyInt(), any());
 
     assertThrows(CommandTargetOverloadedException.class, () ->
         testUnderReplicationWithMissingIndexes(

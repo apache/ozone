@@ -418,8 +418,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         usedNodes.addAll(selectedDatanodes);
         availableSourceNodes.addAll(selectedDatanodes);
         for (int i = 0; i < missingIndexes.size(); i++) {
+          // Reconstruction keeps no storage type yet; the reconstructed fragment's tier is tracked in HDDS-16676.
           adjustPendingOps(
-              replicaCount, selectedDatanodes.get(i), missingIndexes.get(i));
+              replicaCount, selectedDatanodes.get(i), missingIndexes.get(i), null);
         }
         commandsSent++;
       }
@@ -536,9 +537,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
     LOG.debug("Processing decommissioning indexes {} for container {}.",
         decomIndexes, container.containerID());
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
-    final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(
-        container, decomIndexes.size(), usedNodes, excludedNodes, StorageType.DEFAULT);
+    final TargetSelection decomTargets = selectCopyTargetsWithFallback(
+        container, decomIndexes.size(), usedNodes, excludedNodes);
+    final List<DatanodeDetails> selectedDatanodes = decomTargets.targets();
 
     ContainerPlacementStatus placementStatusWithSelectedTargets =
         validatePlacement(container, availableSourceNodes, selectedDatanodes);
@@ -577,7 +578,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       }
       try {
         createReplicateCommand(
-            container, iterator, sourceReplica, replicaCount);
+            container, iterator, sourceReplica, replicaCount, decomTargets.storageType());
         commandsSent++;
       } catch (CommandTargetOverloadedException e) {
         LOG.debug("Unable to send Replicate command for container {}" +
@@ -635,9 +636,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     LOG.debug("Number of maintenance replicas of container {} that need " +
             "additional copies: {}.", container.containerID(),
         additionalMaintenanceCopiesNeeded);
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
-    List<DatanodeDetails> targets = getTargetDatanodes(
-        container, maintIndexes.size(), usedNodes, excludedNodes, StorageType.DEFAULT);
+    final TargetSelection maintTargets = selectCopyTargetsWithFallback(
+        container, maintIndexes.size(), usedNodes, excludedNodes);
+    List<DatanodeDetails> targets = maintTargets.targets();
     usedNodes.addAll(targets);
 
     Iterator<DatanodeDetails> iterator = targets.iterator();
@@ -669,7 +670,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       }
       try {
         createReplicateCommand(
-            container, iterator, sourceReplica, replicaCount);
+            container, iterator, sourceReplica, replicaCount, maintTargets.storageType());
         commandsSent++;
         additionalMaintenanceCopiesNeeded -= 1;
       } catch (CommandTargetOverloadedException e) {
@@ -699,21 +700,66 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
   private void createReplicateCommand(
       ContainerInfo container, Iterator<DatanodeDetails> iterator,
-      ContainerReplica replica, ECContainerReplicaCount replicaCount)
+      ContainerReplica replica, ECContainerReplicaCount replicaCount, StorageType targetStorageType)
       throws CommandTargetOverloadedException, NotLeaderException {
     DatanodeDetails source = replica.getDatanodeDetails();
     DatanodeDetails target = iterator.next();
     replicationManager.sendThrottledReplicationCommand(
         container, Collections.singletonList(source), target,
-        replica.getReplicaIndex());
-    adjustPendingOps(replicaCount, target, replica.getReplicaIndex());
+        replica.getReplicaIndex(), targetStorageType);
+    adjustPendingOps(replicaCount, target, replica.getReplicaIndex(), targetStorageType);
   }
 
   private void adjustPendingOps(ECContainerReplicaCount replicaCount,
-                                DatanodeDetails target, int replicaIndex) {
+                                DatanodeDetails target, int replicaIndex, StorageType targetStorageType) {
     replicaCount.addPendingOp(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, target, replicaIndex, null,
-        Long.MAX_VALUE, 0, null));
+        Long.MAX_VALUE, 0, targetStorageType));
+  }
+
+  /**
+   * Selects copy targets of the container's storage tier, falling back the same way RATIS repair does: on
+   * FAILED_TO_FIND_SUITABLE_NODE, retry with {@link ReplicationManagerUtil#getFallbackStorageType} (SSD to DISK;
+   * others have no fallback). A container with no tier resolves to {@link StorageType#DEFAULT}.
+   */
+  private TargetSelection selectCopyTargetsWithFallback(ContainerInfo container, int requiredNodes,
+      List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes) throws SCMException {
+    StorageType preferred = ReplicationManagerUtil.getTargetStorageType(container);
+    try {
+      return new TargetSelection(
+          getTargetDatanodes(container, requiredNodes, usedNodes, excludedNodes, preferred), preferred);
+    } catch (SCMException e) {
+      if (e.getResult() != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) {
+        throw e;
+      }
+      StorageType fallback = ReplicationManagerUtil.getFallbackStorageType(preferred);
+      if (fallback == null) {
+        throw e;
+      }
+      List<DatanodeDetails> targets = getTargetDatanodes(container, requiredNodes, usedNodes, excludedNodes, fallback);
+      if (targets.isEmpty()) {
+        throw e;
+      }
+      return new TargetSelection(targets, fallback);
+    }
+  }
+
+  private static final class TargetSelection {
+    private final List<DatanodeDetails> targets;
+    private final StorageType storageType;
+
+    private TargetSelection(List<DatanodeDetails> targets, StorageType storageType) {
+      this.targets = targets;
+      this.storageType = storageType;
+    }
+
+    private List<DatanodeDetails> targets() {
+      return targets;
+    }
+
+    private StorageType storageType() {
+      return storageType;
+    }
   }
 
   static ByteString integers2ByteString(List<Integer> src) {

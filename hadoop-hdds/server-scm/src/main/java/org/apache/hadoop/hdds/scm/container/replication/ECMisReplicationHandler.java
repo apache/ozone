@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -64,6 +65,7 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
     int commandsSent = 0;
     int datanodeIdx = 0;
     CommandTargetOverloadedException overloadedException = null;
+    StorageType targetStorageType = ReplicationManagerUtil.getTargetStorageType(containerInfo);
     for (ContainerReplica replica : replicasToBeReplicated) {
       if (datanodeIdx == targetDns.size()) {
         break;
@@ -74,7 +76,7 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
       try {
         replicationManager.sendThrottledReplicationCommand(containerInfo,
             Collections.singletonList(source), target,
-            replica.getReplicaIndex());
+            replica.getReplicaIndex(), targetStorageType);
         commandsSent++;
       } catch (CommandTargetOverloadedException e) {
         LOG.debug("Unable to replicate container {} and index {} from {} to {}"

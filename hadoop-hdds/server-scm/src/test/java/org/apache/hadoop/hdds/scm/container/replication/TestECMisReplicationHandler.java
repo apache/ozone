@@ -27,7 +27,9 @@ import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -38,12 +40,15 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.NodeOperationalStateAndIndex;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -79,6 +84,27 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
             new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
     testMisReplication(availableReplicas, Collections.emptyList(),
             0, misreplicationCount, Math.min(misreplicationCount, 5));
+  }
+
+  @Test
+  public void testMisReplicationPreservesStorageTier() throws IOException {
+    setContainerForTest(TestContainerInfo.newBuilderForTest()
+        .setReplicationConfig(new ECReplicationConfig(DATA, PARITY))
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build());
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
+            new NodeOperationalStateAndIndex(IN_SERVICE, 4), new NodeOperationalStateAndIndex(IN_SERVICE, 5));
+    PlacementPolicy placementPolicy = mockPlacementPolicy();
+
+    testMisReplication(availableReplicas, placementPolicy, Collections.emptyList(), 0, 1, 1);
+
+    // EC mis-replication copies to the container's tier, and does not fall back to another tier.
+    verify(placementPolicy).chooseDatanodes(any(), any(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD));
+    verify(getReplicationManager()).sendThrottledReplicationCommand(
+        any(), anyList(), any(), anyInt(), eq(StorageType.SSD));
   }
 
   @Test
@@ -179,7 +205,7 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
     ReplicationManager replicationManager = getReplicationManager();
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
-            anyList(), any(), anyInt());
+            anyList(), any(), anyInt(), any());
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 1),
             new NodeOperationalStateAndIndex(IN_SERVICE, 2), new NodeOperationalStateAndIndex(IN_SERVICE, 3),
