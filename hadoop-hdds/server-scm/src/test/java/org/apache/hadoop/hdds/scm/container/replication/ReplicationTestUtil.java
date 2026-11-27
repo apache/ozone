@@ -445,7 +445,7 @@ public final class ReplicationTestUtil {
       Set<DatanodeCommand> commandsSent,
       AtomicBoolean throwOverloaded)
       throws NotLeaderException, CommandTargetOverloadedException {
-    doAnswer((Answer<Void>) invocationOnMock -> {
+    Answer<Void> answer = invocationOnMock -> {
       if (throwOverloaded.get()) {
         throwOverloaded.set(false);
         throw new CommandTargetOverloadedException("Overloaded");
@@ -456,10 +456,16 @@ public final class ReplicationTestUtil {
           .getReplicateContainerCommand(containerInfo.getContainerID(),
               invocationOnMock.getArgument(2));
       command.setReplicaIndex(invocationOnMock.getArgument(3));
+      if (invocationOnMock.getArguments().length == 5) {
+        command.setTargetVolumeStorageType(invocationOnMock.getArgument(4));
+      }
       commandsSent.add(new DatanodeCommand(sources.get(0), command));
       return null;
-    }).when(mock).sendThrottledReplicationCommand(
+    };
+    doAnswer(answer).when(mock).sendThrottledReplicationCommand(
         any(ContainerInfo.class), anyList(), any(DatanodeDetails.class), anyInt());
+    doAnswer(answer).when(mock).sendThrottledReplicationCommand(
+        any(ContainerInfo.class), anyList(), any(DatanodeDetails.class), anyInt(), any());
   }
 
   /**

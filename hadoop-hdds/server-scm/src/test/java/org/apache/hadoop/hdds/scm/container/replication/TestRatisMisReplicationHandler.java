@@ -30,6 +30,7 @@ import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +44,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -54,6 +56,7 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.NodeOperationalStateAndIndex;
@@ -97,6 +100,51 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
             new NodeOperationalStateAndIndex(IN_SERVICE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(),
             0, misreplicationCount, Math.min(misreplicationCount, 3));
+  }
+
+  @Test
+  public void testMisReplicationPreservesStorageTier() throws IOException {
+    setContainerForTest(TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(LifeCycleState.CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build());
+    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicas(
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0));
+    PlacementPolicy placementPolicy = mockPlacementPolicy();
+
+    testMisReplication(replicas, placementPolicy, Collections.emptyList(), 0, 1, 1);
+
+    verify(placementPolicy).chooseDatanodes(
+        any(), any(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD));
+    verify(getReplicationManager()).sendThrottledReplicationCommand(
+        any(), anyList(), any(), eq(0), eq(StorageType.SSD));
+  }
+
+  @Test
+  public void testMisReplicationDoesNotFallBackWhenSsdUnavailable() throws IOException {
+    setContainerForTest(TestContainerInfo.newBuilderForTest()
+        .setContainerID(1)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(LifeCycleState.CLOSED)
+        .setStorageTier(StorageTier.SSD)
+        .build());
+    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicas(
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0), new NodeOperationalStateAndIndex(IN_SERVICE, 0),
+        new NodeOperationalStateAndIndex(IN_SERVICE, 0));
+    PlacementPolicy placementPolicy = mockPlacementPolicy();
+    when(placementPolicy.chooseDatanodes(any(), any(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD)))
+        .thenThrow(new SCMException("No suitable SSD target", SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE));
+
+    assertThrows(SCMException.class, () -> testMisReplication(
+        replicas, placementPolicy, Collections.emptyList(), 0, 1, 0));
+
+    verify(placementPolicy).chooseDatanodes(any(), any(), any(), eq(1), anyLong(), anyLong(), eq(StorageType.SSD));
+    verify(placementPolicy, never()).chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong(),
+        eq(StorageType.DISK));
+    verify(getReplicationManager(), never()).sendThrottledReplicationCommand(any(), anyList(), any(), anyInt(), any());
   }
 
   @ParameterizedTest
@@ -255,7 +303,8 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
     nodeInfos.get(4).setNodeStatus(NodeStatus.inServiceHealthy());
     assertEquals(1, handler.processAndSendCommands(replicas, Collections.emptyList(), result, 0));
     ArgumentCaptor<DatanodeDetails> target = ArgumentCaptor.forClass(DatanodeDetails.class);
-    verify(getReplicationManager()).sendThrottledReplicationCommand(eq(container), anyList(), target.capture(), eq(0));
+    verify(getReplicationManager()).sendThrottledReplicationCommand(
+        eq(container), anyList(), target.capture(), eq(0), eq(StorageType.DEFAULT));
     assertEquals(nodes.get(4), target.getValue());
   }
 
@@ -264,7 +313,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
     ReplicationManager replicationManager = getReplicationManager();
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
-            anyList(), any(), anyInt());
+            anyList(), any(), anyInt(), any());
 
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(new NodeOperationalStateAndIndex(IN_SERVICE, 0),
