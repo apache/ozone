@@ -17,11 +17,17 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import java.io.IOException;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.client.StorageTier;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -44,6 +50,12 @@ public final class SCMPipelineMetrics implements MetricsSource {
 
   private static final String SOURCE_NAME =
       SCMPipelineMetrics.class.getSimpleName();
+  private static final String UNKNOWN_TIER = "UNKNOWN";
+  private static final MetricsInfo REQUESTED_TIER = Interns.info("RequestedTier", "Requested allocation tier");
+  private static final MetricsInfo REASON = Interns.info("Reason", "Tier allocation failure category");
+  private static final MetricsInfo TIER_PLACEMENT_FAILURES = Interns.info("TierPlacementFailures",
+      "Failed RATIS/standalone tier allocations after retries; no_space includes storage-type capacity shortages; "
+          + "no_suitable_node includes pipeline limits");
 
   private MetricsRegistry registry;
   private static SCMPipelineMetrics instance;
@@ -59,11 +71,20 @@ public final class SCMPipelineMetrics implements MetricsSource {
   private @Metric MutableCounterLong numPipelineContainSameDatanodes;
   private @Metric MutableRate pipelineCreationLatencyNs;
   private final Map<PipelineID, MutableCounterLong> numBlocksAllocated;
+  // Series are allocated once; concurrent updates only change the thread-safe counters.
+  private final Map<String, Map<PlacementFailureReason, MutableCounterLong>> tierPlacementFailures =
+      new LinkedHashMap<>();
 
   /** Private constructor. */
   private SCMPipelineMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
     numBlocksAllocated = new ConcurrentHashMap<>();
+    for (StorageTier tier : StorageTier.values()) {
+      if (tier != StorageTier.EMPTY) {
+        addTierPlacementCounters(tier.name());
+      }
+    }
+    addTierPlacementCounters(UNKNOWN_TIER);
   }
 
   /**
@@ -106,6 +127,67 @@ public final class SCMPipelineMetrics implements MetricsSource {
     pipelineCreationLatencyNs.snapshot(recordBuilder, true);
     numBlocksAllocated
         .forEach((pid, metric) -> metric.snapshot(recordBuilder, true));
+    tierPlacementFailures.forEach((tier, counters) -> counters.forEach((reason, counter) ->
+        collector.addRecord(SOURCE_NAME)
+            .tag(REQUESTED_TIER, tier)
+            .tag(REASON, reason.getLabel())
+            .addCounter(TIER_PLACEMENT_FAILURES, counter.value())));
+  }
+
+  private void addTierPlacementCounters(String tier) {
+    Map<PlacementFailureReason, MutableCounterLong> counters = new EnumMap<>(PlacementFailureReason.class);
+    for (PlacementFailureReason reason : PlacementFailureReason.values()) {
+      counters.put(reason, new MutableCounterLong(TIER_PLACEMENT_FAILURES, 0));
+    }
+    tierPlacementFailures.put(tier, counters);
+  }
+
+  /**
+   * Counts one unsuccessful RATIS/standalone tier allocation after all provider retries. A later allocation on a
+   * fallback tier may still succeed. This does not count background pipeline creation or change aggregate counters.
+   * Missing/empty tiers are UNKNOWN. Reasons use SCM result codes, never exception messages; no_space includes
+   * storage-type capacity shortages, not just full volumes; no_suitable_node includes pipeline limits. Unclassified
+   * failures are other.
+   *
+   * @param tier tier of this allocation attempt, including a fallback tier when it is attempted
+   * @param failure last unsuccessful creation/wait operation, or null when no structured failure is available
+   */
+  void incTierPlacementFailure(StorageTier tier, IOException failure) {
+    String requestedTier = tier == null || tier == StorageTier.EMPTY ? UNKNOWN_TIER : tier.name();
+    tierPlacementFailures.get(requestedTier).get(PlacementFailureReason.fromException(failure)).incr();
+  }
+
+  enum PlacementFailureReason {
+    NO_SPACE("no_space"),
+    NO_SUITABLE_NODE("no_suitable_node"),
+    OTHER("other");
+
+    private final String label;
+
+    PlacementFailureReason(String label) {
+      this.label = label;
+    }
+
+    String getLabel() {
+      return label;
+    }
+
+    private static PlacementFailureReason fromException(IOException failure) {
+      if (failure instanceof SCMException) {
+        SCMException.ResultCodes code = ((SCMException) failure).getResult();
+        if (code == SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE
+            || code == SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER_WITH_SPACE) {
+          return NO_SPACE;
+        }
+        if (code == SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES
+            || code == SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE
+            || code == SCMException.ResultCodes.FAILED_TO_FIND_NODE_IN_POOL
+            || code == SCMException.ResultCodes.FAILED_TO_FIND_ACTIVE_PIPELINE) {
+          return NO_SUITABLE_NODE;
+        }
+      }
+      return OTHER;
+    }
   }
 
   void createPerPipelineMetrics(Pipeline pipeline) {
