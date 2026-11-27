@@ -130,48 +130,36 @@ public class ConfigFileGenerator extends AbstractProcessor {
     return dir != null && TEST_OUTPUT_DIR.equals(dir.getName());
   }
 
-  private void writeConfigAnnotations(ConfigGroup configGroup,
-      ConfigFileAppender appender,
-      TypeElement typeElement) {
-    // Collect the key of every @Config field in the class and its
-    // superclass chain, like ConfigurationReflectionUtil does at runtime,
-    // and fail the compilation on a duplicated key.
+  private void writeConfigAnnotations(ConfigGroup configGroup, ConfigFileAppender appender, TypeElement typeElement) {
+    // Collect the key of every @Config field in the class and its superclass chain and fail the
+    // compilation on a duplicated key, including keys inherited from @Config superclasses.
     Map<String, String> keyToField = new HashMap<>();
-    for (TypeElement clazz = typeElement; clazz != null;
-        clazz = superclassOf(clazz)) {
+    for (TypeElement clazz = typeElement; clazz != null; clazz = superclassOf(clazz)) {
       for (Element element : clazz.getEnclosedElements()) {
-        if (element.getKind() != ElementKind.FIELD
-            || element.getAnnotation(Config.class) == null) {
+        if (element.getKind() != ElementKind.FIELD || element.getAnnotation(Config.class) == null) {
           continue;
         }
         Config configAnnotation = element.getAnnotation(Config.class);
         String key = configAnnotation.key();
-        String field = clazz.getSimpleName() + "#"
-            + element.getSimpleName();
+        String field = clazz.getSimpleName() + "#" + element.getSimpleName();
         String previousField = keyToField.put(key, field);
         if (previousField != null) {
           processingEnv.getMessager().printMessage(Kind.ERROR,
-              "Duplicated config key '" + key + "': " + previousField
-                  + " and " + field,
-              element);
+              "Duplicated config key '" + key + "': " + previousField + " and " + field, element);
         }
 
         if (clazz != typeElement) {
-          // Fields of superclasses are validated here but written by their
-          // own @ConfigGroup class, keeping the generated file unchanged.
+          // Fields of superclasses are validated here but written by their own @ConfigGroup class,
+          // keeping the generated file unchanged.
           continue;
         }
 
         String prefix = configGroup.prefix() + ".";
         if (!key.startsWith(prefix)) {
-          processingEnv.getMessager().printMessage(Kind.ERROR,
-              prefix + " is not a prefix of " + key,
-              typeElement);
+          processingEnv.getMessager().printMessage(Kind.ERROR, prefix + " is not a prefix of " + key, typeElement);
         }
 
-        appender.addConfig(key,
-            configAnnotation.defaultValue(),
-            configAnnotation.description(),
+        appender.addConfig(key, configAnnotation.defaultValue(), configAnnotation.description(),
             configAnnotation.tags());
       }
     }
@@ -184,11 +172,9 @@ public class ConfigFileGenerator extends AbstractProcessor {
     case ERROR:
       return null;
     default:
-      Element element =
-          processingEnv.getTypeUtils().asElement(superclass);
+      Element element = processingEnv.getTypeUtils().asElement(superclass);
       if (element instanceof TypeElement
-          && !"java.lang.Object"
-              .equals(((TypeElement) element).getQualifiedName().toString())) {
+          && !"java.lang.Object".equals(((TypeElement) element).getQualifiedName().toString())) {
         return (TypeElement) element;
       }
       return null;

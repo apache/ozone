@@ -137,11 +137,6 @@ class TestOzoneClientConfig {
   }
 
   @Test
-  void testNoDuplicatedKeys() {
-    ConfigurationReflectionUtil.assertNoDuplicatedKeys(OzoneClientConfig.class);
-  }
-
-  @Test
   void testNettyWarmUpEnabledByDefault() {
     assertTrue(new OzoneConfiguration().getObject(OzoneClientConfig.class).isNettyWarmUpEnabled());
 

@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import static org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil.assertNoDuplicatedKeys;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import com.google.common.collect.ImmutableSet;
@@ -105,24 +103,4 @@ class TestConfigurationReflectionUtil {
     ), props);
   }
 
-  @Test
-  void testDuplicatedConfig() {
-    assertThrows(IllegalStateException.class, () -> assertNoDuplicatedKeys(DuplicatedConfig.class));
-  }
-
-  static class DuplicatedConfig {
-    @Config(key = "key",
-        defaultValue = "1",
-        tags = ConfigTag.HDDS,
-        description = "key1"
-    )
-    private String key1;
-
-    @Config(key = "key",
-        defaultValue = "2",
-        tags = ConfigTag.HDDS,
-        description = "key2"
-    )
-    private String key2;
-  }
 }
