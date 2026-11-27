@@ -1056,6 +1056,29 @@ public class TestHddsDispatcher {
   }
 
   @Test
+  public void testWritesToDeletedContainer() throws IOException {
+    try {
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDir.getPath());
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
+      DatanodeDetails dd = randomDatanodeDetails();
+      HddsDispatcher dispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+      ContainerCommandRequestProto write = getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+      DispatcherContext writeContext = newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA);
+      assertEquals(ContainerProtos.Result.SUCCESS, dispatcher.dispatch(write, writeContext).getResult());
+
+      Container container = dispatcher.getContainer(1L);
+      container.markContainerForDelete();
+      assertEquals(ContainerProtos.Result.CONTAINER_NOT_OPEN, dispatcher.dispatch(write, writeContext).getResult());
+      assertEquals(ContainerProtos.Result.CONTAINER_NOT_OPEN, dispatcher.dispatch(
+          getEmptyPutBlockRequest(dd.getUuidString(), 1L, 1L), newContext(Op.APPLY_TRANSACTION)).getResult());
+      assertEquals(ContainerProtos.ContainerDataProto.State.DELETED, container.getContainerData().getState());
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
   public void testEcReconstructionWriteChunkDeniedWhenContainerCreatableFalse()
       throws IOException {
     String testDirPath = testDir.getPath();
