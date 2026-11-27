@@ -26,6 +26,8 @@ import java.io.Writer;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.NoSuchFileException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -37,6 +39,7 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
@@ -127,29 +130,54 @@ public class ConfigFileGenerator extends AbstractProcessor {
     return dir != null && TEST_OUTPUT_DIR.equals(dir.getName());
   }
 
-  private void writeConfigAnnotations(ConfigGroup configGroup,
-      ConfigFileAppender appender,
-      TypeElement typeElement) {
-    for (Element element : typeElement.getEnclosedElements()) {
-      if (element.getKind() == ElementKind.FIELD) {
-        if (element.getAnnotation(Config.class) != null) {
-
-          Config configAnnotation = element.getAnnotation(Config.class);
-          String prefix = configGroup.prefix() + ".";
-          String key = configAnnotation.key();
-          if (!key.startsWith(prefix)) {
-            processingEnv.getMessager().printMessage(Kind.ERROR,
-                prefix + " is not a prefix of " + key,
-                typeElement);
-          }
-
-          appender.addConfig(key,
-              configAnnotation.defaultValue(),
-              configAnnotation.description(),
-              configAnnotation.tags());
+  private void writeConfigAnnotations(ConfigGroup configGroup, ConfigFileAppender appender, TypeElement typeElement) {
+    // Collect the key of every @Config field in the class and its superclass chain and fail the
+    // compilation on a duplicated key, including keys inherited from @Config superclasses.
+    Map<String, String> keyToField = new HashMap<>();
+    for (TypeElement clazz = typeElement; clazz != null; clazz = superclassOf(clazz)) {
+      for (Element element : clazz.getEnclosedElements()) {
+        if (element.getKind() != ElementKind.FIELD || element.getAnnotation(Config.class) == null) {
+          continue;
         }
-      }
+        Config configAnnotation = element.getAnnotation(Config.class);
+        String key = configAnnotation.key();
+        String field = clazz.getSimpleName() + "#" + element.getSimpleName();
+        String previousField = keyToField.put(key, field);
+        if (previousField != null) {
+          processingEnv.getMessager().printMessage(Kind.ERROR,
+              "Duplicated config key '" + key + "': " + previousField + " and " + field, element);
+        }
 
+        if (clazz != typeElement) {
+          // Fields of superclasses are validated here but written by their own @ConfigGroup class,
+          // keeping the generated file unchanged.
+          continue;
+        }
+
+        String prefix = configGroup.prefix() + ".";
+        if (!key.startsWith(prefix)) {
+          processingEnv.getMessager().printMessage(Kind.ERROR, prefix + " is not a prefix of " + key, typeElement);
+        }
+
+        appender.addConfig(key, configAnnotation.defaultValue(), configAnnotation.description(),
+            configAnnotation.tags());
+      }
+    }
+  }
+
+  private TypeElement superclassOf(TypeElement typeElement) {
+    TypeMirror superclass = typeElement.getSuperclass();
+    switch (superclass.getKind()) {
+    case NONE:
+    case ERROR:
+      return null;
+    default:
+      Element element = processingEnv.getTypeUtils().asElement(superclass);
+      if (element instanceof TypeElement
+          && !"java.lang.Object".equals(((TypeElement) element).getQualifiedName().toString())) {
+        return (TypeElement) element;
+      }
+      return null;
     }
   }
 
