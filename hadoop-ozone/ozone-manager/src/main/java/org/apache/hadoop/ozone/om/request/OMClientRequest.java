@@ -142,6 +142,19 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   /**
+   * Perform post-execute steps on an OMResponse.
+   *
+   * Called from the RPC context on the leader after the request has been applied successfully. When the response is
+   * served from the Ratis retry cache, this is called on a new request instance on which {@link #preExecute} has not
+   * run, and only if the command type is registered in {@code OMExecutionFlow.POST_EXECUTE_CMD_TYPES}.
+   *
+   * @return OMResponse that will be returned to the client.
+   */
+  public OMResponse postExecute(OzoneManager ozoneManager, OMResponse omResponse) throws IOException {
+    return omResponse;
+  }
+
+  /**
    * Performs any request specific failure handling during request
    * submission. An example of this would be an undo of any steps
    * taken during pre-execute.

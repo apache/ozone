@@ -41,12 +41,12 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.SimplifiedContainerHealthStateForReporting;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
@@ -194,14 +194,14 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     replicasByContainer.put(mismatchContainerId,
         setOfMockReplicasWithChecksums(1000L, 2000L, 3000L));
 
-    Map<Long, ContainerHealthState> stateByContainer = new HashMap<>();
-    stateByContainer.put(missingContainerId, ContainerHealthState.MISSING);
+    Map<Long, SimplifiedContainerHealthStateForReporting> stateByContainer = new HashMap<>();
+    stateByContainer.put(missingContainerId, SimplifiedContainerHealthStateForReporting.MISSING);
     stateByContainer.put(underReplicatedContainerId,
-        ContainerHealthState.UNDER_REPLICATED);
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED);
     stateByContainer.put(overReplicatedContainerId,
-        ContainerHealthState.OVER_REPLICATED);
+        SimplifiedContainerHealthStateForReporting.OVER_REPLICATED);
     stateByContainer.put(misReplicatedContainerId,
-        ContainerHealthState.MIS_REPLICATED);
+        SimplifiedContainerHealthStateForReporting.MIS_REPLICATED);
 
     for (ContainerInfo container : containers) {
       long containerId = container.getContainerID();
@@ -315,19 +315,19 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
         setOfMockReplicasWithChecksums(1000L, 1000L, 1000L, 1000L));
     replicasByContainer.put(missingUnderContainerId, Collections.emptySet());
 
-    Map<Long, ContainerHealthState> stateByContainer = new HashMap<>();
+    Map<Long, SimplifiedContainerHealthStateForReporting> stateByContainer = new HashMap<>();
     stateByContainer.put(unhealthyUnderContainerId,
-        ContainerHealthState.UNHEALTHY_UNDER_REPLICATED);
+        SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED);
     stateByContainer.put(unhealthyOverContainerId,
-        ContainerHealthState.UNHEALTHY_OVER_REPLICATED);
+        SimplifiedContainerHealthStateForReporting.UNHEALTHY_OVER_REPLICATED);
     stateByContainer.put(qcStuckMissingContainerId,
-        ContainerHealthState.QUASI_CLOSED_STUCK_MISSING);
+        SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_MISSING);
     stateByContainer.put(qcStuckUnderContainerId,
-        ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED);
+        SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_UNDER_REPLICATED);
     stateByContainer.put(qcStuckOverContainerId,
-        ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED);
+        SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_OVER_REPLICATED);
     stateByContainer.put(missingUnderContainerId,
-        ContainerHealthState.MISSING_UNDER_REPLICATED);
+        SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED);
 
     for (ContainerInfo container : containers) {
       long containerId = container.getContainerID();
@@ -375,9 +375,9 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     when(containerManager.getContainerReplicas(ContainerID.valueOf(unsupportedStateContainerId)))
         .thenReturn(replicas);
 
-    Map<Long, ContainerHealthState> stateByContainer = new HashMap<>();
+    Map<Long, SimplifiedContainerHealthStateForReporting> stateByContainer = new HashMap<>();
     // This SCM state has no matching value in Recon's allowed DB enum.
-    stateByContainer.put(unsupportedStateContainerId, ContainerHealthState.UNHEALTHY);
+    stateByContainer.put(unsupportedStateContainerId, SimplifiedContainerHealthStateForReporting.UNHEALTHY);
 
     reconRM = createStateInjectingReconRM(stateByContainer);
     reconRM.processAll();
@@ -507,8 +507,8 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
       long usedBytes, int requiredNodes) {
     ContainerInfo containerInfo = mock(ContainerInfo.class);
     ReplicationConfig replicationConfig = mock(ReplicationConfig.class);
-    AtomicReference<ContainerHealthState> healthStateRef =
-        new AtomicReference<>(ContainerHealthState.HEALTHY);
+    AtomicReference<SimplifiedContainerHealthStateForReporting> healthStateRef =
+        new AtomicReference<>(SimplifiedContainerHealthStateForReporting.HEALTHY);
 
     when(containerInfo.getContainerID()).thenReturn(containerId);
     when(containerInfo.containerID()).thenReturn(ContainerID.valueOf(containerId));
@@ -516,12 +516,12 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     when(containerInfo.getUsedBytes()).thenReturn(usedBytes);
     when(containerInfo.getReplicationConfig()).thenReturn(replicationConfig);
     when(containerInfo.getState()).thenReturn(HddsProtos.LifeCycleState.CLOSED);
-    when(containerInfo.getHealthState()).thenAnswer(invocation -> healthStateRef.get());
+    when(containerInfo.getSimplifiedHealthStateForReporting()).thenAnswer(invocation -> healthStateRef.get());
     doAnswer(invocation -> {
       healthStateRef.set(invocation.getArgument(0));
       return null;
-    }).when(containerInfo).setHealthState(
-        org.mockito.ArgumentMatchers.any(ContainerHealthState.class));
+    }).when(containerInfo).setSimplifiedHealthStateForReporting(
+        org.mockito.ArgumentMatchers.any(SimplifiedContainerHealthStateForReporting.class));
     when(replicationConfig.getRequiredNodes()).thenReturn(requiredNodes);
     return containerInfo;
   }
@@ -529,15 +529,15 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
   private ReconReplicationManager createStateInjectingReconRM(
       long emptyMissingContainerId, long negativeSizeContainerId)
       throws Exception {
-    Map<Long, ContainerHealthState> stateByContainer = new HashMap<>();
-    stateByContainer.put(emptyMissingContainerId, ContainerHealthState.MISSING);
+    Map<Long, SimplifiedContainerHealthStateForReporting> stateByContainer = new HashMap<>();
+    stateByContainer.put(emptyMissingContainerId, SimplifiedContainerHealthStateForReporting.MISSING);
     stateByContainer.put(negativeSizeContainerId,
-        ContainerHealthState.UNDER_REPLICATED);
+        SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED);
     return createStateInjectingReconRM(stateByContainer);
   }
 
   private ReconReplicationManager createStateInjectingReconRM(
-      Map<Long, ContainerHealthState> stateByContainer) throws Exception {
+      Map<Long, SimplifiedContainerHealthStateForReporting> stateByContainer) throws Exception {
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     SCMContext scmContext = mock(SCMContext.class);
     NodeManager nodeManager = mock(NodeManager.class);
@@ -565,11 +565,11 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
           boolean readOnly) {
         ReconReplicationManagerReport reconReport =
             (ReconReplicationManagerReport) report;
-        ContainerHealthState state =
+        SimplifiedContainerHealthStateForReporting state =
             stateByContainer.get(containerInfo.getContainerID());
         if (state != null) {
           reconReport.incrementAndSample(state, containerInfo);
-          containerInfo.setHealthState(state);
+          containerInfo.setSimplifiedHealthStateForReporting(state);
           return true;
         }
         return false;
@@ -581,11 +581,11 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
           boolean readOnly) {
         ReconReplicationManagerReport reconReport =
             (ReconReplicationManagerReport) report;
-        ContainerHealthState state =
+        SimplifiedContainerHealthStateForReporting state =
             stateByContainer.get(containerInfo.getContainerID());
         if (state != null) {
           reconReport.incrementAndSample(state, containerInfo);
-          containerInfo.setHealthState(state);
+          containerInfo.setSimplifiedHealthStateForReporting(state);
           return true;
         }
         return false;

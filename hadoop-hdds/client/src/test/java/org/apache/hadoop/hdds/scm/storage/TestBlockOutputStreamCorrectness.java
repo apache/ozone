@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Deque;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -150,6 +152,61 @@ class TestBlockOutputStreamCorrectness {
         .isEqualTo(ByteString.copyFrom(DATA, acked, 2 * FLUSH_SIZE + BUFFER_SIZE - acked));
 
     assertThatThrownBy(outputStream::close).isInstanceOf(IOException.class);
+  }
+
+  /**
+   * A failed WriteChunk reply must complete the returned future exceptionally.
+   * A later WriteChunk must also fail, with the earlier error, even if its own reply is successful.
+   */
+  @Test
+  void testFailedWriteChunkCompletesExceptionally() throws Exception {
+    final MockXceiverClientSpi xceiverClient = new MockXceiverClientSpi(MockPipeline.createRatisPipeline());
+    final BlockOutputStream outputStream = createBlockOutputStream(new BufferPool(BUFFER_SIZE, 16), xceiverClient,
+        newFixedThreadPool(2));
+    try {
+      xceiverClient.setReplyResult(Result.CLOSED_CONTAINER_IO);
+      assertFailed(outputStream.writeChunkToContainer(ChunkBuffer.wrap(ByteBuffer.wrap(DATA, 0, BUFFER_SIZE))));
+      final IOException ioe = outputStream.getIoException();
+      assertThat(ioe).isNotNull();
+
+      xceiverClient.setReplyResult(Result.SUCCESS);
+      assertFailed(outputStream.writeChunkToContainer(
+          ChunkBuffer.wrap(ByteBuffer.wrap(DATA, BUFFER_SIZE, BUFFER_SIZE).slice())));
+      assertThat(outputStream.getIoException()).isSameAs(ioe);
+    } finally {
+      outputStream.cleanup(false);
+    }
+  }
+
+  /**
+   * For EC, a failed WriteChunk reply must also complete the returned future exceptionally,
+   * and set the IOException checked by the EC key output stream.
+   */
+  @Test
+  void testFailedEcWriteChunkCompletesExceptionally() throws Exception {
+    final ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    final DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    final Pipeline pipeline = Pipeline.newBuilder()
+        .setId(datanodeDetails.getID())
+        .setReplicationConfig(replicationConfig)
+        .setNodes(ImmutableList.of(datanodeDetails))
+        .setState(Pipeline.PipelineState.CLOSED)
+        .setReplicaIndexes(ImmutableMap.of(datanodeDetails, 2))
+        .build();
+    final MockXceiverClientSpi xceiverClient = new MockXceiverClientSpi(pipeline);
+    xceiverClient.setReplyResult(Result.CLOSED_CONTAINER_IO);
+    final ECBlockOutputStream outputStream = createECBlockOutputStream(new OzoneClientConfig(), replicationConfig,
+        new BlockID(1, 1), xceiverClient, true);
+    try {
+      assertFailed(outputStream.write(ByteBuffer.wrap(DATA, 0, BUFFER_SIZE)));
+      assertThat(outputStream.getIoException()).isNotNull();
+    } finally {
+      outputStream.cleanup(false);
+    }
+  }
+
+  private static void assertFailed(CompletableFuture<ContainerCommandResponseProto> future) {
+    assertThatThrownBy(future::get).isInstanceOf(ExecutionException.class);
   }
 
   /**
@@ -293,9 +350,17 @@ class TestBlockOutputStreamCorrectness {
   private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
       ECReplicationConfig repConfig, BlockID blockID, Pipeline pipeline,
       boolean containerAutoCreate) throws IOException {
+    return createECBlockOutputStream(clientConfig, repConfig, blockID, new MockXceiverClientSpi(pipeline),
+        containerAutoCreate);
+  }
+
+  private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
+      ECReplicationConfig repConfig, BlockID blockID, XceiverClientSpi xceiverClient,
+      boolean containerAutoCreate) throws IOException {
+    final Pipeline pipeline = xceiverClient.getPipeline();
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
     when(xcm.acquireClient(any()))
-        .thenReturn(new MockXceiverClientSpi(pipeline));
+        .thenReturn(xceiverClient);
 
     ContainerClientMetrics clientMetrics = ContainerClientMetrics.acquire();
     StreamBufferArgs streamBufferArgs =

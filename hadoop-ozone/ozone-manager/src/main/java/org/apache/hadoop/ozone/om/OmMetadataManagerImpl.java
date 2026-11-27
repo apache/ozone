@@ -1107,12 +1107,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           ResultCodes.BUCKET_NOT_FOUND);
     }
 
+    String seekPrefix;
+    if (StringUtils.isNotEmpty(keyPrefix)) {
+      seekPrefix = getOzoneKey(volumeName, bucketName, keyPrefix);
+    } else {
+      seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
+    }
+
     String seekKey;
     boolean skipStartKey = false;
     // Every key matching keyPrefix sorts after a startKey that sorts before keyPrefix,
     // so seek to keyPrefix; seeking to startKey would stop at the first non-matching key.
-    if (StringUtils.isNotBlank(startKey)
-        && (StringUtils.isEmpty(keyPrefix) || startKey.compareTo(keyPrefix) >= 0)) {
+    // Compare DB keys: keyPrefix "/" maps to the DB prefix of the bucket, which also matches keys sorting before "/".
+    if (StringUtils.isNotEmpty(startKey) && getOzoneKey(volumeName, bucketName, startKey).compareTo(seekPrefix) >= 0) {
       // Seek to the specified key.
       seekKey = getOzoneKey(volumeName, bucketName, startKey);
       skipStartKey = true;
@@ -1120,13 +1127,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       // This allows us to seek directly to the first key with the right prefix.
       seekKey = getOzoneKey(volumeName, bucketName,
           StringUtils.isNotEmpty(keyPrefix) ? keyPrefix : OM_KEY_PREFIX);
-    }
-
-    String seekPrefix;
-    if (StringUtils.isNotEmpty(keyPrefix)) {
-      seekPrefix = getOzoneKey(volumeName, bucketName, keyPrefix);
-    } else {
-      seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
     }
 
     TreeMap<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();

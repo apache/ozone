@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -299,6 +300,20 @@ class ReconStorageContainerSyncHelper {
             containerID);
         return 1;
       }
+      // SCM moves a CLOSED container back to QUASI_CLOSED only through DELETING or DELETED, which Recon
+      // may not have copied. Recon is ahead of SCM only when it closed the container from a CLOSED replica
+      // that SCM has not processed yet. DELETING here is that same move, stopped between the two steps.
+      if (reconState == HddsProtos.LifeCycleState.DELETING
+          || (reconState == HddsProtos.LifeCycleState.CLOSED && !hasClosedReplica(reconContainer))) {
+        if (reconState == HddsProtos.LifeCycleState.CLOSED) {
+          containerManager.updateContainerState(containerID, DELETE);
+        }
+        containerManager.transitionDeletingOrDeletedToTargetState(
+            containerID, HddsProtos.LifeCycleState.QUASI_CLOSED);
+        LOG.info("Container {} moved from {} back to QUASI_CLOSED based on SCM state.",
+            containerID, reconState);
+        return 1;
+      }
       LOG.debug("Skipping container {} because SCM reports QUASI_CLOSED while "
           + "Recon has state {}.", containerID, reconState);
     } catch (InvalidStateTransitionException | IOException e) {
@@ -306,6 +321,19 @@ class ReconStorageContainerSyncHelper {
           containerID, e);
     }
     return 0;
+  }
+
+  /**
+   * Returns true iff Recon has a CLOSED replica whose sequence ID matches the container's.
+   * A stale CLOSED replica (older sequence) is treated the same as a non-CLOSED replica: SCM
+   * would not close the container on its basis, so it cannot be evidence that Recon is ahead.
+   */
+  private boolean hasClosedReplica(ContainerInfo container) throws ContainerNotFoundException {
+    long containerSeq = container.getSequenceId();
+    return containerManager.getContainerReplicas(container.containerID()).stream()
+        .anyMatch(replica -> replica.getState() == ContainerReplicaProto.State.CLOSED
+            && replica.getSequenceId() != null
+            && replica.getSequenceId() == containerSeq);
   }
 
   private int reconcileToClosed(ContainerID containerID,

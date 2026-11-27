@@ -116,6 +116,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -773,7 +774,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
 
     List<Tag> tagsPutOrder = Arrays.asList(
         Tag.builder().key("key2").value("val2").build(),
-        Tag.builder().key("key").value("val").build());
+        Tag.builder().key("key").value("a@b").build());
     s3Client.putObjectTagging(b -> b.bucket(bucketName).key(keyName)
         .tagging(Tagging.builder().tagSet(tagsPutOrder).build()));
 
@@ -781,7 +782,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
     List<Tag> tagSet = taggingResult.tagSet();
     assertEquals(2, tagSet.size());
     assertEquals("key", tagSet.get(0).key());
-    assertEquals("val", tagSet.get(0).value());
+    assertEquals("a@b", tagSet.get(0).value());
     assertEquals("key2", tagSet.get(1).key());
     assertEquals("val2", tagSet.get(1).value());
   }
@@ -2219,6 +2220,43 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
         .prefix(prefix).delimiter("/").startAfter("dir1bi"));
     assertThat(v2AfterPrefix.commonPrefixes()).isEmpty();
     assertThat(v2AfterPrefix.contents()).isEmpty();
+  }
+
+  /**
+   * Prefix "/" matches no key here. On an OBS bucket, S3 Gateway still pages through the whole bucket and filters
+   * the keys, so pagination must end when a page ends at a key that sorts before "/".
+   */
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"OBJECT_STORE", "FILE_SYSTEM_OPTIMIZED"})
+  @Timeout(120)
+  public void testListObjectsSlashPrefix(BucketLayout layout) throws Exception {
+    final String bucketName = getBucketName("slash-prefix");
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setBucketLayout(layout).build());
+    }
+    s3Client.putObject(b -> b.bucket(bucketName).key(".cache/0"), RequestBody.fromString("x"));
+
+    ListObjectsV2Response v2 = s3Client.listObjectsV2(b -> b.bucket(bucketName).prefix("/"));
+    assertThat(v2.contents()).isEmpty();
+  }
+
+  /**
+   * FSO removes the leading "/" from key names, so only an OBS bucket can have a key matching Prefix "/".
+   */
+  @Test
+  @Timeout(120)
+  public void testListObjectsSlashPrefixMatchesKey() throws Exception {
+    final String bucketName = getBucketName("slash-prefix-key");
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE).build());
+    }
+    s3Client.putObject(b -> b.bucket(bucketName).key(".cache/0"), RequestBody.fromString("x"));
+    s3Client.putObject(b -> b.bucket(bucketName).key("/keep"), RequestBody.fromString("x"));
+
+    ListObjectsV2Response v2 = s3Client.listObjectsV2(b -> b.bucket(bucketName).prefix("/"));
+    assertThat(v2.contents()).extracting(S3Object::key).containsExactly("/keep");
   }
 
   private void testListObjectsMany(boolean isListV2) throws Exception {
