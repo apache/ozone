@@ -157,8 +157,10 @@ public abstract class MisReplicationHandler implements
 
     int requiredNodes = replicasToBeReplicated.size();
 
-    StorageType targetStorageType = container.getReplicationType() == HddsProtos.ReplicationType.RATIS
-        ? ReplicationManagerUtil.getTargetStorageType(container) : StorageType.DEFAULT;
+    // Both RATIS and EC mis-replication copies target the container's storage tier (DEFAULT when it has no tier).
+    // Mis-replication has no fallback: a mis-replicated container has all its replicas, so a different-tier copy
+    // would only be deleted by over-replication and never moved back.
+    StorageType targetStorageType = ReplicationManagerUtil.getTargetStorageType(container);
     List<DatanodeDetails> targetDatanodes;
     try {
       targetDatanodes = ReplicationManagerUtil.getTargetDatanodes(containerPlacement, requiredNodes,
