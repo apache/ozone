@@ -219,12 +219,8 @@ public class TestReconSCMContainerSyncIntegration
   private ContainerID seedDeletedWithReplica(long id) throws Exception {
     seedRecon(id, 1, CLOSED);
     ContainerID containerID = ContainerID.valueOf(id);
+    addReplica(containerID, ContainerReplicaProto.State.CLOSED);
     ReconContainerManager containerManager = getContainerManager();
-    containerManager.updateContainerReplica(containerID, ContainerReplica.newBuilder()
-        .setContainerID(containerID)
-        .setContainerState(ContainerReplicaProto.State.CLOSED)
-        .setDatanodeDetails(randomDatanodeDetails())
-        .build());
     containerManager.updateContainerState(containerID, DELETE);
     containerManager.updateContainerState(containerID, CLEANUP);
     return containerID;
