@@ -317,6 +317,39 @@ class TestRewriteTablePathOzoneAction {
   }
 
   @Test
+  void startVersionRejectsWhenNewerThanEndVersion() {
+    List<String> metadataPaths = metadataLogEntryPaths(table);
+    String oldestName = RewriteTablePathUtil.fileName(metadataPaths.get(0));
+    String newestName = RewriteTablePathUtil.fileName(metadataPaths.get(metadataPaths.size() - 1));
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> new RewriteTablePathOzoneAction(table, 2)
+            .rewriteLocationPrefix(sourcePrefix, targetPrefix)
+            .startVersion(newestName)
+            .endVersion(oldestName)
+            .execute());
+
+    assertThat(exception).hasMessageContaining("chronologically older");
+    assertThat(exception).hasMessageContaining(newestName);
+    assertThat(exception).hasMessageContaining(oldestName);
+  }
+
+  @Test
+  void startVersionRejectsWhenSameAsEndVersion() {
+    List<String> metadataPaths = metadataLogEntryPaths(table);
+    String versionName = RewriteTablePathUtil.fileName(metadataPaths.get(2));
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> new RewriteTablePathOzoneAction(table, 2)
+            .rewriteLocationPrefix(sourcePrefix, targetPrefix)
+            .startVersion(versionName)
+            .endVersion(versionName)
+            .execute());
+
+    assertThat(exception).hasMessageContaining("chronologically older");
+  }
+
+  @Test
   void endVersionRejectsDeletedVersionFile() {
     List<String> metadataPaths = metadataLogEntryPaths(table);
     String existingName = RewriteTablePathUtil.fileName(metadataPaths.get(0));
