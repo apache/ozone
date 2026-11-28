@@ -17,14 +17,28 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
+import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
+import org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -32,6 +46,13 @@ import org.junit.jupiter.params.provider.CsvSource;
  * Tests for {@link DataNodeMetricsCollectionTask}.
  */
 class TestDataNodeMetricsCollectionTask {
+
+  private static final String BEAN_PREFIX = "Hadoop:service=HddsDatanode,name=";
+  private static final String LEGACY_BEAN = BEAN_PREFIX + "BlockDeletingService";
+
+  private final DatanodeInfo nodeDetails = new DatanodeInfo(
+      MockDatanodeDetails.randomDatanodeDetails(),
+      NodeStatus.inServiceHealthy(), defaultVersionProto(), 5 * 60 * 1000);
 
   @ParameterizedTest
   @CsvSource({
@@ -49,5 +70,39 @@ class TestDataNodeMetricsCollectionTask {
     new DataNodeMetricsCollectionTask(datanode, httpsEnabled, factory);
 
     verify(factory).getJmxMetricsServiceProvider(expectedUrl);
+  }
+
+  private DatanodePendingDeletionMetrics collect(List<Map<String, Object>> beans) throws Exception {
+    MetricsServiceProvider provider = mock(MetricsServiceProvider.class);
+    when(provider.getMetrics(LEGACY_BEAN + "*")).thenReturn(beans);
+    MetricsServiceProviderFactory factory = mock(MetricsServiceProviderFactory.class);
+    when(factory.getJmxMetricsServiceProvider(anyString())).thenReturn(provider);
+    return new DataNodeMetricsCollectionTask(nodeDetails, false, factory).call();
+  }
+
+  private static Map<String, Object> bean(String name, long pendingBlockBytes) {
+    Map<String, Object> bean = new HashMap<>();
+    bean.put("name", name);
+    bean.put("TotalPendingBlockBytes", pendingBlockBytes);
+    return bean;
+  }
+
+  @Test
+  void picksDatanodeQualifiedBeanWhenPresent() throws Exception {
+    String ownBean = BEAN_PREFIX + BlockDeletingServiceMetrics.getSourceName(nodeDetails.getUuidString());
+    String otherBean = BEAN_PREFIX + BlockDeletingServiceMetrics.getSourceName("other-datanode");
+    List<Map<String, Object>> beans = Arrays.asList(bean(LEGACY_BEAN, 7L), bean(otherBean, 11L), bean(ownBean, 42L));
+
+    assertEquals(42L, collect(beans).getPendingBlockSize());
+  }
+
+  @Test
+  void fallsBackToLegacyBeanName() throws Exception {
+    assertEquals(7L, collect(Collections.singletonList(bean(LEGACY_BEAN, 7L))).getPendingBlockSize());
+  }
+
+  @Test
+  void reportsMinusOneWhenNoBeansFound() throws Exception {
+    assertEquals(-1L, collect(Collections.emptyList()).getPendingBlockSize());
   }
 }

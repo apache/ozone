@@ -19,9 +19,14 @@ package org.apache.hadoop.hdds.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.Arrays;
 import java.util.Collections;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -31,6 +36,16 @@ import org.junit.jupiter.api.Test;
 class TestNettyMetrics {
 
   private static final long MAX_HEAP = 8L << 30;
+
+  @BeforeEach
+  void enableMiniClusterMode() {
+    DefaultMetricsSystem.setMiniClusterMode(true);
+  }
+
+  @AfterEach
+  void resetMiniClusterMode() {
+    DefaultMetricsSystem.setMiniClusterMode(false);
+  }
 
   @Test
   void resolveUsesNettyProperty() {
@@ -85,5 +100,32 @@ class TestNettyMetrics {
   @Test
   void maxDirectMemoryIsPositive() {
     assertThat(NettyMetrics.maxDirectMemory()).isGreaterThan(0L);
+  }
+
+  @Test
+  void defaultCreateKeepsStandaloneSourceName() {
+    NettyMetrics metrics = NettyMetrics.create();
+    try {
+      assertNotNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME));
+    } finally {
+      metrics.unregister();
+    }
+    assertNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME));
+  }
+
+  @Test
+  void componentSourcesRegisterAndUnregisterIndependently() {
+    NettyMetrics scmMetrics = NettyMetrics.create("SCM");
+    NettyMetrics omMetrics = NettyMetrics.create("OM");
+    try {
+      assertNotNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME + "-SCM"));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME + "-OM"));
+      scmMetrics.unregister();
+      assertNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME + "-SCM"));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME + "-OM"));
+    } finally {
+      scmMetrics.unregister();
+      omMetrics.unregister();
+    }
   }
 }

@@ -90,6 +90,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -543,6 +544,9 @@ public class TestKeyValueContainer {
     ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(keyValueContainer);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    BlockDeletingService blockDeletingService = mock(BlockDeletingService.class);
+    when(blockDeletingService.getMetrics()).thenReturn(BlockDeletingServiceMetrics.create(null));
+    when(ozoneContainer.getBlockDeletingService()).thenReturn(blockDeletingService);
     DeleteBlocksCommandHandler handler =
         new DeleteBlocksCommandHandler(ozoneContainer, CONF, CONF.getObject(DatanodeConfiguration.class), "");
     try {
@@ -557,7 +561,7 @@ public class TestKeyValueContainer {
       assertTrue(results.get(0).getSuccess());
     } finally {
       handler.stop();
-      BlockDeletingServiceMetrics.unRegister();
+      handler.getBlockDeleteMetrics().unregister();
     }
     assertEquals(txId, keyValueContainerData.getDeleteTransactionId());
 

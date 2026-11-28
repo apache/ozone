@@ -107,8 +107,13 @@ public class StorageVolumeChecker {
    */
   public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
       String threadNamePrefix) {
+    this(conf, timer, threadNamePrefix, null);
+  }
 
-    metrics = BackgroundVolumeScannerMetrics.create();
+  public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
+      String threadNamePrefix, String metricsSourceId) {
+
+    metrics = BackgroundVolumeScannerMetrics.create(metricsSourceId);
 
     this.timer = timer;
 
@@ -484,11 +489,12 @@ public class StorageVolumeChecker {
    * of the parameters.
    */
   public void shutdownAndWait(int gracePeriod, TimeUnit timeUnit) {
+    // Registered in the constructor, so unregister even if the checker never started.
+    metrics.unregister();
     if (started.compareAndSet(true, false)) {
       periodicDiskChecker.cancel(true);
       diskCheckerservice.shutdownNow();
       checkVolumeResultHandlerExecutorService.shutdownNow();
-      metrics.unregister();
       try {
         delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
       } catch (InterruptedException e) {

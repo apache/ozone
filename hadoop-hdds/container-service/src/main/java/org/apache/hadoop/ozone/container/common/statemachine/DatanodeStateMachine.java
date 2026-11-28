@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeActionProvider;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
@@ -153,13 +154,15 @@ public class DatanodeStateMachine implements Closeable {
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
+    String metricsSourceId = datanodeDetails.getUuidString();
 
     Clock clock = Clock.system(ZoneId.systemDefault());
     // Expected to be initialized already.
     storage = new DatanodeStorage(conf,
         datanodeDetails.getUuidString());
 
-    versionManager = new DatanodeVersionManager(storage, this);
+    versionManager = new DatanodeVersionManager(storage, this, new DatanodeUpgradeActionProvider(),
+        metricsSourceId);
     VersionedDatanodeFeatures.initialize(versionManager);
 
     String threadNamePrefix = datanodeDetails.threadNamePrefix();
@@ -169,7 +172,7 @@ public class DatanodeStateMachine implements Closeable {
             .setNameFormat(threadNamePrefix +
                 "DatanodeStateMachineTaskThread-%d")
             .build());
-    connectionManager = new SCMConnectionManager(conf);
+    connectionManager = new SCMConnectionManager(conf, metricsSourceId);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this,
         threadNamePrefix);
     volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
@@ -190,7 +193,7 @@ public class DatanodeStateMachine implements Closeable {
         new GrpcContainerUploader(conf, certClient, container.getController())
     );
 
-    pushReplicatorWithMetrics = new MeasuredReplicator(pushReplicator, "push");
+    pushReplicatorWithMetrics = new MeasuredReplicator(pushReplicator, "push", metricsSourceId);
 
     ReplicationConfig replicationConfig =
         conf.getObject(ReplicationConfig.class);
@@ -208,10 +211,9 @@ public class DatanodeStateMachine implements Closeable {
       supervisor.shutdownFailedVolumePools(container.getVolumeSet());
     });
 
-    replicationSupervisorMetrics =
-        ReplicationSupervisorMetrics.create(supervisor);
+    replicationSupervisorMetrics = ReplicationSupervisorMetrics.create(supervisor, metricsSourceId);
 
-    ecReconstructionMetrics = ECReconstructionMetrics.create();
+    ecReconstructionMetrics = ECReconstructionMetrics.create(metricsSourceId);
     ecReconstructionCoordinator = new ECReconstructionCoordinator(
         conf, certClient, secretKeyClient, context, ecReconstructionMetrics,
         threadNamePrefix);
@@ -278,7 +280,8 @@ public class DatanodeStateMachine implements Closeable {
     dispatcherBuilder
         .setConnectionManager(connectionManager)
         .setContainer(container)
-        .setContext(context);
+        .setContext(context)
+        .setMetricsSourceId(metricsSourceId);
 
     commandDispatcher = dispatcherBuilder.build();
 
@@ -291,8 +294,8 @@ public class DatanodeStateMachine implements Closeable {
         .addThreadNamePrefix(threadNamePrefix)
         .build();
 
-    queueMetrics = DatanodeQueueMetrics.create(this);
-    nettyMetrics = NettyMetrics.create();
+    queueMetrics = DatanodeQueueMetrics.create(this, metricsSourceId);
+    nettyMetrics = NettyMetrics.create(metricsSourceId);
   }
 
   @VisibleForTesting
@@ -457,6 +460,7 @@ public class DatanodeStateMachine implements Closeable {
     }
     context.setState(DatanodeStates.getLastState());
     replicationSupervisorMetrics.unRegister();
+    IOUtils.close(LOG, pushReplicatorWithMetrics);
     ecReconstructionMetrics.unRegister();
     executorServiceShutdownGraceful(executorService);
     executorServiceShutdownGraceful(closePipelineCommandExecutorService);
@@ -475,7 +479,7 @@ public class DatanodeStateMachine implements Closeable {
     }
 
     if (queueMetrics != null) {
-      DatanodeQueueMetrics.unRegister();
+      queueMetrics.unRegister();
     }
 
     if (nettyMetrics != null) {
@@ -650,7 +654,6 @@ public class DatanodeStateMachine implements Closeable {
    */
   public synchronized void stopDaemon() {
     try {
-      IOUtils.close(LOG, pushReplicatorWithMetrics);
       supervisor.stop();
       context.setShutdownGracefully();
       context.setState(DatanodeStates.SHUTDOWN);

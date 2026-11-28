@@ -103,7 +103,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     this.ozoneContainer = container;
     this.containerSet = container.getContainerSet();
     this.conf = conf;
-    this.blockDeleteMetrics = BlockDeletingServiceMetrics.create();
+    this.blockDeleteMetrics = container.getBlockDeletingService().getMetrics();
     this.tryLockTimeoutMs = dnConf.getBlockDeleteMaxLockWaitTimeoutMs();
     schemaHandlers = new HashMap<>();
     schemaHandlers.put(SCHEMA_V1, this::markBlocksForDeletionSchemaV1);
