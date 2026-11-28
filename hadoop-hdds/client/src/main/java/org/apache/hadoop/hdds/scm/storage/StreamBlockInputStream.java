@@ -72,6 +72,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private static final Logger LOG = LoggerFactory.getLogger(StreamBlockInputStream.class);
   private static final int EOF = -1;
   private static final String STREAM_CLOSE_REASON = "StreamBlockInputStream closed";
+  private static final String STREAM_FAILED_REASON = "StreamBlockInputStream stream failed";
   private static final AtomicInteger STREAM_ID = new AtomicInteger(0);
   private static final AtomicInteger READER_ID = new AtomicInteger(0);
 
@@ -216,6 +217,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         client.initStreamRead(blockID, reader, failedStreamingDatanodes);
         try {
           return preadOnce(client, reader, pipeline, blockOffset, length, dst);
+        } catch (IOException | RuntimeException e) {
+          reader.abandon(e);
+          throw e;
         } finally {
           closeStream(reader);
         }
@@ -387,12 +391,27 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private static void closeStream(StreamingReader reader) {
-    reader.onCompleted();
+    final boolean failed = reader.isFailed();
+    if (failed) {
+      reader.releaseResources();
+    } else {
+      reader.onCompleted();
+    }
 
     final StreamingReadResponse response = reader.getResponse();
     if (response != null) {
       final ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver =
           response.getRequestObserver();
+      if (failed) {
+        // A half-close leaves the call open until the datanode finishes the request it is stuck on,
+        // and the datanode then still sends its reply to this abandoned reader: cancel the call instead.
+        try {
+          requestObserver.cancel(STREAM_FAILED_REASON, null);
+        } catch (RuntimeException e) {
+          LOG.warn("Failed to cancel gRPC request stream for {}", reader, e);
+        }
+        return;
+      }
       try {
         requestObserver.onCompleted();
       } catch (RuntimeException e) {
@@ -519,6 +538,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
          root instanceof TimeoutIOException) {
       if (shouldRetryRead(root, retryPolicy, retries++)) {
         recordFailedStreamingDatanode();
+        if (streamingReader != null) {
+          streamingReader.abandon(root);
+        }
         releaseClient();
         refreshBlockInfo(root);
         requestedLength = position;
@@ -636,6 +658,18 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     StreamingReader(XceiverClientGrpc client) {
       this.client = client;
+    }
+
+    boolean isFailed() {
+      return future.isCompletedExceptionally();
+    }
+
+    /**
+     * Marks a reader that is given up after a failure which did not fail it (e.g. a request that could not be sent),
+     * so that closing it cancels the call. No effect on a reader that has already completed.
+     */
+    void abandon(Throwable cause) {
+      future.completeExceptionally(cause);
     }
 
     void checkError() throws IOException {
@@ -774,8 +808,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     public void onError(Throwable throwable) {
       if (throwable instanceof StatusRuntimeException
           && ((StatusRuntimeException) throwable).getStatus().getCode() == CANCELLED) {
-        // This is expected when the client cancels the stream.
-        setCompleted();
+        // This is expected when the client cancels the stream, including a failed stream it tears down.
+        if (!isFailed()) {
+          setCompleted();
+        }
       } else {
         setFailed(throwable);
       }
