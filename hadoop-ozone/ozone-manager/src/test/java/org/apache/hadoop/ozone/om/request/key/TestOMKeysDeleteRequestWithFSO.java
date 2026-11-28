@@ -41,6 +41,8 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
@@ -156,6 +158,19 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
     for (String key : Arrays.asList("a/", "a/b/", "a/b/file")) {
       assertNull(getFileStatus(key), key);
     }
+  }
+
+  @Test
+  public void testNonRecursiveIsIgnoredBeforeFinalization() throws Exception {
+    addFile("a/b", "file");
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
+
+    OMResponse response = deleteNonRecursive("a/");
+
+    // An older leader does not reject the request, so until finalization the OM ignores the flag like an older OM.
+    assertEquals(Status.OK, response.getStatus());
+    assertNull(getFileStatus("a/"));
   }
 
   /**

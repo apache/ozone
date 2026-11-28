@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -141,7 +142,9 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
     // A non-recursive request deletes a directory only if the rest of the request leaves it empty. The files are
     // marked above; check each subdirectory before its parent, so that the parent sees it deleted as well.
-    final boolean recursive = getOmRequest().getDeleteKeysRequest().getRecursive();
+    // An older leader does not reject the flag before finalization, so ignore it here as an older OM does.
+    final boolean recursive = getOmRequest().getDeleteKeysRequest().getRecursive()
+        || !ozoneManager.getVersionManager().isAllowed(OzoneManagerVersion.NON_RECURSIVE_DELETE_KEYS);
     if (!recursive) {
       dirList.sort(Comparator.comparingInt((OmKeyInfo dir) -> OzoneFSUtils.getFileCount(dir.getKeyName())).reversed());
     }

@@ -18,12 +18,14 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.ozone.om.request.validation.ValidationContext.of;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
@@ -330,6 +333,23 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
     when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(false);
     when(ozoneManager.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
     assertDoesNotThrow(() -> request.preExecute(ozoneManager));
+  }
+
+  @Test
+  public void testNonRecursiveIsRejectedBeforeFinalization() throws Exception {
+    ValidationContext ctx = of(OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager(), omMetadataManager);
+    OMRequest recursive = OMRequest.newBuilder().setCmdType(DeleteKeys).setClientId(UUID.randomUUID().toString())
+        .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
+            .setDeleteKeys(DeleteKeyArgs.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+                .addKeys("dir/")))
+        .build();
+    OMRequest nonRecursive = recursive.toBuilder()
+        .setDeleteKeysRequest(recursive.getDeleteKeysRequest().toBuilder().setRecursive(false)).build();
+
+    assertSame(recursive, OMKeysDeleteRequest.disallowNonRecursiveDeleteKeysBeforeFinalization(recursive, ctx));
+    OMException e = assertThrows(OMException.class,
+        () -> OMKeysDeleteRequest.disallowNonRecursiveDeleteKeysBeforeFinalization(nonRecursive, ctx));
+    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION, e.getResult());
   }
 
   @Test

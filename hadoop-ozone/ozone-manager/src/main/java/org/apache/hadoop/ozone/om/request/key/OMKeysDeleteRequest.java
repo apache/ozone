@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -513,6 +514,26 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
             keyArgs.getVolumeName(), keyArgs.getBucketName());
         bucketLayout.validateSupportedOperation();
       }
+    }
+    return req;
+  }
+
+  /**
+   * Rejects non-recursive DeleteKeys until the OM is finalized for it, because an older OM ignores the flag and
+   * deletes directories recursively.
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.DeleteKeys
+  )
+  public static OMRequest disallowNonRecursiveDeleteKeysBeforeFinalization(OMRequest req, ValidationContext ctx)
+      throws OMException {
+    if (!req.getDeleteKeysRequest().getRecursive()
+        && !ctx.versionManager().isAllowed(OzoneManagerVersion.NON_RECURSIVE_DELETE_KEYS)) {
+      throw new OMException("Cluster does not have non-recursive DeleteKeys finalized yet. Rejecting the request,"
+          + " please finalize the cluster upgrade and then try again.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     }
     return req;
   }
