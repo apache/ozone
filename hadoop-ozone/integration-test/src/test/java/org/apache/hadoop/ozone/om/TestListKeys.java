@@ -18,11 +18,15 @@
 package org.apache.hadoop.ozone.om;
 
 import static com.google.common.collect.Lists.newLinkedList;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.params.provider.Arguments.of;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -34,17 +38,23 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.ClusterForTests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -355,6 +365,85 @@ public abstract class TestListKeys implements ClusterForTests.TestCase {
     checkKeyShallowList(keyPrefix, startKey, expectedKeys, obsOzoneBucket);
   }
 
+  @Test
+  public void testListKeysPaginationWithCacheAndTombstones() throws Exception {
+    final String volumeName = uniqueObjectName("vol-pagination");
+    final String bucketName = uniqueObjectName("bucket-pagination");
+    final BucketLayout layout = BucketLayout.OBJECT_STORE;
+    final OMMetadataManager metadataManager = metadataManager();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, metadataManager, layout);
+
+    final RatisReplicationConfig replication = RatisReplicationConfig.getInstance(ONE);
+    // Flush odd p1 keys, then tombstoned p2 keys, then cache-only even p1 keys.
+    for (int keyIndex : new int[] {1, 3, 5}) {
+      OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, "p1/k" + keyIndex, 0L, replication,
+          metadataManager);
+    }
+    for (int i = 0; i < 50; i++) {
+      OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, String.format("p2/k%03d", i), 0L, replication,
+          metadataManager);
+    }
+    metadataManager.getStore().flushDB();
+
+    final Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(layout);
+    for (int i = 0; i < 50; i++) {
+      keyTable.delete(metadataManager.getOzoneKey(volumeName, bucketName, String.format("p2/k%03d", i)));
+    }
+
+    for (int keyIndex : new int[] {2, 4}) {
+      OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName, "p1/k" + keyIndex, replication, metadataManager);
+    }
+
+    assertEquals(Arrays.asList("p1/k1", "p1/k2", "p1/k3", "p1/k4", "p1/k5"),
+        listAllKeysPaginated(metadataManager, volumeName, bucketName, "p1/", 2));
+  }
+
+  @Test
+  public void testListKeysWithStartKeyPastPrefixUpperBound() throws Exception {
+    final String volumeName = uniqueObjectName("vol-oob");
+    final String bucketName = uniqueObjectName("bucket-oob");
+    final OMMetadataManager metadataManager = metadataManager();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, metadataManager, BucketLayout.OBJECT_STORE);
+
+    final RatisReplicationConfig replication = RatisReplicationConfig.getInstance(ONE);
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, "a/1", 0L, replication, metadataManager);
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, "a/2", 0L, replication, metadataManager);
+    OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, "b/1", 0L, replication, metadataManager);
+    metadataManager.getStore().flushDB();
+
+    ListKeysResult result = metadataManager.listKeys(volumeName, bucketName, "b/1", "a/", 10);
+
+    assertEquals(Collections.emptyList(), listKeyNames(result),
+        "Expected empty result when startKey is past prefix upper bound");
+    assertFalse(result.isTruncated());
+  }
+
+  @Test
+  public void testListKeysPaginationBucketBoundaryIsolation() throws Exception {
+    final String volumeName = uniqueObjectName("vol-boundary");
+    final String bucket1 = "bucket1";
+    final String bucket10 = "bucket10";
+    final BucketLayout layout = BucketLayout.OBJECT_STORE;
+    final OMMetadataManager metadataManager = metadataManager();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket1, metadataManager, layout);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket10, metadataManager, layout);
+
+    final RatisReplicationConfig replication = RatisReplicationConfig.getInstance(ONE);
+    for (int i = 1; i <= 5; i++) {
+      OMRequestTestUtils.addKeyToTable(false, volumeName, bucket1, "k" + i, 0L, replication, metadataManager);
+      OMRequestTestUtils.addKeyToTable(false, volumeName, bucket10, "other" + i, 0L, replication, metadataManager);
+    }
+    metadataManager.getStore().flushDB();
+
+    final Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(layout);
+    for (int i = 1; i <= 5; i++) {
+      keyTable.delete(metadataManager.getOzoneKey(volumeName, bucket10, "other" + i));
+    }
+
+    assertEquals(Arrays.asList("k1", "k2", "k3", "k4", "k5"),
+        listAllKeysPaginated(metadataManager, volumeName, bucket1, "", 2));
+  }
+
   private void checkKeyShallowList(String keyPrefix, String startKey,
       List<String> keys, OzoneBucket bucket)
       throws Exception {
@@ -399,5 +488,34 @@ public abstract class TestListKeys implements ClusterForTests.TestCase {
     }
 
     assertEquals(new String(input, StandardCharsets.UTF_8), new String(read, StandardCharsets.UTF_8));
+  }
+
+  private OMMetadataManager metadataManager() {
+    return cluster().getOzoneManager().getMetadataManager();
+  }
+
+  private static List<String> listKeyNames(ListKeysResult result) {
+    final List<String> names = new ArrayList<>();
+    for (OmKeyInfo keyInfo : result.getKeys()) {
+      names.add(keyInfo.getKeyName());
+    }
+    return names;
+  }
+
+  private static List<String> listAllKeysPaginated(OMMetadataManager metadataManager, String volumeName,
+      String bucketName, String keyPrefix, int maxKeys) throws IOException {
+    final List<String> collected = new ArrayList<>();
+    String startKey = null;
+    boolean truncated;
+    do {
+      final ListKeysResult result = metadataManager.listKeys(volumeName, bucketName, startKey, keyPrefix, maxKeys);
+      final List<String> page = listKeyNames(result);
+      collected.addAll(page);
+      if (!page.isEmpty()) {
+        startKey = page.get(page.size() - 1);
+      }
+      truncated = result.isTruncated();
+    } while (truncated);
+    return collected;
   }
 }
