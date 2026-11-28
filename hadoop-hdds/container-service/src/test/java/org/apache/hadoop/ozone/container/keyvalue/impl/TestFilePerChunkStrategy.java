@@ -20,12 +20,17 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMBINED_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -163,4 +168,20 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
     assertFalse(file.exists());
   }
 
+  @Test
+  public void testReadChunkAtOffsetWithMissingChunksDirectory() throws Exception {
+    ChunkManager chunkManager = createTestSubject();
+    KeyValueContainer container = getKeyValueContainer();
+    BlockID blockID = getBlockID();
+    ChunkInfo chunkInfo = getChunkInfo();
+    chunkManager.writeChunk(container, blockID, chunkInfo, getData(), COMBINED_STAGE);
+    chunkManager.readChunk(container, blockID, chunkInfo, null);
+    FileUtils.deleteDirectory(new File(getKeyValueContainerData().getChunksPath()));
+
+    // A non-zero offset looks up the block first, which fails because the block was never put.
+    ChunkInfo nextChunk = new ChunkInfo(blockID.getLocalID() + ".data.1", chunkInfo.getLen(), chunkInfo.getLen());
+    assertThatThrownBy(() -> chunkManager.readChunk(container, blockID, nextChunk, null))
+        .isInstanceOfSatisfying(StorageContainerException.class,
+            ex -> assertThat(ex.getResult()).isEqualTo(ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR));
+  }
 }

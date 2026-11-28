@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -224,7 +225,8 @@ public class FilePerChunkStrategy implements ChunkManager {
 
     // In version1, we verify checksum if it is available and return data
     // of the chunk file.
-    File finalChunkFile = getChunkFile(kvContainer, blockID, info);
+    File finalChunkFile = FILE_PER_CHUNK.getChunkFile(
+        containerData.getChunksDirForRead(), blockID, info.getChunkName());
 
     List<File> possibleFiles = new ArrayList<>();
     possibleFiles.add(finalChunkFile);
@@ -259,6 +261,8 @@ public class FilePerChunkStrategy implements ChunkManager {
                   blockID.toString(), UNABLE_TO_FIND_CHUNK);
         }
       } catch (IOException e) {
+        // Report a missing chunks directory rather than the missing block.
+        ContainerUtils.getChunkDir(containerData);
         throw new StorageContainerException(
             "Cannot find block " + blockID.toString() + " for chunk " +
                 info.getChunkName(), UNABLE_TO_FIND_CHUNK);
@@ -284,6 +288,8 @@ public class FilePerChunkStrategy implements ChunkManager {
         }
       }
     }
+    // Report a missing chunks directory rather than the missing chunk.
+    ContainerUtils.getChunkDir(containerData);
     throw new StorageContainerException(
         "Chunk file can't be found " + possibleFiles.toString(),
         UNABLE_TO_FIND_CHUNK);
