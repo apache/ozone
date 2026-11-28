@@ -29,8 +29,8 @@ OZONE_ROOT=$(pwd -P)
 source "${DIR}/_lib.sh"
 
 if [[ "${OZONE_TEST_SELECTOR}" == "xcompat/test-old.sh" ]]; then
-  : ${OZONE_OLD_VERSIONS:="${2:-}"}
-  export OZONE_OLD_VERSIONS
+  : ${OZONE_CLUSTER_VERSIONS:="${2:-}"}
+  export OZONE_CLUSTER_VERSIONS
 
   # use JDK8 image for Rebot in compat-old, to avoid pulling JDK25 image just for generating reports
   # TODO after HDDS-17509 this can be moved to env: of compat-old job

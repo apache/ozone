@@ -177,8 +177,9 @@ HSync Lease Recover Can Be Used
     Execute    ozone admin om lease recover --path=ofs://om/${FSO_BUCKET}/dir/subdir/file
 
 Key Info File Flag Should Be Set Correctly
-    Pass Execution If    '${CLUSTER_VERSION}' <= '${EC_VERSION}'   Cluster does not support 'file' flag
-    Pass Execution If    '${CLIENT_VERSION}' <= '${EC_VERSION}'    Client does not support 'file' flag
+    Pass Execution If    '${CLUSTER_VERSION}' < '${FILE_FLAG_VERSION}'   Cluster does not support 'file' flag
+    Pass Execution If    '${CLIENT_VERSION}' < '${FILE_FLAG_VERSION}'    Client does not support 'file' flag
+    Pass Execution If    '${DATA_VERSION}' < '${FSO_VERSION}'            Skipped write test case
 
     ${dirpath} =      Set Variable    /${FSO_BUCKET}/dir/subdir/
     ${filepath} =     Set Variable    ${dirpath}file

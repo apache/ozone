@@ -22,9 +22,9 @@ set -u -o pipefail
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-# shellcheck source=hadoop-ozone/dist/src/main/compose/xcompat/lib.sh
-source "${COMPOSE_DIR}/lib.sh"
+# shellcheck source=hadoop-ozone/dist/src/main/compose/xcompat/init.sh
+source "${COMPOSE_DIR}/init.sh"
 
 # current cluster with various clients
 export COMPOSE_FILE=new-cluster.yaml:clients.yaml
-cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}
+cluster_version=${current_version} test_cross_compatibility
