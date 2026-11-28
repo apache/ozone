@@ -77,7 +77,9 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -2257,7 +2259,18 @@ public class KeyValueHandler extends Handler {
     // matching one, it means the client did not write any chunk into the block.
     // Since the putBlock request may fail, we don't know if the chunk exists,
     // thus we need to check it when receiving the request to delete such blocks
-    String[] chunkNames = getFilesWithPrefix(prefix, chunkDir);
+    String[] chunkNames;
+    // FILE_PER_BLOCK has one known file name. Keep listing for legacy layouts and unreadable directories.
+    if (layoutVersion == FILE_PER_BLOCK && chunkDir.isDirectory() && chunkDir.canRead()) {
+      try {
+        Files.readAttributes(chunkDir.toPath().resolve(prefix), BasicFileAttributes.class);
+        chunkNames = new String[]{prefix};
+      } catch (NoSuchFileException e) {
+        chunkNames = new String[0];
+      }
+    } else {
+      chunkNames = getFilesWithPrefix(prefix, chunkDir);
+    }
     if (chunkNames == null) {
       throw new IOException("Failed to list chunks under " + chunkDir
           + " for unreferenced block " + localID + " in container "
