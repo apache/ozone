@@ -1076,10 +1076,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(deleteKeys.getVolume())
         .addAllKeys(deleteKeys.getKeyNames()).build();
     req.setDeleteKeys(deletedKeys);
-    OMRequest omRequest = createOMRequest(Type.DeleteKeys)
-        .setDeleteKeysRequest(req)
-        .build();
-    OMResponse omResponse = submitRequest(omRequest);
+    OMRequest.Builder omRequest = createOMRequest(Type.DeleteKeys)
+        .setDeleteKeysRequest(req);
+    if (deleteKeys.isAssumeS3Context()) {
+      omRequest.setAssumeS3Context(true);
+    }
+    OMResponse omResponse = submitRequest(omRequest.build());
 
     Map<String, ErrorInfo> keyToErrors = new HashMap<>();
     if (quiet && omResponse.getStatus() == PARTIAL_DELETE) {

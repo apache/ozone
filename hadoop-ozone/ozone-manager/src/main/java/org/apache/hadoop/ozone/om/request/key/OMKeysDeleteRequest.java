@@ -102,6 +102,20 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     DeleteKeysRequest deleteKeysRequest = omRequest.getDeleteKeysRequest();
     Objects.requireNonNull(deleteKeysRequest, "deleteKeysRequest == null");
 
+    if (omRequest.getAssumeS3Context() && ozoneManager.getAclsEnabled()) {
+      DeleteKeyArgs args = deleteKeysRequest.getDeleteKeys();
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET, OzoneObj.StoreType.OZONE,
+            IAccessAuthorizer.ACLType.READ, args.getVolumeName(), args.getBucketName(), null);
+      } catch (IOException ex) {
+        Map<String, String> auditMap = buildVolumeAuditMap(args.getVolumeName());
+        auditMap.put(BUCKET, args.getBucketName());
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(DELETE_KEYS, auditMap, ex, omRequest.getUserInfo()));
+        throw ex;
+      }
+    }
+
     if (deleteKeysRequest.getSourceType() == RequestSource.LIFECYCLE && deleteKeysRequest.hasScanState()) {
       if (ozoneManager.isAdminAuthorizationEnabled()) {
         UserGroupInformation ugi = createUGIForApi();

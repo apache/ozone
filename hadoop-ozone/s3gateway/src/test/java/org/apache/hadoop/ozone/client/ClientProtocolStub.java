@@ -21,7 +21,6 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -415,7 +414,7 @@ public class ClientProtocolStub implements ClientProtocol {
   public Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName,
                                            List<String> keyNameList, boolean quiet)
       throws IOException {
-    return new HashMap<>();
+    return getBucket(volumeName, bucketName).deleteKeys(keyNameList, quiet);
   }
 
   @Override

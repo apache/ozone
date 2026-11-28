@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
@@ -185,6 +186,7 @@ public class TestMultiTenantVolume {
     }
     bucket.abortMultipartUpload("key", uploadID);
 
+    assertS3BatchDeletion(store, store.getS3Bucket(bucketName), bucketName);
     assertS3KeyDeletion(store, store.getS3Bucket(bucketName), bucketName);
     assertS3TagDeletion(store, store.getS3Bucket(bucketName), bucketName);
 
@@ -208,6 +210,7 @@ public class TestMultiTenantVolume {
     store.createS3Bucket(BUCKET_NAME);
     OzoneBucket bucket = store.getS3Bucket(BUCKET_NAME);
     assertEquals(TENANT_ID, bucket.getVolumeName());
+    assertS3BatchDeletion(store, bucket, BUCKET_NAME);
     assertS3KeyDeletion(store, bucket, BUCKET_NAME);
     assertS3TagDeletion(store, bucket, BUCKET_NAME);
 
@@ -264,6 +267,7 @@ public class TestMultiTenantVolume {
     exception = assertThrows(OMException.class, () -> sourceBucket.abortMultipartUpload(keyName, linkUploadID));
     assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, exception.getResult());
 
+    assertS3BatchDeletion(store, sourceBucket, linkBucketName);
     assertS3KeyDeletion(store, sourceBucket, linkBucketName);
     assertS3TagDeletion(store, sourceBucket, linkBucketName);
 
@@ -295,7 +299,27 @@ public class TestMultiTenantVolume {
 
     OMException error = assertThrows(OMException.class, () -> bucket.getKey("key"));
     assertThat(error.getResult()).isEqualTo(OMException.ResultCodes.KEY_NOT_FOUND);
+    bucket.createKey("batch-key", 0).close();
+    assertThat(olderS3Client.getProxy().deleteKeys(null, bucketName, Collections.singletonList("batch-key"), true))
+        .isEmpty();
+    error = assertThrows(OMException.class, () -> bucket.getKey("batch-key"));
+    assertThat(error.getResult()).isEqualTo(OMException.ResultCodes.KEY_NOT_FOUND);
     store.deleteS3Bucket(bucketName);
+  }
+
+  private void assertS3BatchDeletion(ObjectStore store, OzoneBucket bucket, String s3BucketName) throws Exception {
+    String keyName = "batch-delete-key";
+    bucket.createKey(keyName, 0).close();
+
+    try (OzoneClient s3Client = newS3Client(store)) {
+      assertThat(OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(s3Client.getProxy().getOmVersion()))
+          .isTrue();
+      assertThat(s3Client.getProxy().deleteKeys(null, s3BucketName, Arrays.asList(keyName, "missing-key"), true))
+          .containsOnlyKeys("missing-key");
+    }
+
+    OMException exception = assertThrows(OMException.class, () -> bucket.getKey(keyName));
+    assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.KEY_NOT_FOUND);
   }
 
   private void assertS3KeyDeletion(ObjectStore store, OzoneBucket bucket, String s3BucketName) throws Exception {

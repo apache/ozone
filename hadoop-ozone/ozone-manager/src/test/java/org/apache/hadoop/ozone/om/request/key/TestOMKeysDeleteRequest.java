@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -27,7 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -39,11 +44,15 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
@@ -55,6 +64,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleScanState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
@@ -76,6 +87,50 @@ public class TestOMKeysDeleteRequest extends OMKeyRequestTests {
         new Object[]{RequestSource.USER},
         new Object[]{RequestSource.LIFECYCLE},
         new Object[]{RequestSource.TRASH});
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testS3VolumeContextBeforeLayoutSelection(boolean assumeS3Context) throws Exception {
+    createPreRequisites();
+    when(ozoneManager.getS3VolumeContext()).thenReturn(new S3VolumeContext(
+        OmVolumeArgs.newBuilder().setVolume(volumeName).setOwnerName("owner").setAdminName("admin").build(), "owner"));
+    OMRequest original = getOmRequest();
+    original = original.toBuilder().setAssumeS3Context(assumeS3Context).setDeleteKeysRequest(
+        original.getDeleteKeysRequest().toBuilder().setDeleteKeys(original.getDeleteKeysRequest().getDeleteKeys()
+            .toBuilder().setVolumeName(assumeS3Context ? "s3v" : volumeName))).build();
+
+    OMKeysDeleteRequest resolved =
+        (OMKeysDeleteRequest) OzoneManagerRatisUtils.createClientRequest(original, ozoneManager);
+    assertThat(resolved.getBucketLayout()).isEqualTo(getBucketLayout());
+    OMRequest replicated = resolved.preExecute(ozoneManager).toBuilder().clearAssumeS3Context().build();
+    assertThat(replicated.getDeleteKeysRequest().getDeleteKeys().getVolumeName()).isEqualTo(volumeName);
+    assertThat(replicated.getDeleteKeysRequest().getDeleteKeys().getKeysList())
+        .containsExactlyElementsOf(getDeleteKeyList());
+    OMKeysDeleteRequest replayed =
+        (OMKeysDeleteRequest) OzoneManagerRatisUtils.createClientRequest(replicated, ozoneManager);
+    assertThat(replayed.getBucketLayout()).isEqualTo(getBucketLayout());
+    checkDeleteKeysResponse(replayed);
+    verify(ozoneManager, times(assumeS3Context ? 1 : 0)).getS3VolumeContext();
+  }
+
+  @Test
+  public void testS3DeletePermissionDeniedIsAudited() throws Exception {
+    createPreRequisites();
+    OMRequest original = getOmRequest().toBuilder().setAssumeS3Context(true).build();
+    assertPreExecuteAclDenialIsAudited(getOmKeysDeleteRequest(original), OMAction.DELETE_KEYS);
+  }
+
+  @Test
+  public void testDeleteWithoutS3ContextSkipsBucketReadCheck() throws Exception {
+    createPreRequisites();
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    OMKeysDeleteRequest request = spy(getOmKeysDeleteRequest(getOmRequest()));
+    doThrow(new OMException("Bucket READ denied", OMException.ResultCodes.ACCESS_DENIED)).when(request)
+        .checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET, OzoneObj.StoreType.OZONE,
+            IAccessAuthorizer.ACLType.READ, volumeName, bucketName, null);
+
+    assertDoesNotThrow(() -> request.preExecute(ozoneManager));
   }
 
   @ParameterizedTest
