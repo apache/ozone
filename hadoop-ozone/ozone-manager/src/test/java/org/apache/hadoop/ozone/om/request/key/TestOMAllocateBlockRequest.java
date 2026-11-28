@@ -19,11 +19,13 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -109,7 +111,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
   private IOException allocateBlockWithScmFailure(SCMException cause) throws Exception {
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), anyString())).thenThrow(cause);
+        anyString(), any(ExcludeList.class), anyString(), anyBoolean())).thenThrow(cause);
 
     OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
     return assertThrows(IOException.class,
@@ -312,17 +314,19 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     preExecuteWithClient(request, "1.2.3.4");
 
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Boolean> sortDatanodes = ArgumentCaptor.forClass(Boolean.class);
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
-        any(), any(), clientMachine.capture());
+        any(), any(), clientMachine.capture(), sortDatanodes.capture());
     assertEquals("1.2.3.4", clientMachine.getValue());
+    assertTrue(sortDatanodes.getValue());
     verify(mockKeyManager, never()).resolveClientForWrite(anyString(), any());
     verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
   }
 
   @Test
-  public void testAllocateBlockDoesNotSendClientMachineToScm() throws Exception {
-    // OM now sorts the write pipeline locally, so SCM must receive an empty
-    // clientMachine even when the client requests sorted datanodes.
+  public void testAllocateBlockSkipsScmSortWhenOmSorts() throws Exception {
+    // OM sorts the write pipeline locally, so SCM gets the client address only to
+    // prefer a pipeline on the client's datanode, and must not sort.
     KeyManager mockKeyManager = mock(KeyManager.class);
     when(mockKeyManager.isSortDatanodesForWriteEnabled()).thenReturn(true);
     when(mockKeyManager.resolveClientForWrite(anyString(), any())).thenReturn(mock(Node.class));
@@ -336,9 +340,28 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     preExecuteWithClient(request, "1.2.3.4");
 
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Boolean> sortDatanodes = ArgumentCaptor.forClass(Boolean.class);
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
-        any(), any(), clientMachine.capture());
-    assertEquals("", clientMachine.getValue());
+        any(), any(), clientMachine.capture(), sortDatanodes.capture());
+    assertEquals("1.2.3.4", clientMachine.getValue());
+    assertFalse(sortDatanodes.getValue());
+  }
+
+  @Test
+  public void testAllocateBlockSendsClientMachineWithoutSortToScm() throws Exception {
+    // The client did not ask for sorted datanodes; SCM still gets the address for locality.
+    KeyManager mockKeyManager = mock(KeyManager.class);
+    when(ozoneManager.getKeyManager()).thenReturn(mockKeyManager);
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+    preExecuteWithClient(request, "1.2.3.4");
+
+    ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Boolean> sortDatanodes = ArgumentCaptor.forClass(Boolean.class);
+    verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
+        any(), any(), clientMachine.capture(), sortDatanodes.capture());
+    assertEquals("1.2.3.4", clientMachine.getValue());
+    assertFalse(sortDatanodes.getValue());
   }
 
   @Test
@@ -352,9 +375,11 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     preExecuteWithClient(request, "1.2.3.4");
 
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Boolean> sortDatanodes = ArgumentCaptor.forClass(Boolean.class);
     verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(),
-        any(), any(), clientMachine.capture());
+        any(), any(), clientMachine.capture(), sortDatanodes.capture());
     assertEquals("1.2.3.4", clientMachine.getValue());
+    assertTrue(sortDatanodes.getValue());
     verify(mockKeyManager, never()).resolveClientForWrite(anyString(), any());
     verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
   }
@@ -381,8 +406,9 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     AllocatedBlock block = new AllocatedBlock.Builder().setPipeline(pipeline)
         .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Boolean> sortDatanodes = ArgumentCaptor.forClass(Boolean.class);
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), clientMachine.capture()))
+        anyString(), any(ExcludeList.class), clientMachine.capture(), sortDatanodes.capture()))
         .thenReturn(Collections.singletonList(block));
 
     KeyManager mockKeyManager = mock(KeyManager.class);
@@ -397,6 +423,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
 
     assertEquals("1.2.3.4", clientMachine.getValue());
+    assertTrue(sortDatanodes.getValue());
     verify(mockKeyManager, times(1)).resolveClientForWrite(eq("1.2.3.4"), any());
     verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
     assertEquals(1, locations.size());
@@ -435,8 +462,9 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     AllocatedBlock block2 = new AllocatedBlock.Builder().setPipeline(pipeline2)
         .setContainerBlockID(new ContainerBlockID(CONTAINER_ID + 1, LOCAL_ID + 1)).build();
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Boolean> sortDatanodes = ArgumentCaptor.forClass(Boolean.class);
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), clientMachine.capture()))
+        anyString(), any(ExcludeList.class), clientMachine.capture(), sortDatanodes.capture()))
         .thenReturn(Arrays.asList(block1, block2));
 
     Node client = mock(Node.class);
@@ -455,7 +483,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
     assertEquals(2, locations.size());
     // OM sorts, so SCM is told not to.
-    assertEquals("", clientMachine.getValue());
+    assertEquals("1.2.3.4", clientMachine.getValue());
+    assertFalse(sortDatanodes.getValue());
     verify(mockKeyManager, times(1)).resolveClientForWrite(eq("1.2.3.4"), any());
     verify(mockKeyManager, times(2)).sortDatanodesForWrite(any(), eq("1.2.3.4"), eq(client), any());
   }
@@ -478,7 +507,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     AllocatedBlock.Builder blockBuilder =
         new AllocatedBlock.Builder().setPipeline(pipeline);
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), anyString())).thenAnswer(inv -> {
+        anyString(), any(ExcludeList.class), anyString(), anyBoolean())).thenAnswer(inv -> {
           int num = inv.getArgument(1);
           List<AllocatedBlock> blocks = new ArrayList<>(num);
           for (int i = 0; i < num; i++) {
@@ -549,7 +578,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     AllocatedBlock block2 = new AllocatedBlock.Builder().setPipeline(pipeline2)
         .setContainerBlockID(new ContainerBlockID(CONTAINER_ID + 1, LOCAL_ID + 1)).build();
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), anyString()))
+        anyString(), any(ExcludeList.class), anyString(), anyBoolean()))
         .thenReturn(Arrays.asList(block1, block2));
 
     KeyManager mockKeyManager = mock(KeyManager.class);
@@ -589,8 +618,9 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     AllocatedBlock block = new AllocatedBlock.Builder().setPipeline(pipeline)
         .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID)).build();
     ArgumentCaptor<String> clientMachine = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Boolean> sortDatanodes = ArgumentCaptor.forClass(Boolean.class);
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(), any(),
-        anyString(), any(ExcludeList.class), clientMachine.capture()))
+        anyString(), any(ExcludeList.class), clientMachine.capture(), sortDatanodes.capture()))
         .thenReturn(Collections.singletonList(block));
 
     KeyManager mockKeyManager = mock(KeyManager.class);
@@ -605,6 +635,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         UserInfo.newBuilder().setRemoteAddress("").build(), ozoneManager);
 
     assertEquals("", clientMachine.getValue());
+    assertTrue(sortDatanodes.getValue());
     verify(mockKeyManager, never()).resolveClientForWrite(anyString(), any());
     verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any(), any());
     assertEquals(1, locations.size());

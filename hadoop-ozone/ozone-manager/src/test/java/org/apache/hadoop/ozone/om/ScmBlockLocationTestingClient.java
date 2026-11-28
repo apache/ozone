@@ -120,7 +120,7 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   @Override
   public List<AllocatedBlock> allocateBlock(long size, int num,
       ReplicationConfig config,
-      String owner, ExcludeList excludeList, String clientMachine)
+      String owner, ExcludeList excludeList, String clientMachine, boolean sortDatanodes)
       throws IOException {
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     Pipeline pipeline = createPipeline(datanodeDetails);

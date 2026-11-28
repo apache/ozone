@@ -167,6 +167,9 @@ message AllocateScmBlockRequestProto {
 
   optional string client = 9;
 
+  // Whether SCM sorts the pipeline nodes by distance to client. If false, SCM uses client only to prefer a
+  // pipeline on the client's datanode. If absent, SCM sorts when client is set.
+  optional bool sortDatanodes = 10;
 }
 
 /**

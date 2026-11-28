@@ -217,7 +217,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final int numBlocks = (int) Math.min(ozoneManager.getPreallocateBlocksMax(),
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
-    final String scmClientMachine;
+    // SCM always gets the client address, so it can prefer a pipeline on the client's datanode.
+    final boolean scmSortDatanodes;
     // Sorted order cached by datanode set so blocks whose pipelines share the
     // same datanodes are sorted once (mirrors the read path's caching). Keyed by
     // the UUID set so it is order-insensitive and dedups across pipelines.
@@ -231,16 +232,16 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final Node omClient = clusterMap != null && !remoteAddress.isEmpty()
         ? keyManager.resolveClientForWrite(remoteAddress, clusterMap) : null;
     if (!shouldSortDatanodes) {
-      scmClientMachine = "";
+      scmSortDatanodes = false;
       sortedByNodes = null;
     } else if (omClient != null) {
-      // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
-      scmClientMachine = "";
+      // Sort in OM: SCM skips sorting, OM sorts by remoteAddress.
+      scmSortDatanodes = false;
       sortedByNodes = new HashMap<>();
     } else {
       // Sort in SCM when OM has no topology or cannot resolve the client (or keep order
       // when remoteAddress is empty, since SCM skips sorting for an empty client machine).
-      scmClientMachine = remoteAddress;
+      scmSortDatanodes = true;
       sortedByNodes = null;
     }
 
@@ -249,7 +250,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = ozoneManager.getScmClient().getBlockClient().allocateBlock(
-          scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, scmClientMachine);
+          scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, remoteAddress,
+          scmSortDatanodes);
     } catch (SCMException ex) {
       ozoneManager.getMetrics().incNumBlockAllocateCallFails();
       if (ex.getResult() == SCMException.ResultCodes.SAFE_MODE_EXCEPTION) {

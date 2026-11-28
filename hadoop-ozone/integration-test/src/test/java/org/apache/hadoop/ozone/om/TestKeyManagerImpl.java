@@ -43,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyString;
@@ -227,7 +228,7 @@ public class TestKeyManagerImpl {
             any(ReplicationConfig.class),
             anyString(),
             any(ExcludeList.class),
-            anyString())).thenThrow(
+            anyString(), anyBoolean())).thenThrow(
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);

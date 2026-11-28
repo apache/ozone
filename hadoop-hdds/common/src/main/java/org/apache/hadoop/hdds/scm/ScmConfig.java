@@ -30,6 +30,8 @@ import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 @ConfigGroup(prefix = "hdds.scm")
 public class ScmConfig extends ReconfigurableConfig {
   public static final String HDDS_SCM_UNKNOWN_CONTAINER_ACTION = "hdds.scm.unknown-container.action";
+  public static final String HDDS_SCM_BLOCK_ALLOCATION_PREFER_CLIENT_LOCAL =
+      "hdds.scm.block.allocation.prefer.client.local";
 
   @Config(key = "hdds.scm.kerberos.principal",
       type = ConfigType.STRING,
@@ -101,6 +103,19 @@ public class ScmConfig extends ReconfigurableConfig {
           + " will be used as default value. " + DESCRIPTION_COMMON_CHOICES_OF_PIPELINE_CHOOSE_POLICY_IMPL
   )
   private String ecPipelineChoosePolicyName;
+
+  @Config(key = HDDS_SCM_BLOCK_ALLOCATION_PREFER_CLIENT_LOCAL,
+      type = ConfigType.BOOLEAN,
+      defaultValue = "true",
+      tags = { ConfigTag.SCM, ConfigTag.PIPELINE, ConfigTag.PERFORMANCE },
+      description = "If true, when allocating a Ratis block for a client that runs on a datanode host, SCM prefers "
+          + "an open pipeline that contains that datanode, so one replica is local to the writer (like the HDFS "
+          + "first replica). Falls back to the pipeline choose policy when that datanode has no room for another "
+          + "container, more than one datanode has the client's address, or no such pipeline has a usable "
+          + "container. The client is the caller of OM, so writes through a gateway on a datanode host, such as "
+          + "S3 Gateway or HttpFS, prefer that host's datanode."
+  )
+  private boolean preferClientLocalPipeline;
 
   @Config(key = "hdds.scm.block.deletion.per-interval.max",
       type = ConfigType.INT,
@@ -191,6 +206,10 @@ public class ScmConfig extends ReconfigurableConfig {
 
   public String getPipelineChoosePolicyName() {
     return pipelineChoosePolicyName;
+  }
+
+  public boolean isPreferClientLocalPipeline() {
+    return preferClientLocalPipeline;
   }
 
   public String getECPipelineChoosePolicyName() {

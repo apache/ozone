@@ -168,6 +168,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    * @param excludeList       - exclude list while allocating blocks.
    * @param clientMachine     - client address, depends, can be hostname or
    *                            ipaddress.
+   * @param sortDatanodes     - whether SCM sorts the datanodes by distance to clientMachine.
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
@@ -176,7 +177,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       long size, int num,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList,
-      String clientMachine
+      String clientMachine, boolean sortDatanodes
   ) throws IOException {
     Preconditions.checkArgument(size > 0, "block size must be greater than 0");
 
@@ -190,6 +191,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
 
     if (StringUtils.isNotEmpty(clientMachine)) {
       requestBuilder.setClient(clientMachine);
+      requestBuilder.setSortDatanodes(sortDatanodes);
     }
 
     switch (replicationConfig.getReplicationType()) {

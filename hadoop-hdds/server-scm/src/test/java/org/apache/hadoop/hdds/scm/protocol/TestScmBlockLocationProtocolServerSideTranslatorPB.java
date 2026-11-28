@@ -22,9 +22,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -73,6 +75,8 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests that {@link ScmBlockLocationProtocolServerSideTranslatorPB} forwards the
@@ -112,7 +116,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     AllocatedBlock block = blockInPipeline(1L, pipeline);
 
     when(impl.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
-        anyString(), any(), anyString())).thenReturn(Collections.singletonList(block));
+        anyString(), any(), anyString(), anyBoolean())).thenReturn(Collections.singletonList(block));
 
     service = new ScmBlockLocationProtocolServerSideTranslatorPB(impl, scm, mock(ProtocolMessageMetrics.class));
   }
@@ -172,7 +176,7 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
 
   private void setAllocatedBlocks(List<AllocatedBlock> blocks) throws Exception {
     when(impl.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
-        anyString(), any(), anyString())).thenReturn(blocks);
+        anyString(), any(), anyString(), anyBoolean())).thenReturn(blocks);
   }
 
   private void assertAllMembersHaveVersion(int expected,
@@ -184,12 +188,33 @@ class TestScmBlockLocationProtocolServerSideTranslatorPB {
     }
   }
 
+  @ParameterizedTest
+  @CsvSource(value = {"null, true", "true, true", "false, false"}, nullValues = "null")
+  void sortDatanodesDefaultsToTrueWhenAbsent(Boolean requested, boolean expected) throws Exception {
+    // An OM without sortDatanodes in the request expects SCM to sort whenever client is set.
+    AllocateScmBlockRequestProto.Builder request = AllocateScmBlockRequestProto.newBuilder()
+        .setSize(1024)
+        .setNumBlocks(1)
+        .setType(ReplicationType.RATIS)
+        .setFactor(ReplicationFactor.THREE)
+        .setOwner("owner")
+        .setClient("1.2.3.4");
+    if (requested != null) {
+      request.setSortDatanodes(requested);
+    }
+
+    service.allocateScmBlock(request.build(), ClientVersion.CURRENT);
+
+    verify(impl).allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class), anyString(), any(), eq("1.2.3.4"),
+        eq(expected));
+  }
+
   @Test
   void missingPipelineResultSurvivesScmRpcTranslators() throws Exception {
     when(scm.checkLeader()).thenReturn(true);
     when(scm.getVersionManager()).thenReturn(mock(ScmVersionManager.class));
     when(impl.allocateBlock(anyLong(), anyInt(), any(ReplicationConfig.class),
-        anyString(), any(), anyString()))
+        anyString(), any(), anyString(), anyBoolean()))
         .thenThrow(new SCMException("waited pipeline disappeared", SCMException.ResultCodes.PIPELINE_NOT_FOUND));
 
     AllocateScmBlockRequestProto allocation = AllocateScmBlockRequestProto.newBuilder()

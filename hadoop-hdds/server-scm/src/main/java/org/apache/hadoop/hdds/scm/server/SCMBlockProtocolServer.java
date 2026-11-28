@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
@@ -63,6 +64,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
@@ -114,15 +116,17 @@ public class SCMBlockProtocolServer implements
       protocolMessageMetrics;
   private final SCMPerformanceMetrics perfMetrics;
   private final String omPrincipal;
+  private final boolean preferClientLocalPipeline;
 
   /**
    * The RPC server that listens to requests from block service clients.
    */
-  public SCMBlockProtocolServer(OzoneConfiguration conf,
-      StorageContainerManager scm) throws IOException {
+  public SCMBlockProtocolServer(OzoneConfiguration conf, StorageContainerManager scm, ScmConfig scmConfig)
+      throws IOException {
     this.scm = scm;
     this.perfMetrics = scm.getPerfMetrics();
     this.omPrincipal = conf.get(OM_KERBEROS_PRINCIPAL_KEY, "");
+    this.preferClientLocalPipeline = scmConfig.isPreferClientLocalPipeline();
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
@@ -218,7 +222,7 @@ public class SCMBlockProtocolServer implements
       long size, int num,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList,
-      String clientMachine
+      String clientMachine, boolean sortDatanodes
   ) throws IOException {
     checkOmOrAdminAccess();
     long startNanos = Time.monotonicNowNanos();
@@ -235,12 +239,13 @@ public class SCMBlockProtocolServer implements
           num, size, excludeList);
     }
     try {
+      final Node client = sortDatanodes ? getClientNode(clientMachine) : null;
+      final DatanodeDetails localDatanode = preferClientLocalPipeline ? getLocalDatanode(clientMachine) : null;
       for (int i = 0; i < num; i++) {
-        AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(size, replicationConfig, owner, excludeList);
+        AllocatedBlock block =
+            scm.getScmBlockManager().allocateBlock(size, replicationConfig, owner, excludeList, localDatanode);
         if (block != null) {
           // Sort the datanodes if client machine is specified
-          final Node client = getClientNode(clientMachine);
           if (client != null) {
             final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
             final List<DatanodeDetails> sorted = scm.getClusterMap()
@@ -439,6 +444,21 @@ public class SCMBlockProtocolServer implements
         );
       }
     }
+  }
+
+  /**
+   * @return the datanode at {@code clientMachine} if it is the only one there and has room for another container
+   *     (as pipeline creation requires), otherwise null.
+   */
+  private DatanodeDetails getLocalDatanode(String clientMachine) {
+    final NodeManager nodeManager = scm.getScmNodeManager();
+    final List<DatanodeDetails> datanodes = nodeManager.getNodesByAddress(clientMachine);
+    // With several datanodes on one address (such as a mini cluster), every write would prefer the first one.
+    if (datanodes.size() != 1 || !(datanodes.get(0) instanceof DatanodeInfo)) {
+      return null;
+    }
+    final DatanodeInfo datanode = (DatanodeInfo) datanodes.get(0);
+    return nodeManager.hasAvailableSpace(datanode) ? datanode : null;
   }
 
   private Node getClientNode(String clientMachine) {

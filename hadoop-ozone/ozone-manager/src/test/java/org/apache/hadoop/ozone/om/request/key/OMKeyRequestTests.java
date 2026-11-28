@@ -228,7 +228,7 @@ public class OMKeyRequestTests {
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
         any(ReplicationConfig.class),
         anyString(), any(ExcludeList.class),
-        anyString())).thenAnswer(invocation -> {
+        anyString(), anyBoolean())).thenAnswer(invocation -> {
           int num = invocation.getArgument(1);
           List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
           for (int i = 0; i < num; i++) {
