@@ -28,6 +28,8 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class TestOzoneClientConfig {
 
@@ -143,5 +145,28 @@ class TestOzoneClientConfig {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean("ozone.client.netty.warmup.enabled", false);
     assertFalse(conf.getObject(OzoneClientConfig.class).isNettyWarmUpEnabled());
+  }
+
+  @Test
+  void testMetricsModeDefault() {
+    OzoneClientConfig subject = new OzoneConfiguration().getObject(OzoneClientConfig.class);
+    assertEquals(OzoneClientConfig.MetricsMode.AUTO, subject.getMetricsMode());
+  }
+
+  @ParameterizedTest
+  @EnumSource(OzoneClientConfig.MetricsMode.class)
+  void testMetricsModeParsing(OzoneClientConfig.MetricsMode mode) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set("ozone.client.metrics.mode", mode.name());
+
+    assertEquals(mode, conf.getObject(OzoneClientConfig.class).getMetricsMode());
+  }
+
+  @Test
+  void testBadMetricsModeFallsBackToAuto() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set("ozone.client.metrics.mode", "SOMETIMES");
+
+    assertEquals(OzoneClientConfig.MetricsMode.AUTO, conf.getObject(OzoneClientConfig.class).getMetricsMode());
   }
 }
