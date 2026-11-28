@@ -248,8 +248,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       String amzDecodedLength =
           getHeaders().getHeaderString(S3Consts.DECODED_CONTENT_LENGTH_HEADER);
       String amzContentSha256 = getHeaders().getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256);
-      boolean useDecodedLength = amzDecodedLength != null && amzContentSha256 != null &&
-          S3ContentSha256Type.fromHeaderValue(amzContentSha256).isStreaming();
+      S3ContentSha256Type payloadType = amzContentSha256 == null ? null :
+          S3ContentSha256Type.fromHeaderValue(amzContentSha256);
+      boolean useDecodedLength = amzDecodedLength != null && payloadType != null && payloadType.isStreaming();
       boolean isEmptyPayload = useDecodedLength ? Long.parseLong(amzDecodedLength) == 0 : length == 0;
       if (canCreateDirectory &&
           isEmptyPayload &&
@@ -257,8 +258,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       ) {
         context.setAction(S3GAction.CREATE_DIRECTORY);
         if (STREAMING_UNSIGNED_PAYLOAD_TRAILER.equals(amzContentSha256)
-            || STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256)) {
-          // No key is opened for a directory: verify trailer framing and checksum without a chunk signing key.
+            || STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256)
+            || (payloadType != null && payloadType.isEcdsaSignedStreaming())) {
+          // Reject unsupported payloads and verify trailer framing and checksum without a chunk signing key.
           S3ChunkInputStreamInfo info = getS3ChunkInputStreamInfo(body, length, amzDecodedLength, keyPath, false);
           multiDigestInputStream = info.getMultiDigestInputStream();
           validateContentLength(info.getEffectiveLength(), 0, keyPath).run();

@@ -62,4 +62,8 @@ public enum S3ContentSha256Type {
   public boolean isHmacSignedStreaming() {
     return this == STREAMING_AWS4_HMAC_SHA256_PAYLOAD || this == STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
   }
+
+  public boolean isEcdsaSignedStreaming() {
+    return this == STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD || this == STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER;
+  }
 }

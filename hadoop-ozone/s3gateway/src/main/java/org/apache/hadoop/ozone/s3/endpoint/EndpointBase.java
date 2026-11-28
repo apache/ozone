@@ -891,6 +891,10 @@ public abstract class EndpointBase {
       String amzDecodedLength, String keyPath, boolean opensKey) throws OS3Exception {
     final String amzContentSha256Header = validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
     final S3ContentSha256Type payloadType = S3ContentSha256Type.fromHeaderValue(amzContentSha256Header);
+    if (payloadType.isEcdsaSignedStreaming()) {
+      throw newError(S3ErrorTable.NOT_IMPLEMENTED, keyPath)
+          .withMessage("ECDSA streaming payload signatures are not supported.");
+    }
     final InputStream chunkInputStream;
     final long effectiveLength;
     if (payloadType.isStreaming()) {

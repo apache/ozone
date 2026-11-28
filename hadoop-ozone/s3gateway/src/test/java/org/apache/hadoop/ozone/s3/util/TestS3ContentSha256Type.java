@@ -67,19 +67,21 @@ class TestS3ContentSha256Type {
 
   @ParameterizedTest
   @CsvSource({
-      "UNSIGNED_PAYLOAD, true, false, false",
-      "STREAMING_UNSIGNED_PAYLOAD_TRAILER, true, true, false",
-      "STREAMING_AWS4_HMAC_SHA256_PAYLOAD, false, true, true",
-      "STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER, false, true, true",
-      "STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD, false, true, false",
-      "STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER, false, true, false",
-      "OTHER, false, false, false",
-      "OTHER_STREAMING, false, true, false"
+      "UNSIGNED_PAYLOAD, true, false, false, false",
+      "STREAMING_UNSIGNED_PAYLOAD_TRAILER, true, true, false, false",
+      "STREAMING_AWS4_HMAC_SHA256_PAYLOAD, false, true, true, false",
+      "STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER, false, true, true, false",
+      "STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD, false, true, false, true",
+      "STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER, false, true, false, true",
+      "OTHER, false, false, false, false",
+      "OTHER_STREAMING, false, true, false, false"
   })
-  void classifiesPayload(S3ContentSha256Type type, boolean unsigned, boolean streaming, boolean hmacSignedStreaming) {
+  void classifiesPayload(S3ContentSha256Type type, boolean unsigned, boolean streaming, boolean hmacSignedStreaming,
+      boolean ecdsaSignedStreaming) {
     assertThat(type.isUnsigned()).isEqualTo(unsigned);
     assertThat(type.isStreaming()).isEqualTo(streaming);
     assertThat(type.isHmacSignedStreaming()).isEqualTo(hmacSignedStreaming);
+    assertThat(type.isEcdsaSignedStreaming()).isEqualTo(ecdsaSignedStreaming);
   }
 
   @Test
