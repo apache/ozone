@@ -23,9 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.TraceFlags;
+import io.opentelemetry.api.trace.TraceState;
+import io.opentelemetry.context.Scope;
 import io.opentelemetry.sdk.trace.ReadableSpan;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.Collections;
@@ -40,14 +45,14 @@ public class TestTraceAllMethod {
 
   @Test
   public void testUnknownMethod() {
-    TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), "service", SpanKind.CLIENT);
+    TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), SpanKind.CLIENT);
     assertThrows(NoSuchMethodException.class, () -> subject.invoke(null,
         ServiceImpl.class.getMethod("no such method"), new Object[]{}));
   }
 
   @Test
   public void testDefaultMethod() throws Throwable {
-    TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), "service", SpanKind.CLIENT);
+    TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), SpanKind.CLIENT);
 
     assertEquals("Hello default", subject.invoke(null,
         ServiceImpl.class.getMethod("defaultMethod"), new Object[]{}));
@@ -56,32 +61,32 @@ public class TestTraceAllMethod {
   @Test
   public void testConstructorKindIsUsed() throws Throwable {
     try (TestSpanCollector spans = TestSpanCollector.install("test")) {
-      TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), "service", SpanKind.CLIENT);
+      TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), SpanKind.CLIENT);
       assertEquals("normal", subject.invoke(null, Service.class.getMethod("normalMethod"), null));
-      spans.assertKind("service.normalMethod", SpanKind.CLIENT);
+      spans.assertKind("ServiceImpl.normalMethod", SpanKind.CLIENT);
     }
   }
 
   @Test
   public void testMethodAnnotationOverridesConstructorKind() throws Throwable {
     try (TestSpanCollector spans = TestSpanCollector.install("test")) {
-      TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), "service", SpanKind.SERVER);
+      TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), SpanKind.SERVER);
       assertEquals("normal", subject.invoke(null, Service.class.getMethod("normalMethod"), null));
       assertEquals("local", subject.invoke(null, Service.class.getMethod("localMethod"), null));
-      spans.assertKind("service.normalMethod", SpanKind.SERVER);
-      spans.assertKind("service.localMethod", SpanKind.INTERNAL);
+      spans.assertKind("ServiceImpl.normalMethod", SpanKind.SERVER);
+      spans.assertKind("ServiceImpl.localMethod", SpanKind.INTERNAL);
     }
   }
 
   @Test
   public void testClassAnnotationSkipsInheritedMethods() throws Throwable {
     try (TestSpanCollector spans = TestSpanCollector.install("test")) {
-      TraceAllMethod<Service> subject = new TraceAllMethod<>(new InternalServiceImpl(), "service", SpanKind.CLIENT);
+      TraceAllMethod<Service> subject = new TraceAllMethod<>(new InternalServiceImpl(), SpanKind.CLIENT);
       assertEquals("normal", subject.invoke(null, Service.class.getMethod("normalMethod"), null));
       assertEquals("Internal x", subject.invoke(null, Service.class.getMethod("otherMethod", String.class),
           new Object[]{"x"}));
-      spans.assertKind("service.normalMethod", SpanKind.CLIENT);
-      spans.assertKind("service.otherMethod", SpanKind.INTERNAL);
+      spans.assertKind("InternalServiceImpl.normalMethod", SpanKind.CLIENT);
+      spans.assertKind("InternalServiceImpl.otherMethod", SpanKind.INTERNAL);
     }
   }
 
@@ -89,27 +94,104 @@ public class TestTraceAllMethod {
   public void testOverloadsResolveTheirOwnKind() throws Throwable {
     try (TestSpanCollector spans = TestSpanCollector.install("test")) {
       TraceAllMethod<OverloadedService> subject =
-          new TraceAllMethod<>(new OverloadedServiceImpl(), "service", SpanKind.CLIENT);
+          new TraceAllMethod<>(new OverloadedServiceImpl(), SpanKind.CLIENT);
       assertEquals("a", subject.invoke(null, OverloadedService.class.getMethod("call", String.class),
           new Object[]{"a"}));
       assertEquals("a2", subject.invoke(null, OverloadedService.class.getMethod("call", String.class, int.class),
           new Object[]{"a", 2}));
       assertEquals(Arrays.asList(SpanKind.CLIENT, SpanKind.INTERNAL),
-          spans.named("service.call").stream().map(ReadableSpan::getKind).collect(Collectors.toList()));
+          spans.named("OverloadedServiceImpl.call").stream().map(ReadableSpan::getKind).collect(Collectors.toList()));
     }
   }
 
   @Test
   public void testExceptionIsRecorded() {
     try (TestSpanCollector spans = TestSpanCollector.install("test")) {
-      TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), "service",
-          SpanKind.CLIENT);
+      TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), SpanKind.CLIENT);
       IOException ex = assertThrows(IOException.class,
           () -> subject.invoke(null, Service.class.getMethod("tracedThrowingMethod"), null));
       assertEquals("Failed", ex.getMessage());
-      spans.assertError("service.tracedThrowingMethod", "Failed");
-      spans.assertExceptionRecorded("service.tracedThrowingMethod", IOException.class);
+      spans.assertError("ServiceImpl.tracedThrowingMethod", "Failed");
+      spans.assertExceptionRecorded("ServiceImpl.tracedThrowingMethod", IOException.class);
     }
+  }
+
+  @Test
+  public void testUnsampledParentCreatesNoSpan() throws Throwable {
+    try (TestSpanCollector spans = TestSpanCollector.install("test")) {
+      ServiceImpl delegate = new ServiceImpl();
+      TraceAllMethod<Service> subject = new TraceAllMethod<>(delegate, SpanKind.CLIENT);
+      try (Scope ignored = parentSpan(TraceFlags.getDefault()).makeCurrent()) {
+        assertEquals("normal", subject.invoke(null, Service.class.getMethod("normalMethod"), null));
+      }
+      assertTrue(delegate.wasSpanActive(), "delegate should run in the unsampled parent span");
+      assertTrue(spans.getSpans().isEmpty());
+    }
+  }
+
+  @Test
+  public void testSampledParentCreatesChildSpan() throws Throwable {
+    try (TestSpanCollector spans = TestSpanCollector.install("test")) {
+      TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), SpanKind.CLIENT);
+      Span parent = parentSpan(TraceFlags.getSampled());
+      try (Scope ignored = parent.makeCurrent()) {
+        assertEquals("normal", subject.invoke(null, Service.class.getMethod("normalMethod"), null));
+      }
+      List<ReadableSpan> children = spans.named("ServiceImpl.normalMethod");
+      assertEquals(1, children.size());
+      assertEquals(parent.getSpanContext(), children.get(0).getParentSpanContext());
+    }
+  }
+
+  @Test
+  public void testRepeatedCallsResolveSameMethod() throws Throwable {
+    try (TestSpanCollector spans = TestSpanCollector.install("test")) {
+      TraceAllMethod<Service> subject = new TraceAllMethod<>(new ServiceImpl(), SpanKind.SERVER);
+      Method method = Service.class.getMethod("localMethod");
+      assertEquals("local", subject.invoke(null, method, null));
+      assertEquals("local", subject.invoke(null, method, null));
+      // an equal but distinct Method instance
+      assertEquals("local", subject.invoke(null, Service.class.getMethod("localMethod"), null));
+      assertEquals(Arrays.asList(SpanKind.INTERNAL, SpanKind.INTERNAL, SpanKind.INTERNAL),
+          spans.named("ServiceImpl.localMethod").stream().map(ReadableSpan::getKind).collect(Collectors.toList()));
+    }
+  }
+
+  @Test
+  public void testSpanKindIsPerProxyForSameDelegateClass() throws Throwable {
+    try (TestSpanCollector spans = TestSpanCollector.install("test")) {
+      Method method = Service.class.getMethod("normalMethod");
+      new TraceAllMethod<Service>(new ServiceImpl(), SpanKind.CLIENT).invoke(null, method, null);
+      new TraceAllMethod<Service>(new ServiceImpl(), SpanKind.SERVER).invoke(null, method, null);
+      assertEquals(Arrays.asList(SpanKind.CLIENT, SpanKind.SERVER),
+          spans.named("ServiceImpl.normalMethod").stream().map(ReadableSpan::getKind).collect(Collectors.toList()));
+    }
+  }
+
+  @Test
+  public void testAnonymousDelegateUsesInterfaceName() throws Throwable {
+    try (TestSpanCollector spans = TestSpanCollector.install("test")) {
+      OverloadedService delegate = new OverloadedService() {
+        @Override
+        public String call(String name) {
+          return name;
+        }
+
+        @Override
+        public String call(String name, int count) {
+          return name + count;
+        }
+      };
+      TraceAllMethod<OverloadedService> subject = new TraceAllMethod<>(delegate, SpanKind.CLIENT);
+      assertEquals("a", subject.invoke(null, OverloadedService.class.getMethod("call", String.class),
+          new Object[]{"a"}));
+      spans.assertKind("OverloadedService.call", SpanKind.CLIENT);
+    }
+  }
+
+  private static Span parentSpan(TraceFlags traceFlags) {
+    return Span.wrap(SpanContext.createFromRemoteParent("0af7651916cd43dd8448eb211c80319c", "b7ad6b7169203331",
+        traceFlags, TraceState.getDefault()));
   }
 
   @Test
@@ -117,9 +199,9 @@ public class TestTraceAllMethod {
     try (TestSpanCollector spans = TestSpanCollector.install("test")) {
       List<String> delegate = Collections.unmodifiableList(Arrays.asList("a", "b"));
       assertFalse(Modifier.isPublic(delegate.getClass().getModifiers()));
-      TraceAllMethod<List<String>> subject = new TraceAllMethod<>(delegate, "List", SpanKind.INTERNAL);
+      TraceAllMethod<List<String>> subject = new TraceAllMethod<>(delegate, SpanKind.INTERNAL);
       assertEquals(2, subject.invoke(null, List.class.getMethod("size"), null));
-      spans.assertKind("List.size", SpanKind.INTERNAL);
+      spans.assertKind("UnmodifiableRandomAccessList.size", SpanKind.INTERNAL);
     }
   }
 
@@ -127,7 +209,7 @@ public class TestTraceAllMethod {
   public void testObjectMethodsGoToDelegate() throws Throwable {
     try (TestSpanCollector spans = TestSpanCollector.install("test")) {
       ServiceImpl delegate = new ServiceImpl();
-      TraceAllMethod<Service> subject = new TraceAllMethod<>(delegate, "service", SpanKind.CLIENT);
+      TraceAllMethod<Service> subject = new TraceAllMethod<>(delegate, SpanKind.CLIENT);
       assertEquals(delegate.toString(), subject.invoke(null, Object.class.getMethod("toString"), null));
       assertEquals(delegate.hashCode(), subject.invoke(null, Object.class.getMethod("hashCode"), null));
       assertTrue(spans.getSpans().isEmpty());

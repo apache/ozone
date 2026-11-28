@@ -94,11 +94,11 @@ public class TestTracingAnnotations {
 
       serviceProxy.normalMethod();
       assertTrue(impl.wasSpanActive(), "Normal method should have an active span.");
-      assertEquals(1, spans.named("Service.normalMethod").size(), "Normal method should create exactly one span.");
+      assertEquals(1, spans.named("ServiceImpl.normalMethod").size(), "Normal method should create exactly one span.");
 
       serviceProxy.skippedMethod();
       assertFalse(impl.wasSpanActive(), "@SkipTracing method should NOT have an active span.");
-      assertTrue(spans.named("Service.skippedMethod").isEmpty(), "@SkipTracing method should not create a span.");
+      assertTrue(spans.named("ServiceImpl.skippedMethod").isEmpty(), "@SkipTracing method should not create a span.");
     }
   }
 
@@ -110,7 +110,7 @@ public class TestTracingAnnotations {
       serviceProxy.localMethod();
       assertTrue(impl.wasSpanActive(), "Local method should have an active span.");
       assertEquals(SpanKind.INTERNAL, impl.lastSpanKind(), "@InternalSpanKind method should use INTERNAL.");
-      spans.assertKind("Service.localMethod", SpanKind.INTERNAL);
+      spans.assertKind("ServiceImpl.localMethod", SpanKind.INTERNAL);
     }
   }
 
@@ -119,7 +119,7 @@ public class TestTracingAnnotations {
     try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
       Service serviceProxy = createClientProxy(new ServiceImpl(), Service.class, tracingEnabled());
       serviceProxy.annotatedOnlyOnInterface();
-      spans.assertKind("Service.annotatedOnlyOnInterface", SpanKind.CLIENT);
+      spans.assertKind("ServiceImpl.annotatedOnlyOnInterface", SpanKind.CLIENT);
     }
   }
 
@@ -136,11 +136,11 @@ public class TestTracingAnnotations {
   public void testCreateProxyKinds() {
     try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
       TracingUtil.createInternalProxy(new ServiceImpl(), Service.class, tracingEnabled()).normalMethod();
-      spans.assertKind("Service.normalMethod", SpanKind.INTERNAL);
+      spans.assertKind("ServiceImpl.normalMethod", SpanKind.INTERNAL);
     }
     try (TestSpanCollector spans = TestSpanCollector.install("TestService")) {
       createClientProxy(new ServiceImpl(), Service.class, tracingEnabled()).normalMethod();
-      spans.assertKind("Service.normalMethod", SpanKind.CLIENT);
+      spans.assertKind("ServiceImpl.normalMethod", SpanKind.CLIENT);
     }
   }
 
