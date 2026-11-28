@@ -27,7 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
@@ -366,6 +368,91 @@ public class TestECBlockReconstructedInputStream {
         // Seeking beyond EOF should give an error
         assertThrows(IOException.class, () -> stream.seek(blockLength + 1));
       }
+    }
+  }
+
+  @Test
+  void testReadFailsAgainAfterFailedStripeRead() throws IOException {
+    int stripeSize = repConfig.getEcChunkSize() * repConfig.getData();
+    int blockLength = stripeSize * 2;
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), repConfig.getEcChunkSize() * 2);
+    ECStreamTestUtil.randomFill(dataBufs, repConfig.getEcChunkSize(), dataGenerator, blockLength);
+    addDataStreamsToFactory(dataBufs, generateParity(dataBufs, repConfig));
+    // Index 3 is missing and both parity replicas fail, so no stripe can be recovered.
+    streamFactory.setFailIndexes(4, 5);
+
+    Map<DatanodeDetails, Integer> dnMap = ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
+    try (ECBlockReconstructedStripeInputStream stripeStream = createStripeInputStream(dnMap, blockLength);
+        ECBlockReconstructedInputStream stream = new ECBlockReconstructedInputStream(repConfig, bufferPool,
+            stripeStream)) {
+      ByteBuffer b = ByteBuffer.allocate(stripeSize);
+      assertThrows(InsufficientLocationsException.class, () -> stream.read(b));
+      assertThrows(InsufficientLocationsException.class, () -> stream.read(b));
+      assertThrows(InsufficientLocationsException.class, () -> stream.seek(stripeSize + 100));
+      assertThrows(InsufficientLocationsException.class, () -> stream.read(b));
+      assertEquals(0, stream.getPos());
+      assertEquals(0, b.position());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testFailedSeekLeavesStreamAtOldPosition(boolean runtimeException) throws IOException {
+    int readBufferSize = 1000;
+    int blockLength = repConfig.getEcChunkSize() * repConfig.getData() * 3;
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), repConfig.getEcChunkSize() * 3);
+    ECStreamTestUtil.randomFill(dataBufs, repConfig.getEcChunkSize(), dataGenerator, blockLength);
+    addDataStreamsToFactory(dataBufs, generateParity(dataBufs, repConfig));
+
+    Map<DatanodeDetails, Integer> dnMap = ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
+    try (ECBlockReconstructedStripeInputStream stripeStream = spy(createStripeInputStream(dnMap, blockLength));
+        ECBlockReconstructedInputStream stream = new ECBlockReconstructedInputStream(repConfig, bufferPool,
+            stripeStream)) {
+      ByteBuffer b = ByteBuffer.allocate(readBufferSize);
+      assertEquals(readBufferSize, stream.read(b));
+
+      // The stripe read of the seek fails once, after the stripe reader has moved to the target stripe.
+      Exception failure = runtimeException ? new IllegalStateException("injected") : new IOException("injected");
+      doThrow(failure).doCallRealMethod().when(stripeStream).readStripe(any());
+      assertThatThrownBy(() -> stream.seek(blockLength - 100)).isSameAs(failure);
+
+      assertEquals(readBufferSize, stream.getPos());
+      b.clear();
+      assertEquals(readBufferSize, stream.read(b));
+      resetAndAdvanceDataGenerator(readBufferSize);
+      ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
+      assertEquals(readBufferSize * 2, stream.getPos());
+    }
+  }
+
+  @Test
+  void testReadResumesAfterFailedStripeWithPartialProgress() throws IOException {
+    int stripeSize = repConfig.getEcChunkSize() * repConfig.getData();
+    int blockLength = stripeSize * 3;
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), repConfig.getEcChunkSize() * 3);
+    ECStreamTestUtil.randomFill(dataBufs, repConfig.getEcChunkSize(), dataGenerator, blockLength);
+    addDataStreamsToFactory(dataBufs, generateParity(dataBufs, repConfig));
+
+    Map<DatanodeDetails, Integer> dnMap = ECStreamTestUtil.createIndexMap(1, 2, 4, 5);
+    try (ECBlockReconstructedStripeInputStream stripeStream = spy(createStripeInputStream(dnMap, blockLength));
+        ECBlockReconstructedInputStream stream = new ECBlockReconstructedInputStream(repConfig, bufferPool,
+            stripeStream)) {
+      int initialRead = 1000;
+      assertEquals(initialRead, stream.read(ByteBuffer.allocate(initialRead)));
+      IOException failure = new IOException("injected");
+      doThrow(failure).doCallRealMethod().when(stripeStream).readStripe(any());
+
+      ByteBuffer b = ByteBuffer.allocate(stripeSize);
+      assertThatThrownBy(() -> stream.read(b)).isSameAs(failure);
+      assertEquals(stripeSize - initialRead, b.position());
+      assertEquals(stripeSize, stream.getPos());
+      resetAndAdvanceDataGenerator(initialRead);
+      ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
+
+      b.clear();
+      assertEquals(stripeSize, stream.read(b));
+      ECStreamTestUtil.assertBufferMatches(b, dataGenerator);
+      assertEquals(stripeSize * 2L, stream.getPos());
     }
   }
 

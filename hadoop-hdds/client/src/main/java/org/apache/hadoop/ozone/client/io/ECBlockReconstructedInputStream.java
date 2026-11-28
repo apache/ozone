@@ -38,6 +38,7 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
   private ByteBuffer[] bufs;
   private final ByteBufferPool byteBufferPool;
   private boolean closed = false;
+  // Set by unbuffer() and by a failed stripe read: the next read must first seek to the current position.
   private boolean unBuffered = false;
 
   private long position = 0;
@@ -222,7 +223,16 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
 
   private long readStripe() throws IOException {
     clearBuffers();
-    return stripeReader.readStripe(bufs);
+    try {
+      return stripeReader.readStripe(bufs);
+    } catch (IOException | RuntimeException e) {
+      // Do not return partly read data, and seek the stripe reader back to the current position on the next read.
+      for (ByteBuffer b : bufs) {
+        b.limit(0);
+      }
+      unBuffered = true;
+      throw e;
+    }
   }
 
   private void allocateBuffers() {
