@@ -110,6 +110,10 @@ public final class S3GatewayConfigKeys {
       "ozone.s3g.standard.storage-class.use-client-default";
   public static final boolean OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT = false;
 
+  public static final String OZONE_S3G_S3VECTORS_ENABLED_KEY =
+      "ozone.s3g.s3vectors.enabled";
+  public static final boolean OZONE_S3G_S3VECTORS_ENABLED_DEFAULT = false;
+
   /**
    * Never constructed.
    */

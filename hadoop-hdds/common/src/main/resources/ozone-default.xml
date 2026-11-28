@@ -2063,6 +2063,15 @@
   </property>
 
   <property>
+    <name>ozone.s3g.s3vectors.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      Enables the S3 Vectors API (SigV4 service s3vectors) on S3 Gateway.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.list.max.keys.limit</name>
     <value>1000</value>
     <description>

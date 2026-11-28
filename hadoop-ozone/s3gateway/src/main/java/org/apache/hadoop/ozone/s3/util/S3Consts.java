@@ -52,6 +52,9 @@ public final class S3Consts {
   public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
   public static final String X_AMZ_TRAILER = "x-amz-trailer";
 
+  public static final String S3_SERVICE = "s3";
+  public static final String S3_VECTORS_SERVICE = "s3vectors";
+
   public static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
   public static final String STREAMING_UNSIGNED_PAYLOAD_TRAILER = "STREAMING-UNSIGNED-PAYLOAD-TRAILER";
   public static final String STREAMING_AWS4_HMAC_SHA256_PAYLOAD = "STREAMING-AWS4-HMAC-SHA256-PAYLOAD";
