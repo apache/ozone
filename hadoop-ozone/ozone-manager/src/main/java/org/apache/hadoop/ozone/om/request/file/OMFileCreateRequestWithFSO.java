@@ -186,7 +186,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
     }
 
     // check if the file or directory already existed in OM
-    checkDirectoryResult(keyName, isOverWrite,
+    OMFileRequest.checkDirectoryResult(keyName, isOverWrite,
             pathInfoFSO.getDirectoryResult());
 
     // if isRecursive is true, file would be created even if parent

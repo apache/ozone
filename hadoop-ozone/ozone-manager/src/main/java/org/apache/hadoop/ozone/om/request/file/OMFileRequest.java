@@ -156,6 +156,33 @@ public final class OMFileRequest {
   }
 
   /**
+   * Verify om directory result.
+   *
+   * @param keyName           key name
+   * @param isOverWrite       flag represents whether file can be overwritten
+   * @param omDirectoryResult directory result
+   * @throws OMException NOT_A_FILE if a directory exists at the key or a file exists in its parent path,
+   *     FILE_ALREADY_EXISTS if a file exists at the key and isOverWrite is false
+   */
+  public static void checkDirectoryResult(String keyName, boolean isOverWrite,
+      OMDirectoryResult omDirectoryResult) throws OMException {
+    if (omDirectoryResult == OMDirectoryResult.FILE_EXISTS) {
+      if (!isOverWrite) {
+        throw new OMException("File " + keyName + " already exists",
+            OMException.ResultCodes.FILE_ALREADY_EXISTS);
+      }
+    } else if (omDirectoryResult == OMDirectoryResult.DIRECTORY_EXISTS) {
+      throw new OMException("Can not write to directory: " + keyName,
+          OMException.ResultCodes.NOT_A_FILE);
+    } else if (omDirectoryResult == OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH) {
+      throw new OMException(
+          "Can not create file: " + keyName + " as there " +
+              "is already file in the given path",
+          OMException.ResultCodes.NOT_A_FILE);
+    }
+  }
+
+  /**
    * Reads only the objectID of the directory stored under the given directory table key, without
    * materializing an {@link OmDirectoryInfo}. The path walks below need each parent directory's
    * objectID, but a full read also decodes and rebuilds the ACL list, the metadata map and the

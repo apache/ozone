@@ -17,10 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -37,7 +34,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -127,15 +123,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
           keyArgs, dbFileInfo);
 
       // Check if a file or directory exists with same key name.
-      if (pathInfoFSO.getDirectoryResult() == DIRECTORY_EXISTS) {
-        throw new OMException("Cannot write to "
-            + "directory. createIntermediateDirs behavior is enabled and "
-            + "hence / has special interpretation: " + keyName, NOT_A_FILE);
-      } else if (pathInfoFSO.getDirectoryResult()
-          == FILE_EXISTS_IN_GIVENPATH) {
-        throw new OMException("Can not create file: " + keyName
-            + " as there is already file in the given path", NOT_A_FILE);
-      }
+      OMFileRequest.checkDirectoryResult(keyName, true, pathInfoFSO.getDirectoryResult());
 
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(

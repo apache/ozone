@@ -1402,6 +1402,9 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     String keyName = "dir1/dir2/dir3/file1";
     createAndCheck(keyName);
 
+    // A directory exists at the key. Should fail.
+    checkNotAFile("dir1/dir2");
+
     // Key with leading '/'.
     keyName = "/a/b/c/file1";
     createAndCheck(keyName);
