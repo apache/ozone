@@ -21,9 +21,13 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -31,8 +35,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +81,11 @@ public class TestOmSnapshotLocalDataYaml {
       @Override
       public void computeAndSetChecksum(Yaml yaml, OmSnapshotLocalData data) throws IOException {
         data.computeAndSetChecksum(yaml);
+      }
+
+      @Override
+      protected InputStream newInputStream(File yamlFile) throws IOException {
+        return OmSnapshotLocalDataYaml.newInputStream(yamlFile);
       }
     };
   }
@@ -327,6 +339,45 @@ public class TestOmSnapshotLocalDataYaml {
       assertEquals(versionMeta.getPreviousSnapshotVersion(), metaOnly.getPreviousSnapshotVersion());
       assertThat(metaOnly.getSstFiles()).isEmpty();
     });
+  }
+
+  @Test
+  public void testCompressedYaml() throws IOException {
+    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot8", TransactionInfo.valueOf(1, 2)).getLeft();
+    assertFalse(OmSnapshotLocalDataYaml.isCompressed(yamlFile));
+    OmSnapshotLocalData plainData = omSnapshotLocalDataSerializer.load(yamlFile);
+    long plainSize = yamlFile.length();
+
+    // Compressing in place keeps the content, so the checksum still matches.
+    OmSnapshotLocalDataYaml.compress(yamlFile);
+    assertTrue(OmSnapshotLocalDataYaml.isCompressed(yamlFile));
+    assertThat(yamlFile.length()).isLessThan(plainSize);
+    OmSnapshotLocalData compressedData = omSnapshotLocalDataSerializer.load(yamlFile);
+    assertEquals(plainData.getChecksum(), compressedData.getChecksum());
+    assertEquals(plainData.getVersionSstFileInfos(), compressedData.getVersionSstFileInfos());
+    assertTrue(omSnapshotLocalDataSerializer.verifyChecksum(compressedData));
+    assertLoadWithoutSstFiles(yamlFile);
+
+    File written = new File(testRoot, "snapshot8-written.yaml");
+    OmSnapshotLocalDataYaml.dumpCompressed(YAML_FACTORY.create(), compressedData, written);
+    assertTrue(OmSnapshotLocalDataYaml.isCompressed(written));
+    assertEquals(compressedData.getChecksum(), omSnapshotLocalDataSerializer.load(written).getChecksum());
+
+    // A failed write keeps the previous file and leaves no temporary file behind.
+    byte[] before = FileUtils.readFileToByteArray(written);
+    Yaml failingYaml = mock(Yaml.class);
+    doThrow(new IllegalStateException("injected")).when(failingYaml).dump(any(), any(Writer.class));
+    assertThrows(IllegalStateException.class,
+        () -> OmSnapshotLocalDataYaml.dumpCompressed(failingYaml, compressedData, written));
+    assertArrayEquals(before, FileUtils.readFileToByteArray(written));
+    assertThat(new File(written.getPath() + ".tmp")).doesNotExist();
+
+    // A truncated compressed file fails to load instead of returning partial data.
+    File truncated = new File(testRoot, "truncated.yaml");
+    byte[] bytes = FileUtils.readFileToByteArray(yamlFile);
+    FileUtils.writeByteArrayToFile(truncated, Arrays.copyOf(bytes, bytes.length / 2));
+    assertTrue(OmSnapshotLocalDataYaml.isCompressed(truncated));
+    assertThrows(IOException.class, () -> omSnapshotLocalDataSerializer.load(truncated));
   }
 
   @Test
