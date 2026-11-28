@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -84,6 +85,8 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInter
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.net.StaticMapping;
@@ -366,6 +369,19 @@ public class TestSCMBlockProtocolServer {
   }
 
   @Test
+  void testAllocateBlockAuditParamsAreAddedToSpan() throws IOException {
+    try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      TracingUtil.executeInNewSpan("allocateBlock", this::allocateBlock);
+
+      collector.assertAttribute("allocateBlock", "size", String.valueOf(128 * MB));
+      collector.assertAttribute("allocateBlock", "num", "1");
+      collector.assertAttribute("allocateBlock", "replication",
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE).toString());
+      collector.assertAttribute("allocateBlock", "allocated", "1");
+    }
+  }
+
+  @Test
   void testAllocateBlockWithClientMachine() throws IOException {
     final DatanodeDetails clientDatanode = nodeManager.getAllNodes().get(0);
     final String clientAddress = clientDatanode.getIpAddress();
@@ -599,6 +615,25 @@ public class TestSCMBlockProtocolServer {
       assertEquals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION, ex.getResult());
     } finally {
       scm.getScmContext().updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
+    }
+  }
+
+  @Test
+  void testDeleteKeyBlocksFailureInResponseIsRecordedOnSpan() throws Exception {
+    StorageContainerManager mockScm = mockScmForBlockServer();
+    when(mockScm.getPerfMetrics()).thenReturn(mock(SCMPerformanceMetrics.class));
+    BlockManager blockManager = mock(BlockManager.class);
+    doThrow(new SCMException("SafeModePrecheck failed for deleteBlocks", SCMException.ResultCodes.SAFE_MODE_EXCEPTION))
+        .when(blockManager).deleteBlocks(any());
+    when(mockScm.getScmBlockManager()).thenReturn(blockManager);
+    try (SCMBlockProtocolServer blockServer = new SCMBlockProtocolServer(new OzoneConfiguration(), mockScm);
+         TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      List<DeleteBlockGroupResult> results =
+          TracingUtil.executeInNewSpan("deleteKeyBlocks", () -> blockServer.deleteKeyBlocks(Collections.emptyList()));
+
+      assertThat(results).isEmpty();
+      collector.assertError("deleteKeyBlocks", "SafeModePrecheck failed for deleteBlocks");
+      collector.assertExceptionRecorded("deleteKeyBlocks", SCMException.class);
     }
   }
 

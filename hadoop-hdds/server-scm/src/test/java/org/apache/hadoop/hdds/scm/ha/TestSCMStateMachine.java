@@ -68,6 +68,8 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.scm.upgrade.FinalizationStateManagerTestImpl;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -484,6 +486,53 @@ public class TestSCMStateMachine {
   }
 
   @Test
+  public void testApplyTransactionContinuesTheRequestTrace() throws Exception {
+    SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+    SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, succeedingInvoker());
+
+    try (TestSpanCollector spans = TestSpanCollector.install("scm-state-machine-test")) {
+      // Encoded under a span like SCMRatisServerImpl#submitRequest does. Ratis then applies it on its own threads,
+      // which is simulated here by applying outside of the span.
+      TransactionContext trx = TracingUtil.executeInNewSpan("submit", () -> newTransaction(RequestType.PIPELINE, 7));
+
+      applyingStateMachine.applyTransaction(trx).get();
+
+      spans.assertParent("SCMStateMachine.applyTransaction", "submit");
+      spans.assertNotError("SCMStateMachine.applyTransaction");
+    }
+  }
+
+  @Test
+  public void testApplyTransactionWithoutTraceCreatesNoSpan() throws Exception {
+    SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+    SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, succeedingInvoker());
+
+    try (TestSpanCollector spans = TestSpanCollector.install("scm-state-machine-test")) {
+      applyingStateMachine.applyTransaction(newTransaction(RequestType.PIPELINE, 7)).get();
+
+      spans.assertNoSpan("SCMStateMachine.applyTransaction");
+    }
+  }
+
+  @Test
+  public void testRejectedTransactionIsRecordedOnTheApplySpan() throws Exception {
+    SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+    ScmInvoker<?> invoker = mock(ScmInvoker.class);
+    when(invoker.invokeLocal(anyString(), any()))
+        .thenThrow(new SCMException("rejected", ResultCodes.FAILED_TO_FIND_CONTAINER));
+    SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, invoker);
+
+    try (TestSpanCollector spans = TestSpanCollector.install("scm-state-machine-test")) {
+      TransactionContext trx = TracingUtil.executeInNewSpan("submit", () -> newTransaction(RequestType.PIPELINE, 3));
+
+      assertTrue(applyingStateMachine.applyTransaction(trx).isCompletedExceptionally());
+
+      spans.assertError("SCMStateMachine.applyTransaction", "rejected");
+      spans.assertExceptionRecorded("SCMStateMachine.applyTransaction", SCMException.class);
+    }
+  }
+
+  @Test
   public void testFlushCheckedForEveryAppliedTransaction() throws Exception {
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, succeedingInvoker());
@@ -525,6 +574,43 @@ public class TestSCMStateMachine {
           () -> applyingStateMachine.applyTransaction(newTransaction(RequestType.PIPELINE, 9)));
 
       verify(buffer).endApplyingTransaction();
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
+  @Test
+  public void testFlushFailureIsRecordedOnTheApplySpan() throws Exception {
+    ExitUtils.disableSystemExit();
+    try (TestSpanCollector spans = TestSpanCollector.install("scm-state-machine-test")) {
+      SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+      doThrow(new IllegalStateException("injected flush failure")).when(buffer).flushIfPendingLimitReached();
+      SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, succeedingInvoker());
+      TransactionContext trx = TracingUtil.executeInNewSpan("submit", () -> newTransaction(RequestType.PIPELINE, 9));
+
+      assertThrows(ExitUtils.ExitException.class, () -> applyingStateMachine.applyTransaction(trx));
+
+      spans.assertError("SCMStateMachine.applyTransaction", "injected flush failure");
+      spans.assertExceptionRecorded("SCMStateMachine.applyTransaction", IllegalStateException.class);
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
+  @Test
+  public void testUnexpectedApplyFailureIsRecordedOnTheApplySpan() throws Exception {
+    ExitUtils.disableSystemExit();
+    try (TestSpanCollector spans = TestSpanCollector.install("scm-state-machine-test")) {
+      SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+      ScmInvoker<?> invoker = mock(ScmInvoker.class);
+      when(invoker.invokeLocal(anyString(), any())).thenThrow(new IllegalStateException("unexpected"));
+      SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, invoker);
+      TransactionContext trx = TracingUtil.executeInNewSpan("submit", () -> newTransaction(RequestType.PIPELINE, 4));
+
+      assertThrows(ExitUtils.ExitException.class, () -> applyingStateMachine.applyTransaction(trx));
+
+      spans.assertError("SCMStateMachine.applyTransaction", "unexpected");
+      spans.assertExceptionRecorded("SCMStateMachine.applyTransaction", IllegalStateException.class);
     } finally {
       ExitUtils.clear();
     }

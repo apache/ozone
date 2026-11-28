@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.MethodArgument;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisRequestProto;
 import org.apache.hadoop.hdds.scm.ha.io.ScmCodecFactory;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -40,15 +41,17 @@ public final class SCMRatisRequest {
   static final ScmCodecFactory FACTORY =  ScmCodecFactory.getInstance();
   private final RequestType type;
   private final String operation;
+  private final String traceID;
   private final Object[] arguments;
   private final Class<?>[] parameterTypes;
   private static final Logger LOG = LoggerFactory
       .getLogger(SCMRatisRequest.class);
 
-  private SCMRatisRequest(final RequestType type, final String operation,
+  private SCMRatisRequest(final RequestType type, final String operation, final String traceID,
       final Class<?>[] parameterTypes, final Object... arguments) {
     this.type = type;
     this.operation = operation;
+    this.traceID = traceID;
     this.parameterTypes = parameterTypes;
     this.arguments = arguments;
   }
@@ -58,7 +61,7 @@ public final class SCMRatisRequest {
       final Class<?>[] parameterTypes,
       final Object... arguments) {
     Preconditions.checkState(parameterTypes.length == arguments.length);
-    return new SCMRatisRequest(type, operation, parameterTypes, arguments);
+    return new SCMRatisRequest(type, operation, "", parameterTypes, arguments);
   }
 
   /**
@@ -73,6 +76,10 @@ public final class SCMRatisRequest {
    */
   public String getOperation() {
     return operation;
+  }
+
+  public String getTraceID() {
+    return traceID;
   }
 
   /**
@@ -93,6 +100,9 @@ public final class SCMRatisRequest {
     final SCMRatisRequestProto.Builder requestProtoBuilder =
         SCMRatisRequestProto.newBuilder();
     requestProtoBuilder.setType(type);
+    if (TracingUtil.isCurrentSpanSampled()) {
+      requestProtoBuilder.setTraceID(TracingUtil.exportCurrentSpan());
+    }
 
     final Method.Builder methodBuilder = Method.newBuilder();
     methodBuilder.setName(operation);
@@ -154,7 +164,7 @@ public final class SCMRatisRequest {
       args.add(FACTORY.getCodec(clazz).deserialize(argument.getValue()));
     }
     return new SCMRatisRequest(requestProto.getType(),
-        method.getName(), parameterTypes, args.toArray());
+        method.getName(), requestProto.getTraceID(), parameterTypes, args.toArray());
   }
 
   /**

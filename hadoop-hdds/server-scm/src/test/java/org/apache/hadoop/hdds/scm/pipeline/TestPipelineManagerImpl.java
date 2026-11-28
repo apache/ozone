@@ -101,6 +101,8 @@ import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -240,6 +242,29 @@ public class TestPipelineManagerImpl {
       assertTrue(pipelineManager.getPipelines().isEmpty());
       assertFailsNotLeader(() -> pipelineManager.createPipeline(
               RatisReplicationConfig.getInstance(ReplicationFactor.THREE)));
+    }
+  }
+
+  @Test
+  public void testCreatePipelineIsTracedUnderTheCurrentSpan() throws Exception {
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true);
+         TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      TracingUtil.executeInNewSpan("request", () -> pipelineManager.createPipeline(
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE)));
+
+      collector.assertParent("PipelineManagerImpl.createPipeline", "request");
+      collector.assertNotError("PipelineManagerImpl.createPipeline");
+    }
+  }
+
+  @Test
+  public void testFailedCreatePipelineIsRecordedOnSpan() throws Exception {
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(false);
+         TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      assertFailsNotLeader(() -> TracingUtil.executeInNewSpan("request", () -> pipelineManager.createPipeline(
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE))));
+
+      collector.assertExceptionRecorded("PipelineManagerImpl.createPipeline", SCMException.class);
     }
   }
 

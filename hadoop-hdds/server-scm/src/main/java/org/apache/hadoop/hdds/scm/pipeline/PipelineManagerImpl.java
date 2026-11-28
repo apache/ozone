@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
@@ -57,6 +59,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -222,8 +225,9 @@ public class PipelineManagerImpl implements PipelineManager {
     checkIfPipelineCreationIsAllowed(replicationConfig);
 
     acquireWriteLock();
+    final Span span = TracingUtil.createInternalSpan("PipelineManagerImpl.createPipeline");
     final Pipeline pipeline;
-    try {
+    try (Scope ignored = span.makeCurrent()) {
       try {
         pipeline = pipelineFactory.create(replicationConfig,
             excludedNodes, favoredNodes);
@@ -233,8 +237,12 @@ public class PipelineManagerImpl implements PipelineManager {
       }
       addPipelineToManager(pipeline);
       return pipeline;
+    } catch (Exception e) {
+      TracingUtil.recordError(span, e);
+      throw e;
     } finally {
       releaseWriteLock();
+      span.end();
     }
   }
 

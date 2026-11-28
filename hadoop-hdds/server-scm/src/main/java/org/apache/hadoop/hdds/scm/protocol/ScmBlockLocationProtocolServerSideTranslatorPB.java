@@ -63,6 +63,8 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.OzoneTracingAttributes;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -192,8 +194,10 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     } catch (IOException e) {
       RatisUtil.checkRatisException(e, scm.getBlockProtocolRpcPort(),
           scm.getScmId(), scm.getHostname(), ROLE_TYPE);
+      TracingUtil.recordErrorInCurrentSpan(e);
       response.setSuccess(false);
       response.setStatus(exceptionToResponseStatus(e));
+      TracingUtil.addAttributesToCurrentSpan(OzoneTracingAttributes.ERROR_STATUS, response.getStatus().name());
       if (e.getMessage() != null) {
         response.setMessage(e.getMessage());
       }

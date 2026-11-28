@@ -22,6 +22,8 @@ import static java.util.Objects.requireNonNull;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collection;
@@ -45,6 +47,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.util.Time;
@@ -195,6 +198,7 @@ public class SCMStateMachine extends BaseStateMachine {
     final CompletableFuture<Message> applyTransactionFuture =
         new CompletableFuture<>();
     transactionBuffer.beginApplyingTransaction();
+    Span span = Span.getInvalid();
     try {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
@@ -202,7 +206,10 @@ public class SCMStateMachine extends BaseStateMachine {
       if (LOG.isDebugEnabled()) {
         LOG.debug("{}: applyTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
       }
-      try {
+      if (!request.getTraceID().isEmpty()) {
+        span = TracingUtil.importAndCreateSpan("SCMStateMachine.applyTransaction", request.getTraceID());
+      }
+      try (Scope ignored = span.makeCurrent()) {
         applyTransactionFuture.complete(process(request));
       } catch (SCMException ex) {
         // For SCM exceptions while applying a transaction, if the error
@@ -211,6 +218,7 @@ public class SCMStateMachine extends BaseStateMachine {
             || ex.getResult() == ResultCodes.IO_EXCEPTION) {
           throw ex;
         }
+        TracingUtil.recordError(span, ex);
         // Otherwise, it's considered as a logical rejection and is returned to
         // Ratis client, leaving SCM intact.
         applyTransactionFuture.completeExceptionally(ex);
@@ -231,9 +239,13 @@ public class SCMStateMachine extends BaseStateMachine {
       // in both places. No-op once the datanode protocol server has started.
       tryStartDNServerAndRefreshSafeMode();
     } catch (Exception ex) {
+      TracingUtil.recordError(span, ex);
+      // ExitUtils.terminate() below exits the JVM so the finally block never runs; end the span here.
+      span.end();
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
     } finally {
+      span.end();
       transactionBuffer.endApplyingTransaction();
     }
     return applyTransactionFuture;

@@ -49,6 +49,9 @@ import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
@@ -214,6 +217,19 @@ public class TestTracingUtil {
   }
 
   @Test
+  public void testIsCurrentSpanSampled() {
+    assertFalse(TracingUtil.isCurrentSpanSampled());
+    try (Scope ignored = spanContext(PARENT_SPAN_ID).makeCurrent()) {
+      assertTrue(TracingUtil.isCurrentSpanSampled());
+    }
+    Span unsampled = Span.wrap(
+        SpanContext.create(TRACE_ID, PARENT_SPAN_ID, TraceFlags.getDefault(), TraceState.getDefault()));
+    try (Scope ignored = unsampled.makeCurrent()) {
+      assertFalse(TracingUtil.isCurrentSpanSampled());
+    }
+  }
+
+  @Test
   public void testExecuteInNewSpanUsesParentWhenContextHasActiveSpan() {
     TracingUtil.initTracing("nested-span", tracingEnabled().getObject(TracingConfig.class));
     try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("outer")) {
@@ -256,6 +272,41 @@ public class TestTracingUtil {
               throw new IOException("expected");
             }));
     assertEquals("expected", thrown.getMessage());
+  }
+
+  @Test
+  public void testAddAttributesFromMapToCurrentSpan() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      Map<String, String> attributes = new HashMap<>();
+      attributes.put("size", "128");
+      attributes.put("skipped", null);
+
+      TracingUtil.executeInNewSpan("request", () -> TracingUtil.addAttributesToCurrentSpan(attributes));
+
+      collector.assertAttribute("request", "size", "128");
+      collector.assertNoAttribute("request", "skipped");
+    }
+  }
+
+  @Test
+  public void testAddAttributesFromNullMapOrWithoutSpanIsIgnored() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      TracingUtil.addAttributesToCurrentSpan(Collections.singletonMap("size", "128"));
+      TracingUtil.executeInNewSpan("request", () -> TracingUtil.addAttributesToCurrentSpan((Map<String, String>) null));
+
+      collector.assertNoAttribute("request", "size");
+    }
+  }
+
+  @Test
+  public void testAssertNoSpan() {
+    try (TestSpanCollector collector = TestSpanCollector.install("test")) {
+      collector.assertNoSpan("request");
+
+      TracingUtil.executeInNewSpan("request", () -> { });
+
+      assertThrows(AssertionError.class, () -> collector.assertNoSpan("request"));
+    }
   }
 
   @Test
@@ -456,7 +507,7 @@ public class TestTracingUtil {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
       Span span = TracingUtil.createInternalSpan("failing");
       try (Scope ignored = span.makeCurrent()) {
-        TracingUtil.recordExceptionInCurrentSpan(new IOException("disk failed"));
+        TracingUtil.recordErrorInCurrentSpan(new IOException("disk failed"));
       } finally {
         span.end();
       }
@@ -475,7 +526,7 @@ public class TestTracingUtil {
         try (Scope ignored2 = span.makeCurrent()) {
           throw new IOException("disk failed");
         } catch (IOException e) {
-          TracingUtil.recordException(span, e);
+          TracingUtil.recordError(span, e);
         } finally {
           span.end();
         }
@@ -495,7 +546,7 @@ public class TestTracingUtil {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
       Span span = TracingUtil.createInternalSpan("failing");
       try (Scope ignored = span.makeCurrent()) {
-        TracingUtil.recordExceptionInCurrentSpan(new IllegalStateException());
+        TracingUtil.recordErrorInCurrentSpan(new IllegalStateException());
       } finally {
         span.end();
       }
@@ -504,15 +555,15 @@ public class TestTracingUtil {
   }
 
   @Test
-  public void testRecordExceptionIgnoresNull() {
+  public void testRecordExceptionWithNullSetsError() {
     try (TestSpanCollector collector = TestSpanCollector.install("test")) {
-      Span span = TracingUtil.createInternalSpan("ok");
+      Span span = TracingUtil.createInternalSpan("failing");
       try (Scope ignored = span.makeCurrent()) {
-        TracingUtil.recordExceptionInCurrentSpan(null);
+        TracingUtil.recordErrorInCurrentSpan(null);
       } finally {
         span.end();
       }
-      collector.assertNotError("ok");
+      collector.assertError("failing", "");
     }
   }
 
@@ -554,7 +605,7 @@ public class TestTracingUtil {
       TracingUtil.addAttributesToCurrentSpan("dataSize", 1L);
       TracingUtil.addAttributesToCurrentSpan("om.success", true);
       TracingUtil.addEventToCurrentSpan("event", "k", "v");
-      TracingUtil.recordExceptionInCurrentSpan(new IOException("ignored"));
+      TracingUtil.recordErrorInCurrentSpan(new IOException("ignored"));
       assertTrue(collector.getSpans().isEmpty());
     }
   }

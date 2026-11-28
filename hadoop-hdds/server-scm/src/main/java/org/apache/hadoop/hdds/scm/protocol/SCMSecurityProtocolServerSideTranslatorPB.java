@@ -42,6 +42,8 @@ import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.OzoneTracingAttributes;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -150,8 +152,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     } catch (IOException e) {
       RatisUtil.checkRatisException(e, scm.getSecurityProtocolRpcPort(),
           scm.getScmId(), scm.getHostname(), ROLE_TYPE);
+      TracingUtil.recordErrorInCurrentSpan(e);
       scmSecurityResponse.setSuccess(false);
       scmSecurityResponse.setStatus(exceptionToResponseStatus(e));
+      TracingUtil.addAttributesToCurrentSpan(OzoneTracingAttributes.ERROR_STATUS,
+          scmSecurityResponse.getStatus().name());
       // If actual cause is set in SCMSecurityException, set message with
       // actual cause message.
       if (e.getMessage() != null) {

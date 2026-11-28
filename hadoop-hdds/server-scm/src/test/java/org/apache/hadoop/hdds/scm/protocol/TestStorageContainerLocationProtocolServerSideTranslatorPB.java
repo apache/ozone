@@ -67,6 +67,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io_.retry.RetryPolicies;
@@ -290,5 +291,23 @@ class TestStorageContainerLocationProtocolServerSideTranslatorPB {
     SCMException ex = assertThrows(SCMException.class, () -> service.getContainerWithPipeline(
         GetContainerWithPipelineRequestProto.newBuilder().setContainerID(1L).build(), ClientVersion.CURRENT));
     assertThat(ex.getMessage()).contains(unknownNode.toString());
+  }
+
+  @Test
+  public void testSubmitRequestMarksServerSpanError() throws Exception {
+    when(impl.getContainerWithPipeline(anyLong()))
+        .thenThrow(new SCMException("container 1 not found", SCMException.ResultCodes.CONTAINER_NOT_FOUND));
+    ScmContainerLocationRequest request = ScmContainerLocationRequest.newBuilder()
+        .setCmdType(Type.GetContainerWithPipeline)
+        .setVersion(ClientVersion.CURRENT.serialize())
+        .setGetContainerWithPipelineRequest(GetContainerWithPipelineRequestProto.newBuilder().setContainerID(1L))
+        .build();
+
+    try (TestSpanCollector collector = TestSpanCollector.install("scm")) {
+      assertThrows(ServiceException.class, () -> service.submitRequest(null, request));
+      collector.assertError("GetContainerWithPipeline",
+          "org.apache.hadoop.hdds.scm.exceptions.SCMException: container 1 not found");
+      collector.assertExceptionRecorded("GetContainerWithPipeline", ServiceException.class);
+    }
   }
 }

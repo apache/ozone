@@ -22,11 +22,18 @@ import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.TraceFlags;
+import io.opentelemetry.api.trace.TraceState;
+import io.opentelemetry.context.Scope;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -47,6 +54,30 @@ public class TestSCMRatisRequest {
         new Class[]{pipelineID.getProtobuf().getClass()}, args);
     assertEquals(operation, SCMRatisRequest.decode(request.encode()).getOperation());
     assertEquals(args[0], SCMRatisRequest.decode(request.encode()).getArguments()[0]);
+  }
+
+  @Test
+  public void testEncodeAndDecodeTraceID() throws Exception {
+    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, "test", new Class[0]);
+    try (TestSpanCollector ignored = TestSpanCollector.install("test")) {
+      TracingUtil.executeInNewSpan("submit", () -> {
+        String traceID = TracingUtil.exportCurrentSpan();
+        Message message = request.encode();
+        assertEquals(traceID, SCMRatisProtocol.SCMRatisRequestProto.parseFrom(
+            message.getContent().asReadOnlyByteBuffer()).getTraceID());
+        assertEquals(traceID, SCMRatisRequest.decode(message).getTraceID());
+      });
+    }
+  }
+
+  @Test
+  public void testEncodeSkipsTraceIDOfUnsampledSpan() throws Exception {
+    SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, "test", new Class[0]);
+    Span unsampled = Span.wrap(SpanContext.create("0af7651916cd43dd8448eb211c80319c", "b7ad6b7169203331",
+        TraceFlags.getDefault(), TraceState.getDefault()));
+    try (Scope ignored = unsampled.makeCurrent()) {
+      assertEquals("", SCMRatisRequest.decode(request.encode()).getTraceID());
+    }
   }
 
   @Test

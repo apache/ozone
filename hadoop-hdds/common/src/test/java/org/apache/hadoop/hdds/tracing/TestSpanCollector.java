@@ -23,6 +23,7 @@ import static io.opentelemetry.api.common.AttributeKey.stringKey;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
@@ -74,6 +75,10 @@ public final class TestSpanCollector implements SpanProcessor, AutoCloseable {
   }
 
   /** @return the only ended span named {@code spanName}; fails unless there is exactly one. */
+  public void assertNoSpan(String spanName) {
+    assertTrue(named(spanName).isEmpty(), () -> "unexpected span " + spanName);
+  }
+
   public SpanData onlySpan(String spanName) {
     List<ReadableSpan> matches = named(spanName);
     assertEquals(1, matches.size(), () -> "spans named " + spanName + ": " + spans);
