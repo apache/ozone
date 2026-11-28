@@ -25,7 +25,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineCreateInfoProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -44,6 +46,7 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
     implements WitnessedContainerMetadataStore {
 
   private Table<ContainerID, ContainerCreateInfo> containerCreateInfoTable;
+  private Table<PipelineID, PipelineCreateInfoProto> pipelineCreateInfoTable;
   private PreviousVersionTables previousVersionTables;
 
   private static final ConcurrentMap<String, WitnessedContainerMetadataStore> INSTANCES =
@@ -81,6 +84,7 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
     final DBStore dbStore = dbStoreBuilder.build();
     previousVersionTables.init(dbStore);
     this.containerCreateInfoTable = this.getDbDef().getContainerCreateInfoTableDef().getTable(dbStore);
+    this.pipelineCreateInfoTable = this.getDbDef().getPipelineCreateInfoTableDef().getTable(dbStore);
     return dbStore;
   }
 
@@ -90,6 +94,11 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
       return previousVersionTables.getContainerIdsTable();
     }
     return containerCreateInfoTable;
+  }
+
+  @Override
+  public Table<PipelineID, PipelineCreateInfoProto> getPipelineCreateInfoTable() {
+    return pipelineCreateInfoTable;
   }
 
   public PreviousVersionTables getPreviousVersionTables() {

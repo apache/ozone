@@ -18,10 +18,13 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import java.util.Map;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineCreateInfoProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
@@ -37,9 +40,18 @@ public final class WitnessedContainerDBDefinition extends DBDefinition.WithMap {
       ContainerID.getCodec(),
       ContainerCreateInfo.getCodec());
 
+  private static final String PIPELINE_CREATE_INFO_TABLE_NAME = "PipelineCreateInfoTable";
+
+  /** The {@link PipelineCreateInfoProto} of the pipelines in a datanode; only non-RATIS pipelines are stored. */
+  public static final DBColumnFamilyDefinition<PipelineID, PipelineCreateInfoProto>
+      PIPELINE_CREATE_INFO_TABLE_DEF = new DBColumnFamilyDefinition<>(
+      PIPELINE_CREATE_INFO_TABLE_NAME,
+      PipelineID.getCodec(),
+      Proto2Codec.get(PipelineCreateInfoProto.getDefaultInstance()));
+
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
-      CONTAINER_CREATE_INFO_TABLE_DEF);
+      CONTAINER_CREATE_INFO_TABLE_DEF, PIPELINE_CREATE_INFO_TABLE_DEF);
 
   private static final WitnessedContainerDBDefinition INSTANCE = new WitnessedContainerDBDefinition();
 
@@ -63,5 +75,9 @@ public final class WitnessedContainerDBDefinition extends DBDefinition.WithMap {
 
   DBColumnFamilyDefinition<ContainerID, ContainerCreateInfo> getContainerCreateInfoTableDef() {
     return CONTAINER_CREATE_INFO_TABLE_DEF;
+  }
+
+  DBColumnFamilyDefinition<PipelineID, PipelineCreateInfoProto> getPipelineCreateInfoTableDef() {
+    return PIPELINE_CREATE_INFO_TABLE_DEF;
   }
 }

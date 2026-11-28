@@ -145,6 +145,12 @@ message Pipeline {
     optional DatanodeIDProto suggestedLeaderDatanodeID = 102;
 }
 
+// The information of a pipeline creation; stored in datanode RocksDB
+message PipelineCreateInfoProto {
+  required PipelineID id = 1;
+  required ReplicationType replicationType = 2;
+}
+
 message KeyValue {
     required string key = 1;
     optional string value = 2;

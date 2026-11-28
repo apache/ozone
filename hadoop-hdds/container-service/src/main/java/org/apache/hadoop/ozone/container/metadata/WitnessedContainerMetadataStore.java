@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.container.metadata;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineCreateInfoProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
@@ -30,4 +32,12 @@ public interface WitnessedContainerMetadataStore extends DBStoreManager {
    * @return Table
    */
   Table<ContainerID, ContainerCreateInfo> getContainerCreateInfoTable();
+
+  /**
+   * A Table that keeps the {@link PipelineCreateInfoProto} of the pipelines in a datanode.
+   * Only non-RATIS pipelines are stored; a pipeline not in the table is RATIS.
+   *
+   * @return Table
+   */
+  Table<PipelineID, PipelineCreateInfoProto> getPipelineCreateInfoTable();
 }

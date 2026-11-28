@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import static org.apache.hadoop.hdds.HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+import static org.apache.hadoop.hdds.HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.CHAINED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
@@ -35,11 +38,14 @@ import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -63,6 +69,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineCreateInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
@@ -74,13 +81,17 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
@@ -245,15 +256,74 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
-    ReplicationType type = addingGroups.get(gid);
-    if (type == null) {
-      // The type is unknown when the group is reloaded on restart or added by a peer.
-      // TODO HDDS-17845: support restart for CHAINED.
-      LOG.info("{}: ReplicationType is unknown, use {}", gid, ReplicationType.RATIS);
-      type = ReplicationType.RATIS;
+    return new ContainerStateMachine(datanodeService, gid, getReplicationTypeForNewGroup(gid), dispatcher,
+        containerController, chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
+  }
+
+  private ReplicationType getReplicationTypeForNewGroup(RaftGroupId gid) {
+    final ReplicationType adding = addingGroups.get(gid);
+    if (adding != null) {
+      return adding;
     }
-    return new ContainerStateMachine(datanodeService, gid, type, dispatcher, containerController,
-        chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
+    // The group is reloaded on restart or added by a peer.
+    final Table<PipelineID, PipelineCreateInfoProto> table = getPipelineCreateInfoTable();
+    if (table != null) {
+      final PipelineCreateInfoProto stored;
+      try {
+        stored = table.get(PipelineID.valueOf(gid.getUuid()));
+      } catch (IOException e) {
+        throw new UncheckedIOException(gid + ": Failed to get ReplicationType from PipelineCreateInfoTable", e);
+      }
+      if (stored != null) {
+        return stored.getReplicationType();
+      }
+    }
+    LOG.debug("{}: ReplicationType not found, use {}", gid, RATIS);
+    return RATIS;
+  }
+
+  /** @return PipelineCreateInfoTable, or null if it is unavailable. */
+  private Table<PipelineID, PipelineCreateInfoProto> getPipelineCreateInfoTable() {
+    final WitnessedContainerMetadataStore store = containerController == null ? null
+        : containerController.getContainerMetadataStore();
+    return store == null ? null : store.getPipelineCreateInfoTable();
+  }
+
+  /** Remove the PipelineCreateInfoTable entries without a group, e.g. the datanode crashed during {@link #addGroup}. */
+  private void cleanupPipelineCreateInfoTable() throws IOException {
+    final Table<PipelineID, PipelineCreateInfoProto> table = getPipelineCreateInfoTable();
+    if (table == null) {
+      return;
+    }
+    final Set<RaftGroupId> groupIds = new HashSet<>();
+    server.getGroupIds().forEach(groupIds::add);
+    final List<PipelineID> toDelete = new ArrayList<>();
+    try (TableIterator<PipelineID, PipelineID> i = table.keyIterator()) {
+      while (i.hasNext()) {
+        final PipelineID id = i.next();
+        if (!groupIds.contains(id.getGroupId())) {
+          toDelete.add(id);
+        }
+      }
+    }
+    for (PipelineID id : toDelete) {
+      LOG.info("{}: Remove {} from PipelineCreateInfoTable since its group does not exist", name, id);
+      table.delete(id);
+    }
+  }
+
+  /**
+   * Close the CHAINED pipelines reloaded on restart.
+   * Unlike RATIS, a CHAINED pipeline has no Raft log to replay,
+   * so this datanode cannot catch up with the writes it missed during the restart.
+   */
+  private void closeChainedPipelines() throws IOException {
+    for (RaftGroupId groupId : server.getGroupIds()) {
+      if (getReplicationType(groupId) == CHAINED) {
+        triggerPipelineClose(groupId, "Datanode " + datanodeDetails
+            + " is restarted", ClosePipelineInfo.Reason.DATANODE_RESTARTED);
+      }
+    }
   }
 
   private void setUpRatisStream(RaftProperties properties) {
@@ -576,6 +646,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         executor.prestartAllCoreThreads();
       }
       server.start();
+      cleanupPipelineCreateInfoTable();
+      closeChainedPipelines();
 
       RaftServerRpc serverRpc = server.getServerRpc();
       clientPort = updateDatanodePort(serverRpc.getClientServerAddress(),
@@ -810,10 +882,27 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       ReplicationType type,
       List<DatanodeDetails> peers,
       List<Integer> priorityList) throws IOException {
+    if (type == CHAINED && !VersionedDatanodeFeatures.isFinalized(STREAM_PUTBLOCK_WITHOUT_RAFT)) {
+      // Otherwise, a downgraded datanode would load the CHAINED group as RATIS.
+      throw new IOException("Failed to add " + type + " " + pipelineID
+          + ": the datanode has not been finalized to version " + STREAM_PUTBLOCK_WITHOUT_RAFT);
+    }
     final RaftGroupId groupId = pipelineID.getGroupId();
     final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers, priorityList);
     GroupManagementRequest request = GroupManagementRequest.newAdd(
         clientId, server.getId(), nextCallId(), group);
+
+    if (type != RATIS) {
+      // Persist the type before adding the group, so that the group can be reloaded with the type on restart.
+      // If the datanode crashes before the group is added, cleanupPipelineCreateInfoTable() removes the entry.
+      final Table<PipelineID, PipelineCreateInfoProto> table = getPipelineCreateInfoTable();
+      if (table != null) {
+        table.put(pipelineID, PipelineCreateInfoProto.newBuilder()
+            .setId(pipelineID.getProtobuf())
+            .setReplicationType(type)
+            .build());
+      }
+    }
 
     final RaftClientReply reply;
     // groupManagement calls getStateMachine(groupId) before it returns.
@@ -848,7 +937,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   public void removeGroup(RaftGroupId groupId, GrpcTlsConfig tlsConfig) throws IOException {
     // For RATIS  , fan-out to removeGroup for the other datanodes (faster)
     // For CHAINED, just remove it locally and don't fan-out
-    if (getReplicationType(groupId) == ReplicationType.RATIS) {
+    if (getReplicationType(groupId) == RATIS) {
       final Collection<RaftPeer> peers = getRaftPeers(groupId);
       // For RATIS pipeline, send remove group to the other datanodes first
       peers.stream()
@@ -867,6 +956,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     }
     // Remove local group, might throw GroupMismatchException
     removeGroup(groupId);
+
+    final Table<PipelineID, PipelineCreateInfoProto> table = getPipelineCreateInfoTable();
+    if (table != null) {
+      table.delete(PipelineID.valueOf(groupId.getUuid()));
+    }
   }
 
   void handleFollowerSlowness(RaftGroupId groupId, RoleInfoProto roleInfoProto, RaftPeer follower) {
