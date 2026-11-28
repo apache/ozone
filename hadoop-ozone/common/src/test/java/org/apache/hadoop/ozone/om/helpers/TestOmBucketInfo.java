@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
@@ -40,6 +42,10 @@ import org.junit.jupiter.api.Test;
  */
 public class TestOmBucketInfo {
 
+  private static final BucketRetention RETENTION = new BucketRetention(
+      OzoneManagerProtocolProtos.RetentionMode.COMPLIANCE,
+      new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.DAYS, 30), null);
+
   @Test
   public void protobufConversion() {
     OmBucketInfo bucket = OmBucketInfo.newBuilder()
@@ -48,10 +54,26 @@ public class TestOmBucketInfo {
         .setCreationTime(1L)
         .setIsVersionEnabled(false)
         .setStorageType(StorageType.ARCHIVE)
+        .setObjectLockEnabled(true)
+        .setDefaultRetention(RETENTION)
         .build();
 
-    assertEquals(bucket,
-        OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+    OzoneManagerProtocolProtos.BucketInfo protobuf = bucket.getProtobuf();
+    assertTrue(protobuf.hasObjectLockEnabled());
+    OmBucketInfo decoded = OmBucketInfo.getFromProtobuf(protobuf);
+    assertEquals(bucket, decoded);
+    assertTrue(decoded.isObjectLockEnabled());
+    assertEquals(RETENTION, decoded.getDefaultRetention());
+
+    OmBucketInfo legacy = OmBucketInfo.getFromProtobuf(protobuf.toBuilder()
+        .clearObjectLockEnabled().clearDefaultRetention().build());
+    assertFalse(legacy.isObjectLockEnabled());
+    assertNull(legacy.getDefaultRetention());
+    assertFalse(legacy.getProtobuf().hasObjectLockEnabled());
+    assertFalse(legacy.getProtobuf().getObjectLockEnabled());
+    assertFalse(OmBucketInfo.getFromProtobuf(legacy.getProtobuf()).isObjectLockEnabled());
+    assertFalse(OmBucketInfo.getFromProtobuf(protobuf.toBuilder()
+        .setObjectLockEnabled(false).build()).isObjectLockEnabled());
   }
 
   @Test
@@ -80,6 +102,8 @@ public class TestOmBucketInfo {
             "defaultUser",
             OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL
         )))
+        .setObjectLockEnabled(true)
+        .setDefaultRetention(RETENTION)
         .build();
 
     /* Clone an omBucketInfo. */
@@ -95,6 +119,27 @@ public class TestOmBucketInfo {
     assertEquals(
         omBucketInfo.getAcls().get(0),
         cloneBucketInfo.getAcls().get(0));
+
+    assertTrue(cloneBucketInfo.isObjectLockEnabled());
+    assertEquals(RETENTION, cloneBucketInfo.getDefaultRetention());
+    OmBucketInfo rebuilt = omBucketInfo.toBuilder().build();
+    assertTrue(rebuilt.isObjectLockEnabled());
+    assertEquals(RETENTION, rebuilt.getDefaultRetention());
+
+    assertNotEquals(omBucketInfo, omBucketInfo.toBuilder().setObjectLockEnabled(false).build());
+    assertNotEquals(omBucketInfo, omBucketInfo.toBuilder().setDefaultRetention(null).build());
+    BucketRetention longerRetention = new BucketRetention(RETENTION.getRetentionMode(),
+        new RetentionDuration(RETENTION.getDuration().getTimeUnit(), 31), null);
+    assertNotEquals(omBucketInfo, omBucketInfo.toBuilder().setDefaultRetention(longerRetention).build());
+
+    assertEquals("true", omBucketInfo.toAuditMap().get(OzoneConsts.OBJECT_LOCK_ENABLED));
+    assertFalse(omBucketInfo.toAuditMap().containsKey(OzoneConsts.DEFAULT_RETENTION));
+    assertTrue(omBucketInfo.toString().contains("objectLockEnabled=true"));
+    assertTrue(omBucketInfo.toString().contains("defaultRetention=" + RETENTION));
+    assertTrue(RETENTION.toString().contains("COMPLIANCE"));
+    assertTrue(RETENTION.toString().contains("duration: 30"));
+    OmBucketInfo withoutLock = omBucketInfo.toBuilder().setObjectLockEnabled(false).setDefaultRetention(null).build();
+    assertEquals("false", withoutLock.toAuditMap().get(OzoneConsts.OBJECT_LOCK_ENABLED));
   }
 
   @Test
@@ -112,6 +157,8 @@ public class TestOmBucketInfo {
         .setUsedNamespace(5)
         .setDefaultReplicationConfig(new DefaultReplicationConfig(sourceReplication))
         .addAllMetadata(Collections.singletonMap("sourceKey", "sourceValue"))
+        .setObjectLockEnabled(true)
+        .setDefaultRetention(RETENTION)
         .build();
 
     OmBucketInfo link = OmBucketInfo.newBuilder()
@@ -143,6 +190,8 @@ public class TestOmBucketInfo {
     assertEquals(5, resolvedLink.getUsedNamespace());
     assertEquals(sourceReplication,
         resolvedLink.getDefaultReplicationConfig().getReplicationConfig());
+    assertTrue(resolvedLink.isObjectLockEnabled());
+    assertEquals(RETENTION, resolvedLink.getDefaultRetention());
     assertEquals("sourceValue", resolvedLink.getMetadata().get("sourceKey"));
     assertEquals("linkValue", resolvedLink.getMetadata().get("linkKey"));
   }

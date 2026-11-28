@@ -37,9 +37,12 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.hadoop.io.MD5Hash;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Test {@link OmKeyInfo#getCodec()} .
@@ -204,16 +207,26 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     assertEquals(12345L, deserializedKey.getExpectedDataGeneration());
   }
 
-  @Test
-  public void testCodecsWithKeyWithoutOpenKeyFields() throws IOException {
+  @ParameterizedTest
+  @CsvSource({"false, true", "true, true", "true, false"})
+  public void testCodecsWithKeyWithoutOpenKeyFields(boolean hasDate, boolean eventHoldEnabled) throws IOException {
     final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getOpenKeyTableCodec();
     final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getKeyTableCodec();
 
-    OmKeyInfo originKey = getKeyInfo(1);
+    RetentionDuration rule = new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.YEARS, 1);
+    ObjectRetention retention = new ObjectRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
+        hasDate ? 1_800_000_000_000L : 0, new EventHold(eventHoldEnabled, eventHoldEnabled ? rule : null));
+    OmKeyInfo originKey = getKeyInfo(1).toBuilder()
+        .setRetention(retention).setLegalHold(true).build();
     assertNull(originKey.getExpectedDataGeneration());
 
     byte[] openKeyData = openKeyCodec.toPersistedFormat(originKey);
     byte[] keyTableData = keyTableCodec.toPersistedFormat(originKey);
+
+    OzoneManagerProtocolProtos.KeyRetention retentionProto = KeyInfo.parseFrom(openKeyData).getRetention();
+    assertTrue(retentionProto.hasEventHold());
+    assertEquals(eventHoldEnabled, retentionProto.getEventHold().getEnabled());
+    assertEquals(eventHoldEnabled, retentionProto.getEventHold().hasDuration());
 
     OmKeyInfo fromOpenKeyCodec = openKeyCodec.fromPersistedFormat(openKeyData);
     OmKeyInfo fromKeyTableCodec = keyTableCodec.fromPersistedFormat(keyTableData);
@@ -224,6 +237,10 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     assertEquals(BUCKET, fromKeyTableCodec.getBucketName());
     assertNull(fromOpenKeyCodec.getExpectedDataGeneration());
     assertNull(fromKeyTableCodec.getExpectedDataGeneration());
+    assertEquals(retention, fromOpenKeyCodec.getRetention());
+    assertEquals(retention, fromKeyTableCodec.getRetention());
+    assertTrue(fromOpenKeyCodec.getLegalHold());
+    assertTrue(fromKeyTableCodec.getLegalHold());
   }
 
   @Test
