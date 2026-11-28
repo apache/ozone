@@ -23,6 +23,7 @@ import { TablePaginationConfig } from 'antd/es/table';
 import { InfoCircleOutlined } from '@ant-design/icons';
 
 import { Option } from '@/v2/components/select/singleSelect';
+import BucketPendingDeletionTable from '@/v2/components/tables/insights/bucketPendingDeletionTable';
 import ContainerMismatchTable from '@/v2/components/tables/insights/containerMismatchTable';
 import DeletedContainerKeysTable from '@/v2/components/tables/insights/deletedContainerKeysTable';
 import DeletePendingDirTable from '@/v2/components/tables/insights/deletePendingDirsTable';
@@ -194,6 +195,21 @@ const OMDBInsights: React.FC<{}> = () => {
             </label>
           }>
             <DeletePendingDirTable
+              limit={selectedLimit}
+              paginationConfig={paginationConfig}
+              handleLimitChange={handleLimitChange} />
+          </Tabs.TabPane>
+          <Tabs.TabPane key='6' tab={
+            <label>
+              Bucket Level Pending Deletion
+              <Tooltip
+                placement='right'
+                title='Data pending deletion per bucket, with on demand calculation of the bytes trapped by snapshots.'>
+                <InfoCircleOutlined style={{ marginLeft: '10px' }} />
+              </Tooltip>
+            </label>
+          }>
+            <BucketPendingDeletionTable
               limit={selectedLimit}
               paginationConfig={paginationConfig}
               handleLimitChange={handleLimitChange} />
