@@ -33,6 +33,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -131,6 +132,24 @@ public class PipelineManagerImpl implements PipelineManager {
       SCMContext scmContext,
       SCMServiceManager serviceManager,
       Clock clock) throws IOException {
+    return newPipelineManager(conf, scmhaManager, nodeManager, pipelineStore, eventPublisher, scmContext,
+        serviceManager, clock, PipelineID::randomId);
+  }
+
+  /**
+   * Creates a PipelineManagerImpl whose new pipelines get their IDs from the given generator.
+   */
+  @SuppressWarnings("checkstyle:parameterNumber")
+  public static PipelineManagerImpl newPipelineManager(
+      ConfigurationSource conf,
+      SCMHAManager scmhaManager,
+      NodeManager nodeManager,
+      Table<PipelineID, Pipeline> pipelineStore,
+      EventPublisher eventPublisher,
+      SCMContext scmContext,
+      SCMServiceManager serviceManager,
+      Clock clock,
+      Supplier<PipelineID> pipelineIdGenerator) throws IOException {
 
     // Create PipelineStateManagerImpl
     PipelineStateManager stateManager = PipelineStateManagerImpl
@@ -138,11 +157,12 @@ public class PipelineManagerImpl implements PipelineManager {
         .setRatisServer(scmhaManager.getRatisServer())
         .setNodeManager(nodeManager)
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .setClock(clock)
         .build();
 
     // Create PipelineFactory
     PipelineFactory pipelineFactory = new PipelineFactory(
-        nodeManager, stateManager, conf, eventPublisher, scmContext);
+        nodeManager, stateManager, conf, eventPublisher, scmContext, pipelineIdGenerator);
 
     // Create PipelineManager
     PipelineManagerImpl pipelineManager = new PipelineManagerImpl(conf,
@@ -250,6 +270,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
   private void addPipelineToManager(Pipeline pipeline)
       throws IOException {
+    pipeline.setCreationTimestamp(clock.instant());
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
         ClientVersion.CURRENT);
     acquireWriteLock();

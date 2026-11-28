@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.List;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -48,8 +49,9 @@ public class RatisPipelineProvider
                                PipelineStateManager stateManager,
                                ConfigurationSource conf,
                                EventPublisher eventPublisher,
-                               SCMContext scmContext) {
-    super(nodeManager, stateManager, conf, eventPublisher, scmContext);
+                               SCMContext scmContext,
+                               Supplier<PipelineID> pipelineIdGenerator) {
+    super(nodeManager, stateManager, conf, eventPublisher, scmContext, pipelineIdGenerator);
     this.pipelineNumberLimit = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT);

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -70,8 +71,9 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
                                   PipelineStateManager stateManager,
                                   ConfigurationSource conf,
                                   EventPublisher eventPublisher,
-                                  SCMContext scmContext) {
-    super(nodeManager, stateManager);
+                                  SCMContext scmContext,
+                                  Supplier<PipelineID> pipelineIdGenerator) {
+    super(nodeManager, stateManager, pipelineIdGenerator);
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.placementPolicy = PipelinePlacementPolicyFactory
@@ -113,7 +115,7 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
   @Override
   public Pipeline create(C replicationConfig, List<DatanodeDetails> nodes) {
     return newPipelineBuilder(replicationConfig, nodes)
-        .setId(PipelineID.randomId())
+        .setId(newPipelineID())
         .build();
   }
 
@@ -134,7 +136,7 @@ public abstract class NCopyPipelineProvider<C extends ReplicatedReplicationConfi
     DatanodeDetails suggestedLeader = leaderChoosePolicy.chooseLeader(dns);
 
     Pipeline pipeline = newPipelineBuilder(replicationConfig, dns)
-        .setId(PipelineID.randomId())
+        .setId(newPipelineID())
         .setSuggestedLeaderId(suggestedLeader != null ? suggestedLeader.getID() : null)
         .build();
 
