@@ -658,7 +658,12 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   public void deleteKey(String key, String expectedETag) throws IOException {
-    if (expectedETag == null) {
+    deleteKey(key, expectedETag, null);
+  }
+
+  public void deleteKey(String key, String expectedETag,
+      Long ifMatchLastModifiedTime) throws IOException {
+    if (expectedETag == null && ifMatchLastModifiedTime == null) {
       deleteKey(key);
       return;
     }
@@ -667,7 +672,7 @@ public final class OzoneBucketStub extends OzoneBucket {
       throw new OMException("Key not found for If-Match",
           ResultCodes.KEY_NOT_FOUND);
     }
-    if (!"*".equals(expectedETag)) {
+    if (expectedETag != null && !"*".equals(expectedETag)) {
       if (!existing.hasEtag()) {
         throw new OMException("Key does not have an ETag",
             ResultCodes.ETAG_NOT_AVAILABLE);
@@ -676,6 +681,12 @@ public final class OzoneBucketStub extends OzoneBucket {
         throw new OMException("ETag mismatch",
             ResultCodes.ETAG_MISMATCH);
       }
+    }
+    if (ifMatchLastModifiedTime != null
+        && existing.getModificationTime().toEpochMilli()
+            != ifMatchLastModifiedTime) {
+      throw new OMException("Last modified time mismatch",
+          ResultCodes.LAST_MODIFIED_TIME_MISMATCH);
     }
     deleteKey(key);
   }

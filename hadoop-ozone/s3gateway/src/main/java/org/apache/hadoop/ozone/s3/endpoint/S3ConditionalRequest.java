@@ -167,7 +167,27 @@ final class S3ConditionalRequest {
       ex.setErrorMessage("If-Match header cannot be empty.");
       throw ex;
     }
-    return new DeleteCondition(ifMatch);
+    String lastModifiedTime = headers.getHeaderString(
+        S3Consts.IF_MATCH_LAST_MODIFIED_TIME_HEADER);
+    Long expectedLastModifiedTime = null;
+    if (lastModifiedTime != null) {
+      if (StringUtils.isBlank(lastModifiedTime)) {
+        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
+        ex.setErrorMessage(
+            "x-amz-if-match-last-modified-time header cannot be empty.");
+        throw ex;
+      }
+      try {
+        expectedLastModifiedTime = Instant.parse(lastModifiedTime.trim())
+            .toEpochMilli();
+      } catch (RuntimeException e) {
+        OS3Exception ex = newError(INVALID_REQUEST, keyPath);
+        ex.setErrorMessage("x-amz-if-match-last-modified-time header is not"
+            + " a valid ISO 8601 timestamp: " + lastModifiedTime);
+        throw ex;
+      }
+    }
+    return new DeleteCondition(ifMatch, expectedLastModifiedTime);
   }
 
   private static Response buildNotModifiedResponse(OzoneKey key) {
@@ -260,9 +280,11 @@ final class S3ConditionalRequest {
 
   static final class DeleteCondition {
     private final String ifMatch;
+    private final Long ifMatchLastModifiedTime;
 
-    private DeleteCondition(String ifMatch) {
+    private DeleteCondition(String ifMatch, Long ifMatchLastModifiedTime) {
       this.ifMatch = ifMatch;
+      this.ifMatchLastModifiedTime = ifMatchLastModifiedTime;
     }
 
     boolean hasIfMatch() {
@@ -271,6 +293,10 @@ final class S3ConditionalRequest {
 
     String getExpectedETag() {
       return parseETag(ifMatch);
+    }
+
+    Long getIfMatchLastModifiedTime() {
+      return ifMatchLastModifiedTime;
     }
   }
 }

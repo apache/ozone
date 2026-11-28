@@ -351,6 +351,55 @@ public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
     return modifiedOmRequest;
   }
 
+  @Test
+  public void testValidateAndUpdateCacheWithExpectedLastModifiedTimeMatch()
+      throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    String ozoneKey = addKeyToTable();
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(ozoneKey);
+
+    OMRequest modifiedOmRequest = doPreExecute(
+        createDeleteKeyRequestWithExpectedLastModifiedTime(
+            omKeyInfo.getModificationTime()));
+    OMKeyDeleteRequest omKeyDeleteRequest =
+        getOmKeyDeleteRequest(modifiedOmRequest);
+
+    OMClientResponse omClientResponse =
+        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey));
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithExpectedLastModifiedTimeMismatch()
+      throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    String ozoneKey = addKeyToTable();
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(ozoneKey);
+
+    OMRequest modifiedOmRequest = doPreExecute(
+        createDeleteKeyRequestWithExpectedLastModifiedTime(
+            omKeyInfo.getModificationTime() + 1L));
+    OMKeyDeleteRequest omKeyDeleteRequest =
+        getOmKeyDeleteRequest(modifiedOmRequest);
+
+    OMClientResponse omClientResponse =
+        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.LAST_MODIFIED_TIME_MISMATCH,
+        omClientResponse.getOMResponse().getStatus());
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(ozoneKey));
+  }
+
   /**
    * Create OMRequest which encapsulates DeleteKeyRequest.
    * @return OMRequest
@@ -366,6 +415,20 @@ public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
   protected OMRequest createDeleteKeyRequestWithExpectedETag(
       String expectedETag) {
     return createDeleteKeyRequest(keyName, expectedETag);
+  }
+
+  protected OMRequest createDeleteKeyRequestWithExpectedLastModifiedTime(
+      long expectedLastModifiedTime) {
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder().setBucketName(bucketName)
+        .setVolumeName(volumeName).setKeyName(keyName)
+        .setExpectedLastModifiedTime(expectedLastModifiedTime);
+
+    DeleteKeyRequest deleteKeyRequest =
+        DeleteKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+
+    return OMRequest.newBuilder().setDeleteKeyRequest(deleteKeyRequest)
+        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
+        .setClientId(UUID.randomUUID().toString()).build();
   }
 
   protected OMRequest createDeleteKeyRequest(

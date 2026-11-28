@@ -679,6 +679,29 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Deletes an existing key if the key's current last modified time matches
+   * ifMatchLastModifiedTime (epoch milliseconds, from the S3
+   * x-amz-if-match-last-modified-time header).
+   * @param volumeName Name of the Volume, or null to resolve it from the S3 request context.
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param recursive recursive deletion of all sub path keys if true,
+   *                  otherwise non-recursive
+   * @param expectedETag expected ETag, or null for no ETag condition
+   * @param ifMatchLastModifiedTime expected last modified time in epoch
+   *                                milliseconds, or null for no condition
+   * @throws IOException
+   */
+  default void deleteKey(String volumeName, String bucketName, String keyName,
+                         boolean recursive, String expectedETag,
+                         Long ifMatchLastModifiedTime)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "Conditional delete by last modified time is not supported by this"
+            + " client implementation.");
+  }
+
+  /**
    * Deletes keys through the list.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

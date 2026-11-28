@@ -759,21 +759,28 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     try {
       deleteCondition = S3ConditionalRequest.parseDeleteCondition(getHeaders(), keyPath);
 
-      getClientProtocol().deleteKey(context.getCachedVolumeName(), context.getBucketName(), keyPath, false,
-          deleteCondition.getExpectedETag());
+      if (deleteCondition.getIfMatchLastModifiedTime() == null) {
+        getClientProtocol().deleteKey(context.getCachedVolumeName(), context.getBucketName(), keyPath, false,
+            deleteCondition.getExpectedETag());
+      } else {
+        getClientProtocol().deleteKey(context.getCachedVolumeName(), context.getBucketName(), keyPath, false,
+            deleteCondition.getExpectedETag(), deleteCondition.getIfMatchLastModifiedTime());
+      }
 
       getMetrics().updateDeleteKeySuccessStats(startNanos);
       return Response.status(Status.NO_CONTENT).build();
     } catch (OMException ex) {
       getMetrics().updateDeleteKeyFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        if (deleteCondition != null && deleteCondition.hasIfMatch()) {
+        if (deleteCondition != null && (deleteCondition.hasIfMatch()
+            || deleteCondition.getIfMatchLastModifiedTime() != null)) {
           throw newError(PRECOND_FAILED, keyPath, ex);
         }
         //NOT_FOUND is not a problem, AWS doesn't throw exception for missing
         // keys. Just return 204
         return Response.status(Status.NO_CONTENT).build();
-      } else if (ex.getResult() == ResultCodes.ETAG_MISMATCH || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
+      } else if (ex.getResult() == ResultCodes.ETAG_MISMATCH || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE
+          || ex.getResult() == ResultCodes.LAST_MODIFIED_TIME_MISMATCH) {
         throw newError(PRECOND_FAILED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.DIRECTORY_NOT_EMPTY) {
         // With PREFIX metadata layout, a dir deletion without recursive flag

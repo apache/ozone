@@ -24,10 +24,12 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.createObject
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.delete;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_OWNER_MISMATCH;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_LAST_MODIFIED_TIME_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -41,6 +43,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Instant;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -216,6 +219,94 @@ public class TestObjectDelete {
         .build();
 
     assertErrorResponse(PRECOND_FAILED, () -> delete(rest, "b1", "missing"));
+  }
+
+  @Test
+  void testDeleteIfMatchLastModifiedTime()
+      throws IOException, OS3Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+
+    OzoneBucket bucket =
+        client.getObjectStore().getS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("UNSIGNED-PAYLOAD");
+
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    assertStatus(HttpStatus.SC_OK, () -> put(rest, "b1", "key1", "content"));
+    Instant lastModified = bucket.getKey("key1").getModificationTime();
+
+    when(headers.getHeaderString(IF_MATCH_LAST_MODIFIED_TIME_HEADER))
+        .thenReturn(lastModified.toString());
+    assertStatus(HttpStatus.SC_NO_CONTENT, () -> delete(rest, "b1", "key1"));
+
+    assertFalse(bucket.listKeys("").hasNext(),
+        "Bucket should not contain any key after delete");
+  }
+
+  @Test
+  void testDeleteIfMatchLastModifiedTimeMismatch()
+      throws IOException, OS3Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+
+    OzoneBucket bucket =
+        client.getObjectStore().getS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("UNSIGNED-PAYLOAD");
+
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    assertStatus(HttpStatus.SC_OK, () -> put(rest, "b1", "key1", "content"));
+    Instant lastModified = bucket.getKey("key1").getModificationTime();
+
+    when(headers.getHeaderString(IF_MATCH_LAST_MODIFIED_TIME_HEADER))
+        .thenReturn(lastModified.plusMillis(1).toString());
+    assertErrorResponse(PRECOND_FAILED, () -> delete(rest, "b1", "key1"));
+
+    assertNotNull(bucket.getKey("key1"),
+        "Key should still exist after a failed conditional delete");
+  }
+
+  @Test
+  void testDeleteIfMatchLastModifiedTimeForMissingKey() throws IOException {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(IF_MATCH_LAST_MODIFIED_TIME_HEADER))
+        .thenReturn(Instant.now().toString());
+
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    assertErrorResponse(PRECOND_FAILED, () -> delete(rest, "b1", "missing"));
+  }
+
+  @Test
+  void testDeleteIfMatchLastModifiedTimeMalformed() throws IOException {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(IF_MATCH_LAST_MODIFIED_TIME_HEADER))
+        .thenReturn("not-a-timestamp");
+
+    ObjectEndpoint rest = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    assertErrorResponse(INVALID_REQUEST, () -> delete(rest, "b1", "key1"));
   }
 
   @Test

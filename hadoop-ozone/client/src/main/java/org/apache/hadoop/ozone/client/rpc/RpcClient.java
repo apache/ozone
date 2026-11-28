@@ -1891,6 +1891,37 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void deleteKey(
+      String volumeName, String bucketName, String keyName, boolean recursive,
+      String expectedETag, Long ifMatchLastModifiedTime) throws IOException {
+    if (!OzoneManagerVersion.S3_IF_MATCH_LAST_MODIFIED_TIME.isSupportedBy(getOmVersion())) {
+      throw new IOException("OzoneManager does not support conditional key"
+          + " deletion by last modified time.");
+    }
+    boolean assumeS3Context = volumeName == null
+        && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
+    if (assumeS3Context) {
+      volumeName = OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
+    }
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Objects.requireNonNull(keyName, "keyName == null");
+    OmKeyArgs.Builder keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setRecursive(recursive)
+        .setAssumeS3Context(assumeS3Context);
+    if (expectedETag != null) {
+      keyArgs.setExpectedETag(expectedETag);
+    }
+    if (ifMatchLastModifiedTime != null) {
+      keyArgs.setExpectedLastModifiedTime(ifMatchLastModifiedTime);
+    }
+    ozoneManagerClient.deleteKey(keyArgs.build());
+  }
+
+  @Override
   public void deleteKeys(
           String volumeName, String bucketName, List<String> keyNameList)
           throws IOException {
