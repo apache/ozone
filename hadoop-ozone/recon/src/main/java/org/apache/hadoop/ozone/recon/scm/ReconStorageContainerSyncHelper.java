@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -63,7 +64,7 @@ import org.slf4j.LoggerFactory;
  *   <li><b>QUASI_CLOSED and CLOSED:</b> paginate SCM state lists; add absent
  *       containers and advance existing Recon containers through valid local
  *       state-machine transitions. If Recon has DELETED but SCM reports one of
- *       these states, Recon rebuilds the container record from SCM metadata.</li>
+ *       these states, Recon moves its record back to that state.</li>
  *   <li><b>DELETED:</b> paginates SCM's DELETED ID list. For IDs already in
  *       Recon, Recon drives the container to DELETED in a single call. Full
  *       {@code ContainerInfo} is fetched only for IDs missing from Recon. The
@@ -286,7 +287,7 @@ class ReconStorageContainerSyncHelper {
                                      HddsProtos.LifeCycleState reconState) {
     try {
       if (reconState == HddsProtos.LifeCycleState.DELETED) {
-        return rebuildContainerFromScm(containerID,
+        return moveDeletedBackToScmState(containerID,
             HddsProtos.LifeCycleState.QUASI_CLOSED);
       }
       if (reconState == HddsProtos.LifeCycleState.OPEN) {
@@ -299,6 +300,20 @@ class ReconStorageContainerSyncHelper {
             containerID);
         return 1;
       }
+      // SCM moves a CLOSED container back to QUASI_CLOSED only through DELETING or DELETED, which Recon
+      // may not have copied. Recon is ahead of SCM only when it closed the container from a CLOSED replica
+      // that SCM has not processed yet. DELETING here is that same move, stopped between the two steps.
+      if (reconState == HddsProtos.LifeCycleState.DELETING
+          || (reconState == HddsProtos.LifeCycleState.CLOSED && !hasClosedReplica(reconContainer))) {
+        if (reconState == HddsProtos.LifeCycleState.CLOSED) {
+          containerManager.updateContainerState(containerID, DELETE);
+        }
+        containerManager.transitionDeletingOrDeletedToTargetState(
+            containerID, HddsProtos.LifeCycleState.QUASI_CLOSED);
+        LOG.info("Container {} moved from {} back to QUASI_CLOSED based on SCM state.",
+            containerID, reconState);
+        return 1;
+      }
       LOG.debug("Skipping container {} because SCM reports QUASI_CLOSED while "
           + "Recon has state {}.", containerID, reconState);
     } catch (InvalidStateTransitionException | IOException e) {
@@ -308,12 +323,25 @@ class ReconStorageContainerSyncHelper {
     return 0;
   }
 
+  /**
+   * Returns true iff Recon has a CLOSED replica whose sequence ID matches the container's.
+   * A stale CLOSED replica (older sequence) is treated the same as a non-CLOSED replica: SCM
+   * would not close the container on its basis, so it cannot be evidence that Recon is ahead.
+   */
+  private boolean hasClosedReplica(ContainerInfo container) throws ContainerNotFoundException {
+    long containerSeq = container.getSequenceId();
+    return containerManager.getContainerReplicas(container.containerID()).stream()
+        .anyMatch(replica -> replica.getState() == ContainerReplicaProto.State.CLOSED
+            && replica.getSequenceId() != null
+            && replica.getSequenceId() == containerSeq);
+  }
+
   private int reconcileToClosed(ContainerID containerID,
                                 ContainerInfo reconContainer,
                                 HddsProtos.LifeCycleState reconState) {
     try {
       if (reconState == HddsProtos.LifeCycleState.DELETED) {
-        return rebuildContainerFromScm(containerID, HddsProtos.LifeCycleState.CLOSED);
+        return moveDeletedBackToScmState(containerID, HddsProtos.LifeCycleState.CLOSED);
       }
       if (reconState == HddsProtos.LifeCycleState.OPEN) {
         containerManager.transitionOpenToClosing(containerID, reconContainer);
@@ -339,23 +367,24 @@ class ReconStorageContainerSyncHelper {
     return 0;
   }
 
-  private int rebuildContainerFromScm(ContainerID containerID,
-                                      HddsProtos.LifeCycleState scmState) {
+  private int moveDeletedBackToScmState(ContainerID containerID,
+                                        HddsProtos.LifeCycleState scmState) {
     try {
       List<ContainerInfo> infos = scmServiceProvider.getListOfContainerInfos(
           containerID, 1, scmState);
       if (infos.isEmpty() || !infos.get(0).containerID().equals(containerID)) {
-        LOG.debug("Container {} no longer in SCM state {}; skipping rebuild.",
+        LOG.debug("Container {} no longer in SCM state {}; skipping move back.",
             containerID, scmState);
         return 0;
       }
-      containerManager.deleteContainer(containerID);
-      containerManager.addNewContainer(new ContainerWithPipeline(infos.get(0), null));
-      LOG.info("Rebuilt container {} in Recon from DELETED to SCM state {}.",
+      // Move the existing record back in place, as SCM's report handler does, so the replicas Recon
+      // already knows are kept. If the update fails the container stays in the map and the next sync retries.
+      containerManager.transitionDeletingOrDeletedToTargetState(containerID, scmState);
+      LOG.info("Moved container {} in Recon from DELETED back to SCM state {}.",
           containerID, scmState);
       return 1;
     } catch (IOException e) {
-      LOG.warn("Failed to rebuild container {} from SCM state {}.",
+      LOG.warn("Failed to move container {} from DELETED back to SCM state {}.",
           containerID, scmState, e);
       return 0;
     }

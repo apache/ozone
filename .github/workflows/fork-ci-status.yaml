@@ -45,8 +45,14 @@ jobs:
       - uses: apache/infrastructure-actions/fork-ci@fork-ci/v1
         with:
           workflow: post-commit.yml
+          # the list must match on.pull_request.branches-ignore in post-commit.yml
+          # the list should match on.pull_request.branches in fork-ci-ping.yaml
           base-branches: |
             master
+            HDDS-11233
+            HDDS-11541
+            HDDS-15728
+            HDDS-15945-worm
           check-name: build-branch (fork)
           recent-hours: 6
           sweep-minutes: '15'

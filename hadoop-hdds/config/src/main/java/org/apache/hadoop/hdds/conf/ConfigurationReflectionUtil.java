@@ -264,17 +264,6 @@ public final class ConfigurationReflectionUtil {
     return Optional.empty();
   }
 
-  public static void assertNoDuplicatedKeys(Class<?> configClass) {
-    for (Field field : configClass.getDeclaredFields()) {
-      final Config config = field.getAnnotation(Config.class);
-      if (config == null) {
-        continue;
-      }
-
-      getConfigByKey(configClass, config.key()); // getConfigByKey throws IllegalStateException for duplicated
-    }
-  }
-
   private static void checkNotFinal(
       Class<?> configurationClass, Field field) {
 

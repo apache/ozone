@@ -28,12 +28,19 @@ set -u
 : "${TEST_DIR}"
 : "${CLIENT}"
 : "${OZONE_CURRENT_VERSION}"
+: "${EXECUTION_MODE}"
 set +u
 
-echo "--- RUNNING ROLLING UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRADE_TO ---"
+if [[ "$EXECUTION_MODE" != "rolling" && "$EXECUTION_MODE" != "non-rolling" ]]; then
+  echo "Unsupported EXECUTION_MODE: $EXECUTION_MODE (expected rolling or non-rolling)" >&2
+  exit 1
+fi
+
+echo "--- RUNNING ${EXECUTION_MODE} UPGRADE TEST FROM $OZONE_UPGRADE_FROM TO $OZONE_UPGRADE_TO ---"
 
 source "$TEST_DIR"/testlib.sh
 
+# Only used in rolling execution mode.
 # The first upgrade (old -> new) is always exercised as a rolling (zero-downtime) upgrade,
 # since that is the path this suite exists to prove. The downgrade and the subsequent
 # re-upgrade are run NON-ROLLING (all servers restarts at once) to save CI time. The
@@ -135,8 +142,35 @@ non_rolling_restart_all_services() {
   wait_for_all_oms
 }
 
+set_downgrade_om_args() {
+  # 1.1.0 Is the earliest version we support upgrade/downgrade to, but it did
+  # not have OM prepare.
+  if [[ "$OZONE_UPGRADE_FROM" != '1.1.0' ]]; then
+    export OM_HA_ARGS='--downgrade'
+  else
+    export OM_HA_ARGS='--'
+  fi
+}
+
+## @description Prepare OMs, then restart the whole cluster (including the client) with the target image.
+##   Used in non-rolling execution mode.
+## @param target image
+## @param arguments passed to the OMs
+prepare_and_restart_cluster() {
+  local target_image="$1"
+  local om_args="$2"
+
+  execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-prepare" upgrade/non-rolling/prepare.robot
+  stop_docker_env
+  prepare_for_image "${target_image}"
+  export OM_HA_ARGS="${om_args}"
+  OZONE_KEEP_RESULTS=true start_docker_env
+  wait_for_all_oms
+}
+
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-1-original"
+export OM_HA_ARGS='--'
 prepare_for_image "$OZONE_UPGRADE_FROM"
 
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
@@ -145,14 +179,21 @@ wait_for_all_oms
 
 callback with_old_version
 
-echo "--- ROLLING UPGRADE TO $OZONE_UPGRADE_TO PRE-FINALIZED ---"
-rolling_restart_all_services "2-upgrade" "$OZONE_UPGRADE_TO"
+echo "--- UPGRADE TO $OZONE_UPGRADE_TO PRE-FINALIZED ---"
+if [[ "$EXECUTION_MODE" == "rolling" ]]; then
+  rolling_restart_all_services "2-upgrade" "$OZONE_UPGRADE_TO"
+else
+  prepare_and_restart_cluster "$OZONE_UPGRADE_TO" '--upgrade'
+fi
 
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-2-pre-finalized"
 callback with_this_version_pre_finalized
 
 echo "--- DOWNGRADE TO $OZONE_UPGRADE_FROM ---"
-if [[ "$DOWNGRADE_AND_REUPGRADE_ROLLING" == "true" ]]; then
+if [[ "$EXECUTION_MODE" == "non-rolling" ]]; then
+  set_downgrade_om_args
+  prepare_and_restart_cluster "$OZONE_UPGRADE_FROM" "$OM_HA_ARGS"
+elif [[ "$DOWNGRADE_AND_REUPGRADE_ROLLING" == "true" ]]; then
   rolling_restart_all_services "3-downgrade" "$OZONE_UPGRADE_FROM" "reverse"
 else
   non_rolling_restart_all_services "3-downgrade" "$OZONE_UPGRADE_FROM"
@@ -162,7 +203,9 @@ OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-3-downgraded"
 callback with_old_version_downgraded
 
 echo "--- UPGRADE TO $OZONE_UPGRADE_TO ---"
-if [[ "$DOWNGRADE_AND_REUPGRADE_ROLLING" == "true" ]]; then
+if [[ "$EXECUTION_MODE" == "non-rolling" ]]; then
+  prepare_and_restart_cluster "$OZONE_UPGRADE_TO" '--upgrade'
+elif [[ "$DOWNGRADE_AND_REUPGRADE_ROLLING" == "true" ]]; then
   rolling_restart_all_services "4-upgrade" "$OZONE_UPGRADE_TO"
 else
   non_rolling_restart_all_services "4-upgrade" "$OZONE_UPGRADE_TO"
@@ -170,15 +213,18 @@ fi
 
 # Upgrade client after all server components are upgraded but before finalization,
 # so new client APIs can be exercised against pre-finalized servers.
-echo "--- UPGRADING CLIENT TO $OZONE_UPGRADE_TO ---"
-OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-4-upgrade-client"
-stop_containers "$CLIENT"
-prepare_for_image "${OZONE_UPGRADE_TO}"
-create_containers "$CLIENT"
+# In non-rolling upgrade the client was already restarted with the whole cluster.
+if [[ "$EXECUTION_MODE" == "rolling" ]]; then
+  echo "--- UPGRADING CLIENT TO $OZONE_UPGRADE_TO ---"
+  OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-4-upgrade-client"
+  stop_containers "$CLIENT"
+  prepare_for_image "${OZONE_UPGRADE_TO}"
+  create_containers "$CLIENT"
+fi
 
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO FINALIZED ---"
 OUTPUT_NAME="${OZONE_UPGRADE_FROM}-${OZONE_UPGRADE_TO}-5-finalized"
 
 # Sends command to finalize the cluster.
-execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-finalize" upgrade/rolling/finalize.robot
+execute_robot_test "$CLIENT" -N "${OUTPUT_NAME}-finalize" "upgrade/${EXECUTION_MODE}/finalize.robot"
 callback with_this_version_finalized

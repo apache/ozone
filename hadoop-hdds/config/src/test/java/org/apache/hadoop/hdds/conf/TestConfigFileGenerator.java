@@ -21,9 +21,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Scanner;
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.SimpleJavaFileObject;
+import javax.tools.StandardJavaFileManager;
+import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test the ConfigFileGenerator.
@@ -33,6 +45,9 @@ import org.junit.jupiter.api.Test;
  * generated ozone-default-generated.xml
  */
 public class TestConfigFileGenerator {
+
+  @TempDir
+  private Path tempDir;
 
   @Test
   public void testGeneratedXml() throws FileNotFoundException {
@@ -48,5 +63,48 @@ public class TestConfigFileGenerator {
 
     assertThat(generatedXml)
         .contains("<tag>MANAGEMENT</tag>");
+  }
+
+  @Test
+  public void testDuplicatedKeyFailsCompilation() throws IOException {
+    JavaFileObject source = new SimpleJavaFileObject(
+        URI.create("string:///DuplicatedKeys.java"), JavaFileObject.Kind.SOURCE) {
+      @Override
+      public CharSequence getCharContent(boolean ignoreEncodingErrors) {
+        return "package org.apache.hadoop.hdds.conf;\n"
+            + "@ConfigGroup(prefix = \"ozone.test.config\")\n"
+            + "class DuplicatedKeys {\n"
+            + "  @ConfigGroup(prefix = \"ozone.test.config.nested\")\n"
+            + "  static class Nested {\n"
+            + "    @Config(key = \"ozone.test.config.nested.same\", defaultValue = \"1\",\n"
+            + "        description = \"first\", tags = {})\n"
+            + "    int first;\n"
+            + "    @Config(key = \"ozone.test.config.nested.same\", defaultValue = \"2\",\n"
+            + "        description = \"second\", tags = {})\n"
+            + "    int second;\n"
+            + "  }\n"
+            + "}\n";
+      }
+    };
+
+    JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+    DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
+    List<String> options = Arrays.asList(
+        "-proc:only",
+        "-processor", ConfigFileGenerator.class.getName(),
+        "-classpath", Config.class.getProtectionDomain().getCodeSource().getLocation().getPath(),
+        "-d", tempDir.toString());
+
+    try (StandardJavaFileManager files =
+        compiler.getStandardFileManager(diagnostics, null, null)) {
+      assertThat(compiler.getTask(null, files, diagnostics, options, null,
+          Arrays.asList(source)).call())
+          .isFalse();
+    }
+
+    assertThat(diagnostics.getDiagnostics())
+        .anyMatch(diagnostic ->
+            diagnostic.getMessage(null).contains(
+                "Duplicated config key 'ozone.test.config.nested.same'"));
   }
 }
