@@ -207,6 +207,38 @@ public interface Table<KEY, VALUE> {
     delete(endKey);
   }
 
+  /**
+   * Scan all entries whose key starts with {@code prefix} (all entries if
+   * null) using up to {@code numThreads} threads, as of a single consistent
+   * snapshot. The consumer may be called concurrently and must be
+   * thread-safe; there is no ordering guarantee across threads.
+   * When parallel scan is disabled by configuration, a single thread is used.
+   *
+   * @return the number of entries passed to the consumer.
+   */
+  default long parallelScan(KEY prefix, int numThreads,
+      java.util.function.Consumer<KeyValue<KEY, VALUE>> consumer)
+      throws RocksDatabaseException, CodecException {
+    return parallelScan(prefix, numThreads, IteratorType.KEY_AND_VALUE, consumer);
+  }
+
+  /**
+   * Same as {@link #parallelScan(Object, int, java.util.function.Consumer)},
+   * reading only the key and/or value components requested by {@code type}.
+   */
+  default long parallelScan(KEY prefix, int numThreads, IteratorType type,
+      java.util.function.Consumer<KeyValue<KEY, VALUE>> consumer)
+      throws RocksDatabaseException, CodecException {
+    long count = 0;
+    try (KeyValueIterator<KEY, VALUE> it = iterator(prefix, type)) {
+      while (it.hasNext()) {
+        consumer.accept(it.next());
+        count++;
+      }
+    }
+    return count;
+  }
+
   /** The same as iterator(null, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator() throws RocksDatabaseException, CodecException {
     return iterator(null, IteratorType.KEY_AND_VALUE);

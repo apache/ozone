@@ -673,6 +673,63 @@ public class TestRDBTableStore {
   }
 
   @Test
+  public void testPrefixedIteratorUsesNativeBounds() throws Exception {
+    Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFirst");
+    testTable.put(bytes("prefix-aa-key-01"), bytes("value-01"));
+    testTable.put(bytes("prefix-aa-key-02"), bytes("value-02"));
+    testTable.put(bytes("prefix-ab-key-01"), bytes("value-03"));
+    testTable.put(bytes("prefix-b-key-01"), bytes("value-04"));
+
+    try (Table.KeyValueIterator<byte[], byte[]> iter =
+             testTable.iterator(bytes("prefix-aa"))) {
+      List<String> keys = new ArrayList<>();
+      while (iter.hasNext()) {
+        keys.add(StringUtils.bytes2String(iter.next().getKey()));
+      }
+
+      assertEquals(Arrays.asList("prefix-aa-key-01", "prefix-aa-key-02"),
+          keys);
+
+      assertArrayEquals(bytes("prefix-aa-key-01"),
+          iter.seek(bytes("prefix-a0")).getKey());
+      assertArrayEquals(bytes("prefix-aa-key-01"),
+          iter.seek(bytes("prefix-aa-key-01")).getKey());
+      assertNull(iter.seek(bytes("prefix-ab")));
+      assertFalse(iter.hasNext());
+    }
+  }
+
+  @Test
+  public void testPrefixedIteratorReturnsExactlyPrefixKeysAcrossSsts()
+      throws Exception {
+    Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFirst");
+    // Neighbors just below and just above the prefix range, in separate SSTs.
+    testTable.put(new byte[] {'p', 0x00}, bytes("below"));
+    testTable.put(new byte[] {'q', (byte) 0xFF}, bytes("in-1"));
+    rdbStore.flushDB();
+    testTable.put(new byte[] {'q'}, bytes("in-0"));
+    testTable.put(new byte[] {'q', (byte) 0xFF, (byte) 0xFF}, bytes("in-2"));
+    testTable.put(new byte[] {'r'}, bytes("above"));
+    rdbStore.flushDB();
+    testTable.put(new byte[] {'r', 0x00}, bytes("above-2"));
+
+    List<byte[]> expected = Arrays.asList(new byte[] {'q'},
+        new byte[] {'q', (byte) 0xFF},
+        new byte[] {'q', (byte) 0xFF, (byte) 0xFF});
+    try (Table.KeyValueIterator<byte[], byte[]> iter =
+             testTable.iterator(new byte[] {'q'})) {
+      List<byte[]> keys = new ArrayList<>();
+      while (iter.hasNext()) {
+        keys.add(iter.next().getKey());
+      }
+      assertEquals(expected.size(), keys.size());
+      for (int i = 0; i < expected.size(); i++) {
+        assertArrayEquals(expected.get(i), keys.get(i));
+      }
+    }
+  }
+
+  @Test
   public void testStringPrefixedIterator() throws Exception {
     final int prefixCount = 3;
     final int keyCount = 5;
@@ -907,6 +964,10 @@ public class TestRDBTableStore {
             entry.getValue().getBytes(StandardCharsets.UTF_8));
       }
     }
+  }
+
+  private static byte[] bytes(String value) {
+    return value.getBytes(StandardCharsets.UTF_8);
   }
 
   private void populateTable(Table<String, String> table,

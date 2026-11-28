@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSnapshot;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -834,6 +835,30 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
+  /**
+   * Take a snapshot of the DB. The caller must close the returned snapshot,
+   * which releases it and the DB reference it holds.
+   */
+  public ManagedSnapshot newSnapshot() throws RocksDatabaseException {
+    final UncheckedAutoCloseable ref = acquire();
+    try {
+      return ManagedSnapshot.newSnapshot(db, ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
+    }
+  }
+
+  /** Throw if the iterator has encountered an error, e.g. an I/O error. */
+  static void checkStatus(ManagedRocksIterator iterator, Object name)
+      throws RocksDatabaseException {
+    try {
+      iterator.get().status();
+    } catch (RocksDBException e) {
+      throw toRocksDatabaseException(name, "iterator.status", e);
+    }
+  }
+
   public ManagedRocksIterator newIterator(ColumnFamily family)
       throws RocksDatabaseException {
     final UncheckedAutoCloseable ref = acquire();
@@ -850,6 +875,17 @@ public final class RocksDatabase implements Closeable {
     final UncheckedAutoCloseable ref = acquire();
     try (ManagedReadOptions readOptions = new ManagedReadOptions()) {
       readOptions.setFillCache(fillCache);
+      return managed(db.get().newIterator(family.getHandle(), readOptions), ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
+    }
+  }
+
+  public ManagedRocksIterator newIterator(ColumnFamily family,
+      ManagedReadOptions readOptions) throws RocksDatabaseException {
+    final UncheckedAutoCloseable ref = acquire();
+    try {
       return managed(db.get().newIterator(family.getHandle(), readOptions), ref);
     } catch (RuntimeException e) {
       ref.close();

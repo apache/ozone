@@ -136,6 +136,25 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public long parallelScan(KEY prefix, int numThreads, IteratorType type,
+      java.util.function.Consumer<KeyValue<KEY, VALUE>> consumer)
+      throws RocksDatabaseException, CodecException {
+    // Note: reads RocksDB only; the table cache is not consulted.
+    return rawTable.parallelScan(encodeKey(prefix), numThreads, type, kv -> {
+      try {
+        final KEY key = type.readKey() ? decodeKey(kv.getKey()) : null;
+        final byte[] valueBytes = kv.getValue();
+        final KeyValue<KEY, VALUE> typed = !type.readValue() || valueBytes == null
+            ? Table.newKeyValue(key, null)
+            : Table.newKeyValue(key, decodeValue(valueBytes), valueBytes.length);
+        consumer.accept(typed);
+      } catch (CodecException e) {
+        throw new IllegalStateException("Failed to decode entry in " + TypedTable.this, e);
+      }
+    });
+  }
+
+  @Override
   public void put(KEY key, VALUE value) throws RocksDatabaseException, CodecException {
     if (supportCodecBuffer) {
       try (CodecBuffer k = keyCodec.toDirectCodecBuffer(key);

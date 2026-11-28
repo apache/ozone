@@ -741,6 +741,25 @@
     </description>
   </property>
   <property>
+    <name>ozone.metadata.db.parallel.scan.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM, SCM, RECON, STORAGE, PERFORMANCE</tag>
+    <description>
+      Enable snapshot-consistent multi-threaded RocksDB table scans via
+      Table#parallelScan. When disabled, parallelScan falls back to a
+      single-threaded scan.
+    </description>
+  </property>
+  <property>
+    <name>ozone.metadata.db.parallel.scan.max.threads</name>
+    <value>4</value>
+    <tag>OZONE, OM, SCM, RECON, STORAGE, PERFORMANCE</tag>
+    <description>
+      Maximum number of worker threads used by a single Table#parallelScan
+      invocation when ozone.metadata.db.parallel.scan.enabled is true.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.db.dirs</name>
     <value/>
     <tag>OZONE, SCM, STORAGE, PERFORMANCE</tag>

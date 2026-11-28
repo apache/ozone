@@ -78,6 +78,7 @@ public class RDBStore implements DBStore {
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
   private final boolean readOnly;
+  private final ParallelScanConfig parallelScanConfig;
 
   @SuppressWarnings("parameternumber")
   RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
@@ -94,6 +95,7 @@ public class RDBStore implements DBStore {
     Objects.requireNonNull(families, "families == null");
     Preconditions.checkArgument(!families.isEmpty());
     this.maxDbUpdatesSizeThreshold = maxDbUpdatesSizeThreshold;
+    this.parallelScanConfig = ParallelScanConfig.from(configuration);
     dbLocation = dbFile;
     this.dbOptions = dbOptions;
     this.statistics = statistics;
@@ -288,7 +290,7 @@ public class RDBStore implements DBStore {
     if (handle == null) {
       throw new RocksDatabaseException("No such table in this DB. TableName : " + name);
     }
-    return new RDBTable(this.db, handle, rdbMetrics);
+    return new RDBTable(this.db, handle, rdbMetrics, parallelScanConfig);
   }
 
   @Override
@@ -302,7 +304,7 @@ public class RDBStore implements DBStore {
   public List<Table<?, ?>> listTables() {
     final List<Table<?, ?>> returnList = new ArrayList<>();
     for (ColumnFamily family : getColumnFamilies()) {
-      returnList.add(new RDBTable(db, family, rdbMetrics));
+      returnList.add(new RDBTable(db, family, rdbMetrics, parallelScanConfig));
     }
     return returnList;
   }

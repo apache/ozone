@@ -17,20 +17,22 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.util.Arrays;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 
 /**
  * RocksDB store iterator using the byte[] API.
  */
 class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
-  private static byte[] copyPrefix(byte[] prefix) {
-    return prefix == null || prefix.length == 0 ? null : Arrays.copyOf(prefix, prefix.length);
+  RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
+      RDBTable table, byte[] prefix, IteratorType type) {
+    this(iterator, table, prefix, type, null);
   }
 
   RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
-      RDBTable table, byte[] prefix, IteratorType type) {
-    super(iterator, table, copyPrefix(prefix), type);
+      RDBTable table, byte[] prefix, IteratorType type,
+      ManagedReadOptions readOptions) {
+    super(iterator, table, copyNonEmpty(prefix), type, readOptions);
   }
 
   @Override
@@ -77,5 +79,24 @@ class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
       }
     }
     return true;
+  }
+
+  @Override
+  boolean isBeforePrefix(byte[] key) {
+    final byte[] prefix = getPrefix();
+    if (prefix == null) {
+      return false;
+    }
+    if (key == null) {
+      return true;
+    }
+    final int n = Math.min(key.length, prefix.length);
+    for (int i = 0; i < n; i++) {
+      final int c = (key[i] & 0xFF) - (prefix[i] & 0xFF);
+      if (c != 0) {
+        return c < 0;
+      }
+    }
+    return key.length < prefix.length;
   }
 }
