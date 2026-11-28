@@ -82,6 +82,7 @@ import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -452,9 +453,17 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
         StreamingOutput output = dest -> {
           try (OzoneInputStream ozoneInputStream = keyDetails.getContent()) {
-            ozoneInputStream.seek(startOffset);
-            long readLength = IOUtils.copyLarge(ozoneInputStream, dest, 0,
-                copyLength, new byte[getIOBufferSize(copyLength)]);
+            byte[] buffer = new byte[getIOBufferSize(copyLength)];
+            long readLength;
+            if (buffer.length == copyLength && ozoneInputStream.hasCapability(StreamCapabilities.PREADBYTEBUFFER)) {
+              // A positioned read asks the datanode for the range only, without pre-read.
+              ozoneInputStream.readFully(startOffset, buffer);
+              dest.write(buffer);
+              readLength = buffer.length;
+            } else {
+              ozoneInputStream.seek(startOffset);
+              readLength = IOUtils.copyLarge(ozoneInputStream, dest, 0, copyLength, buffer);
+            }
             getMetrics().incGetKeySuccessLength(readLength);
             perf.appendSizeBytes(readLength);
           }

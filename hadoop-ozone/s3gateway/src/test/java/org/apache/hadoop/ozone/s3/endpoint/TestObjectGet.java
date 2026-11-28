@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
@@ -45,24 +46,35 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.hadoop.fs.ByteBufferPositionedReadable;
+import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneClientTestUtils;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
@@ -372,6 +384,108 @@ public class TestObjectGet {
         response.getHeaderString("Content-Range"));
 
     assertNull(response.getHeaderString(TAG_COUNT_HEADER));
+  }
+
+  @Test
+  public void getRangeWithPositionedRead() throws IOException, OS3Exception {
+    PositionedStream stream = new PositionedStream();
+
+    assertEquals("2345", getRange("bytes=2-5", stream));
+    assertThat(stream.positionedReads()).containsExactly("2+4");
+    assertThat(stream.seeks()).isEmpty();
+  }
+
+  @Test
+  public void getRangeLargerThanBuffer() throws IOException, OS3Exception {
+    PositionedStream stream = new PositionedStream();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_S3G_CLIENT_BUFFER_SIZE_KEY, "3B");
+
+    assertEquals("2345", getRange("bytes=2-5", stream, conf));
+    assertThat(stream.seeks()).containsExactly(2L);
+    assertThat(stream.positionedReads()).isEmpty();
+  }
+
+  @Test
+  public void getRangeWithoutPositionedRead() throws IOException, OS3Exception {
+    SeekableStream stream = new SeekableStream();
+
+    assertEquals("2345", getRange("bytes=2-5", stream));
+    assertThat(stream.seeks()).containsExactly(2L);
+  }
+
+  private String getRange(String range, InputStream stream) throws IOException, OS3Exception {
+    return getRange(range, stream, new OzoneConfiguration());
+  }
+
+  private String getRange(String range, InputStream stream, OzoneConfiguration conf) throws IOException, OS3Exception {
+    OzoneKeyDetails keyDetails = spy(bucket.getKey(KEY_NAME));
+    doReturn(new OzoneInputStream(stream)).when(keyDetails).getContent();
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    when(proxy.getS3KeyDetails(BUCKET_NAME, KEY_NAME)).thenReturn(keyDetails);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
+
+    try (OzoneClient client = new OzoneClient(conf, proxy)) {
+      ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+          .setClient(client)
+          .setHeaders(headers)
+          .setConfig(conf)
+          .build();
+      ByteArrayOutputStream output = new ByteArrayOutputStream();
+      ((StreamingOutput) get(endpoint, BUCKET_NAME, KEY_NAME).getEntity()).write(output);
+      return output.toString(UTF_8);
+    }
+  }
+
+  /** Key stream that records seek positions. */
+  private static class SeekableStream extends ByteArrayInputStream implements Seekable {
+    private final List<Long> seeks = new ArrayList<>();
+
+    SeekableStream() {
+      super(CONTENT.getBytes(UTF_8));
+    }
+
+    List<Long> seeks() {
+      return seeks;
+    }
+
+    @Override
+    public synchronized void seek(long newPos) {
+      seeks.add(newPos);
+      pos = (int) newPos;
+    }
+
+    @Override
+    public synchronized long getPos() {
+      return pos;
+    }
+
+    @Override
+    public boolean seekToNewSource(long targetPos) {
+      return false;
+    }
+  }
+
+  /** Key stream with positioned reads, recorded as {@code offset+length}. */
+  private static final class PositionedStream extends SeekableStream implements ByteBufferPositionedReadable {
+    private final List<String> positionedReads = new ArrayList<>();
+
+    List<String> positionedReads() {
+      return positionedReads;
+    }
+
+    @Override
+    public synchronized int read(long position, ByteBuffer dst) {
+      positionedReads.add(position + "+" + dst.remaining());
+      int length = Math.min(dst.remaining(), count - (int) position);
+      dst.put(buf, (int) position, length);
+      return length;
+    }
+
+    @Override
+    public void readFully(long position, ByteBuffer dst) {
+      read(position, dst);
+    }
   }
 
   @Test
