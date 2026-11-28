@@ -492,6 +492,7 @@ BSD 3-Clause
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer
+   libzstd (bundled in com.github.luben:zstd-jni)
    org.jline:jline3
    org.ow2.asm:asm
    org.ow2.asm:asm-analysis
