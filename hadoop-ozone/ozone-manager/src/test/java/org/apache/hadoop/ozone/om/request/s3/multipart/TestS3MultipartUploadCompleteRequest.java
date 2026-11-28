@@ -650,6 +650,56 @@ public class TestS3MultipartUploadCompleteRequest
   }
 
   @Test
+  public void testPartsRenumberedSequentiallyOnComplete() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OMClientResponse initiateResponse = getS3InitiateMultipartUploadReq(
+        doPreExecuteInitiateMPU(volumeName, bucketName, keyName)).validateAndUpdateCache(ozoneManager, 1L);
+    String uploadID = initiateResponse.getOMResponse().getInitiateMultiPartUploadResponse().getMultipartUploadID();
+
+    Map<Integer, String> partETags = new HashMap<>();
+    long trxnLogIndex = 2L;
+    // Upload parts with non-contiguous part numbers 1, 3 and 5.
+    for (int partNumber : new int[] {1, 3, 5}) {
+      long clientID = Time.now() + partNumber;
+      KeyLocation keyLocation = createKeyLocation(1000L + partNumber, 100L + partNumber);
+      OMRequest commit = doPreExecuteCommitMPU(volumeName, bucketName, keyName,
+          clientID, uploadID, partNumber, Collections.singletonList(keyLocation));
+      addKeyToTable(volumeName, bucketName, keyName, clientID,
+          Collections.singletonList(OmKeyLocationInfo.getFromProtobuf(keyLocation)));
+      getS3MultipartUploadCommitReq(commit).validateAndUpdateCache(ozoneManager, trxnLogIndex++);
+      partETags.put(partNumber, commit.getCommitMultiPartUploadRequest().getKeyArgs().getMetadataList().stream()
+          .filter(kv -> kv.getKey().equals(OzoneConsts.ETAG)).findFirst().get().getValue());
+    }
+
+    List<Part> parts = Arrays.asList(
+        Part.newBuilder().setETag(partETags.get(1)).setPartName(partETags.get(1)).setPartNumber(1).build(),
+        Part.newBuilder().setETag(partETags.get(3)).setPartName(partETags.get(3)).setPartNumber(3).build(),
+        Part.newBuilder().setETag(partETags.get(5)).setPartName(partETags.get(5)).setPartNumber(5).build());
+    OMClientResponse completeResponse = getS3MultipartUploadCompleteReq(
+        doPreExecuteCompleteMPU(volumeName, bucketName, keyName, uploadID, parts))
+        .validateAndUpdateCache(ozoneManager, trxnLogIndex);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, completeResponse.getOMResponse().getStatus());
+
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    completeResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    OmKeyInfo completedKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName));
+    assertNotNull(completedKeyInfo);
+    List<OmKeyLocationInfo> locations = completedKeyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
+    // Parts uploaded as 1, 3 and 5 are renumbered to 1..3 at completion, keeping the ascending order of the data.
+    assertEquals(Arrays.asList(1, 2, 3),
+        locations.stream().map(OmKeyLocationInfo::getPartNumber).collect(Collectors.toList()));
+    assertEquals(Arrays.asList(1001L, 1003L, 1005L),
+        locations.stream().map(OmKeyLocationInfo::getContainerID).collect(Collectors.toList()));
+  }
+
+  @Test
   public void testValidateAndUpdateCacheVolumeNotFound() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
