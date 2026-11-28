@@ -199,6 +199,13 @@ public enum S3ErrorTable {
   INVALID_DIGEST(
       "InvalidDigest", "The Content-MD5 you specified is not valid.", HTTP_BAD_REQUEST),
 
+  INCOMPLETE_BODY(
+      "IncompleteBody", "You did not provide the number of bytes specified by the Content-Length HTTP header.",
+      HTTP_BAD_REQUEST),
+
+  MALFORMED_TRAILER_ERROR(
+      "MalformedTrailerError", "The request contained malformed trailing data.", HTTP_BAD_REQUEST),
+
   /** STS: Code {@code ValidationError}; message is usually overridden via {@link OS3Exception#withMessage}. */
   STS_VALIDATION_ERROR(
       "ValidationError", "A validation error occurred.", HTTP_BAD_REQUEST),

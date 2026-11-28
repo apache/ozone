@@ -150,7 +150,7 @@ public class SignedChunksInputStream extends AwsChunkedInputStream {
     // 10000 will be read and decoded from base-16 representation to 65536, which is the size of
     // the subsequent chunk payload.
     signatureLine = signatureLine.trim();
-    if (signatureLine.isEmpty()) {
+    if (signatureLine.isEmpty() && !requiresCompletion()) {
       return -1;
     }
 
@@ -160,18 +160,19 @@ public class SignedChunksInputStream extends AwsChunkedInputStream {
       throw invalidBody("Invalid signature line: " + signatureLine);
     }
     chunkSignature = matcher.group(2);
-    return Integer.parseInt(matcher.group(1), 16);
+    try {
+      return Long.parseLong(matcher.group(1), 16);
+    } catch (NumberFormatException ex) {
+      throw invalidBody("Invalid signed chunk size");
+    }
   }
 
   @Override
   void readTrailerSignature(String name, String value) throws IOException {
     String signatureLine = readTrailerLine();
-    if (signatureLine == null) {
-      throw invalidBody("Missing trailing signature");
-    }
     Matcher matcher = TRAILER_SIGNATURE_PATTERN.matcher(signatureLine.trim());
     if (!matcher.matches()) {
-      throw invalidBody("Invalid trailing signature");
+      throw malformedTrailer("Invalid trailing signature");
     }
     if (validator != null) {
       validator.validateTrailer(matcher.group(1), DigestUtils.sha256Hex(name + ":" + value + "\n"));

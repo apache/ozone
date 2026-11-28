@@ -189,9 +189,15 @@ public abstract class AwsChunkedInputStream extends InputStream {
    * The message is specific; the S3 error code is the generic InvalidRequest (HTTP 400).
    */
   OS3Exception invalidBody(String message) {
-    OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyPath);
-    ex.setErrorMessage(message);
-    return ex;
+    return bodyError(S3ErrorTable.INVALID_REQUEST, message);
+  }
+
+  OS3Exception malformedTrailer(String message) {
+    return bodyError(S3ErrorTable.MALFORMED_TRAILER_ERROR, message);
+  }
+
+  private OS3Exception bodyError(S3ErrorTable error, String message) {
+    return S3ErrorTable.newError(error, keyPath).withMessage(message);
   }
 
   private void stopAtUnexpectedEof() throws IOException {
@@ -219,20 +225,29 @@ public abstract class AwsChunkedInputStream extends InputStream {
   }
 
   /**
-   * A verified stream must end with the terminating 0-byte chunk. Reaching EOF before it means the
-   * body was truncated, so the payload could not be fully verified. Unverified streams without a
+   * A verified stream must end with the terminating 0-byte chunk and, when declared, its complete trailer.
+   * Reaching EOF before completion means the payload could not be fully verified. Unverified streams without a
    * declared trailer keep their lenient behavior.
    */
   private void checkNotTruncated() throws IOException {
     if (requiresCompletion()) {
-      throw invalidBody("Chunked stream ended before the terminating 0-byte chunk");
+      throw bodyError(S3ErrorTable.INCOMPLETE_BODY, "Chunked stream ended before completion");
     }
   }
 
   private void readChunkTerminator() throws IOException {
     int carriageReturn = originalStream.read();
+    if (requiresCompletion() && carriageReturn != '\r') {
+      if (carriageReturn == -1) {
+        checkNotTruncated();
+      }
+      throw invalidBody("Invalid chunk data terminator");
+    }
     int lineFeed = originalStream.read();
-    if (requiresCompletion() && (carriageReturn != '\r' || lineFeed != '\n')) {
+    if (requiresCompletion() && lineFeed != '\n') {
+      if (lineFeed == -1) {
+        checkNotTruncated();
+      }
       throw invalidBody("Invalid chunk data terminator");
     }
   }
@@ -240,32 +255,32 @@ public abstract class AwsChunkedInputStream extends InputStream {
   /** Check framing, authenticate the trailer if possible, then compare its checksum after the final terminator. */
   private void readTrailer() throws IOException {
     String trailerLine = readTrailerLine();
-    if (trailerLine == null || trailerLine.isEmpty()) {
-      throw invalidBody("Missing trailing checksum header");
+    if (trailerLine.isEmpty()) {
+      throw malformedTrailer("Missing trailing checksum header");
     }
     int separator = trailerLine.indexOf(':');
     if (separator <= 0) {
-      throw invalidBody("Invalid trailing header: " + trailerLine);
+      throw malformedTrailer("Invalid trailing header: " + trailerLine);
     }
     String name = trailerLine.substring(0, separator).trim().toLowerCase(Locale.ROOT);
     String value = trailerLine.substring(separator + 1).trim();
     if (!trailerHeader.getHeaderName().equals(name)) {
-      throw invalidBody("Unexpected trailing header: " + name);
+      throw malformedTrailer("Unexpected trailing header: " + name);
     }
     readTrailerSignature(name, value);
     byte[] expected = trailerHeader.decodeValue(value, keyPath);
     // AWS SDKs terminate the trailer section with a blank line.
     if (!"".equals(readTrailerLine())) {
-      throw invalidBody("Invalid trailer terminator");
+      throw malformedTrailer("Invalid trailer terminator");
     }
     if (originalStream.read() != -1) {
-      throw invalidBody("Unexpected data after trailer terminator");
+      throw malformedTrailer("Unexpected data after trailer terminator");
     }
     payloadChecksum.verify(expected, keyPath);
     trailerChecksum = expected;
   }
 
-  /** Read a line of the trailer section, or null at the end of the stream. */
+  /** Read a line of the trailer section. A declared trailer must be complete, so EOF fails as IncompleteBody. */
   String readTrailerLine() throws IOException {
     return readLine(true);
   }
@@ -276,17 +291,13 @@ public abstract class AwsChunkedInputStream extends InputStream {
     while (true) {
       int current = originalStream.read();
       if (current == -1) {
-        if (trailingHeader && requiresCompletion() && line.length() > 0) {
-          throw invalidBody("Truncated trailing header");
-        }
-        if (!trailingHeader) {
-          checkNotTruncated();
-        }
+        checkNotTruncated();
         return line.length() == 0 ? null : line.toString();
       }
       line.append((char) current);
       if (line.length() > MAX_LINE_LENGTH) {
-        throw invalidBody("Chunk or trailing header line is too long");
+        String message = "Chunk or trailing header line is too long";
+        throw trailingHeader ? malformedTrailer(message) : invalidBody(message);
       }
       if (eol(previous, current)) {
         line.setLength(line.length() - 2);
