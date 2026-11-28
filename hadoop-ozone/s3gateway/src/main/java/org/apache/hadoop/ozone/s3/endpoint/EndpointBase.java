@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.MISSING_METADATA_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -58,6 +59,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nullable;
+import jakarta.mail.internet.MimeUtility;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -470,7 +472,9 @@ public abstract class EndpointBase {
           throw ex;
         }
         List<String> values = requestHeaders.get(key);
-        String value = StringUtils.join(values, ",");
+        String value = values.stream()
+            .map(EndpointBase::decodeRfc2047MetadataValue)
+            .collect(Collectors.joining(","));
         sizeInBytes += mapKey.getBytes(UTF_8).length;
         sizeInBytes += value.getBytes(UTF_8).length;
 
@@ -487,6 +491,29 @@ public abstract class EndpointBase {
         remapReservedMetadataKey(customMetadata, headerName, customKey));
 
     return customMetadata;
+  }
+
+  private static String decodeRfc2047MetadataValue(String value) {
+    try {
+      return MimeUtility.decodeText(value);
+    } catch (UnsupportedEncodingException ex) {
+      return value;
+    }
+  }
+
+  private static String encodeRfc2047MetadataValue(String value) {
+    if (value.chars().allMatch(EndpointBase::isSafeAsciiMetadataCharacter)) {
+      return value;
+    }
+    try {
+      return MimeUtility.encodeText(value, "UTF-8", "Q");
+    } catch (UnsupportedEncodingException ex) {
+      throw new IllegalStateException("Failed to encode S3 metadata", ex);
+    }
+  }
+
+  private static boolean isSafeAsciiMetadataCharacter(int value) {
+    return value == '\t' || value >= ' ' && value <= '~';
   }
 
   /**
@@ -509,6 +536,7 @@ public abstract class EndpointBase {
       Response.ResponseBuilder responseBuilder, OzoneKey key) {
 
     Map<String, String> metadata = key.getMetadata();
+    int missingMetadataCount = 0;
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
       String metadataKey = entry.getKey();
       // System ETag / Content-Type are returned via their own response header, the SSE algorithm via the SSE header.
@@ -516,11 +544,18 @@ public abstract class EndpointBase {
           || ServerSideEncryption.ALGORITHM_METADATA_KEY.equals(metadataKey)) {
         continue;
       }
+      if (entry.getValue().codePoints().anyMatch(Character::isISOControl)) {
+        missingMetadataCount++;
+        continue;
+      }
       // Rebuild a remapped user value (e.g. ozone-s3-internal-content-type -> content-type).
       metadataKey = REBUILT_RESERVED_KEYS.getOrDefault(metadataKey, metadataKey);
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
-              entry.getValue());
+              encodeRfc2047MetadataValue(entry.getValue()));
+    }
+    if (missingMetadataCount > 0) {
+      responseBuilder.header(MISSING_METADATA_HEADER, missingMetadataCount);
     }
   }
 

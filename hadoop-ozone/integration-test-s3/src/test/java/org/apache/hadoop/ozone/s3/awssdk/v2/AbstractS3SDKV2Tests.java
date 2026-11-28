@@ -540,6 +540,22 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
   }
 
   @Test
+  public void testPutObjectWithRfc2047Metadata() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String encodedMetadataValue = "=?UTF-8?B?Y2Fmw6k=?=";
+    final String responseMetadataValue = "=?UTF-8?Q?caf=C3=A9?=";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName)
+            .metadata(Collections.singletonMap("meta1", encodedMetadataValue)),
+        RequestBody.fromString("bar"));
+
+    HeadObjectResponse response = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+    assertEquals(responseMetadataValue, response.metadata().get("meta1"));
+  }
+
+  @Test
   public void testPutDirectoryWithTrailingChecksum() throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName() + "/";

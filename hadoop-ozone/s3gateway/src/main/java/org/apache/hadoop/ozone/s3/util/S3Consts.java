@@ -91,6 +91,7 @@ public final class S3Consts {
 
   // Constants related to custom metadata
   public static final String CUSTOM_METADATA_HEADER_PREFIX = "x-amz-meta-";
+  public static final String MISSING_METADATA_HEADER = "x-amz-missing-meta";
   /**
    * Prefix for internal metadata keys that store remapped user x-amz-meta values
    * colliding with system headers. Users must not set metadata keys with this prefix.

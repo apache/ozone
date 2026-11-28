@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MODIFIED_SINCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.MISSING_METADATA_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
@@ -280,6 +281,88 @@ public class TestObjectGet {
     Response response = get(rest, BUCKET_NAME, keyName);
     assertEquals(metaValue,
         response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
+  }
+
+  @Test
+  public void getKeyWithQEncodedRfc2047CustomMetadata()
+      throws IOException, OS3Exception {
+    final String keyName = "key-with-rfc2047-meta";
+    final String metaValue = "Hello Worldé";
+    final String encodedMetaValue = "=?UTF-8?Q?Hello_World=C3=A9?=";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1",
+        encodedMetaValue);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+
+    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
+
+    assertEquals(metaValue, bucket.getKey(keyName).getMetadata().get("meta1"));
+    Response response = get(rest, BUCKET_NAME, keyName);
+    assertEquals(encodedMetaValue,
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
+  }
+
+  @Test
+  public void getKeyWithBase64Rfc2047CustomMetadata()
+      throws IOException, OS3Exception {
+    final String keyName = "key-with-base64-rfc2047-meta";
+    final String metaValue = "café";
+    final String encodedMetaValue = "=?UTF-8?B?Y2Fmw6k=?=";
+    final String responseMetaValue = "=?UTF-8?Q?caf=C3=A9?=";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1",
+        encodedMetaValue);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+
+    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
+
+    assertEquals(metaValue, bucket.getKey(keyName).getMetadata().get("meta1"));
+    Response response = get(rest, BUCKET_NAME, keyName);
+    assertEquals(responseMetaValue,
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
+  }
+
+  @Test
+  public void getKeyOmitsRfc2047EncodedLineBreaks() throws IOException, OS3Exception {
+    final String keyName = "key-with-line-break-metadata";
+    final String encodedMetaValue = "=?UTF-8?B?YQ0KYg==?=";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1", encodedMetaValue);
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta2", "printable");
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+
+    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
+
+    assertEquals("a\r\nb", bucket.getKey(keyName).getMetadata().get("meta1"));
+    Response response = get(rest, BUCKET_NAME, keyName);
+    assertNull(response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
+    assertEquals("printable", response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta2"));
+    assertEquals("1", response.getHeaderString(MISSING_METADATA_HEADER));
+
+    Response headResponse = rest.head(BUCKET_NAME, keyName);
+    assertNull(headResponse.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
+    assertEquals("printable", headResponse.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta2"));
+    assertEquals("1", headResponse.getHeaderString(MISSING_METADATA_HEADER));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "'=?UTF-8?Q?a?b?=', 'a?b'",
+      "'=?UTF-8?Q??=', ''",
+      "'=?UTF-8?Q?a?= =?UTF-8?Q?b?=', 'ab'",
+      "'=?UTF-8?Q?=GZ?=', '=?UTF-8?Q?=GZ?='",
+      "'=?UNKNOWN?Q?abc?=', '=?UNKNOWN?Q?abc?='"
+  })
+  public void getKeyDecodesRfc2047Metadata(String encodedValue, String expectedValue)
+      throws IOException, OS3Exception {
+    final String keyName = "key-with-rfc2047-meta";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1", encodedValue);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+
+    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
+
+    assertEquals(expectedValue, bucket.getKey(keyName).getMetadata().get("meta1"));
   }
 
   @Test
