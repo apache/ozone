@@ -346,7 +346,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   static ByteBuffer getByteBuffer(ReadBlockResponseProto proto, long blockOffset) {
     final ByteBuffer buffer = proto.getData().asReadOnlyByteBuffer();
-    // Adjust buffer position since the server always returns data starting at checksum boundary.
+    // Adjust buffer position: with checksums sent or verified, the response may start at an earlier checksum boundary.
     final long protoOffset = proto.getOffset();
     if (blockOffset < protoOffset) {
       // This can happen after seek, just drop it for now

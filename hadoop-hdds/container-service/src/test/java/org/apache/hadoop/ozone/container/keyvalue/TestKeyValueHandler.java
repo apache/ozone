@@ -1798,19 +1798,34 @@ public class TestKeyValueHandler {
       assertResponses(withChecksums, 3, 9);
       assertResponses(fixture.read(request.setIncludeChecksums(true)), 3, 9);
       ReadBlockResult withoutChecksums = fixture.read(request.setIncludeChecksums(false));
-      assertNull(withoutChecksums.getResponse());
-      assertThat(withoutChecksums.getErrors()).isEmpty();
-      assertEquals(withChecksums.getDataResponses().size(), withoutChecksums.getDataResponses().size());
-      for (int i = 0; i < withChecksums.getDataResponses().size(); i++) {
-        ContainerProtos.ReadBlockResponseProto expected = withChecksums.getDataResponses().get(i).getReadBlock();
-        assertEquals(expected.toBuilder().clearChunkInfoList().build(),
-            withoutChecksums.getDataResponses().get(i).getReadBlock());
+      if (validateChecksums) {
+        // The datanode verifies, so the ranges stay aligned; only the chunk infos are left out.
+        assertNull(withoutChecksums.getResponse());
+        assertThat(withoutChecksums.getErrors()).isEmpty();
+        assertEquals(withChecksums.getDataResponses().size(), withoutChecksums.getDataResponses().size());
+        for (int i = 0; i < withChecksums.getDataResponses().size(); i++) {
+          ContainerProtos.ReadBlockResponseProto expected = withChecksums.getDataResponses().get(i).getReadBlock();
+          assertEquals(expected.toBuilder().clearChunkInfoList().build(),
+              withoutChecksums.getDataResponses().get(i).getReadBlock());
+        }
+      } else {
+        // Nothing sends or verifies checksums: exactly the requested bytes, in responseDataSize pieces.
+        assertNull(withoutChecksums.getResponse());
+        assertThat(withoutChecksums.getErrors()).isEmpty();
+        assertEquals(2, withoutChecksums.getDataResponses().size());
+        long expectedOffset = 4;
+        for (ContainerCommandResponseProto response : withoutChecksums.getDataResponses()) {
+          assertEquals(expectedOffset, response.getReadBlock().getOffset());
+          assertArrayEquals(writtenBytes(expectedOffset, 4), response.getReadBlock().getData().toByteArray());
+          assertEquals(0, response.getReadBlock().getChunkInfoListCount());
+          expectedOffset += 4;
+        }
       }
 
       File file = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(
           fixture.container.getContainerData(), fixture.blockID, "unused");
       try (java.io.RandomAccessFile corrupt = new java.io.RandomAccessFile(file, "rw")) {
-        corrupt.seek(3);
+        corrupt.seek(4);
         corrupt.write(255);
       }
       ReadBlockResult corrupt = fixture.read(request);
