@@ -19,6 +19,10 @@ package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.util.ProtobufUtils.computeLongSizeWithTag;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -36,6 +40,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -89,6 +94,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final ScmBlockLocationProtocol scmClient;
 
   private int keyLimitPerTask;
+  private final long scmFollowerLagThrottleThreshold;
+  private final int throttledLimitPerTask;
+  private final AtomicBoolean throttledBySCMLag = new AtomicBoolean();
   private final AtomicLong deletedKeyCount;
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
@@ -111,6 +119,15 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
     Preconditions.checkArgument(keyLimitPerTask >= 0,
         OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
+    this.scmFollowerLagThrottleThreshold = conf.getInt(
+        OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD,
+        OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD_DEFAULT);
+    int throttledLimit = conf.getInt(
+        OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK,
+        OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK_DEFAULT);
+    Preconditions.checkArgument(throttledLimit > 0,
+        OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK + " must be positive.");
+    this.throttledLimitPerTask = throttledLimit;
     this.deletedKeyCount = new AtomicLong(0);
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
@@ -524,6 +541,35 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   }
 
   /**
+   * Returns the per-task key deletion limit for this run, reduced to
+   * {@code throttledLimitPerTask} when SCM reports its Ratis follower
+   * apply lag at or above the configured threshold.
+   */
+  int getEffectiveKeyLimitPerTask() {
+    if (scmFollowerLagThrottleThreshold <= 0) {
+      return keyLimitPerTask;
+    }
+    long lag = scmClient.getLastKnownFollowerApplyLag();
+    if (lag >= scmFollowerLagThrottleThreshold) {
+      int effective = Math.min(keyLimitPerTask, throttledLimitPerTask);
+      if (effective < keyLimitPerTask) {
+        getMetrics().incrNumKeyDeletionThrottledBySCMLag();
+        if (!throttledBySCMLag.getAndSet(true)) {
+          LOG.info("Throttling block deletion to SCM: follower apply lag {} >= threshold {}; "
+              + "reducing keys per task from {} to {}.", lag, scmFollowerLagThrottleThreshold,
+              keyLimitPerTask, effective);
+        }
+      }
+      return effective;
+    }
+    if (throttledBySCMLag.getAndSet(false)) {
+      LOG.info("Stopped throttling block deletion to SCM: follower apply lag {} < threshold {}.",
+          lag, scmFollowerLagThrottleThreshold);
+    }
+    return keyLimitPerTask;
+  }
+
+  /**
    * A key deleting task scans OM DB and looking for a certain number of
    * pending-deletion keys, sends these keys along with their associated blocks
    * to SCM for deletion. Once SCM confirms keys are deleted (once SCM persisted
@@ -682,7 +728,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         } else {
           LOG.debug("Running KeyDeletingService for snapshot : {}, {}", snapshotId, run);
         }
-        int remainNum = keyLimitPerTask;
+        int remainNum = getEffectiveKeyLimitPerTask();
         OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
         SnapshotInfo snapInfo = null;
         try {

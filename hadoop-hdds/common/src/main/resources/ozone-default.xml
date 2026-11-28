@@ -503,6 +503,29 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.key.deleting.scm.follower.lag.throttle.threshold</name>
+    <value>100000</value>
+    <tag>OM, DELETION</tag>
+    <description>
+      When SCM reports that any of its Ratis followers is behind in applying
+      committed Raft log entries by at least this many entries, OM throttles
+      key block deletion to SCM by sending fewer keys per task run (see
+      ozone.om.key.deleting.scm.lag.throttled.limit.per.task).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.key.deleting.scm.lag.throttled.limit.per.task</name>
+    <value>1000</value>
+    <tag>OM, DELETION</tag>
+    <description>
+      The reduced value of ozone.key.deleting.limit.per.task used by the key
+      deleting service while SCM follower apply lag is at or above
+      ozone.om.key.deleting.scm.follower.lag.throttle.threshold. Must be greater
+      than 0 so OM keeps sending smaller batches to SCM and keeps receiving
+      fresh lag readings, allowing it to stop throttling once the lag clears.
+    </description>
+  </property>
+  <property>
     <name>ozone.snapshot.key.deleting.limit.per.task</name>
     <value>20000</value>
     <tag>OM, PERFORMANCE, DELETION</tag>
@@ -4395,6 +4418,16 @@
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The interval between ratis server performing
       a leader readiness check.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.follower.apply.lag.poll.interval</name>
+    <value>5s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>The interval at which the SCM leader polls its Ratis
+      followers for their applied index to measure how far they are behind
+      in applying committed Raft log entries. The result is reported to OM
+      on block deletion responses so that OM can throttle key deletion.
     </description>
   </property>
   <property>

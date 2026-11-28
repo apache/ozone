@@ -603,6 +603,11 @@ public final class ScmConfigKeys {
   public static final long
           OZONE_SCM_HA_RATIS_LEADER_READY_CHECK_INTERVAL_DEFAULT = 2 * 1000L;
 
+  public static final String OZONE_SCM_HA_FOLLOWER_APPLY_LAG_POLL_INTERVAL =
+      "ozone.scm.ha.follower.apply.lag.poll.interval";
+  public static final long
+      OZONE_SCM_HA_FOLLOWER_APPLY_LAG_POLL_INTERVAL_DEFAULT = 5 * 1000L;
+
   public static final String OZONE_SCM_HA_RATIS_LEADER_READY_WAIT_TIMEOUT =
           "ozone.scm.ha.ratis.leader.ready.wait.timeout";
   public static final long
