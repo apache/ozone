@@ -746,7 +746,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
             omMetadataManager.getTenantAccessIdTable().get(accessId);
         // accessIdInfo could be null since we may not have a lock on the tenant
         if (accessIdInfo == null) {
-          return false;
+          continue;
         }
         if (tenantId.equals(accessIdInfo.getTenantId())) {
           if (!delegated) {
