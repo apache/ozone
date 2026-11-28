@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
 
@@ -44,6 +45,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServe
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.RaftProperties;
@@ -114,8 +116,8 @@ public final class  HASecurityUtils {
       SecurityConfig config, CertificateStore scmCertStore,
       SCMStorageConfig scmStorageConfig, BigInteger rootCertId,
       PKIProfile pkiProfile, String component) throws IOException {
-    String subject = SCM_ROOT_CA_PREFIX +
-        InetAddress.getLocalHost().getHostName();
+    String subject = CertificateSignRequest.commonName(SCM_ROOT_CA_PREFIX + InetAddress.getLocalHost().getHostName(),
+        SCM_ROOT_CA, scmStorageConfig.getScmId());
 
     DefaultCAServer rootCAServer = new DefaultCAServer(subject,
         scmStorageConfig.getClusterID(),

@@ -18,8 +18,12 @@
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameFormat;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedName;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameWithSN;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCommonName;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,14 +44,18 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.asn1.DLSequence;
+import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
 import org.bouncycastle.asn1.x509.GeneralName;
@@ -65,6 +73,10 @@ import org.mockito.MockedStatic;
  * Certificate Signing Request.
  */
 public class TestCertificateSignRequest {
+  private static final String DISTINGUISHED_NAME_FORMAT = "CN=%s,OU=%s,O=%s";
+  private static final String DISTINGUISHED_NAME_WITH_SN_FORMAT = "CN=%s,OU=%s,O=%s,SERIALNUMBER=%s";
+  /** Longer than the RFC 5280 ub-common-name (64), like user@FQDN of a Kubernetes pod. */
+  static final String LONG_SUBJECT = "dn@" + LONG_HOST_NAME;
 
   private SecurityConfig securityConfig;
 
@@ -95,7 +107,7 @@ public class TestCertificateSignRequest {
     PKCS10CertificationRequest csr = builder.build().generateCSR();
 
     // Check the Subject Name is in the expected format.
-    String dnName = String.format(getDistinguishedNameFormat(),
+    String dnName = String.format(DISTINGUISHED_NAME_FORMAT,
         subject, scmID, clusterID);
     assertEquals(dnName, csr.getSubject().toString());
 
@@ -153,7 +165,7 @@ public class TestCertificateSignRequest {
     PKCS10CertificationRequest csr = builder.build().generateCSR();
 
     // Check the Subject Name is in the expected format.
-    String dnName = String.format(getDistinguishedNameFormat(),
+    String dnName = String.format(DISTINGUISHED_NAME_FORMAT,
         subject, scmID, clusterID);
     assertEquals(dnName, csr.getSubject().toString());
 
@@ -229,7 +241,7 @@ public class TestCertificateSignRequest {
     PKCS10CertificationRequest csr = builder.build().generateCSR();
 
     // Check the Subject Name is in the expected format.
-    String dnName = String.format(getDistinguishedNameFormat(),
+    String dnName = String.format(DISTINGUISHED_NAME_FORMAT,
         subject, scmID, clusterID);
     assertEquals(dnName, csr.getSubject().toString());
 
@@ -268,6 +280,71 @@ public class TestCertificateSignRequest {
     // Verify de-serialized CSR matches with the original CSR
     PKCS10CertificationRequest dsCsr = new PKCS10CertificationRequest(csrBytes);
     assertEquals(csr, dsCsr);
+  }
+
+  @Test
+  public void testDistinguishedNameEncodingUnchanged() throws Exception {
+    String clusterID = UUID.randomUUID().toString();
+    String scmID = UUID.randomUUID().toString();
+    String subject = "dn@host1.example.com";
+
+    assertArrayEquals(
+        new X500Name(String.format(DISTINGUISHED_NAME_FORMAT, subject, scmID, clusterID)).getEncoded(),
+        getDistinguishedName(subject, scmID, clusterID).getEncoded());
+    assertArrayEquals(
+        new X500Name(String.format(DISTINGUISHED_NAME_WITH_SN_FORMAT, subject, scmID, clusterID, "12345"))
+            .getEncoded(),
+        getDistinguishedNameWithSN(subject, scmID, clusterID, "12345").getEncoded());
+    // A datanode sends null SCM and cluster IDs before registration.
+    assertArrayEquals(
+        new X500Name(String.format(DISTINGUISHED_NAME_FORMAT, subject, null, null)).getEncoded(),
+        getDistinguishedName(subject, null, null).getEncoded());
+  }
+
+  @Test
+  public void testCommonName() {
+    String id = UUID.randomUUID().toString();
+    String fits = "dn@" + StringUtils.repeat('a', 61);
+    assertEquals(64, fits.length());
+    assertEquals(fits, CertificateSignRequest.commonName(fits, "dn", id));
+    // one character too long, and a long user@FQDN: the same prefix@id, whatever the host names have in common
+    assertEquals("dn@" + id, CertificateSignRequest.commonName(fits + "b", "dn", id));
+    assertEquals("dn@" + id, CertificateSignRequest.commonName(LONG_SUBJECT, "dn", id));
+
+    assertEquals("dn", CertificateSignRequest.commonNamePrefix(NodeType.DATANODE));
+    assertEquals("om", CertificateSignRequest.commonNamePrefix(NodeType.OM));
+    assertEquals("recon", CertificateSignRequest.commonNamePrefix(NodeType.RECON));
+    assertEquals(OzoneConsts.SCM_SUB_CA, CertificateSignRequest.commonNamePrefix(NodeType.SCM));
+  }
+
+  @Test
+  public void testGenerateCSRWithLongSubject() throws Exception {
+    String clusterID = UUID.randomUUID().toString();
+    String scmID = UUID.randomUUID().toString();
+    // Bouncy Castle 1.85+ rejects a commonName longer than 64 characters when it parses a DN string.
+    String fits = "dn@" + StringUtils.repeat('a', 61);
+    new X500Name(String.format(DISTINGUISHED_NAME_FORMAT, fits, scmID, clusterID));
+    assertThrows(IllegalArgumentException.class,
+        () -> new X500Name(String.format(DISTINGUISHED_NAME_FORMAT, fits + "a", scmID, clusterID)));
+    assertThrows(IllegalArgumentException.class,
+        () -> new X500Name(String.format(DISTINGUISHED_NAME_FORMAT, LONG_SUBJECT, scmID, clusterID)));
+    KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
+
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .setSubject(LONG_SUBJECT)
+        .setScmID(scmID)
+        .setClusterID(clusterID)
+        .setKey(keyPair)
+        .setConfiguration(securityConfig)
+        .build()
+        .generateCSR();
+
+    assertEquals(LONG_SUBJECT, getCommonName(csr));
+    assertEquals(String.format(DISTINGUISHED_NAME_FORMAT, LONG_SUBJECT, scmID, clusterID),
+        csr.getSubject().toString());
+    ContentVerifierProvider verifierProvider = new JcaContentVerifierProviderBuilder()
+        .setProvider(securityConfig.getProvider()).build(csr.getSubjectPublicKeyInfo());
+    assertTrue(csr.isSignatureValid(verifierProvider));
   }
 
   @Test

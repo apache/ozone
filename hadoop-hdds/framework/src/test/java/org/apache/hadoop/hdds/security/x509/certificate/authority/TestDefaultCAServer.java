@@ -24,14 +24,21 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer.VerificationStatus;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCommonName;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.when;
 
@@ -43,13 +50,17 @@ import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.cert.CertPath;
+import java.security.cert.CertPathValidator;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
+import java.security.cert.PKIXParameters;
+import java.security.cert.TrustAnchor;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -73,6 +84,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertific
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -201,6 +214,130 @@ public class TestDefaultCAServer {
     assertEquals(caInReturnedBundle.getSubjectX500Principal(),
         signedCert.getIssuerX500Principal());
 
+  }
+
+  /**
+   * Tests that a CSR whose subject is longer than the RFC 5280 ub-common-name (64), like user@FQDN of a
+   * Kubernetes pod, is signed and the CN is kept.
+   */
+  @Test
+  public void testRequestCertificateWithLongSubject() throws Exception {
+    String subject = "dn@" + LONG_HOST_NAME;
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
+    KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .setCA(false)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject(subject)
+        .setConfiguration(securityConfig)
+        .setKey(keyPair)
+        .build()
+        .generateCSR();
+
+    CertificateServer testCA = new DefaultCAServer("testCA", clusterId, scmId, caStore, new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    testCA.init(securityConfig, CAType.ROOT);
+
+    Future<CertPath> holder = testCA.requestCertificate(csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC,
+        OM, String.valueOf(System.nanoTime()));
+    X509Certificate signedCert = CertificateCodec.firstCertificateFrom(holder.get());
+    X500Name name = X500Name.getInstance(signedCert.getSubjectX500Principal().getEncoded());
+    assertEquals(subject, getCommonName(signedCert));
+    assertEquals(scmId, name.getRDNs(BCStyle.OU)[0].getFirst().getValue().toString());
+    assertEquals(clusterId, name.getRDNs(BCStyle.O)[0].getFirst().getValue().toString());
+  }
+
+  /**
+   * Tests that an implementation with only the methods without commonNameIfTooLong, as before HDDS-17879, still
+   * serves the overloads with it: the defaults ignore the replacement commonName.
+   */
+  @Test
+  public void testOverloadsWithCommonNameDefaultToOldMethods() throws Exception {
+    CertificateServer server = mock(CertificateServer.class, CALLS_REAL_METHODS);
+    Future<CertPath> future = CompletableFuture.completedFuture(null);
+    doReturn(future).when(server).requestCertificate(any(), any(), any(), anyString());
+    assertSame(future, server.requestCertificate(null, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM, "1",
+        "om@id"));
+
+    CertificateApprover approver = mock(CertificateApprover.class, CALLS_REAL_METHODS);
+    X509Certificate cert = mock(X509Certificate.class);
+    doReturn(cert).when(approver).sign(any(), any(), any(), any(), any(), any(), any(), any(), anyString());
+    assertSame(cert, approver.sign(null, null, null, null, null, null, null, null, "1", "om@id"));
+  }
+
+  /**
+   * Tests that SCM issues the given commonName instead of a CSR commonName longer than 64 characters, as from a
+   * client that predates CertificateSignRequest.commonName, and keeps a commonName that fits.
+   */
+  @Test
+  public void testRequestCertificateReplacesLongCommonName() throws Exception {
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
+    String replacement = "om@" + UUID.randomUUID();
+    CertificateServer testCA = new DefaultCAServer("testCA", clusterId, scmId, caStore, new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    testCA.init(securityConfig, CAType.ROOT);
+
+    String longSubject = "om@" + LONG_HOST_NAME;
+    assertEquals(replacement, signedCommonName(testCA, longSubject, scmId, clusterId, replacement));
+    assertEquals("om@host1.example.com",
+        signedCommonName(testCA, "om@host1.example.com", scmId, clusterId, replacement));
+  }
+
+  /**
+   * Tests that a CA whose own commonName is longer than 64 characters, like a root CA created before Bouncy Castle
+   * 1.85, still issues certificates that validate against it.
+   */
+  @Test
+  public void testCAWithLongSubjectSignsCertificate() throws Exception {
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
+    String caSubject = "scm@" + LONG_HOST_NAME;
+    CertificateServer testCA = new DefaultCAServer(caSubject, clusterId, scmId, caStore, new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    testCA.init(securityConfig, CAType.ROOT);
+    X509Certificate caCert = testCA.getCACertificate();
+    assertEquals(caSubject, getCommonName(caCert));
+
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .setCA(false)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject("om@host1.example.com")
+        .setConfiguration(securityConfig)
+        .setKey(new HDDSKeyGenerator(securityConfig).generateKey())
+        .build()
+        .generateCSR();
+    X509Certificate signedCert = CertificateCodec.firstCertificateFrom(testCA.requestCertificate(csr,
+        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM, String.valueOf(System.nanoTime())).get());
+
+    assertEquals(caCert.getSubjectX500Principal(), signedCert.getIssuerX500Principal());
+    PKIXParameters params = new PKIXParameters(Collections.singleton(new TrustAnchor(caCert, null)));
+    params.setRevocationEnabled(false);
+    CertPathValidator.getInstance("PKIX").validate(
+        CertificateFactory.getInstance("X.509").generateCertPath(Collections.singletonList(signedCert)), params);
+  }
+
+  private String signedCommonName(CertificateServer ca, String subject, String scmId, String clusterId,
+      String commonNameIfTooLong) throws Exception {
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .setCA(false)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject(subject)
+        .setConfiguration(securityConfig)
+        .setKey(new HDDSKeyGenerator(securityConfig).generateKey())
+        .build()
+        .generateCSR();
+    Future<CertPath> holder = ca.requestCertificate(csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC,
+        OM, String.valueOf(System.nanoTime()), commonNameIfTooLong);
+    X509Certificate signedCert = CertificateCodec.firstCertificateFrom(holder.get());
+    return getCommonName(signedCert);
   }
 
   /**

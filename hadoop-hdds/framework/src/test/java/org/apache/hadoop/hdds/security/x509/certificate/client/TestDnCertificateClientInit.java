@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.security.x509.certificate.client.Certificat
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCsrCommonName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -45,6 +47,7 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -142,6 +145,21 @@ public class TestDnCertificateClientInit {
       assertTrue(OzoneSecurityUtil.checkIfFileExist(
           securityConfig.getKeyLocation(DN_COMPONENT),
           securityConfig.getPublicKeyFileName()));
+    }
+  }
+
+  /** A user@FQDN longer than 64 characters, as on Kubernetes, is replaced by dn@UUID in the CSR. */
+  @Test
+  public void testCsrCommonNameForLongHostName() throws Exception {
+    dnKeyStorage.storeKeyPair(keyPair);
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    try (DNCertificateClient client = new DNCertificateClient(securityConfig, null, dn, null, null, null) {
+      @Override
+      protected String getLocalHostName() {
+        return LONG_HOST_NAME;
+      }
+    }) {
+      assertEquals("dn@" + dn.getUuidString(), getCsrCommonName(client));
     }
   }
 

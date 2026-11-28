@@ -94,6 +94,8 @@ public class OMCertificateClient extends DefaultCertificateClient {
       // isn't a hostname either, so omit username.
       subject = hostname;
     }
+    subject = CertificateSignRequest.commonName(subject,
+        CertificateSignRequest.commonNamePrefix(HddsProtos.NodeType.OM), omInfo.getUuid());
 
     builder.setCA(false)
         .setKey(new KeyPair(getPublicKey(), getPrivateKey()))

@@ -30,24 +30,30 @@ import java.net.UnknownHostException;
 import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.ASN1Set;
 import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.DERPrintableString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 import org.bouncycastle.asn1.DERUTF8String;
 import org.bouncycastle.asn1.pkcs.Attribute;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.X500NameBuilder;
+import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
@@ -71,11 +77,8 @@ import org.slf4j.LoggerFactory;
  * PKCS10CertificationRequest to CertificateServer.
  */
 public final class CertificateSignRequest {
-  // Ozone final certificate distinguished format:
-  // (CN=Subject,OU=ScmID,O=ClusterID,SERIALNUMBER=SerialID).
-  private static final String DISTINGUISHED_NAME_FORMAT = "CN=%s,OU=%s,O=%s";
-  private static final String DISTINGUISHED_NAME_WITH_SN_FORMAT =
-      "CN=%s,OU=%s,O=%s,SERIALNUMBER=%s";
+  /** RFC 5280 ub-common-name. */
+  public static final int MAX_COMMON_NAME_LENGTH = 64;
   private static final Logger LOG =
       LoggerFactory.getLogger(CertificateSignRequest.class);
   private final KeyPair keyPair;
@@ -106,26 +109,55 @@ public final class CertificateSignRequest {
     this.extensions = extensions;
   }
 
-  public static String getDistinguishedNameFormat() {
-    return DISTINGUISHED_NAME_FORMAT;
-  }
-
-  public static String getDistinguishedNameFormatWithSN() {
-    return DISTINGUISHED_NAME_WITH_SN_FORMAT;
-  }
-
   // used by server side DN regeneration
   public static X500Name getDistinguishedNameWithSN(String subject,
       String scmID, String clusterID, String serialID) {
-    return new X500Name(String.format(DISTINGUISHED_NAME_WITH_SN_FORMAT,
-        subject, scmID, clusterID, serialID));
+    return distinguishedNameBuilder(subject, scmID, clusterID)
+        .addRDN(BCStyle.SERIALNUMBER, new DERPrintableString(String.valueOf(serialID)))
+        .build();
   }
 
   // used by client side DN generation
   public static X500Name getDistinguishedName(String subject, String scmID,
       String clusterID) {
-    return new X500Name(String.format(getDistinguishedNameFormat(), subject,
-        scmID, clusterID));
+    return distinguishedNameBuilder(subject, scmID, clusterID).build();
+  }
+
+  /**
+   * The commonName of a certificate subject: {@code preferred} when it fits RFC 5280 ub-common-name
+   * ({@value #MAX_COMMON_NAME_LENGTH}), else {@code prefix@id}, e.g. {@code dn@<datanode UUID>} for a user@FQDN on
+   * Kubernetes. Truncating {@code preferred} instead could give hosts whose names differ only at the end the same
+   * commonName; {@code id} is unique to the requester and does not change with its host name.
+   */
+  public static String commonName(String preferred, String prefix, String id) {
+    return preferred.length() <= MAX_COMMON_NAME_LENGTH ? preferred : prefix + "@" + id;
+  }
+
+  /** The {@link #commonName} prefix for a certificate of {@code role}. */
+  public static String commonNamePrefix(NodeType role) {
+    switch (role) {
+    case DATANODE:
+      return "dn";
+    case SCM:
+      return OzoneConsts.SCM_SUB_CA;
+    default:
+      return role.name().toLowerCase(Locale.ROOT);
+    }
+  }
+
+  /**
+   * Ozone certificate subject: CN=Subject,OU=ScmID,O=ClusterID[,SERIALNUMBER=SerialID].
+   * Builds the RDNs from typed values instead of parsing a DN string, so Bouncy Castle 1.85+ does not reject a
+   * commonName longer than RFC 5280 ub-common-name (64), which a CSR from a client without {@link #commonName} may
+   * still have, and DN syntax in a value is not parsed.
+   * The encoding matches what {@link BCStyle} produces for the same DN string, and a null value is encoded as
+   * "null" like {@link String#format} did (a datanode sends null SCM and cluster IDs before registration).
+   */
+  private static X500NameBuilder distinguishedNameBuilder(String subject, String scmID, String clusterID) {
+    return new X500NameBuilder()
+        .addRDN(BCStyle.CN, new DERUTF8String(String.valueOf(subject)))
+        .addRDN(BCStyle.OU, new DERUTF8String(String.valueOf(scmID)))
+        .addRDN(BCStyle.O, new DERUTF8String(String.valueOf(clusterID)));
   }
 
   public static Extensions getPkcs9Extensions(PKCS10CertificationRequest csr)

@@ -24,6 +24,7 @@ import java.net.InetAddress;
 import java.security.KeyPair;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -72,8 +73,9 @@ public class DNCertificateClient extends DefaultCertificateClient {
 
     try {
       String hostname = getLocalHostName();
-      String subject = UserGroupInformation.getCurrentUser()
-          .getShortUserName() + "@" + hostname;
+      String subject = CertificateSignRequest.commonName(UserGroupInformation.getCurrentUser()
+          .getShortUserName() + "@" + hostname, CertificateSignRequest.commonNamePrefix(NodeType.DATANODE),
+          dn.getUuidString());
       builder.setCA(false)
           .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
           .setConfiguration(getSecurityConfig())

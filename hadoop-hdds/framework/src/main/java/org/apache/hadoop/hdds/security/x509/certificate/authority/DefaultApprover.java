@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.MAX_COMMON_NAME_LENGTH;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameWithSN;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
 
@@ -87,6 +88,22 @@ public class DefaultApprover implements CertificateApprover {
     this.securityConfig = Objects.requireNonNull(config);
   }
 
+  @SuppressWarnings("ParameterNumber")
+  @Override
+  public X509Certificate sign(
+      SecurityConfig config,
+      PrivateKey caPrivate,
+      X509Certificate caCertificate,
+      Date validFrom,
+      Date validTill,
+      PKCS10CertificationRequest certificationRequest,
+      String scmId,
+      String clusterId,
+      String certSerialId) throws IOException, CertificateException {
+    return sign(config, caPrivate, caCertificate, validFrom, validTill, certificationRequest, scmId, clusterId,
+        certSerialId, null);
+  }
+
   /**
    * Sign function signs a Certificate.
    *
@@ -99,6 +116,7 @@ public class DefaultApprover implements CertificateApprover {
    * @param scmId - SCM id.
    * @param clusterId - Cluster id.
    * @param certSerialId - the new certificate id.
+   * @param commonNameIfTooLong - commonName for a CSR commonName longer than 64 characters, or null to keep it.
    * @return Signed Certificate.
    * @throws IOException - On Error
    * @throws CertificateException - on Error.
@@ -114,7 +132,8 @@ public class DefaultApprover implements CertificateApprover {
       PKCS10CertificationRequest certificationRequest,
       String scmId,
       String clusterId,
-      String certSerialId) throws IOException, CertificateException {
+      String certSerialId,
+      String commonNameIfTooLong) throws IOException, CertificateException {
 
     AlgorithmIdentifier sigAlgId = new
         DefaultSignatureAlgorithmIdentifierFinder().find(
@@ -135,6 +154,12 @@ public class DefaultApprover implements CertificateApprover {
         toASN1Primitive().toString();
     String cn = x500Name.getRDNs(BCStyle.CN)[0].getFirst().getValue()
         .toASN1Primitive().toString();
+    if (commonNameIfTooLong != null && cn.length() > MAX_COMMON_NAME_LENGTH) {
+      // A client that predates CertificateSignRequest.commonName: issue an RFC 5280 conformant subject anyway.
+      LOG.info("Replacing commonName '{}' longer than {} characters with '{}'", cn, MAX_COMMON_NAME_LENGTH,
+          commonNameIfTooLong);
+      cn = commonNameIfTooLong;
+    }
 
     if (!clusterId.equals(csrClusterId)) {
       if (csrScmId.equalsIgnoreCase("null") &&

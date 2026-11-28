@@ -19,8 +19,10 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -136,7 +138,7 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   @Override
   public CertificateSignRequest.Builder configureCSRBuilder()
       throws SCMSecurityException {
-    String subject = SCM_SUB_CA_PREFIX + scmHostname;
+    String subject = CertificateSignRequest.commonName(SCM_SUB_CA_PREFIX + scmHostname, SCM_SUB_CA, scmId);
 
     LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
         "subject:{}", scmHostname, scmId, cId, subject);
@@ -386,8 +388,8 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       SecurityConfig config, CertificateStore scmCertStore,
       BigInteger rootCertId, PKIProfile pkiProfile, String component)
       throws IOException {
-    String subject = SCM_ROOT_CA_PREFIX +
-        InetAddress.getLocalHost().getHostName();
+    String subject = CertificateSignRequest.commonName(SCM_ROOT_CA_PREFIX +
+        InetAddress.getLocalHost().getHostName(), SCM_ROOT_CA, scmId);
 
     DefaultCAServer rootCAServer = new DefaultCAServer(subject,
         cId, scmId, scmCertStore, rootCertId, pkiProfile,

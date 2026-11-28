@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCommonName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -47,6 +48,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -112,6 +115,29 @@ public class TestRootCertificate {
     assertEquals(-1, certificate.getBasicConstraints(), "Non-CA cert contains the CA flag in BasicConstraints.");
 
     // Extract the Certificate and verify that certificate matches the public key.
+    certificate.verify(keyPair.getPublic());
+  }
+
+  @Test
+  public void testLongSubject() throws Exception {
+    ZonedDateTime notBefore = ZonedDateTime.now();
+    String subject = TestCertificateSignRequest.LONG_SUBJECT;
+    KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
+
+    X509Certificate certificate = SelfSignedCertificate.newBuilder()
+        .setBeginDate(notBefore)
+        .setEndDate(notBefore.plusYears(1))
+        .setClusterID(UUID.randomUUID().toString())
+        .setScmID(UUID.randomUUID().toString())
+        .setSubject(subject)
+        .setKey(keyPair)
+        .setConfiguration(securityConfig)
+        .build();
+
+    X500Name name = X500Name.getInstance(certificate.getSubjectX500Principal().getEncoded());
+    assertEquals(subject, getCommonName(certificate));
+    assertEquals(certificate.getSerialNumber().toString(),
+        name.getRDNs(BCStyle.SERIALNUMBER)[0].getFirst().getValue().toString());
     certificate.verify(keyPair.getPublic());
   }
 

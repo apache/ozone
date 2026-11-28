@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.security.x509.certificate.client.Certificat
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.LONG_HOST_NAME;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CommonNameTestUtil.getCsrCommonName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -49,6 +51,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -154,6 +157,26 @@ public class TestOmCertificateClientInit {
       assertTrue(OzoneSecurityUtil.checkIfFileExist(
           securityConfig.getKeyLocation(OM_COMPONENT),
           securityConfig.getPublicKeyFileName()));
+    }
+  }
+
+  /**
+   * A user@host, or a bare host name without a DNS SAN, longer than 64 characters, as on Kubernetes, is replaced by
+   * om@UUID in the CSR.
+   */
+  @Test
+  public void testCsrCommonNameForLongHostName() throws Exception {
+    omKeyStorage.storeKeyPair(keyPair);
+    OMStorage storage = mock(OMStorage.class);
+    when(storage.getClusterID()).thenReturn("test");
+    String omId = UUID.randomUUID().toString();
+    HddsProtos.OzoneManagerDetailsProto omInfo = OzoneManager.getOmDetailsProto(new OzoneConfiguration(), omId)
+        .toBuilder()
+        .setHostName(LONG_HOST_NAME)
+        .build();
+    try (OMCertificateClient client = new OMCertificateClient(securityConfig, null, storage, omInfo, "", null, null,
+        null)) {
+      assertEquals("om@" + omId, getCsrCommonName(client));
     }
   }
 

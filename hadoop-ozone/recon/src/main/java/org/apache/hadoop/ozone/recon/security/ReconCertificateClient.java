@@ -66,8 +66,9 @@ public class ReconCertificateClient  extends DefaultCertificateClient {
     try {
       CertificateSignRequest.Builder builder = super.configureCSRBuilder();
       String hostname = InetAddress.getLocalHost().getCanonicalHostName();
-      String subject = UserGroupInformation.getCurrentUser()
-          .getShortUserName() + "@" + hostname;
+      String subject = CertificateSignRequest.commonName(UserGroupInformation.getCurrentUser()
+          .getShortUserName() + "@" + hostname, CertificateSignRequest.commonNamePrefix(HddsProtos.NodeType.RECON),
+          reconID);
 
       builder.setCA(false)
           .setKey(new KeyPair(getPublicKey(), getPrivateKey()))
