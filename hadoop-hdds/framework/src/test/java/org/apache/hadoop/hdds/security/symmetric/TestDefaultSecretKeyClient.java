@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,6 +42,11 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
+import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -132,5 +139,18 @@ class TestDefaultSecretKeyClient {
     } finally {
       client.stop();
     }
+  }
+
+  @Test
+  void initialSecretKeyRetryWaitIsCapped() throws Exception {
+    RetryPolicy policy = DefaultSecretKeySignerClient.initialSecretKeyRetryPolicy();
+    Exception notInitialized = new SCMSecretKeyException("not initialized", ErrorCode.SECRET_KEY_NOT_INITIALIZED);
+    for (int retries = 1; retries < 100; retries++) {
+      RetryAction action = policy.shouldRetry(notInitialized, retries, 0, true);
+      assertEquals(RetryDecision.RETRY, action.action);
+      assertThat(action.delayMillis).isBetween(retries < 3 ? 2000L : 8000L, 23000L);
+    }
+    assertEquals(RetryDecision.FAIL, policy.shouldRetry(notInitialized, 100, 0, true).action);
+    assertEquals(RetryDecision.FAIL, policy.shouldRetry(new IOException("SCM fetch failed"), 0, 0, true).action);
   }
 }
