@@ -324,6 +324,17 @@ public class TestSCMStateMachine {
   }
 
   @Test
+  void testBootstrapStateMachineTerminatesOnApplyTransaction() throws Exception {
+    ExitUtils.disableSystemExit();
+    try (SCMStateMachine bootstrap = new SCMStateMachine()) {
+      assertThrows(ExitUtils.ExitException.class,
+          () -> bootstrap.applyTransaction(newTransaction(RequestType.CONTAINER, 1)));
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
+  @Test
   void testAlreadyCaughtUpStartsDNServerExactlyOnce() throws Exception {
     commitIndexAvailable.set(true);
 

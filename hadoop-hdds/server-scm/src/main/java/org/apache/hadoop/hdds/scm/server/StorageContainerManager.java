@@ -1276,7 +1276,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (state != StorageState.INITIALIZED) {
       try {
         if (clusterId != null && !clusterId.isEmpty()) {
-          // clusterId must be an UUID
+          // clusterId must be a UUID
           Objects.requireNonNull(UUID.fromString(clusterId), "clusterId UUID == null");
           scmStorageConfig.setClusterId(clusterId);
         }

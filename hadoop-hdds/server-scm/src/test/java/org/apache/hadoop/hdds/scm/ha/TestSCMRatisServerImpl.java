@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -30,6 +32,10 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
@@ -38,6 +44,8 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import javax.net.ssl.X509TrustManager;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
@@ -50,6 +58,7 @@ import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -61,6 +70,9 @@ import org.mockito.MockedStatic;
  */
 public class TestSCMRatisServerImpl {
 
+  @TempDir
+  private Path tempDir;
+
   @Test
   public void  testGetLeaderId() throws Exception {
 
@@ -71,6 +83,7 @@ public class TestSCMRatisServerImpl {
     ) {
       // given
       ConfigurationSource conf = mock(ConfigurationSource.class);
+      when(conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR)).thenReturn(tempDir.toString());
       StorageContainerManager scm = mock(StorageContainerManager.class);
       String clusterId = "CID-" + UUID.randomUUID();
       when(scm.getClusterId()).thenReturn(clusterId);
@@ -140,6 +153,7 @@ public class TestSCMRatisServerImpl {
         MockedStatic<RatisUtil> staticMockedRatisUtil = mockStatic(RatisUtil.class);
     ) {
       ConfigurationSource conf = mock(ConfigurationSource.class);
+      when(conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR)).thenReturn(tempDir.toString());
       StorageContainerManager scm = mock(StorageContainerManager.class);
       when(scm.getClusterId()).thenReturn("CID-" + UUID.randomUUID());
       SCMHADBTransactionBuffer dbTransactionBuffer = mock(SCMHADBTransactionBuffer.class);
@@ -188,6 +202,7 @@ public class TestSCMRatisServerImpl {
         MockedStatic<RatisUtil> staticMockedRatisUtil = mockStatic(RatisUtil.class);
     ) {
       ConfigurationSource conf = mock(ConfigurationSource.class);
+      when(conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR)).thenReturn(tempDir.toString());
       StorageContainerManager scm = mock(StorageContainerManager.class);
       when(scm.getClusterId()).thenReturn("CID-" + UUID.randomUUID());
       SCMHADBTransactionBuffer dbTransactionBuffer = mock(SCMHADBTransactionBuffer.class);
@@ -269,5 +284,36 @@ public class TestSCMRatisServerImpl {
     // A chain the cluster trust manager rejects stays rejected.
     doThrow(new CertificateException("untrusted chain")).when(clusterTrustManager).checkClientTrusted(scmChain, "RSA");
     assertThatThrownBy(() -> trustManager.checkClientTrusted(scmChain, "RSA")).hasMessage("untrusted chain");
+  }
+
+  @Test
+  public void testVerifyRaftGroups() throws Exception {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR, tempDir.toString());
+    final RaftGroupId ownGroup = SCMRatisServerImpl.buildRaftGroupId("CID-" + UUID.randomUUID());
+
+    // An empty directory is fine; directories which are not named after a group are ignored.
+    SCMRatisServerImpl.verifyNoOtherRaftGroup(conf, ownGroup);
+    assertTrue(new File(tempDir.toFile(), "snapshot").mkdirs());
+    assertTrue(new File(tempDir.toFile(), "1-1-1-1-1").mkdirs());
+    SCMRatisServerImpl.verifyNoOtherRaftGroup(conf, ownGroup);
+
+    // The SCM's own group is allowed.
+    assertTrue(new File(tempDir.toFile(), ownGroup.getUuid().toString()).mkdirs());
+    SCMRatisServerImpl.verifyNoOtherRaftGroup(conf, ownGroup);
+
+    // A group of another cluster fails init and startup.
+    assertTrue(new File(tempDir.toFile(), UUID.randomUUID().toString()).mkdirs());
+    final String clusterId = "CID-" + UUID.randomUUID();
+    final StorageContainerManager scm = mock(StorageContainerManager.class);
+    when(scm.getClusterId()).thenReturn(clusterId);
+    final SCMNodeDetails details = new SCMNodeDetails.Builder()
+        .setRpcAddress(new InetSocketAddress("localhost", 0)).setSCMNodeId("scm1").build();
+    assertThat(assertThrows(IOException.class,
+        () -> SCMRatisServerImpl.initialize(clusterId, UUID.randomUUID().toString(), details, conf)))
+        .hasMessageContaining("stale Raft group");
+    assertThat(assertThrows(IOException.class,
+        () -> new SCMRatisServerImpl(conf, scm, mock(SCMHADBTransactionBuffer.class))))
+        .hasMessageContaining("stale Raft group");
   }
 }
