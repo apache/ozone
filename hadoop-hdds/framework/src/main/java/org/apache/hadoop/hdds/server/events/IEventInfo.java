@@ -26,4 +26,10 @@ public interface IEventInfo {
   default String getEventId() {
     return "";
   }
+
+  /**
+   * Releases optional event resources when delivery is discarded. Implementations must be idempotent.
+   */
+  default void onDropped() {
+  }
 }

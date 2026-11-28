@@ -19,8 +19,12 @@ package org.apache.hadoop.hdds.server.events;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,11 +32,16 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Testing the basic functionality of the event queue.
@@ -47,6 +56,59 @@ public class TestEventQueue {
   private EventQueue queue;
 
   private AtomicLong eventTotal = new AtomicLong();
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void discardedEventsReleaseResources(boolean closed) {
+    IEventInfo payload = mock(IEventInfo.class);
+    Event<IEventInfo> event = new TypedEvent<>(IEventInfo.class, "Discarded");
+    if (closed) {
+      queue.close();
+    }
+
+    queue.fireEvent(event, payload);
+
+    verify(payload).onDropped();
+  }
+
+  @Test
+  public void closingAffinityExecutorDiscardsQueuedAndLateEvents() {
+    Event<IEventInfo> event = new TypedEvent<>(IEventInfo.class, "Discarded");
+    EventHandler<IEventInfo> handler = (payload, publisher) -> { };
+    BlockingQueue<IEventInfo> pending = new LinkedBlockingQueue<>();
+    FixedThreadPoolWithAffinityExecutor<IEventInfo, IEventInfo> executor = new FixedThreadPoolWithAffinityExecutor<>(
+        EventQueue.getExecutorName(event, handler), handler, Collections.singletonList(pending), queue,
+        IEventInfo.class, Collections.singletonList(mock(ThreadPoolExecutor.class)), new ConcurrentHashMap<>());
+    queue.addHandler(event, executor, handler);
+    IEventInfo queued = mock(IEventInfo.class);
+    IEventInfo late = mock(IEventInfo.class);
+    queue.fireEvent(event, queued);
+    assertThat(pending).containsExactly(queued);
+
+    executor.close();
+    executor.onMessage(handler, late, queue);
+
+    assertThat(pending).isEmpty();
+    verify(queued).onDropped();
+    verify(late).onDropped();
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void missingAffinityExecutorDiscardsEvent() throws InterruptedException {
+    IEventInfo payload = mock(IEventInfo.class);
+    BlockingQueue<IEventInfo> pending = mock(BlockingQueue.class);
+    AtomicBoolean running = new AtomicBoolean(true);
+    when(pending.poll(1, TimeUnit.MILLISECONDS)).thenAnswer(invocation -> {
+      running.set(false);
+      return payload;
+    });
+
+    new FixedThreadPoolWithAffinityExecutor.ContainerReportProcessTask<>(pending, running, new ConcurrentHashMap<>())
+        .run();
+
+    verify(payload).onDropped();
+  }
 
   @BeforeEach
   public void startEventQueue() {

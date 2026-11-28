@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 
 /**
  * Interface for the SCM Facade class that can be used by a passive SCM like
@@ -60,6 +61,8 @@ public interface OzoneStorageContainerManager {
   InetSocketAddress getDatanodeRpcAddress();
 
   SCMNodeDetails getScmNodeDetails();
+
+  ScmVersionManager getVersionManager();
 
   ReconfigurationHandler getReconfigurationHandler();
 

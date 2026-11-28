@@ -70,7 +70,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   private final AtomicLong eventCount = new AtomicLong(0);
 
-  private boolean isRunning = true;
+  private volatile boolean isRunning = true;
 
   private static final ObjectWriter TRACING_SERIALIZER = buildSerializer();
 
@@ -266,6 +266,9 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
     if (!isRunning) {
       LOG.warn("Processing of {} is skipped, EventQueue is not running", event);
+      if (payload instanceof IEventInfo) {
+        ((IEventInfo) payload).onDropped();
+      }
       return;
     }
 
@@ -298,6 +301,9 @@ public class EventQueue implements EventPublisher, AutoCloseable {
     } else {
       if (!isSilent) {
         LOG.warn("No event handler registered for event {}", event);
+      }
+      if (payload instanceof IEventInfo) {
+        ((IEventInfo) payload).onDropped();
       }
     }
 

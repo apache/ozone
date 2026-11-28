@@ -20,15 +20,54 @@ package org.apache.hadoop.hdds.scm.server;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseManager.LeaseClaim;
 import org.junit.jupiter.api.Test;
 
 class TestContainerReportQueue {
+
+  @Test
+  void shouldCompleteReplacedFullContainerReportAsUnprocessed() {
+    ContainerReportQueue queue = new ContainerReportQueue();
+    DatanodeDetails datanode = randomDatanodeDetails();
+    LeaseClaim claim = spy(claimLease(datanode));
+    ContainerReportFromDatanode firstReport = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance(), claim);
+    ContainerReportFromDatanode secondReport = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance());
+
+    queue.add(firstReport);
+    queue.add(secondReport);
+
+    verify(claim).complete(false);
+  }
+
+  @Test
+  void shouldCompleteQueuedFullContainerReportWhenCleared() {
+    ContainerReportQueue queue = new ContainerReportQueue();
+    DatanodeDetails datanode = randomDatanodeDetails();
+    LeaseClaim claim = spy(claimLease(datanode));
+    ContainerReportFromDatanode report = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance(), claim);
+    queue.add(report);
+
+    queue.clear();
+
+    verify(claim).complete(false);
+  }
+
+  private static LeaseClaim claimLease(DatanodeDetails datanode) {
+    SCMFullContainerReportLeaseManager leases = new SCMFullContainerReportLeaseManager(1, 5_000L, true, () -> 0L, null);
+    long leaseId = leases.requestLease(datanode).getAsLong();
+    return leases.claimLease(datanode, leaseId).orElseThrow(AssertionError::new);
+  }
 
   @Test
   void replacesQueuedFullReportAtCapacity() {

@@ -485,7 +485,7 @@ public class ContainerSet implements Iterable<Container<?>> {
         LOG.info("Removed {} containers on failed volumes, asked SCM to close {} open EC containers among them",
             containerCount.get(), openEcCount.get());
         // There are some failed volume(container), send FCR to SCM
-        Message report = context.getFullContainerReportDiscardPendingICR();
+        Message report = context.getFullContainerReport();
         context.refreshFullReport(report);
         context.getParent().triggerHeartbeat();
       } catch (Exception e) {

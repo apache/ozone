@@ -105,8 +105,19 @@ public final class RegisterEndpointTask implements
             .setSoftwareVersion(
                 versionManager.getSoftwareVersion().serialize())
             .build();
-        ContainerReportsProto containerReport =
-            datanodeContainerManager.getController().getContainerReport();
+        boolean supportsFCRLease = stateContext.isFullContainerReportLeaseEnabled(rpcEndPoint);
+        ContainerReportsProto containerReport;
+        if (supportsFCRLease) {
+          // We create an empty FCR and noting the that FCR is deferred
+          // The defer flag is required to differentiate between
+          // DN that has not been granted an FCR lease and an actually empty DN.
+          containerReport = ContainerReportsProto.newBuilder()
+              .setFullContainerReportDeferred(true)
+              .build();
+        } else {
+          // Without FCR lease, we fallback to sending the FCR immediately
+          containerReport = datanodeContainerManager.getController().getContainerReport();
+        }
         NodeReportProto nodeReport = datanodeContainerManager.getNodeReport();
         PipelineReportsProto pipelineReportsProto =
             datanodeContainerManager.getPipelineReport();
@@ -151,6 +162,9 @@ public final class RegisterEndpointTask implements
           this.stateContext.configureReconHeartbeatFrequency();
         } else {
           this.stateContext.configureHeartbeatFrequency();
+        }
+        if (supportsFCRLease) {
+          this.stateContext.markFullContainerReportPending(rpcEndPoint.getAddress());
         }
       }
     } catch (IOException ex) {

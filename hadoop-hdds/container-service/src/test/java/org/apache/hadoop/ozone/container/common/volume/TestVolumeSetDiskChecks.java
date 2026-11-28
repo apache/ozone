@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +58,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -325,6 +327,9 @@ public class TestVolumeSetDiskChecks {
     HostAndPort scm1 = new HostAndPort("scm1", 9001);
     stateContext.addEndpoint(scm1);
     when(datanodeStateMachineMock.getContainer()).thenReturn(ozoneContainer);
+    SCMConnectionManager connections = mock(SCMConnectionManager.class);
+    when(datanodeStateMachineMock.getConnectionManager()).thenReturn(connections);
+    when(connections.getValues()).thenReturn(Collections.emptyList());
 
     Map<String, Integer> expectedReportCount = new HashMap<>();
     checkReportCount(stateContext.getAllAvailableReports(scm1),

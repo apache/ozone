@@ -139,8 +139,14 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   }
 
   @Override
-  public void onMessage(EventHandler<P> handler, P message, EventPublisher
+  public synchronized void onMessage(EventHandler<P> handler, P message, EventPublisher
       publisher) {
+    if (!isRunning.get()) {
+      if (message instanceof IEventInfo) {
+        ((IEventInfo) message).onDropped();
+      }
+      return;
+    }
     metrics.incrementQueued();
     // For messages that need to be routed to the same thread need to
     // implement hashCode to match the messages. This should be safe for
@@ -190,10 +196,18 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
   }
 
   @Override
-  public void close() {
+  public synchronized void close() {
     isRunning.set(false);
     for (ThreadPoolExecutor executor : executors) {
       executor.shutdown();
+    }
+    for (BlockingQueue<Q> queue : workQueues) {
+      Q message;
+      while ((message = queue.poll()) != null) {
+        if (message instanceof IEventInfo) {
+          ((IEventInfo) message).onDropped();
+        }
+      }
     }
     executorMap.clear();
     metrics.unregister();
@@ -234,6 +248,9 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
               report.getClass().getName());
           if (null == executor) {
             LOG.warn("Executor for report is not found");
+            if (report instanceof IEventInfo) {
+              ((IEventInfo) report).onDropped();
+            }
             continue;
           }
           

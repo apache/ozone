@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
@@ -53,9 +54,10 @@ public class EndpointStateMachine
   // RunningDatanodeState reads this without the endpoint lock and must see late SHUTDOWN transitions,
   // even after its wait for the endpoint task has timed out.
   private volatile EndPointStates state = EndPointStates.FIRST;
-  private VersionResponse version;
+  private volatile VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
   private boolean isPassive;
+  private FullContainerReportLeaseProto fullContainerReportLease;
   private final ExecutorService executorService;
 
   private static final String RECON_TYPE = "Recon";
@@ -112,6 +114,25 @@ public class EndpointStateMachine
    */
   public void setVersion(VersionResponse version) {
     this.version = version;
+  }
+
+  public boolean hasFullContainerReportLease() {
+    return fullContainerReportLease != null;
+  }
+
+  public void setFullContainerReportLease(
+      FullContainerReportLeaseProto lease) {
+    fullContainerReportLease = lease;
+  }
+
+  public FullContainerReportLeaseProto takeFullContainerReportLease() {
+    FullContainerReportLeaseProto lease = fullContainerReportLease;
+    fullContainerReportLease = null;
+    return lease;
+  }
+
+  public void clearFullContainerReportLease() {
+    fullContainerReportLease = null;
   }
 
   /**

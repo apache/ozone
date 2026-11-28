@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_RE_REGISTER_M
 import static org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates.GETVERSION;
 import static org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates.HEARTBEAT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
@@ -71,6 +73,7 @@ public class TestHeartbeatEndpointTaskRecovery {
     StorageContainerDatanodeProtocolClientSideTranslatorPB proxy = failingProxy();
     try (EndpointStateMachine endpoint = new EndpointStateMachine(SCM, proxy, conf, "")) {
       endpoint.setState(HEARTBEAT);
+      endpoint.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).build());
       context.addEndpoint(SCM);
       context.addIncrementalReport(newCommandStatusReport(11L));
       context.addIncrementalReport(IncrementalContainerReportProto.getDefaultInstance());
@@ -78,6 +81,7 @@ public class TestHeartbeatEndpointTaskRecovery {
       newHeartbeatTask(endpoint, conf, context).call();
 
       assertEquals(GETVERSION, endpoint.getState());
+      assertFalse(endpoint.hasFullContainerReportLease());
       verify(dsm).setNextHB(anyLong());
       List<Message> pendingReports = context.getAllAvailableReports(SCM);
       assertEquals(1, pendingReports.size());
