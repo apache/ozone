@@ -25,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -41,6 +43,7 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -56,10 +59,12 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.BlockStreamAccessor;
+import org.apache.hadoop.ozone.client.io.ECBlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -715,6 +720,60 @@ public class TestOzoneECClient {
       assertEquals(inSize, is.read(fileContent));
       assertArrayEquals(partialChunk, Arrays.copyOf(fileContent, inSize));
     }
+  }
+
+  /** Create the volume and bucket, and open an EC key with one chunk written. */
+  private ECKeyOutputStream openECKeyWithOneChunk() throws IOException {
+    store.createVolume(volumeName);
+    store.getVolume(volumeName).createBucket(bucketName);
+    OzoneOutputStream out = store.getVolume(volumeName).getBucket(bucketName).createKey(keyName, inputSize,
+        new ECReplicationConfig(dataBlocks, parityBlocks, ECReplicationConfig.EcCodec.RS, chunkSize),
+        new HashMap<>());
+    out.write(inputChunks[0]);
+    return (ECKeyOutputStream) out.getOutputStream();
+  }
+
+  @Test
+  public void testEncoderReleasedWhenCleanupFails() throws Exception {
+    RawErasureEncoder spyEncoder = spy(new RSRawErasureCoderFactory()
+        .createEncoder(new ECReplicationConfig(dataBlocks, parityBlocks)));
+    try (MockedStatic<CodecUtil> mocked = mockStatic(CodecUtil.class)) {
+      mocked.when(() -> CodecUtil.createRawEncoderWithFallback(any()))
+          .thenReturn(spyEncoder);
+      ECKeyOutputStream out = openECKeyWithOneChunk();
+      BufferPool bufferPool = closeOnlyCurrentEntry(out, mock(ECBlockOutputStreamEntry.class));
+      // closing the buffer again in cleanup() fails as a double release
+      bufferPool.allocateBuffer(0).close();
+
+      assertThrows(IllegalStateException.class, out::close);
+    }
+    verify(spyEncoder).release();
+  }
+
+  @Test
+  public void testCleanupWhenClosingTheStreamEntryFails() throws Exception {
+    ECKeyOutputStream out = openECKeyWithOneChunk();
+    BlockOutputStreamEntry failing = mock(ECBlockOutputStreamEntry.class);
+    doThrow(new IllegalStateException("close failed")).when(failing).close();
+    BufferPool bufferPool = closeOnlyCurrentEntry(out, failing);
+    bufferPool.allocateBuffer(0);
+
+    assertThrows(IllegalStateException.class, out::close);
+    assertEquals(0, bufferPool.getSize());
+    assertTrue(out.getStreamEntries().isEmpty());
+  }
+
+  /**
+   * As after a failed write, make close() skip the flush and only close the current entry, replaced by the given one.
+   * @return the buffer pool of the stream.
+   */
+  private static BufferPool closeOnlyCurrentEntry(ECKeyOutputStream out, BlockOutputStreamEntry entry)
+      throws IllegalAccessException {
+    FieldUtils.writeField(out, "closing", true, true);
+    List<BlockOutputStreamEntry> entries = out.getStreamEntries();
+    BufferPool bufferPool = new BlockStreamAccessor(entries.get(0)).getBufferPool();
+    entries.set(0, entry);
+    return bufferPool;
   }
 
   @Test

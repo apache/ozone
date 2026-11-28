@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
@@ -51,10 +52,16 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   private final List<CodecBuffer> underlying;
   /** Is this a duplicated buffer? (for debug only) */
   private final boolean isDuplicated;
+  /** Are the underlying buffers released? Shared with the duplicates, which do not own them. */
+  private final AtomicBoolean released;
   /** The index of the first non-full buffer. */
   private int firstNonFullIndex = 0;
 
   IncrementalChunkBuffer(int limit, int increment, boolean isDuplicated) {
+    this(limit, increment, isDuplicated, new AtomicBoolean());
+  }
+
+  private IncrementalChunkBuffer(int limit, int increment, boolean isDuplicated, AtomicBoolean released) {
     Preconditions.checkArgument(limit >= 0);
     Preconditions.checkArgument(increment > 0);
     this.limit = limit;
@@ -64,12 +71,27 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     this.buffers = new ArrayList<>(size);
     this.underlying = isDuplicated ? Collections.emptyList() : new ArrayList<>(size);
     this.isDuplicated = isDuplicated;
+    this.released = released;
+  }
+
+  /** Assert that the memory of the buffers is not released, before accessing it. */
+  private void assertNotReleased() {
+    if (released.get()) {
+      throw new IllegalStateException(this + " is already released");
+    }
   }
 
   @Override
   public void close() {
-    underlying.forEach(CodecBuffer::release);
+    if (!isDuplicated) {
+      released.set(true);
+    }
+    // A buffer that fails to release must not leak the others, nor leave them to be released again.
+    final RuntimeException failure = BufferUtils.closeAll(underlying, null);
     underlying.clear();
+    if (failure != null) {
+      throw failure;
+    }
   }
 
   /** @return the capacity for the buffer at the given index. */
@@ -212,6 +234,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   @Override
   public ChunkBuffer put(ByteBuffer that) {
     checkArgument(that);
+    assertNotReleased();
 
     final int thatLimit = that.limit();
     for (int p = position(); that.position() < thatLimit;) {
@@ -227,6 +250,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   @Override
   public ChunkBuffer put(byte[] b, int offset, int length) {
     checkArgument(b, offset, length);
+    assertNotReleased();
 
     final int end = offset + length;
     for (int p = position(); offset < end;) {
@@ -249,8 +273,9 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
     Preconditions.checkArgument(newPosition >= 0);
     Preconditions.checkArgument(newPosition <= newLimit);
     Preconditions.checkArgument(newLimit <= limit);
+    assertNotReleased();
     final IncrementalChunkBuffer duplicated = new IncrementalChunkBuffer(
-        newLimit, increment, true);
+        newLimit, increment, true, released);
 
     final int pi = newPosition / increment;
     final int pr = newPosition % increment;
@@ -287,16 +312,19 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
 
   @Override
   public List<ByteBuffer> asByteBufferList() {
+    assertNotReleased();
     return Collections.unmodifiableList(buffers);
   }
 
   @Override
   public long writeTo(GatheringByteChannel channel) throws IOException {
+    assertNotReleased();
     return BufferUtils.writeFully(channel, buffers);
   }
 
   @Override
   public ByteString toByteStringImpl(Function<ByteBuffer, ByteString> f) {
+    assertNotReleased();
     ByteString result = ByteString.EMPTY;
     for (ByteBuffer buffer : buffers) {
       result = result.concat(f.apply(buffer));
@@ -307,6 +335,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   @Override
   public List<ByteString> toByteStringListImpl(
       Function<ByteBuffer, ByteString> f) {
+    assertNotReleased();
     List<ByteString> byteStringList = new ArrayList<>();
     for (ByteBuffer buffer : buffers) {
       byteStringList.add(f.apply(buffer));

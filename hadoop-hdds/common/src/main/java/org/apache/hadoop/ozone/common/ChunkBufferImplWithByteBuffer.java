@@ -25,23 +25,43 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** {@link ChunkBuffer} implementation using a single {@link ByteBuffer}. */
 final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
+  private static final BooleanSupplier NEVER_RELEASED = () -> false;
+
   private final ByteBuffer buffer;
   private final UncheckedAutoCloseable underlying;
+  /** Is the memory of {@link #buffer} released? Shared with the duplicates, which do not own it. */
+  private final BooleanSupplier released;
 
   ChunkBufferImplWithByteBuffer(ByteBuffer buffer) {
-    this(buffer, null);
+    this(buffer, null, NEVER_RELEASED);
   }
 
-  ChunkBufferImplWithByteBuffer(ByteBuffer buffer, UncheckedAutoCloseable underlying) {
+  ChunkBufferImplWithByteBuffer(ByteBuffer buffer, CodecBuffer underlying) {
+    this(buffer, underlying, underlying.getReleaseFuture()::isDone);
+  }
+
+  private ChunkBufferImplWithByteBuffer(ByteBuffer buffer, UncheckedAutoCloseable underlying,
+      BooleanSupplier released) {
     this.buffer = Objects.requireNonNull(buffer, "buffer == null");
     this.underlying = underlying;
+    this.released = released;
+  }
+
+  /** @return {@link #buffer} for an access to its memory, which must not be released. */
+  private ByteBuffer buffer() {
+    if (released.getAsBoolean()) {
+      throw new IllegalStateException(this + " is already released");
+    }
+    return buffer;
   }
 
   @Override
@@ -85,7 +105,7 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
         if (!buffer.hasRemaining()) {
           throw new NoSuchElementException();
         }
-        final ByteBuffer duplicated = buffer.duplicate();
+        final ByteBuffer duplicated = buffer().duplicate();
         final int min = Math.min(
             buffer.position() + bufferSize, buffer.limit());
         duplicated.limit(min);
@@ -97,31 +117,31 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
 
   @Override
   public List<ByteBuffer> asByteBufferList() {
-    return Collections.singletonList(buffer);
+    return Collections.singletonList(buffer());
   }
 
   @Override
   public long writeTo(GatheringByteChannel channel) throws IOException {
-    return BufferUtils.writeFully(channel, buffer);
+    return BufferUtils.writeFully(channel, buffer());
   }
 
   @Override
   public ChunkBuffer duplicate(int newPosition, int newLimit) {
-    final ByteBuffer duplicated = buffer.duplicate();
+    final ByteBuffer duplicated = buffer().duplicate();
     duplicated.position(newPosition).limit(newLimit);
-    return new ChunkBufferImplWithByteBuffer(duplicated);
+    return new ChunkBufferImplWithByteBuffer(duplicated, null, released);
   }
 
   @Override
   public ChunkBuffer put(ByteBuffer b) {
-    buffer.put(b);
+    buffer().put(b);
     return this;
   }
 
   @Override
   public ChunkBuffer put(byte[] b, int offset, int length) {
     checkArgument(b, offset, length);
-    buffer.put(b, offset, length);
+    buffer().put(b, offset, length);
     return this;
   }
 
@@ -132,7 +152,7 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
 
   @Override
   public ChunkBuffer put(byte b) {
-    buffer.put(b);
+    buffer().put(b);
     return this;
   }
 
@@ -144,13 +164,13 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
 
   @Override
   public ByteString toByteStringImpl(Function<ByteBuffer, ByteString> f) {
-    return f.apply(buffer);
+    return f.apply(buffer());
   }
 
   @Override
   public List<ByteString> toByteStringListImpl(
       Function<ByteBuffer, ByteString> f) {
-    return Collections.singletonList(f.apply(buffer));
+    return Collections.singletonList(f.apply(buffer()));
   }
 
   @Override

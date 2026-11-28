@@ -54,6 +54,28 @@ class TestBufferPool {
     testBufferPool(10, 1 << 10);
   }
 
+  /** A buffer that fails to close must not keep the other buffers from closing, nor leave them in the pool. */
+  @Test
+  void testClearBufferPoolClosesAllBuffersWhenSomeFail() throws Exception {
+    final BufferPool pool = new BufferPool(16, 4);
+    final ChunkBuffer first = pool.allocateBuffer(0);
+    final ChunkBuffer failing = pool.allocateBuffer(0);
+    final ChunkBuffer alsoFailing = pool.allocateBuffer(0);
+    final ChunkBuffer released = pool.allocateBuffer(0);
+    pool.releaseBuffer(released);
+    // closing a buffer a second time fails
+    failing.close();
+    alsoFailing.close();
+
+    final IllegalStateException e = assertThrows(IllegalStateException.class, pool::clearBufferPool);
+    assertEquals(1, e.getSuppressed().length);
+    assertEquals(0, pool.getSize());
+    assertNull(pool.getCurrentBuffer());
+    // the buffers that did not fail were closed
+    assertThrows(IllegalStateException.class, first::close);
+    assertThrows(IllegalStateException.class, released::close);
+  }
+
   @Test
   void testBufferPoolConcurrently() throws Exception {
     final BufferPool pool = new BufferPool(1 << 20, 10);

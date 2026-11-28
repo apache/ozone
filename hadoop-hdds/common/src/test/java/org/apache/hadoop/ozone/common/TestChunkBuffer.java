@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
 import java.io.ByteArrayOutputStream;
@@ -37,6 +38,7 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.IntFunction;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.utils.MockGatheringChannel;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
@@ -242,6 +244,56 @@ public class TestChunkBuffer {
       assertEquals(7, buffer.position());
       assertArrayEquals(Arrays.copyOfRange(source, 1, 8), readWrittenBytes(buffer));
     }
+  }
+
+  static Stream<Arguments> ownedChunkBuffers() {
+    return Stream.of(
+        Arguments.of("ImplWithByteBuffer", (IntFunction<ChunkBuffer>) ChunkBuffer::allocate),
+        Arguments.of("Incremental", (IntFunction<ChunkBuffer>) cap -> ChunkBuffer.allocate(cap, cap / 4)));
+  }
+
+  /** Once closed, the memory may belong to another buffer: neither the buffer nor its duplicates may access it. */
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("ownedChunkBuffers")
+  void testAccessAfterCloseFails(String ignored, IntFunction<ChunkBuffer> allocate) {
+    final ChunkBuffer buffer = allocate.apply(16);
+    buffer.put(new byte[8]);
+    final ChunkBuffer duplicate = buffer.duplicate(0, 8);
+    buffer.close();
+
+    assertThrows(IllegalStateException.class, () -> buffer.put((byte) 1));
+    assertThrows(IllegalStateException.class, () -> buffer.toByteString(ByteString::copyFrom));
+    assertThrows(IllegalStateException.class, () -> buffer.duplicate(0, 8));
+    assertThrows(IllegalStateException.class, () -> duplicate.toByteString(ByteString::copyFrom));
+    assertThrows(IllegalStateException.class, duplicate::asByteBufferList);
+  }
+
+  @Test
+  void testWrappedBufferIsAccessibleAfterClose() {
+    final ChunkBuffer buffer = ChunkBuffer.wrap(ByteBuffer.allocate(8));
+    buffer.close();
+    buffer.put((byte) 1);
+    assertEquals(1, buffer.position());
+  }
+
+  @Test
+  void testCloseIncrementalReleasesAllBuffersWhenOneFails() throws Exception {
+    final ChunkBuffer buffer = ChunkBuffer.allocate(9, 3);
+    buffer.put(ByteBuffer.wrap(new byte[9]));
+    @SuppressWarnings("unchecked")
+    final List<CodecBuffer> underlying = (List<CodecBuffer>) FieldUtils.readField(buffer, "underlying", true);
+    final List<CodecBuffer> allocated = new ArrayList<>(underlying);
+    assertEquals(3, allocated.size());
+    // releasing it again in close() fails as a double release
+    final CodecBuffer released = CodecBuffer.allocateDirect(1);
+    released.release();
+    underlying.add(0, released);
+
+    assertThrows(IllegalStateException.class, buffer::close);
+    assertTrue(underlying.isEmpty());
+    allocated.forEach(b -> assertTrue(b.getReleaseFuture().isDone()));
+    // a second close does not release the buffers again
+    buffer.close();
   }
 
   @Test

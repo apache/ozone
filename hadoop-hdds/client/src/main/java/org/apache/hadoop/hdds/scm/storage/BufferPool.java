@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
@@ -159,14 +160,21 @@ public class BufferPool {
     }
   }
 
+  /**
+   * Close all the buffers and empty this pool. A buffer that fails to close does not stop the others from closing;
+   * the first failure is thrown, with any later ones suppressed.
+   */
   public void clearBufferPool() {
     lock.lock();
     try {
-      allocated.forEach(ChunkBuffer::close);
-      released.forEach(ChunkBuffer::close);
+      RuntimeException failure = BufferUtils.closeAll(allocated, null);
+      failure = BufferUtils.closeAll(released, failure);
       allocated.clear();
       released.clear();
       currentBuffer = null;
+      if (failure != null) {
+        throw failure;
+      }
     } finally {
       lock.unlock();
     }

@@ -272,6 +272,19 @@ public class CodecBuffer implements UncheckedAutoCloseable {
   }
 
   /**
+   * Assert that this buffer can be accessed. Once released, the pool may have handed {@link #buf} to another owner,
+   * whose refCnt is also 1, so the refCnt alone does not detect a use after release.
+   * A zero capacity buffer, possibly the singleton, may be released and still used.
+   */
+  private void assertAccessible() {
+    if (released.isDone() && buf.capacity() > 0) {
+      throw new IllegalStateException(getClass().getSimpleName() + "@"
+          + Integer.toHexString(System.identityHashCode(this)) + " is already released");
+    }
+    assertRefCnt(1);
+  }
+
+  /**
    * Detect buffer leak by asserting that the underlying buffer is released
    * when this object is garbage collected.
    * This method may be invoked inside the {@link #finalize()} method
@@ -309,8 +322,11 @@ public class CodecBuffer implements UncheckedAutoCloseable {
       // Allow a zero capacity buffer to be released multiple times.
       Preconditions.assertSame(0, buf.capacity(), "capacity");
     }
+    // Read the count before releasing: once the last reference is released, the pool may already have handed the
+    // same ByteBuf object to another thread, so its refCnt() no longer describes this buffer.
+    final int refCnt = buf.refCnt();
     if (buf.release()) {
-      assertRefCnt(0);
+      Preconditions.assertSame(1, refCnt, "refCnt");
     } else {
       // A zero capacity buffer, possibly singleton, may not be able released.
       Preconditions.assertSame(0, buf.capacity(), "capacity");
@@ -354,13 +370,13 @@ public class CodecBuffer implements UncheckedAutoCloseable {
 
   /** @return a writable {@link ByteBuffer}. */
   public ByteBuffer asWritableByteBuffer() {
-    assertRefCnt(1);
+    assertAccessible();
     return buf.nioBuffer(0, buf.maxCapacity());
   }
 
   /** @return a readonly {@link ByteBuffer} view of this buffer. */
   public ByteBuffer asReadOnlyByteBuffer() {
-    assertRefCnt(1);
+    assertAccessible();
     Preconditions.assertTrue(buf.nioBufferCount() > 0);
     return buf.nioBuffer().asReadOnlyBuffer();
   }
@@ -396,7 +412,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    * @return this object.
    */
   public CodecBuffer putShort(short n) {
-    assertRefCnt(1);
+    assertAccessible();
     final ByteBuf returned = buf.writeShort(n);
     Preconditions.assertSame(buf, returned, "buf");
     return this;
@@ -408,7 +424,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    * @return this object.
    */
   public CodecBuffer putInt(int n) {
-    assertRefCnt(1);
+    assertAccessible();
     final ByteBuf returned = buf.writeInt(n);
     Preconditions.assertSame(buf, returned, "buf");
     return this;
@@ -420,7 +436,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    * @return this object.
    */
   public CodecBuffer putLong(long n) {
-    assertRefCnt(1);
+    assertAccessible();
     final ByteBuf returned = buf.writeLong(n);
     Preconditions.assertSame(buf, returned, "buf");
     return this;
@@ -432,7 +448,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    * @return this object.
    */
   public CodecBuffer put(byte val) {
-    assertRefCnt(1);
+    assertAccessible();
     final ByteBuf returned = buf.writeByte(val);
     Preconditions.assertSame(buf, returned, "buf");
     return this;
@@ -444,7 +460,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    * @return this object.
    */
   public CodecBuffer put(ByteBuffer buffer) {
-    assertRefCnt(1);
+    assertAccessible();
     buf.writeBytes(buffer);
     return this;
   }
@@ -456,7 +472,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    * @return this object.
    */
   CodecBuffer put(ToIntFunction<ByteBuffer> source) {
-    assertRefCnt(1);
+    assertAccessible();
     final int w = buf.writerIndex();
     final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
     final int size = source.applyAsInt(buffer);
@@ -474,7 +490,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    * @throws CodecException in case the source throws an {@link IOException}.
    */
   public CodecBuffer put(CheckedFunction<OutputStream, Integer, IOException> source) throws CodecException {
-    assertRefCnt(1);
+    assertAccessible();
     final int w = buf.writerIndex();
     final int size;
     try (ByteBufOutputStream out = new ByteBufOutputStream(buf)) {
@@ -502,7 +518,7 @@ public class CodecBuffer implements UncheckedAutoCloseable {
    */
   <E extends Exception> Integer putFromSource(
       PutToByteBuffer<E> source) throws E {
-    assertRefCnt(1);
+    assertAccessible();
     final int i = buf.writerIndex();
     final int writable = buf.writableBytes();
     final ByteBuffer buffer = buf.nioBuffer(i, writable);
@@ -519,6 +535,9 @@ public class CodecBuffer implements UncheckedAutoCloseable {
 
   @Override
   public String toString() {
+    if (released.isDone()) {
+      return getClass().getSimpleName() + "[released]";
+    }
     return getClass().getSimpleName()
         + "[" + buf.readerIndex()
         + "<=" + buf.writerIndex()

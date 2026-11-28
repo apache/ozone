@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -206,5 +207,28 @@ public final class BufferUtils {
       }
     }
     return written;
+  }
+
+  /**
+   * Close all the given buffers, even if some fail to close.
+   *
+   * @param failure the failure so far, or null.
+   * @return the first failure, with any later ones suppressed, or null if all the buffers closed.
+   */
+  public static RuntimeException closeAll(Iterable<? extends UncheckedAutoCloseable> buffers,
+      RuntimeException failure) {
+    for (UncheckedAutoCloseable buffer : buffers) {
+      try {
+        buffer.close();
+      } catch (RuntimeException e) {
+        if (failure == null) {
+          failure = e;
+        } else if (failure != e) {
+          // the same exception thrown twice cannot suppress itself
+          failure.addSuppressed(e);
+        }
+      }
+    }
+    return failure;
   }
 }
