@@ -42,7 +42,9 @@ import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.lang.reflect.Proxy;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -363,7 +365,7 @@ public final class TracingUtil {
     }
 
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
-    Context extract = propagator.extract(Context.current(), encodedParent, new TextExtractor());
+    Context extract = propagator.extract(Context.current(), encodedParent, TextExtractor.INSTANCE);
     return tracer.spanBuilder(name)
         .setParent(extract)
         .setSpanKind(spanKind)
@@ -645,37 +647,76 @@ public final class TracingUtil {
 
   /**
    * A TextMapGetter implementation to extract tracing info from String.
+   * The carrier has the form {@code key1=value1;key2=value2;} as written by {@link #exportCurrentSpan()}.
+   * Stateless: each lookup scans the carrier instead of building a map, so one instance is shared.
    */
   public static class TextExtractor implements io.opentelemetry.context.propagation.TextMapGetter<String> {
-    private Map<String, String> map = new HashMap<>();
+    static final TextExtractor INSTANCE = new TextExtractor();
 
     @Override
     public Iterable<String> keys(String carrier) {
-      if (map.isEmpty()) {
-        parse(carrier);
-      }
-      return map.keySet();
+      Set<String> keys = new LinkedHashSet<>();
+      scan(carrier, null, keys);
+      return keys;
     }
 
     @Override
     public String get(String carrier, String key) {
-      if (map.isEmpty()) {
-        parse(carrier);
-      }
-      return map.get(key);
+      return key == null ? null : scan(carrier, key, null);
     }
 
-    private void parse(String carrier) {
-      if (carrier == null || carrier.isEmpty()) {
-        return;
+    /**
+     * Same rules as {@code split(";")} then {@code split("=")} with {@code length == 2} and trimmed key/value;
+     * the last duplicate wins. Returns the value of {@code key}, or collects all keys into {@code keysOut}.
+     */
+    private static String scan(String carrier, String key, Set<String> keysOut) {
+      if (carrier == null) {
+        return null;
       }
-      String[] parts = carrier.split(";");
-      for (String part : parts) {
-        String[] kv = part.split("=");
-        if (kv.length == 2) {
-          map.put(kv[0].trim(), kv[1].trim());
+      String found = null;
+      int len = carrier.length();
+      int start = 0;
+      while (start < len) {
+        int end = carrier.indexOf(';', start);
+        if (end < 0) {
+          end = len;
         }
+        // Like String.split("="): trailing '=' characters produce no value.
+        int valueEnd = end;
+        while (valueEnd > start && carrier.charAt(valueEnd - 1) == '=') {
+          valueEnd--;
+        }
+        int eq = carrier.indexOf('=', start);
+        if (eq >= 0 && eq < valueEnd) {
+          int eq2 = carrier.indexOf('=', eq + 1);
+          if (eq2 < 0 || eq2 >= valueEnd) {
+            int ks = trimStart(carrier, start, eq);
+            int ke = trimEnd(carrier, ks, eq);
+            if (keysOut != null) {
+              keysOut.add(carrier.substring(ks, ke));
+            } else if (ke - ks == key.length() && carrier.startsWith(key, ks)) {
+              int vs = trimStart(carrier, eq + 1, valueEnd);
+              found = carrier.substring(vs, trimEnd(carrier, vs, valueEnd));
+            }
+          }
+        }
+        start = end + 1;
       }
+      return found;
+    }
+
+    private static int trimStart(String s, int from, int to) {
+      while (from < to && s.charAt(from) <= ' ') {
+        from++;
+      }
+      return from;
+    }
+
+    private static int trimEnd(String s, int from, int to) {
+      while (to > from && s.charAt(to - 1) <= ' ') {
+        to--;
+      }
+      return to;
     }
   }
 
