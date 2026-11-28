@@ -47,29 +47,6 @@ public class TestOmBucketInfo {
       new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.DAYS, 30), null);
 
   @Test
-  public void comparesObjectLockFields() {
-    BucketRetention retention = new BucketRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
-        new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.DAYS, 30), null);
-    OmBucketInfo bucket = OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("bucket")
-        .setObjectLockEnabled(true).setDefaultRetention(retention).build();
-    assertEquals(bucket, bucket.copyObject());
-    assertNotEquals(bucket, bucket.toBuilder().setObjectLockEnabled(false).build());
-    assertNotEquals(bucket, bucket.toBuilder().setDefaultRetention(null).build());
-    assertNotEquals(bucket, bucket.toBuilder().setDefaultRetention(
-        new BucketRetention(retention.getRetentionMode(),
-            new RetentionDuration(retention.getDuration().getTimeUnit(), 31), null))
-        .build());
-    assertEquals("true", bucket.toAuditMap().get(OzoneConsts.OBJECT_LOCK_ENABLED));
-    assertFalse(bucket.toAuditMap().containsKey(OzoneConsts.DEFAULT_RETENTION));
-    assertTrue(bucket.toString().contains("objectLockEnabled=true"));
-    assertTrue(bucket.toString().contains("defaultRetention=" + retention));
-    assertTrue(retention.toString().contains("GOVERNANCE"));
-    assertTrue(retention.toString().contains("duration: 30"));
-    OmBucketInfo withoutLock = bucket.toBuilder().setObjectLockEnabled(false).setDefaultRetention(null).build();
-    assertEquals("false", withoutLock.toAuditMap().get(OzoneConsts.OBJECT_LOCK_ENABLED));
-  }
-
-  @Test
   public void protobufConversion() {
     OmBucketInfo bucket = OmBucketInfo.newBuilder()
         .setBucketName("bucket")
@@ -148,6 +125,21 @@ public class TestOmBucketInfo {
     OmBucketInfo rebuilt = omBucketInfo.toBuilder().build();
     assertTrue(rebuilt.isObjectLockEnabled());
     assertEquals(RETENTION, rebuilt.getDefaultRetention());
+
+    assertNotEquals(omBucketInfo, omBucketInfo.toBuilder().setObjectLockEnabled(false).build());
+    assertNotEquals(omBucketInfo, omBucketInfo.toBuilder().setDefaultRetention(null).build());
+    BucketRetention longerRetention = new BucketRetention(RETENTION.getRetentionMode(),
+        new RetentionDuration(RETENTION.getDuration().getTimeUnit(), 31), null);
+    assertNotEquals(omBucketInfo, omBucketInfo.toBuilder().setDefaultRetention(longerRetention).build());
+
+    assertEquals("true", omBucketInfo.toAuditMap().get(OzoneConsts.OBJECT_LOCK_ENABLED));
+    assertFalse(omBucketInfo.toAuditMap().containsKey(OzoneConsts.DEFAULT_RETENTION));
+    assertTrue(omBucketInfo.toString().contains("objectLockEnabled=true"));
+    assertTrue(omBucketInfo.toString().contains("defaultRetention=" + RETENTION));
+    assertTrue(RETENTION.toString().contains("COMPLIANCE"));
+    assertTrue(RETENTION.toString().contains("duration: 30"));
+    OmBucketInfo withoutLock = omBucketInfo.toBuilder().setObjectLockEnabled(false).setDefaultRetention(null).build();
+    assertEquals("false", withoutLock.toAuditMap().get(OzoneConsts.OBJECT_LOCK_ENABLED));
   }
 
   @Test
