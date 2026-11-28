@@ -46,7 +46,6 @@ Datanode In Maintenance Mode
     ${result} =             Execute                         ozone admin datanode list | grep "Operational State:*"
                             Wait Until Keyword Succeeds      30sec   5sec    Should contain   ${result}   ENTERING_MAINTENANCE
                             Wait Until Keyword Succeeds      3min    10sec   Related pipelines are closed
-                            Sleep                   60000ms
 
 Related pipelines are closed
     ${result} =         Execute          ozone admin datanode list | awk -v RS= '{$1=$1}1'|grep MAINT | sed -e 's/^.*pipelines: \\(.*\\)$/\\1/'
@@ -56,11 +55,17 @@ Datanode Recommission
     ${result} =             Execute                         ozone admin datanode recommission ${HOST}
                             Should Contain                  ${result}             Started recommissioning datanode
                             Wait Until Keyword Succeeds      1min    10sec    Datanode Recommission is Finished
-                            Sleep                   300000ms
+                            Wait Until Keyword Succeeds      5min    10sec    All Containers And Replicas Are Closed
 
 Datanode Recommission is Finished
     ${result} =             Execute                         ozone admin datanode list | grep "Operational State:*"
                             Should Not Contain   ${result}   ENTERING_MAINTENANCE
+
+All Containers And Replicas Are Closed
+    ${states} =             Execute          ozone admin container list | jq -r '.[].state' | sort -u
+                            Should Be Equal   ${states}   CLOSED
+    ${replica_states} =     Execute          for c in $(ozone admin container list | jq -r '.[].containerID'); do ozone admin container info "$c" --json | jq -r '.replicas[].state'; done | sort -u
+                            Should Be Equal   ${replica_states}   CLOSED
 
 Run Container Balancer
     ${result} =             Execute                         ozone admin containerbalancer start -t 0.1 -d 100 -i 3
