@@ -527,9 +527,9 @@ public class KeyOutputStream extends OutputStream
         throw new UnsupportedOperationException(
             "Replication type is not " + ReplicationType.RATIS);
       }
-      if (replication.getRequiredNodes() <= 1) {
+      if (replication.getRequiredNodes() <= 0) {
         throw new UnsupportedOperationException("The replication factor = "
-            + replication.getRequiredNodes() + " <= 1");
+            + replication.getRequiredNodes() + " <= 0");
       }
       if (!OzoneManagerVersion.HBASE_SUPPORT.isSupportedBy(ozoneManagerVersion)) {
         throw new UnsupportedOperationException("Hsync API requires OM version "

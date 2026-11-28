@@ -64,6 +64,23 @@ public class OzoneClientConfig {
           "temporarily for this period of time(seconds).",
       tags = { ConfigTag.CLIENT })
   private long shortCircuitReadDisableInterval = 60 * 10;
+
+  @Config(key = SHORT_CIRCUIT_PREFIX + "streams.cache.size",
+      defaultValue = "256",
+      type = ConfigType.INT,
+      description = "Maximum number of local block replicas (block metadata and open file descriptor) cached by " +
+          "a client for short-circuit read, so that reopening a cached block does not send GetBlock to the " +
+          "datanode again. Set to 0 to disable the cache. Only used when short-circuit read is enabled.",
+      tags = { ConfigTag.CLIENT })
+  private int shortCircuitBlockCacheSize = 256;
+
+  @Config(key = SHORT_CIRCUIT_PREFIX + "streams.cache.expiry",
+      defaultValue = "5m",
+      type = ConfigType.TIME,
+      description = "Time after its last access when a local block replica is removed from the short-circuit " +
+          "block cache.",
+      tags = { ConfigTag.CLIENT })
+  private Duration shortCircuitBlockCacheExpiry = Duration.ofMinutes(5);
   
   @Config(key = "ozone.client.stream.buffer.flush.size",
       defaultValue = "16MB",
@@ -533,6 +550,22 @@ public class OzoneClientConfig {
 
   public void setShortCircuitReadDisableInterval(long value) {
     shortCircuitReadDisableInterval = value;
+  }
+
+  public int getShortCircuitBlockCacheSize() {
+    return shortCircuitBlockCacheSize;
+  }
+
+  public void setShortCircuitBlockCacheSize(int size) {
+    this.shortCircuitBlockCacheSize = size;
+  }
+
+  public Duration getShortCircuitBlockCacheExpiry() {
+    return shortCircuitBlockCacheExpiry;
+  }
+
+  public void setShortCircuitBlockCacheExpiry(Duration expiry) {
+    this.shortCircuitBlockCacheExpiry = expiry;
   }
 
   public long getStreamBufferFlushSize() {

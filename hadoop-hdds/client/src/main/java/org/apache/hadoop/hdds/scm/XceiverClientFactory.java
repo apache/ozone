@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.ShortCircuitStreamCache;
 
 /**
  * Interface to provide XceiverClient when needed.
@@ -86,5 +87,14 @@ public interface XceiverClientFactory extends AutoCloseable {
 
   default boolean isShortCircuitEnabled() {
     return false;
+  }
+
+  default boolean isShortCircuitReady() {
+    return false;
+  }
+
+  /** @return the cache of local block replicas for short-circuit read, or null if not available. */
+  default ShortCircuitStreamCache getShortCircuitStreamCache() {
+    return null;
   }
 }

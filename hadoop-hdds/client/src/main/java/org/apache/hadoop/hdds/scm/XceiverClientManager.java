@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.DomainSocketFactory;
+import org.apache.hadoop.hdds.scm.storage.ShortCircuitStreamCache;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.util.CacheMetrics;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
@@ -86,6 +87,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   /** Unreferenced clients evicted by {@link #close()}, to be closed by it; guarded by {@link #clientCache}. */
   private List<XceiverClientSpi> clientsToClose;
   private final ExecutorService closeExecutor;
+  private ShortCircuitStreamCache shortCircuitStreamCache = null;
 
   /**
    * Creates a new XceiverClientManager for non secured ozone cluster.
@@ -125,6 +127,19 @@ public class XceiverClientManager extends XceiverClientCreator {
 
     cacheMetrics = CacheMetrics.create(clientCache, this);
     this.localDNCache = new ConcurrentHashMap<>();
+
+    OzoneClientConfig ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
+    int blockCacheSize = ozoneClientConfig.getShortCircuitBlockCacheSize();
+    long blockCacheStaleThresholdMs = ozoneClientConfig.getShortCircuitBlockCacheExpiry().toMillis();
+    if (isShortCircuitEnabled() && blockCacheSize > 0 && blockCacheStaleThresholdMs > 0) {
+      this.shortCircuitStreamCache = new ShortCircuitStreamCache(blockCacheSize,
+          blockCacheStaleThresholdMs, closeExecutor, cleanupExecutor);
+    }
+  }
+
+  @Override
+  public ShortCircuitStreamCache getShortCircuitStreamCache() {
+    return shortCircuitStreamCache;
   }
 
   private void onRemoval(XceiverClientSpi info) {
@@ -275,7 +290,7 @@ public class XceiverClientManager extends XceiverClientCreator {
 
     // Short-circuit reads are not supported for EC keys. EC key reads use a single-node STAND_ALONE pipeline per
     // replica, which is recognized by its non-zero replica index.
-    if (allowShortCircuit && !isEC && isShortCircuitEnabled() && !isECReplica(pipeline)) {
+    if (allowShortCircuit && !isEC && isShortCircuitReady() && !isECReplica(pipeline)) {
       int port = 0;
       InetSocketAddress localAddr = null;
       for (DatanodeDetails dn : pipeline.getNodes()) {
@@ -349,6 +364,9 @@ public class XceiverClientManager extends XceiverClientCreator {
   @Override
   public void close() {
     super.close();
+    if (shortCircuitStreamCache != null) {
+      shortCircuitStreamCache.close();
+    }
     cleanupExecutor.shutdown();
     final List<XceiverClientSpi> unreferenced = new ArrayList<>();
     synchronized (clientCache) {

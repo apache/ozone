@@ -2368,6 +2368,8 @@
                       <exclusion>org.apache.hadoop.hdds.scm.storage.LocalChunkInputStream</exclusion>
                       <exclusion>org.apache.hadoop.hdds.scm.XceiverClientShortCircuit</exclusion>
                       <exclusion>org.apache.hadoop.hdds.scm.storage.BlockInputStream</exclusion>
+                      <exclusion>org.apache.hadoop.hdds.scm.storage.ShortCircuitStreamCache</exclusion>
+                      <exclusion>org.apache.hadoop.hdds.scm.storage.TestShortCircuitStreamCache</exclusion>
                       <exclusion>org.apache.hadoop.hdds.TestXceiverServerDomainSocket</exclusion>
                     </exclusions>
                   </restrictImports>

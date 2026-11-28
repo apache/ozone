@@ -23,7 +23,10 @@ import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -72,6 +75,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private XceiverClientShortCircuit xceiverClientShortCircuit;
   private final AtomicBoolean fallbackToGrpc = new AtomicBoolean(false);
   private volatile FileInputStream blockFileInputStream;
+  // Set when blockFileInputStream is owned by the short-circuit block cache instead of this stream.
+  private ShortCircuitStreamCache.Replica cachedReplica;
   private volatile boolean initialized = false;
   // TODO: do we need to change retrypolicy based on exception.
   private final RetryPolicy retryPolicy;
@@ -222,11 +227,47 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * @return BlockData.
    */
   protected BlockData getBlockData() throws IOException {
+    releaseCachedReplica();
+    final ShortCircuitStreamCache cache = getShortCircuitStreamCache();
+    if (cache != null) {
+      final ShortCircuitStreamCache.Replica replica = cache.acquire(blockID, length);
+      if (replica != null) {
+        cachedReplica = replica;
+        blockFileInputStream = replica.getStream();
+        return replica.getBlockData();
+      }
+    }
     acquireClient();
     try {
-      return getBlockDataUsingClient();
+      final BlockData data = getBlockDataUsingClient();
+      if (cache != null && blockFileInputStream != null && data.getSize() >= length) {
+        cachedReplica = cache.put(blockID, data, blockFileInputStream);
+      }
+      return data;
     } finally {
       releaseClient();
+    }
+  }
+
+  /** @return the short-circuit stream cache if this block may be served from or added to it, otherwise null. */
+  private ShortCircuitStreamCache getShortCircuitStreamCache() {
+    if (xceiverClientFactory == null || fallbackToGrpc.get() || blockInfo == null || blockInfo.isUnderConstruction()) {
+      return null;
+    }
+    return xceiverClientFactory.getShortCircuitStreamCache();
+  }
+
+  private synchronized void invalidateCachedReplica() {
+    if (cachedReplica != null && xceiverClientFactory != null) {
+      xceiverClientFactory.getShortCircuitStreamCache().invalidate(cachedReplica);
+    }
+  }
+
+  private synchronized void releaseCachedReplica() {
+    if (cachedReplica != null) {
+      xceiverClientFactory.getShortCircuitStreamCache().release(cachedReplica);
+      cachedReplica = null;
+      blockFileInputStream = null;
     }
   }
 
@@ -297,7 +338,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   private void acquireClient() throws IOException {
     final Pipeline pipeline = pipelineRef.get();
     // xceiverClientGrpc not-null indicates there is fall back to GRPC reads
-    if (xceiverClientFactory != null && xceiverClientFactory.isShortCircuitEnabled() && !fallbackToGrpc.get()
+    if (xceiverClientFactory != null && xceiverClientFactory.isShortCircuitReady() && !fallbackToGrpc.get()
         && xceiverClientShortCircuit == null) {
       try {
         XceiverClientSpi newClient = xceiverClientFactory.acquireClientForReadData(pipeline, true);
@@ -383,6 +424,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException e) {
+        invalidateCachedReplica();
         if (shouldRetryRead(e, retryPolicy, ++retries)) {
           handleReadError(e);
           continue;
@@ -390,8 +432,12 @@ public class BlockInputStream extends BlockExtendedInputStream {
           throw e;
         }
       } catch (IOException ex) {
+        invalidateCachedReplica();
+        checkInterrupted(ex);
         if (shouldRetryRead(ex, retryPolicy, ++retries)) {
-          if (isConnectivityIssue(ex)) {
+          if (isNonInterruptedChannelClose(ex) && cachedReplica != null) {
+            resetAllShortCircuitStream();
+          } else if (isConnectivityIssue(ex)) {
             handleReadError(ex);
           } else {
             current.releaseClient();
@@ -465,7 +511,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       final long chunkOffset = pos - offsets[index];
       final long readLength = Math.min(Math.min(dst.remaining(), chunk.getLength() - chunkOffset), blockLength - pos);
       if (readLength > 0) {
-        final int numBytesRead = readChunkAt(chunk, chunkOffset, (int) readLength, dst);
+        final int numBytesRead = readChunkAt(index, chunk, chunkOffset, (int) readLength, dst);
         totalReadLen += numBytesRead;
         pos += numBytesRead;
       }
@@ -475,7 +521,9 @@ public class BlockInputStream extends BlockExtendedInputStream {
   }
 
   /** Read a chunk range with a request-local retry counter and buffer position. */
-  private int readChunkAt(ChunkInputStream chunk, long chunkOffset, int readLength, ByteBuffer dst) throws IOException {
+  private int readChunkAt(int index, ChunkInputStream chunkStream, long chunkOffset, int readLength, ByteBuffer dst)
+      throws IOException {
+    ChunkInputStream chunk = chunkStream;
     int preadRetries = 0;
     while (true) {
       checkOpen();
@@ -487,16 +535,21 @@ public class BlockInputStream extends BlockExtendedInputStream {
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException ex) {
+        invalidateCachedReplica();
         if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
           throw ex;
         }
         refreshBlockInfo(ex);
         continue;
       } catch (IOException ex) {
+        invalidateCachedReplica();
+        checkInterrupted(ex);
         if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
           throw ex;
         }
-        if (isConnectivityIssue(ex)) {
+        if (isNonInterruptedChannelClose(ex) && cachedReplica != null) {
+          chunk = resetShortCircuitStream(index, chunk);
+        } else if (isConnectivityIssue(ex)) {
           refreshBlockInfo(ex);
         }
         continue;
@@ -601,6 +654,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void close() {
     releaseClient();
+    releaseCachedReplica();
     xceiverClientFactory = null;
 
     final List<ChunkInputStream> inputStreams = this.chunkStreams;
@@ -700,4 +754,44 @@ public class BlockInputStream extends BlockExtendedInputStream {
     return blockData;
   }
 
+  private synchronized void resetAllShortCircuitStream() throws IOException {
+    // initialize() seeks back to blockPosition, so keep the sequential read position across the reset.
+    storePosition();
+    releaseCachedReplica();
+    if (chunkStreams != null) {
+      for (ChunkInputStream stream : chunkStreams) {
+        stream.close();
+      }
+      chunkStreams = null;
+    }
+    initialized = false;
+    initialize();
+  }
+
+  /**
+   * Rebuild the local chunk streams if {@code failed} is still the current stream at {@code index}, so that
+   * concurrent positioned readers failing on the same closed channel reset only once.
+   * @return the current chunk stream at {@code index}
+   */
+  private synchronized ChunkInputStream resetShortCircuitStream(int index, ChunkInputStream failed)
+      throws IOException {
+    if (blockFileInputStream != null && chunkStreams != null && chunkStreams.get(index) == failed) {
+      resetAllShortCircuitStream();
+    }
+    checkOpen();
+    return chunkStreams.get(index);
+  }
+
+  private void checkInterrupted(IOException e) throws IOException {
+    if (Thread.currentThread().isInterrupted() &&
+        (e instanceof ClosedByInterruptException ||
+            e instanceof InterruptedIOException)) {
+      LOG.debug("The reading thread has been interrupted.", e);
+      throw e;
+    }
+  }
+
+  private static boolean isNonInterruptedChannelClose(IOException ex) {
+    return ex instanceof ClosedChannelException && !Thread.currentThread().isInterrupted();
+  }
 }
