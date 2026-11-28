@@ -427,6 +427,7 @@ public class BlockOutputStream extends OutputStream {
         LOG.debug("Allocated new buffer {}, used = {}, capacity = {}", currentBuffer,
             bufferPool.getNumberOfUsedBuffers(), bufferPool.getCapacity());
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         handleInterruptedException(e, false);
       }
     }
@@ -484,6 +485,7 @@ public class BlockOutputStream extends OutputStream {
       try {
         watchForCommitAsync.get();
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         handleInterruptedException(e, true);
       } catch (ExecutionException e) {
         handleExecutionException(e);
@@ -724,6 +726,7 @@ public class BlockOutputStream extends OutputStream {
     try {
       allPendingFlushFutures.get();
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       handleInterruptedException(e, true);
     } catch (ExecutionException e) {
       handleExecutionException(e);

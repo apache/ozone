@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -29,6 +30,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -39,26 +41,48 @@ import java.io.InterruptedIOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
+import java.util.Collections;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetCommittedBlockLengthResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientReply;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.event.Level;
 
 /**
@@ -263,4 +287,105 @@ public class TestKeyOutputStream {
     assertSame(allocation.get(5, TimeUnit.SECONDS), read.get(5, TimeUnit.SECONDS),
         "Reader must not observe the intermediate index before the new entry is added");
   }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"write", "hsync", "close"})
+  void testInterruptedOperationFailsWithoutRetry(String operation) throws Exception {
+    Pipeline pipeline = MockPipeline.createRatisPipeline();
+    XceiverClientSpi client = mock(XceiverClientSpi.class);
+    when(client.getPipeline()).thenReturn(pipeline);
+    when(client.sendCommandAsync(any())).thenAnswer(invocation -> {
+      ContainerCommandRequestProto request = invocation.getArgument(0);
+      ContainerCommandResponseProto.Builder response = ContainerCommandResponseProto.newBuilder()
+          .setResult(Result.SUCCESS).setCmdType(request.getCmdType());
+      if (request.getCmdType() == Type.PutBlock) {
+        response.setPutBlock(PutBlockResponseProto.newBuilder().setCommittedBlockLength(
+            GetCommittedBlockLengthResponseProto.newBuilder()
+                .setBlockID(request.getPutBlock().getBlockData().getBlockID()).setBlockLength(0)));
+      }
+      return new XceiverClientReply(CompletableFuture.completedFuture(response.build()));
+    });
+    // The watch for commit never completes, so the operation blocks.
+    CountDownLatch watchStarted = new CountDownLatch(1);
+    when(client.watchForCommit(anyLong())).thenAnswer(invocation -> {
+      watchStarted.countDown();
+      return new CompletableFuture<>();
+    });
+    XceiverClientFactory clientFactory = mock(XceiverClientFactory.class);
+    when(clientFactory.acquireClient(any())).thenReturn(client);
+    OzoneManagerProtocol om = mock(OzoneManagerProtocol.class);
+
+    OzoneClientConfig config = new OzoneClientConfig();
+    config.setStreamBufferSize(1024);
+    config.setStreamBufferFlushSize(1024);
+    config.setStreamBufferMaxSize(1024);
+    config.setChecksumType(ChecksumType.NONE);
+    RatisReplicationConfig replication = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    KeyOutputStream out = new KeyOutputStream.Builder()
+        .setHandler(new OpenKeySession(1, new OmKeyInfo.Builder()
+            .setVolumeName("v").setBucketName("b").setKeyName("k").setReplicationConfig(replication).build(), 0))
+        .setXceiverClientManager(clientFactory)
+        .setOmClient(om)
+        .setOmVersion(OzoneManagerVersion.HBASE_SUPPORT)
+        .setConfig(config)
+        .setReplicationConfig(replication)
+        .setClientMetrics(ContainerClientMetrics.acquire())
+        .setStreamBufferArgs(StreamBufferArgs.getDefaultStreamBufferArgs(replication, config))
+        .setExecutorServiceSupplier(() -> executor)
+        .build();
+    out.addPreallocateBlocks(new OmKeyLocationInfoGroup(0, Collections.singletonList(new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(1, 1)).setLength(4096).setPipeline(pipeline).build())), 0);
+
+    if (!operation.equals("write")) {
+      out.write(new byte[100]);
+    }
+
+    AtomicReference<Throwable> thrown = new AtomicReference<>();
+    AtomicBoolean interrupted = new AtomicBoolean();
+    Thread writer = new Thread(() -> {
+      try {
+        switch (operation) {
+        case "write":
+          out.write(new byte[1024]);
+          break;
+        case "hsync":
+          out.hsync();
+          break;
+        case "close":
+          out.close();
+          break;
+        default:
+          throw new IllegalArgumentException(operation);
+        }
+      } catch (Throwable t) {
+        thrown.set(t);
+      }
+      interrupted.set(Thread.currentThread().isInterrupted());
+    });
+    writer.setDaemon(true);
+    try {
+      writer.start();
+      assertTrue(watchStarted.await(10, TimeUnit.SECONDS), "watch for commit should start");
+      GenericTestUtils.waitFor(() -> writer.getState() == Thread.State.WAITING, 10, 10_000);
+      writer.interrupt();
+      writer.join(10_000);
+
+      assertThat(writer.isAlive()).isFalse();
+      assertThat(thrown.get()).isInstanceOf(IOException.class);
+      assertThat(interrupted.get()).as("interrupt flag").isTrue();
+      // the data is not retried on a new block
+      verify(om, never()).allocateBlock(any(), anyLong(), any());
+      verify(om, never()).commitKey(any(), anyLong());
+      verify(om, never()).hsyncKey(any(), anyLong());
+    } finally {
+      if (writer.isAlive()) {
+        writer.interrupt();
+        writer.join(10_000);
+      }
+      executor.shutdownNow();
+      ContainerClientMetrics.release();
+    }
+  }
+
 }

@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -41,7 +42,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -68,9 +71,11 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -102,6 +107,92 @@ class TestBlockOutputStreamCorrectness {
             outputStream.write(DATA[i]);
           }
         }
+      }
+    }
+  }
+
+  @Test
+  void testInterruptedBufferAllocationKeepsInterruptFlag() throws IOException {
+    BlockOutputStream outputStream = createBlockOutputStream(new BufferPool(1024 * 1024 / 4, 32 / 4));
+    Thread.currentThread().interrupt();
+    try {
+      assertThrows(IOException.class, () -> outputStream.write(DATA, 0, 1));
+      assertThat(Thread.currentThread().isInterrupted()).as("interrupt flag").isTrue();
+    } finally {
+      Thread.interrupted();
+      outputStream.cleanup(false);
+    }
+  }
+
+  @Test
+  void testInterruptedWaitForAllPendingFlushesKeepsInterruptFlag() throws Exception {
+    ExecutorService executor = newFixedThreadPool(10);
+    try {
+      BlockOutputStream outputStream = createBlockOutputStreamWithPendingWatches(
+          new BufferPool(BUFFER_SIZE, 8), executor);
+      try {
+        // a full flush period sends a PutBlock whose watch for commit stays pending
+        outputStream.write(DATA, 0, 1024 * 1024);
+        assertInterruptedWaitKeepsInterruptFlag(outputStream::waitForAllPendingFlushes, () -> { });
+      } finally {
+        outputStream.cleanup(false);
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  void testInterruptedWriteOnRetryKeepsInterruptFlag() throws Exception {
+    BufferPool bufferPool = new BufferPool(1024 * 1024 / 4, 32 / 4);
+    ExecutorService executor = newFixedThreadPool(10);
+    try {
+      BlockOutputStream failedStream = createBlockOutputStreamWithPendingWatches(bufferPool, executor);
+      try {
+        // the data stays in the buffer pool since its watch for commit is pending
+        failedStream.write(DATA, 0, 1024 * 1024);
+        BlockOutputStream retryStream = createBlockOutputStreamWithPendingWatches(bufferPool, executor);
+        assertInterruptedWaitKeepsInterruptFlag(() -> retryStream.writeOnRetry(1024 * 1024),
+            () -> retryStream.cleanup(false));
+      } finally {
+        failedStream.cleanup(false);
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  /**
+   * Runs the given call, which blocks on a pending watch for commit, in a new thread and interrupts it.
+   * The call must fail with an IOException and keep the interrupt flag of the thread.
+   */
+  private static void assertInterruptedWaitKeepsInterruptFlag(Executable call, Runnable cleanup) throws Exception {
+    AtomicReference<Throwable> thrown = new AtomicReference<>();
+    AtomicBoolean interrupted = new AtomicBoolean();
+    Thread thread = new Thread(() -> {
+      try {
+        call.execute();
+      } catch (Throwable t) {
+        thrown.set(t);
+      } finally {
+        interrupted.set(Thread.currentThread().isInterrupted());
+        cleanup.run();
+      }
+    });
+    thread.setDaemon(true);
+    try {
+      thread.start();
+      GenericTestUtils.waitFor(() -> thread.getState() == Thread.State.WAITING, 10, 10_000);
+      thread.interrupt();
+      thread.join(10_000);
+
+      assertThat(thread.isAlive()).isFalse();
+      assertThat(thrown.get()).isInstanceOf(IOException.class);
+      assertThat(interrupted.get()).as("interrupt flag").isTrue();
+    } finally {
+      if (thread.isAlive()) {
+        thread.interrupt();
+        thread.join(10_000);
       }
     }
   }
@@ -309,6 +400,12 @@ class TestBlockOutputStreamCorrectness {
     return blockDataArray;
   }
 
+  private BlockOutputStream createBlockOutputStreamWithPendingWatches(BufferPool bufferPool, ExecutorService executor)
+      throws IOException {
+    return createBlockOutputStream(bufferPool, new MockXceiverClientSpi(MockPipeline.createRatisPipeline(), true),
+        executor);
+  }
+
   private BlockOutputStream createBlockOutputStream(BufferPool bufferPool)
       throws IOException {
     return createBlockOutputStream(bufferPool, new MockXceiverClientSpi(MockPipeline.createRatisPipeline()),
@@ -386,10 +483,16 @@ class TestBlockOutputStreamCorrectness {
     private int i;
     private Result replyResult = Result.SUCCESS;
     private long lastPutBlockIndex;
+    private final boolean pendingWatches;
 
     MockXceiverClientSpi(Pipeline pipeline) {
+      this(pipeline, false);
+    }
+
+    MockXceiverClientSpi(Pipeline pipeline, boolean pendingWatches) {
       super();
       this.pipeline = pipeline;
+      this.pendingWatches = pendingWatches;
     }
 
     @Override
@@ -473,7 +576,7 @@ class TestBlockOutputStreamCorrectness {
       final XceiverClientReply xceiverClientReply = new XceiverClientReply(
           CompletableFuture.completedFuture(builder.build()));
       xceiverClientReply.setLogIndex(index);
-      return CompletableFuture.completedFuture(xceiverClientReply);
+      return pendingWatches ? new CompletableFuture<>() : CompletableFuture.completedFuture(xceiverClientReply);
     }
 
     @Override
