@@ -18,13 +18,17 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests OMKeyDeleteResponse - prefix layout.
@@ -37,6 +41,44 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
     return new OMKeyDeleteResponseWithFSO(omResponse, omKeyInfo.getKeyName(),
         omKeyInfo, getOmBucketInfo(), false,
         omMetadataManager.getVolumeId(volumeName), null);
+  }
+
+  /**
+   * HDDS-16768: the DELETED_HSYNC_KEY marker has to be persisted under the openFileTable key the request flagged
+   * in the table cache, not under the openKeyTable key format.
+   */
+  @Test
+  public void testAddToDBBatchMarksHsyncOpenKey() throws Exception {
+    String ozoneKey = addKeyToTable();
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    String hsyncClientId = String.valueOf(clientID);
+
+    // the hsync writer's open key, stored next to the committed file under the openFileTable key
+    OmKeyInfo openKeyInfo = omKeyInfo.toBuilder().addMetadata(OzoneConsts.HSYNC_CLIENT_ID, hsyncClientId).build();
+    String dbOpenKey = OMRequestTestUtils.addFileToKeyTable(true, false, keyName, openKeyInfo, clientID, 50L,
+        omMetadataManager);
+    OmKeyInfo deletedOpenKeyInfo = openKeyInfo.withMetadataMutations(
+        metadata -> metadata.put(OzoneConsts.DELETED_HSYNC_KEY, "true"));
+
+    OzoneManagerProtocolProtos.OMResponse omResponse =
+        OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
+            OzoneManagerProtocolProtos.DeleteKeyResponse.getDefaultInstance())
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
+            .build();
+    OMKeyDeleteResponse omKeyDeleteResponse = new OMKeyDeleteResponseWithFSO(omResponse, keyName, omKeyInfo,
+        getOmBucketInfo(), false, omMetadataManager.getVolumeId(volumeName), deletedOpenKeyInfo);
+    omKeyDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    assertFalse(omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
+    // the marker lands on the row the request flagged in the cache ...
+    OmKeyInfo markedOpenKey = omMetadataManager.getOpenKeyTable(getBucketLayout()).getSkipCache(dbOpenKey);
+    assertNotNull(markedOpenKey);
+    assertEquals("true", markedOpenKey.getMetadata().get(OzoneConsts.DELETED_HSYNC_KEY));
+    // ... and no stray row is written under the openKeyTable key format
+    assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(
+        omMetadataManager.getOpenKey(volumeName, bucketName, keyName, hsyncClientId)));
   }
 
   @Override
