@@ -57,6 +57,16 @@ Head directory objects
                         Should contain          ${result}    Not Found
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/mydir/   0
 
+Head directory in FSO bucket reports directory content type
+    Pass Execution If   '${BUCKET_LAYOUT}' != 'FILE_SYSTEM_OPTIMIZED'    only applies to FSO buckets
+                        Execute                            echo "Randomtext" > /tmp/testfile
+    ${result} =         Execute AWSS3APICli and checkrc    put-object --bucket ${BUCKET} --key ${PREFIX}/headobject/fsodir/f1 --body /tmp/testfile --content-type video/mp4   0
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/headobject/fsodir/   0
+                        Should contain          ${result}    "ContentType": "application/x-directory"
+    ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/headobject/fsodir/f1   0
+                        Should contain          ${result}    "ContentType": "video/mp4"
+    ${result} =         Execute AWSS3APICli and checkrc    delete-object --bucket ${BUCKET} --key ${PREFIX}/headobject/fsodir/f1   0
+
 Head non existing key
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/non-existent   255
                         Should contain          ${result}    404

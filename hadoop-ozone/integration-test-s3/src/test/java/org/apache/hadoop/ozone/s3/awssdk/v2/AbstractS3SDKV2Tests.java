@@ -570,6 +570,25 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
     }
   }
 
+  @Test
+  public void testFsoDirectoryContentType() throws Exception {
+    final String bucketName = getBucketName();
+    final String fileKey = "implicit/file";
+    final String explicitDir = "explicit/";
+    createFsoBucket(bucketName);
+    s3Client.putObject(b -> b.bucket(bucketName).key(fileKey).contentType("video/mp4"), RequestBody.fromString("bar"));
+    s3Client.putObject(b -> b.bucket(bucketName).key(explicitDir), RequestBody.empty());
+
+    for (String dirKey : Arrays.asList("implicit/", explicitDir)) {
+      HeadObjectResponse head = s3Client.headObject(b -> b.bucket(bucketName).key(dirKey));
+      assertEquals("application/x-directory", head.contentType());
+      GetObjectResponse get = s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(dirKey)).response();
+      assertEquals("application/x-directory", get.contentType());
+    }
+
+    assertEquals("video/mp4", s3Client.headObject(b -> b.bucket(bucketName).key(fileKey)).contentType());
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"", "bar"})
   public void testPutObjectAsyncWithTrailingChecksum(String content) throws Exception {
