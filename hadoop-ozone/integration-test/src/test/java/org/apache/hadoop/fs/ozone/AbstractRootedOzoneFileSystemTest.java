@@ -2181,6 +2181,20 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
+  void testContentSummaryErasureCodingPolicyOfBucketRoot() throws Exception {
+    ECReplicationConfig ecConfig = new ECReplicationConfig("RS-3-2-1024k");
+    OzoneBucket ecBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout,
+        new DefaultReplicationConfig(ecConfig));
+    OzoneBucket ratisBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout,
+        new DefaultReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE)));
+    Path ecBucketPath = new Path(new Path(OZONE_URI_DELIMITER, ecBucket.getVolumeName()), ecBucket.getName());
+    Path ratisBucketPath = new Path(new Path(OZONE_URI_DELIMITER, ratisBucket.getVolumeName()), ratisBucket.getName());
+
+    assertEquals(ecConfig.getReplication(), fs.getContentSummary(ecBucketPath).getErasureCodingPolicy());
+    assertEquals("", fs.getContentSummary(ratisBucketPath).getErasureCodingPolicy());
+  }
+
+  @Test
   void testLsDashEDoesNotThrow() throws Exception {
     FsShell shell = new FsShell(conf);
     try {

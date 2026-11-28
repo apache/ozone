@@ -1710,7 +1710,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     ContentSummary.Builder builder = new ContentSummary.Builder().length(summary[0]).
         fileCount(summary[2]).directoryCount(summary[3]).
         spaceConsumed(summary[1]);
-    applyEcPolicy(builder, status.getErasureCodingPolicy());
+    String ecPolicy = status.getErasureCodingPolicy();
+    OFSPath ofsPath = new OFSPath(f.makeQualified(uri, workingDir), ozoneConfiguration);
+    if (ofsPath.isBucket()) {
+      // OM has no key for the bucket root, so take the EC policy from the bucket's default replication.
+      OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
+      ecPolicy = OzoneClientUtils.getErasureCodingPolicyName(bucket.getReplicationConfig());
+    }
+    applyEcPolicy(builder, ecPolicy);
     return builder.build();
   }
 

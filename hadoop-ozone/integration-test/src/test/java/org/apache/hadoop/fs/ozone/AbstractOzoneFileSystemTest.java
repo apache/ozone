@@ -84,6 +84,7 @@ import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.TrashPolicyDefault;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -433,6 +434,27 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
           fs.getContentSummary(parentDir).getErasureCodingPolicy());
     } finally {
       fs.delete(parentDir, true);
+    }
+  }
+
+  @Test
+  void testContentSummaryErasureCodingPolicyOfBucketRoot() throws Exception {
+    ECReplicationConfig ecConfig = new ECReplicationConfig("RS-3-2-1024k");
+    OzoneBucket ecBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout,
+        new DefaultReplicationConfig(ecConfig));
+    OzoneBucket ratisBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout,
+        new DefaultReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE)));
+
+    assertEquals(ecConfig.getReplication(), getRootErasureCodingPolicy(ecBucket));
+    assertEquals("", getRootErasureCodingPolicy(ratisBucket));
+  }
+
+  // EC policy that an o3fs mount of the given bucket reports for its root.
+  private String getRootErasureCodingPolicy(OzoneBucket bucket) throws IOException {
+    URI uri = URI.create(String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+        bucket.getVolumeName()));
+    try (FileSystem bucketFs = FileSystem.newInstance(uri, cluster.getConf())) {
+      return bucketFs.getContentSummary(ROOT).getErasureCodingPolicy();
     }
   }
 

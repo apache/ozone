@@ -425,8 +425,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     try {
       incrementCounter(Statistic.OBJECTS_QUERY, 1);
       OzoneFileStatus status = bucket.getFileStatus(key, headOp);
+      // OM has no key for the bucket root, so take the EC policy from the bucket's default replication.
+      String rootEcPolicy = key.isEmpty()
+          ? OzoneClientUtils.getErasureCodingPolicyName(getReplicationConfigWithRefreshCheck()) : "";
       // An OM without HDDS-15678 still returns the block locations of a head op, without pipelines: ignore them.
-      return toFileStatusAdapter(status, userName, uri, qualifiedPath, !headOp);
+      return toFileStatusAdapter(status, userName, uri, qualifiedPath, !headOp, rootEcPolicy);
 
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -462,7 +465,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
             .map(status -> toFileStatusAdapter(status, username, uri, workingDir));
       }
       return bucket.listStatusPage(keyName, recursive, startKey, numEntries)
-          .map(status -> toFileStatusAdapter(status, username, uri, workingDir, true));
+          .map(status -> toFileStatusAdapter(status, username, uri, workingDir, true, ""));
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
         throw new FileNotFoundException(e.getMessage());
@@ -541,7 +544,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
-      String owner, URI defaultUri, Path workingDir, boolean withBlockLocations) {
+      String owner, URI defaultUri, Path workingDir, boolean withBlockLocations, String rootEcPolicy) {
     OmKeyInfo keyInfo = status.getKeyInfo();
     short replication = (short) keyInfo.getReplicationConfig()
         .getRequiredNodes();
@@ -550,7 +553,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     if (isEc) {
       ecPolicy = keyInfo.getReplicationConfig().getReplication();
     } else {
-      ecPolicy = status.isFile() ? "Replicated" : "";
+      ecPolicy = status.isFile() ? "Replicated" : rootEcPolicy;
     }
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
