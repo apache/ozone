@@ -524,8 +524,6 @@ class TestObjectPut {
     return Stream.of(
         Arguments.of(STREAMING_AWS4_HMAC_SHA256_PAYLOAD, SignedChunksInputStream.class, false, true),
         Arguments.of(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER, SignedChunksInputStream.class, false, true),
-        Arguments.of(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD, SignedChunksInputStream.class, false, false),
-        Arguments.of(STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER, SignedChunksInputStream.class, false, false),
         Arguments.of(STREAMING_UNSIGNED_PAYLOAD_TRAILER, UnsignedChunksInputStream.class, false, false),
         Arguments.of("STREAMING-FUTURE-PAYLOAD", SignedChunksInputStream.class, false, false),
         Arguments.of("STREAMING", SignedChunksInputStream.class, false, false),
@@ -553,7 +551,6 @@ class TestObjectPut {
   void testPayloadClassification(String header, Class<? extends InputStream> streamType, boolean sha256,
       boolean hmacSignedStreaming) throws Exception {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(header);
-    // ECDSA trailer mode keeps its existing behavior without a trailer declaration.
     if (STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(header)
         || STREAMING_UNSIGNED_PAYLOAD_TRAILER.equals(header)) {
       when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
@@ -574,6 +571,35 @@ class TestObjectPut {
           assertThat(stream.getMessageDigest(OzoneConsts.FILE_HASH) != null).isEqualTo(sha256);
           assertThat(info.isChunkSignatureVerificationRequired()).isEqualTo(headerAuth && hmacSignedStreaming);
         }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD,
+      STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER})
+  void testPutObjectRejectsEcdsaStreamingPayload(String header) throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(header);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(CONTENT.length()));
+
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> putObject(signedChunkedBody(CONTENT)));
+    assertThat(ex.getErrorMessage()).contains("ECDSA streaming payload signatures are not supported");
+    assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD,
+      STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER})
+  void testEcdsaStreamingRejectedBeforeReadingBody(String header) {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(header);
+    for (boolean headerAuth : new boolean[]{true, false}) {
+      objectEndpoint.setSignatureInfo(signatureInfo(headerAuth));
+      for (boolean opensKey : new boolean[]{true, false}) {
+        ByteArrayInputStream body = new ByteArrayInputStream(new byte[]{1});
+        OS3Exception ex = assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED,
+            () -> objectEndpoint.getS3ChunkInputStreamInfo(body, 1, null, KEY_NAME, opensKey));
+        assertThat(ex.getErrorMessage()).contains("ECDSA streaming payload signatures are not supported");
+        assertThat(body.available()).isEqualTo(1);
       }
     }
   }
@@ -1213,6 +1239,18 @@ class TestObjectPut {
     // THEN
     OzoneKeyDetails key = fsoBucket.getKey(path);
     assertThat(key.isFile()).as("directory").isFalse();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD,
+      STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER})
+  void testDirectoryCreationRejectsEcdsaStreamingPayload(String header) {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(header);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("0");
+
+    assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED,
+        () -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/", signedChunkedBody("")));
+    assertThatThrownBy(() -> fsoBucket.getKey("dir/")).isInstanceOf(IOException.class);
   }
 
   @ParameterizedTest
