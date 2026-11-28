@@ -292,20 +292,25 @@ public class TestSCMRatisServerImpl {
     conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR, tempDir.toString());
     final RaftGroupId ownGroup = SCMRatisServerImpl.buildRaftGroupId("CID-" + UUID.randomUUID());
 
-    SCMRatisServerImpl.verifyNoRaftGroup(conf);
+    // An empty directory is fine; directories which are not named after a group are ignored.
+    SCMRatisServerImpl.verifyNoOtherRaftGroup(conf, ownGroup);
     assertTrue(new File(tempDir.toFile(), "snapshot").mkdirs());
     assertTrue(new File(tempDir.toFile(), "1-1-1-1-1").mkdirs());
-    SCMRatisServerImpl.verifyNoRaftGroup(conf);
+    SCMRatisServerImpl.verifyNoOtherRaftGroup(conf, ownGroup);
 
+    // The SCM's own group is allowed.
     assertTrue(new File(tempDir.toFile(), ownGroup.getUuid().toString()).mkdirs());
-    assertThrows(IOException.class, () -> SCMRatisServerImpl.verifyNoRaftGroup(conf));
+    SCMRatisServerImpl.verifyNoOtherRaftGroup(conf, ownGroup);
+
+    // A group of another cluster fails init and startup.
+    assertTrue(new File(tempDir.toFile(), UUID.randomUUID().toString()).mkdirs());
+    final String clusterId = "CID-" + UUID.randomUUID();
     final StorageContainerManager scm = mock(StorageContainerManager.class);
+    when(scm.getClusterId()).thenReturn(clusterId);
     final SCMNodeDetails details = new SCMNodeDetails.Builder()
         .setRpcAddress(new InetSocketAddress("localhost", 0)).setSCMNodeId("scm1").build();
-    assertTrue(new File(tempDir.toFile(), UUID.randomUUID().toString()).mkdirs());
-    when(scm.getClusterId()).thenReturn("CID-" + UUID.randomUUID());
     assertThat(assertThrows(IOException.class,
-        () -> SCMRatisServerImpl.initialize("CID-" + UUID.randomUUID(), UUID.randomUUID().toString(), details, conf)))
+        () -> SCMRatisServerImpl.initialize(clusterId, UUID.randomUUID().toString(), details, conf)))
         .hasMessageContaining("stale Raft group");
     assertThat(assertThrows(IOException.class,
         () -> new SCMRatisServerImpl(conf, scm, mock(SCMHADBTransactionBuffer.class))))
