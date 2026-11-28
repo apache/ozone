@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
@@ -137,6 +138,33 @@ abstract class ContainerStateMachineTests {
   @AfterAll
   public void shutdown() {
     executor.forEach(ThreadPoolExecutor::shutdown);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testContainerNotOpenDoesNotMakeStateMachineUnhealthy(boolean writeData) throws Exception {
+    RaftProtos.LogEntryProto entry = mock(RaftProtos.LogEntryProto.class);
+    when(entry.getTerm()).thenReturn(1L);
+    when(entry.getIndex()).thenReturn(1L);
+    TransactionContext trx = mock(TransactionContext.class);
+    ContainerStateMachine.Context context = mock(ContainerStateMachine.Context.class);
+    when(trx.getLogEntry()).thenReturn(entry);
+    when(trx.getStateMachineContext()).thenReturn(context);
+    when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto.newBuilder()
+        .setCmdType(writeData ? ContainerProtos.Type.WriteChunk : ContainerProtos.Type.PutBlock)
+        .setResult(ContainerProtos.Result.CONTAINER_NOT_OPEN).build());
+
+    Message message;
+    if (writeData) {
+      setUpMockRequestProtoReturn(context, 1, 1);
+      message = stateMachine.write(entry, trx).get();
+    } else {
+      when(context.getLogProto()).thenReturn(newPutBlock(1, newBlockID(1, 1)));
+      message = stateMachine.applyTransaction(trx).get();
+    }
+    assertEquals(ContainerProtos.Result.CONTAINER_NOT_OPEN,
+        ContainerProtos.ContainerCommandResponseProto.parseFrom(message.getContent()).getResult());
+    assertTrue(stateMachine.isStateMachineHealthy());
   }
 
   @ParameterizedTest

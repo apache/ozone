@@ -178,6 +178,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case SUCCESS:
     case CONTAINER_UNHEALTHY:
     case CLOSED_CONTAINER_IO:
+    case CONTAINER_NOT_OPEN:
     case DELETE_ON_OPEN_CONTAINER:
     case UNSUPPORTED_REQUEST:// Blame client for sending unsupported request.
     case MALFORMED_REQUEST:// Blame client for sending malformed request.
