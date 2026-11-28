@@ -1498,7 +1498,12 @@ class TestObjectPut {
         Arguments.of("crc32c", "4waSgw=="),
         Arguments.of("crc64nvme", "rosUhgp5mIg="),
         Arguments.of("sha1", "98O8HYCOBHMq32eZZczDTKeuNEE="),
-        Arguments.of("sha256", "FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="))
+        Arguments.of("sha256", "FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="),
+        Arguments.of("sha512",
+            "2eZ2LdHI6vbWGzxhkvxAjU1tXxF20MKRabwk5xw/J0rSf81YEbMT1oH35V7ALXPUmclUVba1u1A6z1dPuo/+hQ=="),
+        Arguments.of("xxhash64", "jLhB20DmroM="),
+        Arguments.of("xxhash3", "ctyxi2ehff8="),
+        Arguments.of("xxhash128", "MxGUd+3l3NXpcWQnaB1YYA=="))
         .flatMap(args -> Stream.of(false, true).flatMap(signed -> Stream.of(false, true)
             .map(datastream -> Arguments.of(args.get()[0], args.get()[1], signed, datastream))));
   }

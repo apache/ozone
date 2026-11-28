@@ -49,7 +49,9 @@ public class TestUnsignedChunkInputStream {
 
   @ParameterizedTest
   @CsvSource({"CRC32,AAAAAA==", "CRC32C,AAAAAA==", "CRC64NVME,AAAAAAAAAAA=",
-      "SHA1,2jmj7l5rSw0yVb/vlWAYkK/YBwk=", "SHA256,47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="})
+      "SHA1,2jmj7l5rSw0yVb/vlWAYkK/YBwk=", "SHA256,47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+      "SHA512,z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
+      "XXHASH64,70bbN1HY6Zk=", "XXHASH3,LQaABTjTlMI=", "XXHASH128,maoG0wFHmNhgAcMkRo1Jfw=="})
   void emptyPayload(TrailerHeader header, String value) throws IOException {
     String body = "0\r\n" + header.getHeaderName() + ":" + value + "\r\n\r\n";
     try (UnsignedChunksInputStream stream = wrapContent(body, header)) {
@@ -90,7 +92,9 @@ public class TestUnsignedChunkInputStream {
       "CRC32C,4waSgw==",
       "CRC64NVME,rosUhgp5mIg=",
       "SHA1,98O8HYCOBHMq32eZZczDTKeuNEE=",
-      "SHA256,FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="})
+      "SHA256,FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU=",
+      "SHA512,2eZ2LdHI6vbWGzxhkvxAjU1tXxF20MKRabwk5xw/J0rSf81YEbMT1oH35V7ALXPUmclUVba1u1A6z1dPuo/+hQ==",
+      "XXHASH64,jLhB20DmroM=", "XXHASH3,ctyxi2ehff8=", "XXHASH128,MxGUd+3l3NXpcWQnaB1YYA=="})
   void verifiesPayloadChecksum(TrailerHeader header, String value) throws IOException {
     for (boolean singleByte : new boolean[]{false, true}) {
       for (boolean correct : new boolean[]{true, false}) {
@@ -191,7 +195,8 @@ public class TestUnsignedChunkInputStream {
   }
 
   @ParameterizedTest
-  @CsvSource({"CRC32,3", "CRC32C,5", "CRC64NVME,4", "SHA1,19", "SHA256,33"})
+  @CsvSource({"CRC32,3", "CRC32C,5", "CRC64NVME,4", "SHA1,19", "SHA256,33", "SHA512,63",
+      "XXHASH64,7", "XXHASH3,9", "XXHASH128,15"})
   void rejectWrongChecksumLength(TrailerHeader header, int length) throws IOException {
     String value = Base64.getEncoder().encodeToString(new byte[length]);
     try (UnsignedChunksInputStream stream = wrapContent("0\r\n" + header.getHeaderName() + ":" + value + "\r\n\r\n",
