@@ -156,6 +156,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -889,6 +890,28 @@ public class TestKeyValueHandler {
     Mockito.verify(mockDnClient, atMostOnce()).getContainerChecksumInfo(anyLong(), eq(peer2));
     Mockito.verify(mockDnClient, atMostOnce()).getContainerChecksumInfo(anyLong(), eq(peer3));
     Assertions.assertEquals(1, icrCount.get());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ContainerLayoutVersion.class, names = {"FILE_PER_CHUNK", "FILE_PER_BLOCK"})
+  public void testDeleteUnreferencedPreservesOtherBlocks(ContainerLayoutVersion layoutVersion) throws Exception {
+    KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
+        DATANODE_UUID, newContainerSet(), mock(MutableVolumeSet.class),
+        mock(ContainerMetrics.class), c -> { },
+        new ContainerChecksumTreeManager(conf));
+    Path chunkDir = Files.createDirectory(tempDir.resolve("chunks"));
+    Path target = Files.createFile(chunkDir.resolve(getUnreferencedChunkName(layoutVersion, 1L)));
+    Path other = Files.createFile(chunkDir.resolve(getUnreferencedChunkName(layoutVersion, 2L)));
+    KeyValueContainer container = createContainerWithChunksPath(layoutVersion, chunkDir);
+
+    keyValueHandler.deleteUnreferenced(container, 1L);
+
+    assertFalse(Files.exists(target));
+    assertTrue(Files.exists(other));
+
+    keyValueHandler.deleteUnreferenced(container, 1L);
+
+    assertTrue(Files.exists(other));
   }
 
   @ContainerLayoutTestInfo.ContainerTest
