@@ -105,6 +105,8 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "so file system clients no longer need the client-side InfoBucket "
           + "layout check for rename"),
 
+  NON_RECURSIVE_DELETE_KEYS(107, "OzoneManager version that supports non-recursive deletion of multiple keys"),
+
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
 

@@ -49,6 +49,7 @@ import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -104,6 +105,7 @@ public class TestPermissionCheck {
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
     when(clientProtocol.getBucketDetails(isNull(), anyString())).thenReturn(bucket);
+    when(clientProtocol.getOmVersion()).thenReturn(OzoneManagerVersion.SOFTWARE_VERSION);
     when(bucket.getVolumeName()).thenReturn("s3Volume");
   }
 
@@ -188,7 +190,7 @@ public class TestPermissionCheck {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     final Map<String, ErrorInfo> deleteErrors = Collections.singletonMap(
         "deleteKeyName", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
-    when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(deleteErrors);
+    when(bucket.deleteKeys(any(), anyBoolean(), anyBoolean())).thenReturn(deleteErrors);
 
     final BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
@@ -206,7 +208,7 @@ public class TestPermissionCheck {
       throws IOException {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
     doThrow(new IOException("DeleteObjects failed", new OMException("OM failure", resultCode)))
-        .when(bucket).deleteKeys(any(), anyBoolean());
+        .when(bucket).deleteKeys(any(), anyBoolean(), anyBoolean());
 
     final BucketEndpoint bucketEndpoint = spy(new BucketEndpoint());
     EndpointBuilder.newBucketEndpointBuilder()

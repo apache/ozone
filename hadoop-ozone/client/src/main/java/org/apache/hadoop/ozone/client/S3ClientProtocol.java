@@ -390,6 +390,12 @@ final class S3ClientProtocol implements ClientProtocol {
   }
 
   @Override
+  public Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName, List<String> keyNameList,
+      boolean quiet, boolean recursive) throws IOException {
+    return delegate.deleteKeys(volumeName, bucketName, keyNameList, quiet, recursive);
+  }
+
+  @Override
   public void renameKey(String volumeName, String bucketName, String fromKeyName, String toKeyName) throws IOException {
     delegate.renameKey(volumeName, bucketName, fromKeyName, toKeyName);
   }

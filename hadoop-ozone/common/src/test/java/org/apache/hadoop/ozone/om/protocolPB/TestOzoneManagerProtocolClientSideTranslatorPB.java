@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Allocat
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
@@ -491,6 +492,21 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
             .build());
 
     assertThat(pb.deleteKeys(DELETE_KEYS, true)).isEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void deleteKeysSendsRecursive(boolean recursive) throws IOException {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+
+    client.deleteKeys(new OmDeleteKeys("vol", "bucket", Arrays.asList("key1", "key2"), recursive), true);
+
+    // Only the non-default value is sent, so a recursive request stays the same for an older OzoneManager.
+    DeleteKeysRequest request = transport.getLastRequest().getDeleteKeysRequest();
+    assertThat(request.hasRecursive()).isEqualTo(!recursive);
+    assertThat(request.getRecursive()).isEqualTo(recursive);
   }
 
   @Test

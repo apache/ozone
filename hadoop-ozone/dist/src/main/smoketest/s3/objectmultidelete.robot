@@ -47,3 +47,25 @@ Delete file with multi delete
                         Should contain             ${result}         ${PREFIX}/multidelete/key=value/f3
                         Should contain             ${result}         STANDARD
                         Should not contain         ${result}         REDUCED_REDUNDANCY
+
+Delete objects keeps non-empty FSO directories
+    Pass Execution If   '${BUCKET_LAYOUT}' != 'FILE_SYSTEM_OPTIMIZED'    only applies to FSO buckets
+                        Execute                    date > /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/multidelete/fso/c/d2/f1 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/multidelete/fso/c/f2 --body /tmp/testfile
+    ${result} =         Execute AWSS3APICli        delete-objects --bucket ${BUCKET} --delete 'Objects=[{Key=${PREFIX}/multidelete/fso/c/d2/},{Key=${PREFIX}/multidelete/fso/c/}]'
+                        Should not contain         ${result}         Error
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/multidelete/fso/c/
+                        Should contain             ${result}         ${PREFIX}/multidelete/fso/c/d2/f1
+                        Should contain             ${result}         ${PREFIX}/multidelete/fso/c/f2
+
+Delete objects removes FSO directories emptied by the same request
+    Pass Execution If   '${BUCKET_LAYOUT}' != 'FILE_SYSTEM_OPTIMIZED'    only applies to FSO buckets
+                        Execute                    date > /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/multidelete/fso/dir/sub/f1 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/multidelete/fso/dir/f2 --body /tmp/testfile
+    # Keys in listing order, each directory before its contents
+    ${result} =         Execute AWSS3APICli        delete-objects --bucket ${BUCKET} --delete 'Objects=[{Key=${PREFIX}/multidelete/fso/dir/},{Key=${PREFIX}/multidelete/fso/dir/f2},{Key=${PREFIX}/multidelete/fso/dir/sub/},{Key=${PREFIX}/multidelete/fso/dir/sub/f1}]'
+                        Should not contain         ${result}         Error
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/multidelete/fso/
+                        Should not contain         ${result}         ${PREFIX}/multidelete/fso/dir/

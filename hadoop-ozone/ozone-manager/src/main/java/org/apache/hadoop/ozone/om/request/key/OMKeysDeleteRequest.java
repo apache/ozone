@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -248,10 +249,19 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
+      List<OmKeyInfo> nonEmptyDirs = new ArrayList<>();
       // Mark all keys which can be deleted, in cache as deleted.
       Pair<Long, Integer> quotaReleasedEmptyKeys =
           markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
-              dirList, omMetadataManager, openKeyInfoMap);
+              dirList, nonEmptyDirs, omMetadataManager, openKeyInfoMap);
+      for (OmKeyInfo dir : nonEmptyDirs) {
+        deleteStatus = false;
+        deleteKeys.remove(dir.getKeyName());
+        deleteKeysInfo.remove(dir);
+        unDeletedKeys.addKeys(dir.getKeyName());
+        keyToError.put(dir.getKeyName(),
+            new ErrorInfo(OMException.ResultCodes.DIRECTORY_NOT_EMPTY.name(), "Directory is not empty"));
+      }
       omBucketInfo.decrUsedBytes(quotaReleasedEmptyKeys.getKey(), true);
       // For empty keyInfos the quota should be released and not added to namespace.
       omBucketInfo.decrUsedNamespace(omKeyInfoList.size() + dirList.size() -
@@ -403,8 +413,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
+  /**
+   * Marks the keys to delete as deleted in the table cache.
+   * A directory that a non-recursive request leaves non-empty is moved from dirList to nonEmptyDirs instead.
+   */
   protected Pair<Long, Integer> markKeysAsDeletedInCache(OzoneManager ozoneManager,
-      long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
+      long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList, List<OmKeyInfo> nonEmptyDirs,
       OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap)
           throws IOException {
     int emptyKeys = 0;
@@ -500,6 +514,26 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
             keyArgs.getVolumeName(), keyArgs.getBucketName());
         bucketLayout.validateSupportedOperation();
       }
+    }
+    return req;
+  }
+
+  /**
+   * Rejects non-recursive DeleteKeys until the OM is finalized for it, because an older OM ignores the flag and
+   * deletes directories recursively.
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.DeleteKeys
+  )
+  public static OMRequest disallowNonRecursiveDeleteKeysBeforeFinalization(OMRequest req, ValidationContext ctx)
+      throws OMException {
+    if (!req.getDeleteKeysRequest().getRecursive()
+        && !ctx.versionManager().isAllowed(OzoneManagerVersion.NON_RECURSIVE_DELETE_KEYS)) {
+      throw new OMException("Cluster does not have non-recursive DeleteKeys finalized yet. Rejecting the request,"
+          + " please finalize the cluster upgrade and then try again.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     }
     return req;
   }

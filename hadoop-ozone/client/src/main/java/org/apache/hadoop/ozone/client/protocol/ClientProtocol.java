@@ -698,8 +698,26 @@ public interface ClientProtocol {
    * @return key name to error for each key that could not be deleted, empty if all keys were deleted
    * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true
    */
+  default Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName, List<String> keyNameList,
+      boolean quiet) throws IOException {
+    return deleteKeys(volumeName, bucketName, keyNameList, quiet, true);
+  }
+
+  /**
+   * Deletes keys through the list.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyNameList List of the Key
+   * @param quiet if true, per-key failures are returned in the result map instead of being thrown
+   * @param recursive if false, a directory in an FSO bucket is deleted only if the other keys leave it empty,
+   *                  otherwise it is reported as DIRECTORY_NOT_EMPTY
+   * @return key name to error for each key that could not be deleted, empty if all keys were deleted
+   * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true,
+   *                     or if recursive is false and the OzoneManager is older than
+   *                     {@link OzoneManagerVersion#NON_RECURSIVE_DELETE_KEYS}
+   */
   Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName,
-                                    List<String> keyNameList, boolean quiet)
+                                    List<String> keyNameList, boolean quiet, boolean recursive)
       throws IOException;
 
   /**

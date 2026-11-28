@@ -35,6 +35,7 @@ import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Sets;
@@ -52,6 +53,7 @@ import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.xml.bind.JAXBException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -69,6 +71,7 @@ import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -180,7 +183,7 @@ public class TestObjectMultiDelete {
     Map<String, ErrorInfo> undeletedKeys = new HashMap<>();
     undeletedKeys.put("key2", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
     undeletedKeys.put("key3", new ErrorInfo(ResultCodes.KEY_NOT_FOUND.name(), "Key does not exist"));
-    when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(undeletedKeys);
+    when(bucket.deleteKeys(any(), anyBoolean(), anyBoolean())).thenReturn(undeletedKeys);
 
     Map<String, String> auditParams = new HashMap<>();
     MultiDeleteResponse response =
@@ -195,9 +198,37 @@ public class TestObjectMultiDelete {
   }
 
   @Test
+  public void multiDeleteReportsNonEmptyDirectoryAsDeleted() throws Exception {
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    when(bucket.deleteKeys(any(), anyBoolean(), anyBoolean())).thenReturn(singletonMap("key2",
+        new ErrorInfo(ResultCodes.DIRECTORY_NOT_EMPTY.name(), "Directory is not empty")));
+
+    MultiDeleteResponse response = newEndpointFor(bucket, new HashMap<>()).multiDelete("b1", "", threeKeyRequest());
+
+    // S3 has no directories: the key of a non-empty FSO directory names no object, so deleting it is a no-op
+    assertThat(response.getErrors()).isEmpty();
+    assertThat(response.getDeletedObjects()).extracting(DeletedObject::getKey)
+        .containsExactly("key1", "key2", "key3");
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, names = {"CONDITIONAL_DELETE", "NON_RECURSIVE_DELETE_KEYS"})
+  public void multiDeleteIsNonRecursiveIfOmSupportsIt(OzoneManagerVersion omVersion) throws Exception {
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    when(bucket.deleteKeys(any(), anyBoolean(), anyBoolean())).thenReturn(new HashMap<>());
+
+    newEndpointFor(bucket, new HashMap<>(), omVersion).multiDelete("b1", "", threeKeyRequest());
+
+    // An older OzoneManager does not support it, so the request stays recursive, as before.
+    boolean recursive = !OzoneManagerVersion.NON_RECURSIVE_DELETE_KEYS.isSupportedBy(omVersion);
+    verify(bucket).deleteKeys(asList("key1", "key2", "key3"), true, recursive);
+  }
+
+  @Test
   public void multiDeleteAuditsAllKeysWhenDeleteFails() throws Exception {
     OzoneBucket bucket = mock(OzoneBucket.class);
-    when(bucket.deleteKeys(any(), anyBoolean())).thenThrow(new IOException("Ozone Manager is unavailable"));
+    when(bucket.deleteKeys(any(), anyBoolean(), anyBoolean()))
+        .thenThrow(new IOException("Ozone Manager is unavailable"));
 
     Map<String, String> auditParams = new HashMap<>();
     MultiDeleteResponse response =
@@ -258,7 +289,7 @@ public class TestObjectMultiDelete {
   @Test
   public void multiDeleteReturnsVersionIdOfFailedKey() throws Exception {
     OzoneBucket bucket = mock(OzoneBucket.class);
-    when(bucket.deleteKeys(any(), anyBoolean()))
+    when(bucket.deleteKeys(any(), anyBoolean(), anyBoolean()))
         .thenReturn(singletonMap("key1", new ErrorInfo("ACCESS_DENIED", "ACL check failed")));
     final DeleteObject nullVersion = new DeleteObject("key1");
     nullVersion.setVersionId(NULL_VERSION_ID);
@@ -334,6 +365,11 @@ public class TestObjectMultiDelete {
   }
 
   private BucketEndpoint newEndpointFor(OzoneBucket bucket, Map<String, String> auditParams) throws IOException {
+    return newEndpointFor(bucket, auditParams, OzoneManagerVersion.SOFTWARE_VERSION);
+  }
+
+  private BucketEndpoint newEndpointFor(OzoneBucket bucket, Map<String, String> auditParams,
+      OzoneManagerVersion omVersion) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     S3GatewayMetrics.create(conf);
 
@@ -345,6 +381,7 @@ public class TestObjectMultiDelete {
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
     when(clientProtocol.getBucketDetails(isNull(), anyString())).thenReturn(bucket);
+    when(clientProtocol.getOmVersion()).thenReturn(omVersion);
 
     return EndpointBuilder.newBucketEndpointBuilder()
         .setBase(new BucketEndpoint() {
