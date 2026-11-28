@@ -26,6 +26,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
@@ -149,6 +150,8 @@ public final class ContainerScanHelper {
       log.debug("Complete list of errors detected while scanning container {}:\n{}", containerID, allErrorString);
     }
 
+    recordDiskIOError(containerData, result);
+
     // Only increment the number of unhealthy containers if the container was not already unhealthy.
     // TODO HDDS-11593: Scanner counters will start from zero
     //  at the beginning of each run, so this will need to be incremented for every unhealthy container seen
@@ -159,6 +162,22 @@ public final class ContainerScanHelper {
       // triggering a volume scan for the unhealthy container
       triggerVolumeScan(containerData);
     }
+  }
+
+  /**
+   * Counts a disk I/O error found by the scan against the container's volume, so that a disk with bad sectors can be
+   * identified even if the volume check itself passes.
+   */
+  private void recordDiskIOError(ContainerData containerData, ScanResult result) {
+    HddsVolume volume = containerData.getVolume();
+    if (volume == null || volume.isFailed()) {
+      return;
+    }
+    result.getErrors().stream()
+        .map(ContainerScanError::getException)
+        .filter(DiskCheckUtil::isDiskIOError)
+        .findFirst()
+        .ifPresent(volume::recordDataPathIOError);
   }
 
   public void triggerVolumeScan(ContainerData containerData) {

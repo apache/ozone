@@ -158,7 +158,7 @@ public class FilePerBlockStrategy implements ChunkManager {
     try {
       channel = files.getChannel(chunkFile, doSyncWrite);
     } catch (IOException e) {
-      onFailure(volume);
+      onFailure(volume, e);
       throw e;
     }
 
@@ -289,7 +289,7 @@ public class FilePerBlockStrategy implements ChunkManager {
       files.close(chunkFile);
       verifyChunkFileExists(chunkFile);
     } catch (IOException e) {
-      onFailure(container.getContainerData().getVolume());
+      onFailure(container.getContainerData().getVolume(), e);
       throw e;
     }
   }
@@ -305,7 +305,7 @@ public class FilePerBlockStrategy implements ChunkManager {
         }
         verifyChunkFileExists(chunkFile);
       } catch (IOException e) {
-        onFailure(container.getContainerData().getVolume());
+        onFailure(container.getContainerData().getVolume(), e);
         throw e;
       }
     }

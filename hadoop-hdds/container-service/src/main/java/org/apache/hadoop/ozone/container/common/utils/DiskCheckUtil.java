@@ -32,7 +32,11 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.io.IOUtils;
 import org.apache.ratis.util.FileUtils;
@@ -45,6 +49,17 @@ import org.slf4j.LoggerFactory;
  */
 public final class DiskCheckUtil {
   public static final String LINUX_DISK_FULL_MESSAGE = "No space left on device";
+  /**
+   * Linux error messages, as reported by the JDK and RocksDB, for errno values that mean the device or file system
+   * under a volume is failing: EIO, EROFS, ENXIO and ENODEV, EUCLEAN and EREMOTEIO.
+   */
+  private static final List<String> LINUX_DISK_IO_ERROR_MESSAGES = Arrays.asList(
+      "Input/output error",
+      "Read-only file system",
+      "No such device",
+      "Structure needs cleaning",
+      "Remote I/O error");
+  private static final int MAX_CAUSE_CHAIN_DEPTH = 64;
   // For testing purposes, an alternate check implementation can be provided
   // to inject failures.
   private static DiskChecks impl = new DiskChecksImpl();
@@ -73,6 +88,27 @@ public final class DiskCheckUtil {
   public static boolean checkReadWrite(File storageDir, File testFileDir,
       int numBytesToWrite) {
     return impl.checkReadWrite(storageDir, testFileDir, numBytesToWrite);
+  }
+
+  /**
+   * Returns true if the throwable or one of its causes indicates that the device or file system under a volume is
+   * failing, as opposed to errors like a missing file, a full disk or too many open files.
+   */
+  public static boolean isDiskIOError(Throwable throwable) {
+    Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+    int depth = 0;
+    for (Throwable cause = throwable;
+        cause != null && depth < MAX_CAUSE_CHAIN_DEPTH && visited.add(cause);
+        cause = cause.getCause(), depth++) {
+      if (cause instanceof SyncFailedException) {
+        return true;
+      }
+      String message = cause.getMessage();
+      if (message != null && LINUX_DISK_IO_ERROR_MESSAGES.stream().anyMatch(message::contains)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
