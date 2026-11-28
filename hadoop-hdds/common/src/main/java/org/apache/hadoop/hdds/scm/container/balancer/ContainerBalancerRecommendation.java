@@ -30,12 +30,12 @@ public final class ContainerBalancerRecommendation {
   private final String failureMessage;
   private final double thresholdPercent;
   private final int maxDatanodesPercentage;
-  private final long maxSizeToMovePerIteration;
-  private final long maxSizeEnteringTarget;
-  private final long maxSizeLeavingSource;
-  private final long moveTimeoutMillis;
-  private final long moveReplicationTimeoutMillis;
-  private final long balancingIntervalMillis;
+  private final long maxSizeToMovePerIterationInGB;
+  private final long maxSizeEnteringTargetInGB;
+  private final long maxSizeLeavingSourceInGB;
+  private final long moveTimeoutMinutes;
+  private final long moveReplicationTimeoutMinutes;
+  private final long balancingIntervalMinutes;
   private final int recommendedIterations;
   private final Map<String, String> rationale;
   private final ContainerBalancerEstimation estimation;
@@ -46,12 +46,12 @@ public final class ContainerBalancerRecommendation {
     this.failureMessage = b.failureMessage;
     this.thresholdPercent = b.thresholdPercent;
     this.maxDatanodesPercentage = b.maxDatanodesPercentage;
-    this.maxSizeToMovePerIteration = b.maxSizeToMovePerIteration;
-    this.maxSizeEnteringTarget = b.maxSizeEnteringTarget;
-    this.maxSizeLeavingSource = b.maxSizeLeavingSource;
-    this.moveTimeoutMillis = b.moveTimeoutMillis;
-    this.moveReplicationTimeoutMillis = b.moveReplicationTimeoutMillis;
-    this.balancingIntervalMillis = b.balancingIntervalMillis;
+    this.maxSizeToMovePerIterationInGB = b.maxSizeToMovePerIterationInGB;
+    this.maxSizeEnteringTargetInGB = b.maxSizeEnteringTargetInGB;
+    this.maxSizeLeavingSourceInGB = b.maxSizeLeavingSourceInGB;
+    this.moveTimeoutMinutes = b.moveTimeoutMinutes;
+    this.moveReplicationTimeoutMinutes = b.moveReplicationTimeoutMinutes;
+    this.balancingIntervalMinutes = b.balancingIntervalMinutes;
     this.recommendedIterations = b.recommendedIterations;
     this.rationale = b.rationale == null
         ? Collections.emptyMap()
@@ -88,28 +88,28 @@ public final class ContainerBalancerRecommendation {
     return maxDatanodesPercentage;
   }
 
-  public long getMaxSizeToMovePerIteration() {
-    return maxSizeToMovePerIteration;
+  public long getMaxSizeToMovePerIterationInGB() {
+    return maxSizeToMovePerIterationInGB;
   }
 
-  public long getMaxSizeEnteringTarget() {
-    return maxSizeEnteringTarget;
+  public long getMaxSizeEnteringTargetInGB() {
+    return maxSizeEnteringTargetInGB;
   }
 
-  public long getMaxSizeLeavingSource() {
-    return maxSizeLeavingSource;
+  public long getMaxSizeLeavingSourceInGB() {
+    return maxSizeLeavingSourceInGB;
   }
 
-  public long getMoveTimeoutMillis() {
-    return moveTimeoutMillis;
+  public long getMoveTimeoutMinutes() {
+    return moveTimeoutMinutes;
   }
 
-  public long getMoveReplicationTimeoutMillis() {
-    return moveReplicationTimeoutMillis;
+  public long getMoveReplicationTimeoutMinutes() {
+    return moveReplicationTimeoutMinutes;
   }
 
-  public long getBalancingIntervalMillis() {
-    return balancingIntervalMillis;
+  public long getBalancingIntervalMinutes() {
+    return balancingIntervalMinutes;
   }
 
   public int getRecommendedIterations() {
@@ -130,12 +130,12 @@ public final class ContainerBalancerRecommendation {
     private String failureMessage;
     private double thresholdPercent;
     private int maxDatanodesPercentage;
-    private long maxSizeToMovePerIteration;
-    private long maxSizeEnteringTarget;
-    private long maxSizeLeavingSource;
-    private long moveTimeoutMillis;
-    private long moveReplicationTimeoutMillis;
-    private long balancingIntervalMillis;
+    private long maxSizeToMovePerIterationInGB;
+    private long maxSizeEnteringTargetInGB;
+    private long maxSizeLeavingSourceInGB;
+    private long moveTimeoutMinutes;
+    private long moveReplicationTimeoutMinutes;
+    private long balancingIntervalMinutes;
     private int recommendedIterations;
     private Map<String, String> rationale;
     private ContainerBalancerEstimation estimation;
@@ -164,33 +164,33 @@ public final class ContainerBalancerRecommendation {
       return this;
     }
 
-    public Builder setMaxSizeToMovePerIteration(long bytes) {
-      this.maxSizeToMovePerIteration = bytes;
+    public Builder setMaxSizeToMovePerIterationInGB(long gb) {
+      this.maxSizeToMovePerIterationInGB = gb;
       return this;
     }
 
-    public Builder setMaxSizeEnteringTarget(long bytes) {
-      this.maxSizeEnteringTarget = bytes;
+    public Builder setMaxSizeEnteringTargetInGB(long gb) {
+      this.maxSizeEnteringTargetInGB = gb;
       return this;
     }
 
-    public Builder setMaxSizeLeavingSource(long bytes) {
-      this.maxSizeLeavingSource = bytes;
+    public Builder setMaxSizeLeavingSourceInGB(long gb) {
+      this.maxSizeLeavingSourceInGB = gb;
       return this;
     }
 
-    public Builder setMoveTimeoutMillis(long millis) {
-      this.moveTimeoutMillis = millis;
+    public Builder setMoveTimeoutMinutes(long minutes) {
+      this.moveTimeoutMinutes = minutes;
       return this;
     }
 
-    public Builder setMoveReplicationTimeoutMillis(long millis) {
-      this.moveReplicationTimeoutMillis = millis;
+    public Builder setMoveReplicationTimeoutMinutes(long minutes) {
+      this.moveReplicationTimeoutMinutes = minutes;
       return this;
     }
 
-    public Builder setBalancingIntervalMillis(long millis) {
-      this.balancingIntervalMillis = millis;
+    public Builder setBalancingIntervalMinutes(long minutes) {
+      this.balancingIntervalMinutes = minutes;
       return this;
     }
 

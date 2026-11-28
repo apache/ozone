@@ -162,19 +162,36 @@ public final class ContainerBalancerAdvisor {
         .setThresholdPercent(thresholdPercent);
 
     try {
-      long moveReplicationTimeoutMillis = balancerConfig.getMoveReplicationTimeout().toMillis();
-      long moveTimeoutMillis = balancerConfig.getMoveTimeout().toMillis();
-      long balancingIntervalMillis = balancerConfig.getBalancingInterval().toMillis();
+      long moveReplicationTimeoutMillis = request.moveReplicationTimeoutMillis != null
+          ? request.moveReplicationTimeoutMillis
+          : balancerConfig.getMoveReplicationTimeout().toMillis();
+      long moveTimeoutMillis = request.moveTimeoutMillis != null
+          ? request.moveTimeoutMillis
+          : balancerConfig.getMoveTimeout().toMillis();
+      long balancingIntervalMillis = request.balancingIntervalMillis != null
+          ? request.balancingIntervalMillis
+          : balancerConfig.getBalancingInterval().toMillis();
       validateMoveTimeouts(conf, moveReplicationTimeoutMillis, moveTimeoutMillis);
       validateBalancingIntervalMillis(balancingIntervalMillis);
 
-      long configCeiling = balancerConfig.getMaxSizeToMovePerIteration();
+      boolean userProvidedMaxSizeToMove = request.maxSizeToMovePerIteration != null;
+      long configCeiling = userProvidedMaxSizeToMove
+          ? request.maxSizeToMovePerIteration
+          : balancerConfig.getMaxSizeToMovePerIteration();
       ContainerBalancerEstimation initialEstimation = estimateForProfile(
           conf, request, profile, snapshot, balancerConfig, thresholdPercent, null);
       if (!initialEstimation.succeeded()) {
         throw new IllegalArgumentException(initialEstimation.getFailureMessage());
       }
-      long recommendedMaxMove = computeRecommendedMaxSizeToMove(configCeiling, initialEstimation);
+      long recommendedMaxMove = userProvidedMaxSizeToMove
+          ? request.maxSizeToMovePerIteration
+          : computeRecommendedMaxSizeToMove(configCeiling, initialEstimation);
+      // Normalize to whole GB, the unit accepted by the start command.
+      long maxSizeToMoveGb = recommendedMaxMove / OzoneConsts.GB;
+      if (maxSizeToMoveGb <= 0) {
+        throw new IllegalArgumentException("Max Size To Move Per Iteration In GB must be positive.");
+      }
+      recommendedMaxMove = maxSizeToMoveGb * OzoneConsts.GB;
 
       // Estimate with the recommended max-size-to-move so it matches the suggested command.
       ContainerBalancerEstimation estimation = estimateForProfile(
@@ -186,23 +203,31 @@ public final class ContainerBalancerAdvisor {
       int recommendedIterations = (int) Math.ceil(
           estimation.getEstimatedIterations() * PLANNING_ITERATION_BUFFER);
 
+      // Normalize the remaining values to the units accepted by the start command.
+      long maxSizeEnteringTargetGb = toMaxSizeEnteringTargetInGb(
+          estimation.getMaxSizeEnteringTarget(), maxSizeToMoveGb);
+      long maxSizeLeavingSourceGb = toMaxSizeLeavingSourceInGb(
+          estimation.getMaxSizeLeavingSource(), maxSizeToMoveGb);
+      long moveTimeoutMinutes = Duration.ofMillis(moveTimeoutMillis).toMinutes();
+      long moveReplicationTimeoutMinutes = Duration.ofMillis(moveReplicationTimeoutMillis).toMinutes();
+      long balancingIntervalMinutes = Duration.ofMillis(balancingIntervalMillis).toMinutes();
+
       Map<String, String> rationale = buildRationale(
-          request.thresholdPercent != null,
-          profile,
+          request,
           balancerConfig,
           estimation,
-          moveTimeoutMillis,
-          moveReplicationTimeoutMillis,
-          balancingIntervalMillis);
+          moveTimeoutMinutes,
+          moveReplicationTimeoutMinutes,
+          balancingIntervalMinutes);
 
       return builder
           .setMaxDatanodesPercentage(estimation.getMaxDatanodesPercentage())
-          .setMaxSizeToMovePerIteration(recommendedMaxMove)
-          .setMaxSizeEnteringTarget(estimation.getMaxSizeEnteringTarget())
-          .setMaxSizeLeavingSource(estimation.getMaxSizeLeavingSource())
-          .setMoveTimeoutMillis(moveTimeoutMillis)
-          .setMoveReplicationTimeoutMillis(moveReplicationTimeoutMillis)
-          .setBalancingIntervalMillis(balancingIntervalMillis)
+          .setMaxSizeToMovePerIterationInGB(maxSizeToMoveGb)
+          .setMaxSizeEnteringTargetInGB(maxSizeEnteringTargetGb)
+          .setMaxSizeLeavingSourceInGB(maxSizeLeavingSourceGb)
+          .setMoveTimeoutMinutes(moveTimeoutMinutes)
+          .setMoveReplicationTimeoutMinutes(moveReplicationTimeoutMinutes)
+          .setBalancingIntervalMinutes(balancingIntervalMinutes)
           .setRecommendedIterations(recommendedIterations)
           .setRationale(rationale)
           .setEstimation(estimation)
@@ -225,43 +250,66 @@ public final class ContainerBalancerAdvisor {
     return minPositive(configCeiling, floor);
   }
 
+  static long toMaxSizeEnteringTargetInGb(long maxSizeEnteringTargetBytes, long maxSizeToMoveGb) {
+    return Math.min(maxSizeEnteringTargetBytes / OzoneConsts.GB, maxSizeToMoveGb);
+  }
+
+  static long toMaxSizeLeavingSourceInGb(long maxSizeLeavingSourceBytes, long maxSizeToMoveGb) {
+    return Math.min(maxSizeLeavingSourceBytes / OzoneConsts.GB, maxSizeToMoveGb);
+  }
+
   private static Map<String, String> buildRationale(
-      boolean userProvidedThreshold,
-      ContainerBalancerProfile profile,
+      AdvisorRequest request,
       ContainerBalancerConfiguration balancerConfig,
       ContainerBalancerEstimation estimation,
-      long moveTimeoutMillis,
-      long moveReplicationTimeoutMillis,
-      long balancingIntervalMillis) {
+      long moveTimeoutMinutes,
+      long moveReplicationTimeoutMinutes,
+      long balancingIntervalMinutes) {
+    ContainerBalancerProfile profile = estimation.getProfile();
+    long maxSizeToMoveGb = estimation.getMaxSizeToMovePerIteration() / OzoneConsts.GB;
+    long maxSizeEnteringTargetGb = toMaxSizeEnteringTargetInGb(
+        estimation.getMaxSizeEnteringTarget(), maxSizeToMoveGb);
+    long maxSizeLeavingSourceGb = toMaxSizeLeavingSourceInGb(
+        estimation.getMaxSizeLeavingSource(), maxSizeToMoveGb);
     Map<String, String> rationale = new HashMap<>();
-    rationale.put("threshold", userProvidedThreshold
+    rationale.put("threshold", request.thresholdPercent != null
         ? "user override"
         : "default from configuration");
     int profileDatanodesPercentage = profile.getDatanodesMaxPercentage();
     int usedDatanodesPercentage = estimation.getMaxDatanodesPercentage();
-    if (usedDatanodesPercentage == profileDatanodesPercentage) {
+    if (request.maxDatanodesPercentageToInvolvePerIteration != null) {
+      rationale.put("maxDatanodesPercentage", String.format(
+          "user override (%d%%)", usedDatanodesPercentage));
+    } else if (usedDatanodesPercentage == profileDatanodesPercentage) {
       rationale.put("maxDatanodesPercentage", String.format(
           "profile default (%d%%)", usedDatanodesPercentage));
     } else {
       rationale.put("maxDatanodesPercentage", String.format(
           "profile %d%%, raised to %d%% (≥2 nodes)", profileDatanodesPercentage, usedDatanodesPercentage));
     }
-    rationale.put("maxSizeToMovePerIteration", String.format(
-        "min(%s ceiling, max(per-iteration %s, entering %s, leaving %s))",
-        byteDesc(balancerConfig.getMaxSizeToMovePerIteration()),
-        byteDesc(estimation.getPerIterationBytes()),
-        byteDesc(estimation.getMaxSizeEnteringTarget()),
-        byteDesc(estimation.getMaxSizeLeavingSource())));
+    rationale.put("maxSizeToMovePerIteration", request.maxSizeToMovePerIteration != null
+        ? String.format("user override (%d GB)", maxSizeToMoveGb)
+        : String.format(
+            "min(%s ceiling, max(per-iteration %s, entering %s, leaving %s))",
+            byteDesc(balancerConfig.getMaxSizeToMovePerIteration()),
+            byteDesc(estimation.getPerIterationBytes()),
+            byteDesc(estimation.getMaxSizeEnteringTarget()),
+            byteDesc(estimation.getMaxSizeLeavingSource())));
     rationale.put("maxSizeEnteringTarget", String.format(
-        "profile default (%d GB)", estimation.getMaxSizeEnteringTarget() / OzoneConsts.GB));
+        request.maxSizeEnteringTarget != null ? "user override (%d GB)" : "profile default (%d GB)",
+        maxSizeEnteringTargetGb));
     rationale.put("maxSizeLeavingSource", String.format(
-        "profile default (%d GB)", estimation.getMaxSizeLeavingSource() / OzoneConsts.GB));
+        request.maxSizeLeavingSource != null ? "user override (%d GB)" : "profile default (%d GB)",
+        maxSizeLeavingSourceGb));
     rationale.put("moveTimeout", String.format(
-        "configuration default (%d min)", moveTimeoutMillis / 60000));
+        request.moveTimeoutMillis != null ? "user override (%d min)" : "configuration default (%d min)",
+        moveTimeoutMinutes));
     rationale.put("moveReplicationTimeout", String.format(
-        "configuration default (%d min)", moveReplicationTimeoutMillis / 60000));
+        request.moveReplicationTimeoutMillis != null ? "user override (%d min)" : "configuration default (%d min)",
+        moveReplicationTimeoutMinutes));
     rationale.put("balancingInterval", String.format(
-        "configuration default (%d min)", balancingIntervalMillis / 60000));
+        request.balancingIntervalMillis != null ? "user override (%d min)" : "configuration default (%d min)",
+        balancingIntervalMinutes));
     long planningIterations = (long) Math.ceil(
         estimation.getEstimatedIterations() * PLANNING_ITERATION_BUFFER);
     rationale.put("iterations", String.format(
