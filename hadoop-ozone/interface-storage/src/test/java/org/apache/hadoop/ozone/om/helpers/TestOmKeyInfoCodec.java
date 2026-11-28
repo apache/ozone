@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.fs.FileChecksum;
@@ -135,31 +134,6 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
         .build();
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  public void testObjectLockFields(boolean hasDate) throws IOException {
-    RetentionDuration rule = new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.YEARS, 1);
-    ObjectRetention retention = new ObjectRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
-        hasDate ? 1_800_000_000_000L : 0,
-        new EventHold(true, rule));
-    OmKeyInfo key = getKeyInfo(1).toBuilder()
-        .setRetention(retention).setLegalHold(true).build();
-    for (Codec<OmKeyInfo> codec : Arrays.asList(OmKeyInfo.getOpenKeyTableCodec(), OmKeyInfo.getKeyTableCodec())) {
-      byte[] rawData = codec.toPersistedFormat(key);
-      OmKeyInfo decoded = codec.fromPersistedFormat(rawData);
-      assertEquals(retention, decoded.getRetention());
-      assertTrue(decoded.getLegalHold());
-
-      OzoneManagerProtocolProtos.KeyInfoProtoLight light =
-          OzoneManagerProtocolProtos.KeyInfoProtoLight.parseFrom(rawData);
-      assertEquals(retention.toProto(), light.getRetention());
-      assertEquals(hasDate, light.getRetention().hasRetentionDate());
-      assertTrue(light.getLegalHold());
-    }
-    assertEquals(24, KeyInfo.RETENTION_FIELD_NUMBER);
-    assertEquals(25, KeyInfo.LEGALHOLD_FIELD_NUMBER);
-  }
-
   @Test
   public void test() throws IOException {
     testOmKeyInfoCodecWithoutPipeline(1);
@@ -233,12 +207,17 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     assertEquals(12345L, deserializedKey.getExpectedDataGeneration());
   }
 
-  @Test
-  public void testCodecsWithKeyWithoutOpenKeyFields() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testCodecsWithKeyWithoutOpenKeyFields(boolean hasDate) throws IOException {
     final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getOpenKeyTableCodec();
     final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getKeyTableCodec();
 
-    OmKeyInfo originKey = getKeyInfo(1);
+    RetentionDuration rule = new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.YEARS, 1);
+    ObjectRetention retention = new ObjectRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
+        hasDate ? 1_800_000_000_000L : 0, new EventHold(true, rule));
+    OmKeyInfo originKey = getKeyInfo(1).toBuilder()
+        .setRetention(retention).setLegalHold(true).build();
     assertNull(originKey.getExpectedDataGeneration());
 
     byte[] openKeyData = openKeyCodec.toPersistedFormat(originKey);
@@ -253,6 +232,10 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
     assertEquals(BUCKET, fromKeyTableCodec.getBucketName());
     assertNull(fromOpenKeyCodec.getExpectedDataGeneration());
     assertNull(fromKeyTableCodec.getExpectedDataGeneration());
+    assertEquals(retention, fromOpenKeyCodec.getRetention());
+    assertEquals(retention, fromKeyTableCodec.getRetention());
+    assertTrue(fromOpenKeyCodec.getLegalHold());
+    assertTrue(fromKeyTableCodec.getLegalHold());
   }
 
   @Test
