@@ -149,6 +149,32 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
+   * Fails if the witnessed container DB has an entry for the container: it was already created on this datanode,
+   * possibly deleted since, and must not be created again by an ordinary create. The state in the entry does not
+   * matter. It is the state that the replica had when the entry was written, and it is not updated when the container
+   * is closed.
+   * @param containerId ID of the container to be created
+   * @throws StorageContainerException with {@code CLOSED_CONTAINER_IO} if there is an entry, or with
+   *                                   {@code IO_EXCEPTION} if the entry cannot be read
+   */
+  public void ensureContainerNotWitnessed(long containerId) throws StorageContainerException {
+    if (containerMetadataStore == null) {
+      return;
+    }
+    final ContainerCreateInfo info;
+    try {
+      info = containerMetadataStore.getContainerCreateInfoTable().get(ContainerID.valueOf(containerId));
+    } catch (IOException e) {
+      throw new StorageContainerException("Failed to read the witnessed container DB for container " + containerId,
+          e, ContainerProtos.Result.IO_EXCEPTION);
+    }
+    if (info != null) {
+      throw new StorageContainerException("Container " + containerId + " was already created on this datanode"
+          + " and cannot be created again", ContainerProtos.Result.CLOSED_CONTAINER_IO);
+    }
+  }
+
+  /**
    * @param scanner The scanner instance will be invoked when a scan of a container in this set is requested.
    */
   public void registerOnDemandScanner(OnDemandContainerScanner scanner) {
@@ -208,7 +234,7 @@ public class ContainerSet implements Iterable<Container<?>> {
         LOG.debug("Container with container Id {} is added to containerMap",
             containerId);
       }
-      updateContainerIdTable(containerId, container.getContainerData());
+      updateContainerIdTable(containerId, container.getContainerData(), overwrite);
       missingContainerSet.remove(containerId);
       if (container.getContainerData().getState() == RECOVERING) {
         recoveringContainerMap.put(containerId, getCurrentTime() + recoveringTimeout);
@@ -226,14 +252,31 @@ public class ContainerSet implements Iterable<Container<?>> {
     }
   }
 
-  private void updateContainerIdTable(long containerId, ContainerData containerData) throws StorageContainerException {
+  /**
+   * Records the replica that is being added in the witnessed container DB. The entry is written when:
+   * <ul>
+   *   <li>there is none: this is the first replica of the container on this datanode;</li>
+   *   <li>it is DELETED: this datanode deleted its replica, and now loads one from disk at startup or gets one through
+   *   repair. An ordinary create does not get here when there is an entry, whatever its state: KeyValueHandler refuses
+   *   it;</li>
+   *   <li>it has no replica index: it was written in the older table format;</li>
+   *   <li>{@code replaceReplicaIndex} is set and the replica has another index than the entry: a repair replaces the
+   *   replica that this datanode held.</li>
+   * </ul>
+   * In all other cases the entry is kept as it is.
+   */
+  private void updateContainerIdTable(long containerId, ContainerData containerData, boolean replaceReplicaIndex)
+      throws StorageContainerException {
     if (null != containerMetadataStore) {
       try {
         ContainerID containerIdObj = ContainerID.valueOf(containerId);
         Table<ContainerID, ContainerCreateInfo> containerCreateInfoTable =
             containerMetadataStore.getContainerCreateInfoTable();
         ContainerCreateInfo containerCreateInfo = containerCreateInfoTable.get(containerIdObj);
-        if (containerCreateInfo == null || containerCreateInfo.getReplicaIndex() == INVALID_REPLICA_INDEX) {
+        if (containerCreateInfo == null
+            || containerCreateInfo.getState() == State.DELETED
+            || containerCreateInfo.getReplicaIndex() == INVALID_REPLICA_INDEX
+            || (replaceReplicaIndex && containerCreateInfo.getReplicaIndex() != containerData.getReplicaIndex())) {
           containerCreateInfoTable.put(containerIdObj,
               ContainerCreateInfo.valueOf(containerData.getState(), containerData.getReplicaIndex()));
         }
@@ -336,8 +379,9 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
-   * Removes container from both memory and database. This should be used when the containerData on disk has been
-   * removed completely from the node.
+   * Removes container from memory and keeps its entry in the witnessed container DB with state {@link State#DELETED},
+   * so that the container is not created again. The entry is written first: if that fails, the container stays in
+   * memory. This should be used when the containerData on disk is being removed completely from the node.
    * @param containerId
    * @return True if container is removed from containerMap.
    * @throws StorageContainerException
@@ -374,7 +418,7 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @return If container is removed from containerMap returns true, otherwise
    * false
    */
-  private boolean removeContainer(long containerId, boolean markMissing, boolean removeFromDB)
+  private boolean removeContainer(long containerId, boolean markMissing, boolean markDeleted)
       throws StorageContainerException {
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
@@ -384,11 +428,12 @@ public class ContainerSet implements Iterable<Container<?>> {
     if (markMissing) {
       missingContainerSet.add(containerId);
     }
+    // Keep the witnessed entry as DELETED before anything is removed, so a failed write leaves the replica loaded.
+    if (markDeleted) {
+      markDeletedInContainerTable(containerId);
+    }
     removeRecoveringContainer(containerId);
     Container<?> removed = containerMap.remove(containerId);
-    if (removeFromDB) {
-      deleteFromContainerTable(containerId);
-    }
     if (removed == null) {
       LOG.debug("Container with containerId {} is not present in " +
           "containerMap", containerId);
@@ -404,12 +449,14 @@ public class ContainerSet implements Iterable<Container<?>> {
     }
   }
 
-  private void deleteFromContainerTable(long containerId) throws StorageContainerException {
+  private void markDeletedInContainerTable(long containerId) throws StorageContainerException {
     if (null != containerMetadataStore) {
       try {
-        containerMetadataStore.getContainerCreateInfoTable().delete(ContainerID.valueOf(containerId));
+        containerMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(containerId),
+            ContainerCreateInfo.valueOf(State.DELETED, INVALID_REPLICA_INDEX));
       } catch (IOException e) {
-        throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
+        throw new StorageContainerException("Failed to mark container " + containerId
+            + " deleted in the witnessed container DB", e, ContainerProtos.Result.IO_EXCEPTION);
       }
     }
   }
@@ -652,6 +699,21 @@ public class ContainerSet implements Iterable<Container<?>> {
     return missingContainerSet;
   }
 
+  private boolean isDeletedInContainerTable(long containerId) {
+    if (containerMetadataStore == null) {
+      return false;
+    }
+    try {
+      final ContainerCreateInfo info =
+          containerMetadataStore.getContainerCreateInfoTable().get(ContainerID.valueOf(containerId));
+      return info != null && info.getState() == State.DELETED;
+    } catch (IOException e) {
+      LOG.warn("Failed to read the witnessed container DB for container {}, treating it as not deleted",
+          containerId, e);
+      return false;
+    }
+  }
+
   /**
    * Builds the missing container set by taking a diff between total no
    * containers actually found and number of containers which actually
@@ -666,6 +728,10 @@ public class ContainerSet implements Iterable<Container<?>> {
     container2BCSIDMap.entrySet().parallelStream().forEach((mapEntry) -> {
       final long id = getId.applyAsLong(mapEntry.getKey());
       if (!containerMap.containsKey(id)) {
+        if (isDeletedInContainerTable(id)) {
+          LOG.debug("Container {} was deleted, not adding it to missing container set.", id);
+          return;
+        }
         LOG.warn("Adding container {} to missing container set.", id);
         missingContainerSet.add(id);
       } else {

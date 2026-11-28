@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -67,20 +69,25 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -92,7 +99,9 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -123,6 +132,7 @@ public class TestDiskBalancerTask {
 
   private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
+  private HddsDispatcher dispatcher;
   private MutableVolumeSet volumeSet;
   private HddsVolume sourceVolume;
   private HddsVolume destVolume;
@@ -238,7 +248,7 @@ public class TestDiskBalancerTask {
     destVolume.incrementUsedSpace(0 - destVolume.getCurrentUsage().getUsedSpace());
     sourceVolume.incrementUsedSpace(sourceVolume.getCurrentUsage().getCapacity() / 2);
 
-    containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    containerSet = ContainerImplTestUtils.newContainerSet(1000);
     ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler = new KeyValueHandler(conf, datanodeUuid,
         containerSet, volumeSet, containerMetrics, c -> {
@@ -247,6 +257,8 @@ public class TestDiskBalancerTask {
 
     Map<ContainerProtos.ContainerType, Handler> handlers = new HashMap<>();
     handlers.put(ContainerProtos.ContainerType.KeyValueContainer, keyValueHandler);
+    dispatcher = new HddsDispatcher(conf, containerSet, volumeSet, handlers, mock(StateContext.class),
+        containerMetrics, null);
     ContainerController controller = new ContainerController(containerSet, handlers);
     ozoneContainer = mock(OzoneContainer.class);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
@@ -774,6 +786,59 @@ public class TestDiskBalancerTask {
   }
 
   /**
+   * A write for a container that DiskBalancer moved, after the old replica is deleted, is refused by the closed replica
+   * on the destination volume. No replica is created on the source volume, the block is still served, the witnessed
+   * container entry is kept, and after a restart only the moved replica loads.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testLateWriteAfterMoveAndOldReplicaDeletion(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    long delay = 2000L;
+    diskBalancerService.setReplicaDeletionDelay(delay);
+    KeyValueContainer container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    KeyValueContainerData data = container.getContainerData();
+    try (DBHandle db = BlockUtils.getDB(data, conf)) {
+      db.getStore().getBlockDataTable().put(data.getBlockKey(1L), new BlockData(new BlockID(CONTAINER_ID, 1L)));
+      db.getStore().getMetadataTable().put(data.getBlockCountKey(), 1L);
+    }
+    assertNotNull(getWitnessedEntry());
+    assertTrue(containerDir(sourceVolume).exists());
+
+    getTask().call();
+    assertTrue(containerDir(sourceVolume).exists());
+    clock.fastForward(delay);
+    diskBalancerService.cleanupPendingDeletionContainers();
+    assertFalse(containerDir(sourceVolume).exists());
+    Container<?> movedContainer = containerSet.getContainer(CONTAINER_ID);
+    assertEquals(destVolume, movedContainer.getContainerData().getVolume());
+    assertTrue(containerDir(destVolume).exists());
+
+    // A late write is refused by the closed replica on the destination volume.
+    ContainerProtos.ContainerCommandRequestProto writeChunk = ContainerTestHelper.getWriteChunkRequest(
+        MockPipeline.createPipeline(1), new BlockID(CONTAINER_ID, 2L), 100);
+    assertEquals(CLOSED_CONTAINER_IO, dispatcher.dispatch(writeChunk, null).getResult());
+    assertSame(movedContainer, containerSet.getContainer(CONTAINER_ID));
+    assertEquals(1, containerSet.containerCount());
+    assertFalse(containerDir(sourceVolume).exists());
+    assertTrue(containerDir(destVolume).exists());
+    assertEquals(ContainerProtos.Result.SUCCESS, dispatcher.dispatch(getBlockRequest(1L), null).getResult());
+    ContainerCreateInfo entry = getWitnessedEntry();
+    assertNotNull(entry);
+    assertNotEquals(State.DELETED, entry.getState());
+
+    // After a restart that reads both volumes, only the moved replica loads.
+    ContainerSet restartedContainerSet =
+        ContainerImplTestUtils.newContainerSet(1000, containerSet.getContainerMetadataStore());
+    new ContainerReader(volumeSet, sourceVolume, restartedContainerSet, conf, true).run();
+    new ContainerReader(volumeSet, destVolume, restartedContainerSet, conf, true).run();
+    assertEquals(1, restartedContainerSet.containerCount());
+    Container<?> reloadedContainer = restartedContainerSet.getContainer(CONTAINER_ID);
+    assertEquals(destVolume, reloadedContainer.getContainerData().getVolume());
+    assertEquals(State.CLOSED, reloadedContainer.getContainerState());
+    assertNotNull(getWitnessedEntry());
+  }
+
+  /**
    * Testing that invalid states are correctly rejected.
    */
   @ParameterizedTest
@@ -937,6 +1002,26 @@ public class TestDiskBalancerTask {
     // Manually update volume usage for test purposes
     vol.incrementUsedSpace(containerData.getBytesUsed());
     return container;
+  }
+
+  private ContainerCreateInfo getWitnessedEntry() throws IOException {
+    return containerSet.getContainerMetadataStore().getContainerCreateInfoTable()
+        .get(ContainerID.valueOf(CONTAINER_ID));
+  }
+
+  private File containerDir(HddsVolume volume) {
+    return new File(KeyValueContainerLocationUtil.getBaseContainerLocation(
+        volume.getHddsRootDir().toString(), scmId, CONTAINER_ID));
+  }
+
+  private ContainerProtos.ContainerCommandRequestProto getBlockRequest(long localId) {
+    return ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.GetBlock)
+        .setContainerID(CONTAINER_ID)
+        .setDatanodeUuid(datanodeUuid)
+        .setGetBlock(ContainerProtos.GetBlockRequestProto.newBuilder()
+            .setBlockID(new BlockID(CONTAINER_ID, localId).getDatanodeBlockIDProtobuf()))
+        .build();
   }
 
   private DiskBalancerService.DiskBalancerTask getTask() {

@@ -504,6 +504,9 @@ public class KeyValueHandler extends Handler {
     containerIdLock.lock();
     try {
       if (containerSet.getContainer(containerID) == null) {
+        if (containerState != RECOVERING) {
+          containerSet.ensureContainerNotWitnessed(containerID);
+        }
         newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
         if (RECOVERING == newContainer.getContainerState()) {
           created = containerSet.addContainerByOverwriteMissingContainer(newContainer);
@@ -2557,12 +2560,10 @@ public class KeyValueHandler extends Handler {
           ContainerLogger.logDeleted(containerLocked.getContainerData(), force);
           KeyValueContainerUtil.removeContainer(keyValueContainerData, conf);
         } catch (IOException ioe) {
-          LOG.error("Failed to move container under " + hddsVolume
-              .getDeletedContainerDir());
-          String errorMsg =
-              "Failed to move container" + containerLocked.getContainerData()
-                  .getContainerID();
-          triggerVolumeScanAndThrowException(containerLocked, errorMsg,
+          LOG.error("Failed to delete container {} on volume {}", containerId, hddsVolume, ioe);
+          // Trigger a volume scan as exception occurred.
+          StorageVolumeUtil.onFailure(hddsVolume);
+          throw new StorageContainerException("Failed to delete container " + containerId, ioe,
               CONTAINER_INTERNAL_ERROR);
         }
       }

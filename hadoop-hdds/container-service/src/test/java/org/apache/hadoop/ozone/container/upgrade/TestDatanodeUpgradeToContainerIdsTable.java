@@ -17,10 +17,17 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -33,10 +40,15 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
@@ -115,6 +127,63 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   }
 
   @Test
+  public void testDeletedContainerStaysWitnessedAcrossUpgrade() throws Exception {
+    initTests();
+    // start DN and SCM
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
+    dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
+        HDDSLayoutFeature.HBASE_SUPPORT.serialize());
+    ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
+    ContainerSet containerSet = dsm.getContainer().getContainerSet();
+    final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
+    WitnessedContainerMetadataStore metadataStore = dsm.getContainer().getWitnessedContainerMetadataStore();
+    Table<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
+        metadataStore.getContainerCreateInfoTable().getName(), ContainerID.getCodec(), StringCodec.get());
+    assertEquals("containerIds", metadataStore.getContainerCreateInfoTable().getName());
+
+    // add, close and delete a container: the old format table keeps the entry, with the state name DELETED
+    final long containerID = UpgradeTestHelper.addContainer(dispatcher, pipeline);
+    final ContainerID id = ContainerID.valueOf(containerID);
+    assertTrue(containerDirectoryExists(containerID));
+    UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
+    UpgradeTestHelper.deleteContainer(dispatcher, containerID, pipeline);
+    assertNull(containerSet.getContainer(containerID));
+    assertEquals(DELETED.name(), tableWithStringCodec.get(id));
+
+    // an ordinary create is refused before any file is created, a RECOVERING create is not
+    UpgradeTestHelper.dispatchRequest(dispatcher,
+        ContainerTestHelper.getCreateContainerRequest(containerID, pipeline), CLOSED_CONTAINER_IO);
+    assertNull(containerSet.getContainer(containerID));
+    assertFalse(containerDirectoryExists(containerID));
+    UpgradeTestHelper.dispatchRequest(dispatcher,
+        ContainerTestHelper.getCreateContainerRequest(containerID, pipeline, RECOVERING));
+    assertEquals(RECOVERING, containerSet.getContainer(containerID).getContainerState());
+    assertTrue(containerDirectoryExists(containerID));
+
+    // deleting the recovering replica writes DELETED again
+    UpgradeTestHelper.deleteContainer(dispatcher, containerID, pipeline);
+    assertNull(containerSet.getContainer(containerID));
+    assertEquals(DELETED.name(), tableWithStringCodec.get(id));
+    assertFalse(containerDirectoryExists(containerID));
+
+    // finalize: the new table holds (DELETED, -1) and an ordinary create is still refused
+    dsm.getVersionManager().finalizeUpgrade();
+    assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
+    assertEquals(WitnessedContainerDBDefinition.CONTAINER_CREATE_INFO_TABLE_DEF.getName(),
+        metadataStore.getContainerCreateInfoTable().getName());
+    ContainerCreateInfo containerCreateInfo = metadataStore.getContainerCreateInfoTable().get(id);
+    assertNotNull(containerCreateInfo);
+    assertEquals(DELETED, containerCreateInfo.getState());
+    assertEquals(ContainerCreateInfo.INVALID_REPLICA_INDEX, containerCreateInfo.getReplicaIndex());
+    UpgradeTestHelper.dispatchRequest(dispatcher,
+        ContainerTestHelper.getCreateContainerRequest(containerID, pipeline), CLOSED_CONTAINER_IO);
+    assertNull(containerSet.getContainer(containerID));
+    assertFalse(containerDirectoryExists(containerID));
+  }
+
+  @Test
   public void testContainerTableFinalizeRetry() throws Exception {
     initTests();
     // start DN and SCM
@@ -172,6 +241,17 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     assertEquals(OPEN, containerCreateInfo.getState());
 
     assertEquals(1, getTableEntryCount(currTable)); // 1 original + 10 dummy entries
+  }
+
+  private boolean containerDirectoryExists(long containerID) throws Exception {
+    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(dsm.getContainer().getVolumeSet().getVolumesList())) {
+      String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(volume, volume.getClusterID());
+      if (new File(KeyValueContainerLocationUtil.getBaseContainerLocation(
+          volume.getHddsRootDir().toString(), idDir, containerID)).exists()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static int getTableEntryCount(Table<ContainerID, ContainerCreateInfo> currTable) throws Exception {
