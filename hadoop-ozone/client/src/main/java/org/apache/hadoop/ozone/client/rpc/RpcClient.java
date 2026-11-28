@@ -2027,22 +2027,22 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
       throws IOException {
-    OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, false);
-    return getOzoneKeyDetails(keyInfo);
+    KeyInfoWithVolumeContext context = getS3KeyInfoWithVolumeContext(bucketName, keyName, false);
+    return withLifecycleExpiration(getOzoneKeyDetails(context.getKeyInfo()), context);
   }
 
   @Override
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
                                          int partNumber) throws IOException {
-    return getOzoneKeyDetails(
-        getS3PartOmKeyInfo(bucketName, keyName, partNumber, false));
+    KeyInfoWithVolumeContext context = getS3PartKeyInfoWithVolumeContext(bucketName, keyName, partNumber, false);
+    return withLifecycleExpiration(getOzoneKeyDetails(context.getKeyInfo()), context);
   }
 
   @Override
   public OzoneKey headS3Object(String bucketName, String keyName,
                                int partNumber) throws IOException {
-    return OzoneKey.fromKeyInfo(
-        getS3PartOmKeyInfo(bucketName, keyName, partNumber, true));
+    KeyInfoWithVolumeContext context = getS3PartKeyInfoWithVolumeContext(bucketName, keyName, partNumber, true);
+    return withLifecycleExpiration(OzoneKey.fromKeyInfo(context.getKeyInfo()), context);
   }
 
   @Override
@@ -2067,13 +2067,19 @@ public class RpcClient implements ClientProtocol {
     return new S3HeadObjectAttributes(OzoneKey.fromKeyInfo(keyInfo), partSizes, bucketLayout);
   }
 
-  private OmKeyInfo getS3PartOmKeyInfo(String bucketName, String keyName,
+  private static <T extends OzoneKey> T withLifecycleExpiration(T key, KeyInfoWithVolumeContext context) {
+    context.getLifecycleExpiration().ifPresent(key::setLifecycleExpiration);
+    return key;
+  }
+
+  private KeyInfoWithVolumeContext getS3PartKeyInfoWithVolumeContext(String bucketName, String keyName,
       int partNumber, boolean isHeadOp) throws IOException {
-    OmKeyInfo keyInfo;
+    KeyInfoWithVolumeContext context;
     if (OzoneManagerVersion.S3_PART_AWARE_GET.isSupportedBy(getOmVersion())) {
-      keyInfo = getS3PartKeyInfo(bucketName, keyName, partNumber, isHeadOp);
+      context = getS3PartKeyInfo(bucketName, keyName, partNumber, isHeadOp);
     } else {
-      keyInfo = getS3KeyInfo(bucketName, keyName, isHeadOp);
+      context = getS3KeyInfoWithVolumeContext(bucketName, keyName, isHeadOp);
+      OmKeyInfo keyInfo = context.getKeyInfo();
       List<OmKeyLocationInfo> filteredKeyLocationInfo = keyInfo
           .getLatestVersionLocations().getBlocksLatestVersionOnly().stream()
           .filter(omKeyLocationInfo -> omKeyLocationInfo.getPartNumber() ==
@@ -2084,13 +2090,7 @@ public class RpcClient implements ClientProtocol {
           .mapToLong(OmKeyLocationInfo::getLength)
           .sum());
     }
-    return keyInfo;
-  }
-
-  @Nonnull
-  private OmKeyInfo getS3KeyInfo(
-      String bucketName, String keyName, boolean isHeadOp) throws IOException {
-    return getS3KeyInfoWithVolumeContext(bucketName, keyName, isHeadOp).getKeyInfo();
+    return context;
   }
 
   @Nonnull
@@ -2117,7 +2117,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Nonnull
-  private OmKeyInfo getS3PartKeyInfo(
+  private KeyInfoWithVolumeContext getS3PartKeyInfo(
       String bucketName, String keyName, int partNumber, boolean isHeadOp)
       throws IOException {
     verifyBucketName(bucketName);
@@ -2138,7 +2138,7 @@ public class RpcClient implements ClientProtocol {
     KeyInfoWithVolumeContext keyInfoWithS3Context =
         ozoneManagerClient.getKeyInfo(keyArgs, true);
     keyInfoWithS3Context.getUserPrincipal().ifPresent(this::updateS3Principal);
-    return keyInfoWithS3Context.getKeyInfo();
+    return keyInfoWithS3Context;
   }
 
   @Override
@@ -3121,8 +3121,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneKey headS3Object(String bucketName, String keyName)
       throws IOException {
-    OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, true);
-    return OzoneKey.fromKeyInfo(keyInfo);
+    KeyInfoWithVolumeContext context = getS3KeyInfoWithVolumeContext(bucketName, keyName, true);
+    return withLifecycleExpiration(OzoneKey.fromKeyInfo(context.getKeyInfo()), context);
   }
 
   @Override

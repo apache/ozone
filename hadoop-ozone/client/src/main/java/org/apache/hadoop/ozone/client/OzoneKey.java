@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.ozone.om.helpers.LifecycleExpirationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 /**
@@ -74,6 +75,8 @@ public class OzoneKey {
    * Name of the KMS key the data is encrypted with, null if the key is not encrypted or it is not known.
    */
   private String encryptionKeyName;
+
+  private LifecycleExpirationInfo lifecycleExpiration;
 
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
@@ -224,6 +227,19 @@ public class OzoneKey {
   @JsonIgnore
   public String getEncryptionKeyName() {
     return encryptionKeyName;
+  }
+
+  /**
+   * Returns when the key expires under the bucket lifecycle configuration, null if no enabled Expiration rule
+   * applies to the key or it is not known. Only set for keys read through the S3 APIs.
+   */
+  @JsonIgnore
+  public LifecycleExpirationInfo getLifecycleExpiration() {
+    return lifecycleExpiration;
+  }
+
+  public void setLifecycleExpiration(LifecycleExpirationInfo lifecycleExpiration) {
+    this.lifecycleExpiration = lifecycleExpiration;
   }
 
   /**

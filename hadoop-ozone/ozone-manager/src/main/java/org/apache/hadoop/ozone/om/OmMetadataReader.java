@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Collections;
@@ -51,12 +52,14 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.LifecycleExpirationInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
@@ -219,6 +222,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       s3VolumeContext.ifPresent(context -> {
         builder.setVolumeArgs(context.getOmVolumeArgs());
         builder.setUserPrincipal(context.getUserPrincipal());
+        builder.setLifecycleExpiration(getLifecycleExpiration(bucket, resolvedArgs.getKeyName(), keyInfo));
       });
       return builder.build();
     } catch (Exception ex) {
@@ -233,6 +237,27 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
             bucket.audit(resolvedVolumeArgs.toAuditMap())));
       }
       perfMetrics.addGetKeyInfoLatencyNs(Time.monotonicNowNanos() - start);
+    }
+  }
+
+  /**
+   * Returns when the key expires under the bucket lifecycle configuration, for the S3 x-amz-expiration header.
+   * Nothing is returned for a key read from a snapshot, and a failed lookup only omits the expiration.
+   */
+  @Nullable
+  private LifecycleExpirationInfo getLifecycleExpiration(ResolvedBucket bucket, String keyPath, OmKeyInfo keyInfo) {
+    OMMetadataManager metadataManager = keyManager.getMetadataManager();
+    if (metadataManager != ozoneManager.getMetadataManager()) {
+      return null;
+    }
+    try {
+      OmLifecycleConfiguration lifecycleConfiguration = metadataManager.getLifecycleConfigurationTable()
+          .get(metadataManager.getBucketKey(bucket.realVolume(), bucket.realBucket()));
+      return lifecycleConfiguration == null ? null : lifecycleConfiguration.getExpiration(keyInfo, keyPath);
+    } catch (IOException ex) {
+      log.debug("Failed to get lifecycle configuration of bucket {}/{}", bucket.realVolume(), bucket.realBucket(),
+          ex);
+      return null;
     }
   }
 

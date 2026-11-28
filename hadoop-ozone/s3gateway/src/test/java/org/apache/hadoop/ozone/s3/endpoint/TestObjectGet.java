@@ -31,6 +31,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPIRATION_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MODIFIED_SINCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
@@ -43,8 +44,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
@@ -63,6 +67,9 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneClientTestUtils;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.helpers.LifecycleExpirationInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
@@ -120,6 +127,27 @@ public class TestObjectGet {
     // Create a key with object tags
     when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT));
+  }
+
+  @Test
+  public void testGetObjectExpiration() throws Exception {
+    assertNull(get(rest, BUCKET_NAME, KEY_NAME).getHeaderString(EXPIRATION_HEADER));
+
+    OzoneClient client = spy(rest.getClient());
+    ClientProtocol proxy = spy(client.getProxy());
+    doReturn(proxy).when(client).getProxy();
+    doAnswer(invocation -> {
+      OzoneKeyDetails key = (OzoneKeyDetails) invocation.callRealMethod();
+      key.setLifecycleExpiration(new LifecycleExpirationInfo(Instant.parse("2026-11-27T00:00:00Z"), "rule1"));
+      return key;
+    }).when(proxy).getS3KeyDetails(anyString(), anyString());
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    assertEquals("expiry-date=\"Fri, 27 Nov 2026 00:00:00 GMT\", rule-id=\"rule1\"",
+        get(endpoint, BUCKET_NAME, KEY_NAME).getHeaderString(EXPIRATION_HEADER));
   }
 
   @ParameterizedTest

@@ -24,6 +24,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -70,6 +71,31 @@ public final class OmLCExpiration implements OmLCAction {
           ZonedDateTime.ofInstant(Instant.ofEpochMilli(timestamp + daysInMilli), ZoneOffset.UTC);
       return now.isAfter(dateTime);
     }
+  }
+
+  /**
+   * Returns when an object last modified at the given time expires under this action, as AWS S3 reports it in the
+   * x-amz-expiration header: for Days, the modification time plus the days, rounded up to the next midnight UTC;
+   * for Date, the configured date.
+   *
+   * @param modificationTime modification time of the object in milliseconds since epoch
+   * @return the expiry time, or null if neither a positive Days nor a parsable Date is set
+   */
+  @Nullable
+  public Instant getExpiryTime(long modificationTime) {
+    if (days != null && days > 0) {
+      ZonedDateTime expiry = Instant.ofEpochMilli(modificationTime).atZone(ZoneOffset.UTC).plusDays(days);
+      ZonedDateTime midnight = expiry.truncatedTo(ChronoUnit.DAYS);
+      return (midnight.equals(expiry) ? midnight : midnight.plusDays(1)).toInstant();
+    }
+    if (!StringUtils.isBlank(date)) {
+      try {
+        return ZonedDateTime.parse(date, DateTimeFormatter.ISO_DATE_TIME).toInstant();
+      } catch (DateTimeParseException ex) {
+        return null;
+      }
+    }
+    return null;
   }
 
   @Override

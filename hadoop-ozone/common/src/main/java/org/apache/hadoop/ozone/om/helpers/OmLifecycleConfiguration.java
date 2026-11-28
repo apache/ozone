@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import jakarta.annotation.Nullable;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -73,6 +75,29 @@ public final class OmLifecycleConfiguration extends WithObjectID
     this.rules = Collections.unmodifiableList(builder.rules);
     this.creationTime = builder.creationTime;
     this.bucketLayout = builder.bucketLayout;
+  }
+
+  /**
+   * Returns when the key expires under this lifecycle configuration: the earliest expiry time among the enabled
+   * Expiration rules that apply to the key.
+   *
+   * @param omKeyInfo detail Key info to evaluate against the rules
+   * @param keyPath path include key name and all its parent, except bucket and volume
+   * @return the expiry time and rule ID, or null if no enabled Expiration rule applies to the key
+   */
+  @Nullable
+  public LifecycleExpirationInfo getExpiration(OmKeyInfo omKeyInfo, String keyPath) {
+    LifecycleExpirationInfo earliest = null;
+    for (OmLCRule rule : rules) {
+      if (!rule.appliesForExpiration(omKeyInfo, keyPath)) {
+        continue;
+      }
+      Instant expiryTime = rule.getExpiration().getExpiryTime(omKeyInfo.getModificationTime());
+      if (expiryTime != null && (earliest == null || expiryTime.isBefore(earliest.getExpiryTime()))) {
+        earliest = new LifecycleExpirationInfo(expiryTime, rule.getId());
+      }
+    }
+    return earliest;
   }
 
   public List<OmLCRule> getRules() {

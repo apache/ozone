@@ -216,4 +216,20 @@ class TestOmLCExpiration {
     assertNull(expFromProto2.getDays());
     assertEquals(dateStr, expFromProto2.getDate());
   }
+
+  @Test
+  public void testGetExpiryTime() {
+    long modificationTime = Instant.parse("2026-11-25T10:30:00Z").toEpochMilli();
+    // Days: modification time plus the days, rounded up to the next midnight UTC.
+    assertEquals(Instant.parse("2026-11-27T00:00:00Z"),
+        new OmLCExpiration.Builder().setDays(1).build().getExpiryTime(modificationTime));
+    long midnight = Instant.parse("2026-11-25T00:00:00Z").toEpochMilli();
+    assertEquals(Instant.parse("2026-11-28T00:00:00Z"),
+        new OmLCExpiration.Builder().setDays(3).build().getExpiryTime(midnight));
+    // Date: the configured date.
+    assertEquals(Instant.parse("2027-01-05T00:00:00Z"),
+        new OmLCExpiration.Builder().setDate("2027-01-05T00:00:00Z").build().getExpiryTime(modificationTime));
+    assertNull(new OmLCExpiration.Builder().setDate("invalid").build().getExpiryTime(modificationTime));
+    assertNull(new OmLCExpiration.Builder().build().getExpiryTime(modificationTime));
+  }
 }
