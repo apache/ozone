@@ -284,6 +284,30 @@ class TestExportJobManager {
   }
 
   @Test
+  void jobDirectoryCreationFailureFreesQueueSlot() throws Exception {
+    // A regular file in place of the export directory makes the worker fail
+    // while creating the job directory, before any export work starts. With
+    // the smallest queue (1) a leaked slot would reject the very next submit.
+    manager.shutdown();
+    Path exportDir = tempDir.resolve("exports");
+    Files.createFile(exportDir);
+    manager = newManager(/* maxQueueSize */ 1, exportDir);
+    stubExport(STATE_MISSING, 1);
+
+    String failedJobId = manager.submitJob(STATE_MISSING);
+    awaitStatus(failedJobId, JobStatus.FAILED, DEFAULT_AWAIT);
+    assertThat(manager.getJob(failedJobId).getErrorMessage()).contains(exportDir.toString());
+    assertThat(manager.getQueuePosition(failedJobId)).isZero();
+
+    // Fault cleared: the next export must be accepted and complete.
+    Files.delete(exportDir);
+    Files.createDirectory(exportDir);
+
+    String nextJobId = manager.submitJob(STATE_UNDER_REPLICATED);
+    awaitStatus(nextJobId, JobStatus.COMPLETED, DEFAULT_AWAIT);
+  }
+
+  @Test
   void getAllJobsReturnsEveryTrackedJob() throws Exception {
     stubExport(STATE_MISSING, 1);
 
@@ -337,8 +361,12 @@ class TestExportJobManager {
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   private ExportJobManager newManager(int maxQueueSize) {
+    return newManager(maxQueueSize, tempDir);
+  }
+
+  private ExportJobManager newManager(int maxQueueSize, Path exportDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_RECON_EXPORT_DIRECTORY, tempDir.toString());
+    conf.set(OZONE_RECON_EXPORT_DIRECTORY, exportDir.toString());
     conf.setInt(OZONE_RECON_EXPORT_MAX_JOBS_TOTAL, maxQueueSize);
     conf.setInt(OZONE_RECON_EXPORT_MAX_DOWNLOADS, 3);
     return new ExportJobManager(schema, conf);
