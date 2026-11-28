@@ -198,6 +198,11 @@ public class TestSendContainerRequestHandler {
 
     // Verify commit space is released
     assertEquals(volume.getCommittedBytes(), initialCommittedBytes);
+
+    // A late half close can deliver onCompleted after the error. The reservation
+    // must not be released a second time.
+    sendContainerRequestHandler.onCompleted();
+    assertEquals(volume.getCommittedBytes(), initialCommittedBytes);
   }
 
   @ParameterizedTest(name = "for {0}")

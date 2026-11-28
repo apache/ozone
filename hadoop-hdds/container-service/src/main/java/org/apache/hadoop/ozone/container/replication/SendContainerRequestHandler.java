@@ -123,9 +123,7 @@ class SendContainerRequestHandler
       deleteTarball();
       responseObserver.onError(t);
     } finally {
-      if (volume != null && spaceToReserve > 0) {
-        volume.incCommittedBytes(-spaceToReserve);
-      }
+      releaseReservedSpace();
     }
   }
 
@@ -152,9 +150,14 @@ class SendContainerRequestHandler
         responseObserver.onError(t);
       }
     } finally {
-      if (volume != null && spaceToReserve > 0) {
-        volume.incCommittedBytes(-spaceToReserve);
-      }
+      releaseReservedSpace();
+    }
+  }
+
+  private void releaseReservedSpace() {
+    if (volume != null && spaceToReserve > 0) {
+      volume.incCommittedBytes(-spaceToReserve);
+      spaceToReserve = 0;
     }
   }
 
