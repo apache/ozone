@@ -56,7 +56,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -86,7 +86,7 @@ import org.junit.jupiter.api.Test;
  * Tests upgrade finalization failure scenarios and corner cases specific to SCM data distribution feature.
  */
 public class TestScmDataDistributionFinalization {
-  private ScmBlockLocationProtocol scmBlockClient;
+  private ScmBlockLocationInternalInterface scmBlockClient;
   private MiniOzoneHAClusterImpl cluster;
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;

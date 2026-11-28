@@ -30,7 +30,7 @@ import java.nio.file.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -61,7 +61,7 @@ public class TestOMStartupVersionReconciliation {
     try {
       // Inject mock SCM dependencies (same pattern as OmTestManagers, split to allow DB seeding before start).
       Object keyManager = HddsWhiteboxTestUtils.getInternalState(om, "keyManager");
-      ScmBlockLocationProtocol scmBlockClient = new ScmBlockLocationTestingClient(null, null, 0);
+      ScmBlockLocationInternalInterface scmBlockClient = new ScmBlockLocationTestingClient(null, null, 0);
       ScmClient scmClient = new ScmClient(scmBlockClient, mock(StorageContainerLocationInternalInterface.class), conf);
       HddsWhiteboxTestUtils.setInternalState(om, "scmClient", scmClient);
       HddsWhiteboxTestUtils.setInternalState(keyManager, "scmClient", scmClient);

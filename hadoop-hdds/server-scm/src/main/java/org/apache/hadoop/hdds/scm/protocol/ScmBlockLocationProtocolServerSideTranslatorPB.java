@@ -80,7 +80,7 @@ import org.slf4j.LoggerFactory;
 public final class ScmBlockLocationProtocolServerSideTranslatorPB
     implements ScmBlockLocationProtocolPB {
 
-  private final ScmBlockLocationProtocol impl;
+  private final ScmBlockLocationInternalInterface impl;
   private final StorageContainerManager scm;
   private static final String ROLE_TYPE = "SCM";
 
@@ -94,10 +94,10 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   /**
    * Creates a new ScmBlockLocationProtocolServerSideTranslatorPB.
    *
-   * @param impl {@link ScmBlockLocationProtocol} server implementation
+   * @param impl {@link ScmBlockLocationInternalInterface} server implementation
    */
   public ScmBlockLocationProtocolServerSideTranslatorPB(
-      ScmBlockLocationProtocol impl,
+      ScmBlockLocationInternalInterface impl,
       StorageContainerManager scm,
       ProtocolMessageMetrics<ScmBlockLocationProtocolProtos.Type> metrics)
       throws IOException {

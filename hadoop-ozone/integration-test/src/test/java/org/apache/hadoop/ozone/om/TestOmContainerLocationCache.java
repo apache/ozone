@@ -91,7 +91,7 @@ import org.apache.hadoop.hdds.scm.net.InnerNodeImpl;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -134,7 +134,7 @@ import org.mockito.ArgumentMatcher;
 public class TestOmContainerLocationCache {
   @TempDir
   private static File dir;
-  private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
+  private static ScmBlockLocationInternalInterface mockScmBlockLocationProtocol;
   private static StorageContainerLocationInternalInterface mockScmContainerClient;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
@@ -168,7 +168,7 @@ public class TestOmContainerLocationCache {
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
     conf.setLong(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, 10);
 
-    mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
+    mockScmBlockLocationProtocol = mock(ScmBlockLocationInternalInterface.class);
     mockScmContainerClient =
         mock(StorageContainerLocationInternalInterface.class);
     InnerNode.Factory factory = InnerNodeImpl.FACTORY;

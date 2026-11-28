@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.scm.net.InnerNodeImpl;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.common.DeletedBlock;
@@ -64,7 +64,7 @@ import org.slf4j.LoggerFactory;
  * TODO: Move this class to a generic test utils so we can use this class in
  * other Ozone Manager tests.
  */
-public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
+public class ScmBlockLocationTestingClient implements ScmBlockLocationInternalInterface {
   private static final Logger LOG =
       LoggerFactory.getLogger(ScmBlockLocationTestingClient.class);
   private final String clusterID;
