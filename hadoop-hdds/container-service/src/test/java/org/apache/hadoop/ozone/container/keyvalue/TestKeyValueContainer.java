@@ -875,6 +875,72 @@ public class TestKeyValueContainer {
   }
 
   @ContainerTestVersionInfo.ContainerTest
+  public void testReservationReleasedWhenRecoveringContainerIsClosed(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    HddsVolume volume = createRecoveringContainer(versionInfo);
+
+    // EC reconstruction succeeded, so the coordinator closes the container.
+    keyValueContainer.markContainerForClose();
+    assertThat(keyValueContainerData.getState()).isEqualTo(ContainerProtos.ContainerDataProto.State.CLOSING);
+    assertThat(volume.getCommittedBytes()).isZero();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testReservationReleasedWhenRecoveringContainerIsDeleted(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    HddsVolume volume = createRecoveringContainer(versionInfo);
+
+    // EC reconstruction failed, so the coordinator force deletes the container.
+    keyValueContainer.markContainerForDelete();
+    assertThat(keyValueContainerData.getState()).isEqualTo(ContainerProtos.ContainerDataProto.State.DELETED);
+    assertThat(volume.getCommittedBytes()).isZero();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testReservationReleasedWhenRecoveringContainerIsUnhealthy(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    HddsVolume volume = createRecoveringContainer(versionInfo);
+
+    // The stale recovering container scrubber marks the container unhealthy.
+    keyValueContainer.markContainerUnhealthy();
+    assertThat(keyValueContainerData.getState()).isEqualTo(ContainerProtos.ContainerDataProto.State.UNHEALTHY);
+    assertThat(volume.getCommittedBytes()).isZero();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testRecoveringReservationKeptWhenMarkForCloseFails(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    HddsVolume volume = createRecoveringContainer(versionInfo);
+
+    // The .container file cannot be updated, so marking for close fails and rolls back to RECOVERING.
+    File metadataDir = new File(keyValueContainerData.getMetadataPath());
+    assertThat(metadataDir.setWritable(false)).isTrue();
+    try {
+      assertThrows(StorageContainerException.class, () -> keyValueContainer.markContainerForClose());
+    } finally {
+      assertThat(metadataDir.setWritable(true)).isTrue();
+    }
+    // Leaving RECOVERING released the space, so the rollback must reserve it again.
+    assertThat(keyValueContainerData.getState()).isEqualTo(ContainerProtos.ContainerDataProto.State.RECOVERING);
+    assertThat(keyValueContainerData.isCommittedSpace()).isTrue();
+    assertThat(volume.getCommittedBytes()).isEqualTo(keyValueContainerData.getMaxSize());
+  }
+
+  /**
+   * Creates a RECOVERING container, as an EC reconstruction target, holding its space reservation.
+   */
+  private HddsVolume createRecoveringContainer(ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    // Set before create, as the container is created RECOVERING on the reconstruction target.
+    keyValueContainerData.setState(ContainerProtos.ContainerDataProto.State.RECOVERING);
+    createContainer();
+    // Reserve the space as the volume choosing policy does on create.
+    HddsVolume volume = keyValueContainerData.getVolume();
+    volume.incCommittedBytes(keyValueContainerData.getMaxSize());
+    return volume;
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
   public void testReportOfUnhealthyContainer(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
