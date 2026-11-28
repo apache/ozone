@@ -2222,10 +2222,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
     assertThat(v2AfterPrefix.contents()).isEmpty();
   }
 
-  /**
-   * Prefix "/" matches no key here. On an OBS bucket, S3 Gateway still pages through the whole bucket and filters
-   * the keys, so pagination must end when a page ends at a key that sorts before "/".
-   */
   @ParameterizedTest
   @EnumSource(value = BucketLayout.class, names = {"OBJECT_STORE", "FILE_SYSTEM_OPTIMIZED"})
   @Timeout(120)
@@ -2239,6 +2235,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
 
     ListObjectsV2Response v2 = s3Client.listObjectsV2(b -> b.bucket(bucketName).prefix("/"));
     assertThat(v2.contents()).isEmpty();
+    if (layout == BucketLayout.OBJECT_STORE) {
+      ListObjectsV2Response afterSlash = s3Client.listObjectsV2(b -> b.bucket(bucketName).startAfter("/"));
+      assertThat(afterSlash.contents()).isEmpty();
+    }
   }
 
   /**
@@ -2257,6 +2257,64 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements Clus
 
     ListObjectsV2Response v2 = s3Client.listObjectsV2(b -> b.bucket(bucketName).prefix("/"));
     assertThat(v2.contents()).extracting(S3Object::key).containsExactly("/keep");
+
+    ListObjectsV2Response afterSlash = s3Client.listObjectsV2(b -> b.bucket(bucketName).startAfter("/"));
+    assertThat(afterSlash.contents()).extracting(S3Object::key).containsExactly("/keep");
+  }
+
+  @Test
+  public void testListObjectsLeadingSlashDelimiter() throws Exception {
+    final String bucketName = getBucketName("leading-slash");
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE).build());
+    }
+    for (String key : Arrays.asList("//double", "/leading", "/leading/x", "m")) {
+      s3Client.putObject(b -> b.bucket(bucketName).key(key), RequestBody.fromString("x"));
+    }
+
+    ListObjectsV2Response response = s3Client.listObjectsV2(b -> b.bucket(bucketName).delimiter("/"));
+    assertThat(response.commonPrefixes()).extracting(p -> p.prefix()).containsExactly("/");
+    assertThat(response.contents()).extracting(S3Object::key).containsExactly("m");
+
+    ListObjectsV2Response first = s3Client.listObjectsV2(b -> b.bucket(bucketName).delimiter("/").maxKeys(1));
+    assertThat(first.commonPrefixes()).extracting(p -> p.prefix()).containsExactly("/");
+    assertThat(first.isTruncated()).isTrue();
+    ListObjectsV2Response second = s3Client.listObjectsV2(
+        b -> b.bucket(bucketName).delimiter("/").maxKeys(1).continuationToken(first.nextContinuationToken()));
+    assertThat(second.commonPrefixes()).isEmpty();
+    assertThat(second.contents()).extracting(S3Object::key).containsExactly("m");
+    assertThat(second.isTruncated()).isFalse();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "/", "//d"})
+  public void testListObjectsLastCommonPrefixFillsPage(String prefix) throws Exception {
+    final String bucketName = getBucketName("last-common-prefix");
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE).build());
+    }
+    s3Client.putObject(b -> b.bucket(bucketName).key(prefix + "dir/a"), RequestBody.fromString("x"));
+    s3Client.putObject(b -> b.bucket(bucketName).key(prefix + "dir/b"), RequestBody.fromString("x"));
+
+    ListObjectsV2Response response = s3Client.listObjectsV2(
+        b -> b.bucket(bucketName).prefix(prefix).delimiter("/").maxKeys(1));
+    assertThat(response.commonPrefixes()).extracting(p -> p.prefix()).containsExactly(prefix + "dir/");
+    assertThat(response.contents()).isEmpty();
+    assertThat(response.isTruncated()).isFalse();
+    assertThat(response.nextContinuationToken()).isNull();
+
+    s3Client.putObject(b -> b.bucket(bucketName).key(prefix + "tail"), RequestBody.fromString("x"));
+    ListObjectsV2Response first = s3Client.listObjectsV2(
+        b -> b.bucket(bucketName).prefix(prefix).delimiter("/").maxKeys(1));
+    assertThat(first.commonPrefixes()).extracting(p -> p.prefix()).containsExactly(prefix + "dir/");
+    assertThat(first.isTruncated()).isTrue();
+    ListObjectsV2Response second = s3Client.listObjectsV2(b -> b.bucket(bucketName).prefix(prefix).delimiter("/")
+        .maxKeys(1).continuationToken(first.nextContinuationToken()));
+    assertThat(second.commonPrefixes()).isEmpty();
+    assertThat(second.contents()).extracting(S3Object::key).containsExactly(prefix + "tail");
+    assertThat(second.isTruncated()).isFalse();
   }
 
   private void testListObjectsMany(boolean isListV2) throws Exception {
