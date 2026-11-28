@@ -1465,6 +1465,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
   }
 
+  /**
+   * Validates the x-amz-if-match-size condition: the existing key must have the expected data size.
+   *
+   * @param keyArgs the key arguments containing expected data size
+   * @param dbKeyInfo the existing key info from the database, must not be null
+   * @throws OMException if validation fails
+   */
+  protected void validateIfMatchSize(KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+    if (keyArgs.hasExpectedDataSize() && keyArgs.getExpectedDataSize() != dbKeyInfo.getDataSize()) {
+      throw new OMException("Data size mismatch", OMException.ResultCodes.DATA_SIZE_MISMATCH);
+    }
+  }
+
   protected void validateIfNoneMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
     if (keyArgs.hasExcludedETag() && dbKeyInfo != null && dbKeyInfo.isEtagEquals(keyArgs.getExcludedETag())) {
       throw new OMException("ETag matches If-None-Match", OMException.ResultCodes.KEY_ALREADY_EXISTS);

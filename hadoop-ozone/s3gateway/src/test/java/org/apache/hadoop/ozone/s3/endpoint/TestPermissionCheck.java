@@ -285,7 +285,8 @@ public class TestPermissionCheck {
 
   @Test
   public void testDeleteKey() throws IOException {
-    doThrow(exception).when(clientProtocol).deleteKey(isNull(), anyString(), anyString(), anyBoolean(), isNull());
+    doThrow(exception).when(clientProtocol)
+        .deleteKey(isNull(), anyString(), anyString(), anyBoolean(), isNull(), isNull());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)

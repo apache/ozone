@@ -1186,6 +1186,35 @@ public class TestRpcClient {
   }
 
   @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, names = {"RENAME_KEY_REJECTS_NON_FSO", "S3_IF_MATCH_SIZE_DELETE"})
+  public void testConditionalDeleteBySizeOmVersion(OzoneManagerVersion version) throws IOException {
+    List<OMRequest> requests = new ArrayList<>();
+    RpcClient client = createConditionalRequestClient(requests, version);
+    try {
+      for (Long size : Arrays.asList(null, 42L)) {
+        requests.clear();
+        IOException error = assertThrows(IOException.class,
+            () -> client.deleteKey("vol", "bucket", "key", false, "etag", size));
+        if (size == null || OzoneManagerVersion.S3_IF_MATCH_SIZE_DELETE.isSupportedBy(version)) {
+          assertThat(error).hasMessage("request sent");
+          assertThat(requests).hasSize(1);
+          KeyArgs args = requests.get(0).getDeleteKeyRequest().getKeyArgs();
+          assertEquals("etag", args.getExpectedETag());
+          assertThat(args.hasExpectedDataSize()).isEqualTo(size != null);
+          if (size != null) {
+            assertEquals(size, args.getExpectedDataSize());
+          }
+        } else {
+          assertThat(error).hasMessage("OzoneManager does not support conditional key deletion by size.");
+          assertThat(requests).isEmpty();
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
       names = {"S3_LIST_MULTIPART_UPLOADS_PAGINATION", "ATOMIC_CREATE_IF_NOT_EXISTS"})
   public void testConditionalCompleteMpuOmVersion(OzoneManagerVersion version) throws IOException {

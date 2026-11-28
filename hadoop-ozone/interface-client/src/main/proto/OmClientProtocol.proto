@@ -641,6 +641,7 @@ enum Status {
     UPDATE_ID_NOT_MATCH = 103;
     REVOKED_TOKEN = 104;
     MALFORMED_POLICY_DOCUMENT = 105;
+    DATA_SIZE_MISMATCH = 106;
 }
 
 /**
@@ -1174,6 +1175,11 @@ message KeyArgs {
     // part is created, the part is encrypted with it instead of the IV in the
     // FileEncryptionInfo, which is still used to decrypt the EDEK.
     optional bytes partIv = 26;
+
+    // expectedDataSize, when set, indicates that the existing key must have
+    // the given data size for the operation to succeed. This is used for
+    // S3 conditional deletes with the x-amz-if-match-size header.
+    optional uint64 expectedDataSize = 27;
 }
 
 message KeyLocation {

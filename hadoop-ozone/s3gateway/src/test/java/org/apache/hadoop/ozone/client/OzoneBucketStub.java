@@ -657,6 +657,19 @@ public final class OzoneBucketStub extends OzoneBucket {
     keyDetails.remove(key);
   }
 
+  public void deleteKey(String key, String expectedETag, Long expectedDataSize) throws IOException {
+    if (expectedDataSize != null) {
+      OzoneKeyDetails existing = keyDetails.get(key);
+      if (existing == null) {
+        throw new OMException("Key not found", ResultCodes.KEY_NOT_FOUND);
+      }
+      if (existing.getDataSize() != expectedDataSize) {
+        throw new OMException("Data size mismatch", ResultCodes.DATA_SIZE_MISMATCH);
+      }
+    }
+    deleteKey(key, expectedETag);
+  }
+
   public void deleteKey(String key, String expectedETag) throws IOException {
     if (expectedETag == null) {
       deleteKey(key);

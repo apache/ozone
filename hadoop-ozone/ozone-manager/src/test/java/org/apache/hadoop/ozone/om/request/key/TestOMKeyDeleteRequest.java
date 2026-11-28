@@ -43,7 +43,9 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -332,6 +334,79 @@ public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
         omClientResponse.getOMResponse().getStatus());
   }
 
+  @Test
+  public void testValidateAndUpdateCacheWithExpectedDataSizeSuccess() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable();
+    long dataSize = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey).getDataSize();
+
+    OMClientResponse omClientResponse = getOmKeyDeleteRequest(
+        doPreExecute(createDeleteKeyRequest(keyName, null, dataSize))).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omClientResponse.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey));
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithExpectedDataSizeMismatch() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable();
+    long dataSize = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey).getDataSize();
+
+    OMClientResponse omClientResponse = getOmKeyDeleteRequest(
+        doPreExecute(createDeleteKeyRequest(keyName, null, dataSize + 1))).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.DATA_SIZE_MISMATCH, omClientResponse.getOMResponse().getStatus());
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey));
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithExpectedETagMatchAndDataSizeMismatch() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTableWithETag("matching-etag");
+    long dataSize = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey).getDataSize();
+
+    OMClientResponse omClientResponse = getOmKeyDeleteRequest(
+        doPreExecute(createDeleteKeyRequest(keyName, "matching-etag", dataSize + 1)))
+        .validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.DATA_SIZE_MISMATCH, omClientResponse.getOMResponse().getStatus());
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey));
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithExpectedDataSizeKeyNotFound() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OMClientResponse omClientResponse = getOmKeyDeleteRequest(createDeleteKeyRequest("missing-key", null, 0L))
+        .validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testDisallowExpectedDataSizeBeforeFinalization() throws Exception {
+    ValidationContext ctx = ValidationContext.of(OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager(),
+        omMetadataManager);
+
+    OMException ex = assertThrows(OMException.class, () -> OMKeyDeleteRequest
+        .disallowDeleteKeyWithExpectedDataSizeBeforeFinalization(createDeleteKeyRequest(keyName, null, 0L), ctx));
+    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION, ex.getResult());
+
+    OMRequest withoutSize = createDeleteKeyRequest(keyName, "etag");
+    assertSame(withoutSize,
+        OMKeyDeleteRequest.disallowDeleteKeyWithExpectedDataSizeBeforeFinalization(withoutSize, ctx));
+  }
+
+  @Test
+  public void testAllowExpectedDataSizeAfterFinalization() throws Exception {
+    ValidationContext ctx = ValidationContext.of(OMVersionManagerTestUtils.mockFinalizedOmVersionManager(),
+        omMetadataManager);
+    OMRequest request = createDeleteKeyRequest(keyName, null, 0L);
+
+    assertSame(request, OMKeyDeleteRequest.disallowDeleteKeyWithExpectedDataSizeBeforeFinalization(request, ctx));
+  }
+
   /**
    * This method calls preExecute and verify the modified request.
    * @param originalOmRequest
@@ -370,10 +445,17 @@ public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
 
   protected OMRequest createDeleteKeyRequest(
       String testKeyName, String expectedETag) {
+    return createDeleteKeyRequest(testKeyName, expectedETag, null);
+  }
+
+  protected OMRequest createDeleteKeyRequest(String testKeyName, String expectedETag, Long expectedDataSize) {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder().setBucketName(bucketName)
         .setVolumeName(volumeName).setKeyName(testKeyName);
     if (expectedETag != null) {
       keyArgs.setExpectedETag(expectedETag);
+    }
+    if (expectedDataSize != null) {
+      keyArgs.setExpectedDataSize(expectedDataSize);
     }
 
     DeleteKeyRequest deleteKeyRequest =

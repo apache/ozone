@@ -1867,8 +1867,17 @@ public class RpcClient implements ClientProtocol {
   public void deleteKey(
       String volumeName, String bucketName, String keyName, boolean recursive,
       String expectedETag) throws IOException {
+    deleteKey(volumeName, bucketName, keyName, recursive, expectedETag, null);
+  }
+
+  @Override
+  public void deleteKey(String volumeName, String bucketName, String keyName, boolean recursive, String expectedETag,
+      Long expectedDataSize) throws IOException {
     if (expectedETag != null && !OzoneManagerVersion.CONDITIONAL_DELETE.isSupportedBy(getOmVersion())) {
       throw new IOException("OzoneManager does not support conditional key deletion.");
+    }
+    if (expectedDataSize != null && !OzoneManagerVersion.S3_IF_MATCH_SIZE_DELETE.isSupportedBy(getOmVersion())) {
+      throw new IOException("OzoneManager does not support conditional key deletion by size.");
     }
     boolean assumeS3Context = volumeName == null
         && OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(getOmVersion());
@@ -1886,6 +1895,9 @@ public class RpcClient implements ClientProtocol {
         .setAssumeS3Context(assumeS3Context);
     if (expectedETag != null) {
       keyArgs.setExpectedETag(expectedETag);
+    }
+    if (expectedDataSize != null) {
+      keyArgs.setExpectedDataSize(expectedDataSize);
     }
     ozoneManagerClient.deleteKey(keyArgs.build());
   }

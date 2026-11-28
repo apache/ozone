@@ -175,6 +175,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
     OmKeyInfo omKeyInfo = keyStatus.getKeyInfo();
     validateIfMatchETag(keyArgs, omKeyInfo);
+    validateIfMatchSize(keyArgs, omKeyInfo);
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
     if (deleteKeyRequest.hasUpdateID() && omKeyInfo.getUpdateID() != deleteKeyRequest.getUpdateID()) {
       throw new OMException("UpdateID does not match. Key: " + keyName +

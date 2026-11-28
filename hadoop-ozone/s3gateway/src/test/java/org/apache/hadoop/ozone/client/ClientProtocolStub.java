@@ -406,6 +406,12 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void deleteKey(String volumeName, String bucketName, String keyName, boolean recursive, String expectedETag,
+      Long expectedDataSize) throws IOException {
+    ((OzoneBucketStub) getBucket(volumeName, bucketName)).deleteKey(keyName, expectedETag, expectedDataSize);
+  }
+
+  @Override
   public void deleteKeys(String volumeName, String bucketName,
                          List<String> keyNameList) throws IOException {
 

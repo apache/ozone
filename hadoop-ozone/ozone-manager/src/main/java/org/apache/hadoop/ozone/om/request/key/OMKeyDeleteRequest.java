@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -156,6 +157,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       }
 
       validateIfMatchETag(keyArgs, omKeyInfo);
+      validateIfMatchSize(keyArgs, omKeyInfo);
       if (deleteKeyRequest.hasUpdateID() && omKeyInfo.getUpdateID() != deleteKeyRequest.getUpdateID()) {
         throw new OMException("UpdateID does not match. Key: " + keyName +
             ", Expected UpdateID: " + omKeyInfo.getUpdateID() +
@@ -281,6 +283,27 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
             keyArgs.getVolumeName(), keyArgs.getBucketName());
         bucketLayout.validateSupportedOperation();
       }
+    }
+    return req;
+  }
+
+  /**
+   * Rejects a size-conditional delete until the cluster is finalized, so that an older OM applying the same
+   * transaction cannot ignore the condition and delete the key.
+   */
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.DeleteKey
+  )
+  public static OMRequest disallowDeleteKeyWithExpectedDataSizeBeforeFinalization(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (req.getDeleteKeyRequest().getKeyArgs().hasExpectedDataSize()
+        && !ctx.versionManager().isAllowed(OzoneManagerVersion.S3_IF_MATCH_SIZE_DELETE)) {
+      throw new OMException("Cluster does not have the " + OzoneManagerVersion.S3_IF_MATCH_SIZE_DELETE
+          + " feature finalized yet, but the request contains a data size condition. Rejecting the request,"
+          + " please finalize the cluster upgrade and then try again.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
     }
     return req;
   }

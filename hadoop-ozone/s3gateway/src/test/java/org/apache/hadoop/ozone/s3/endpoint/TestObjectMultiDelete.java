@@ -23,6 +23,7 @@ import static java.util.Collections.singleton;
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BAD_DIGEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_DIGEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
@@ -30,9 +31,11 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -51,13 +54,18 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.xml.bind.JAXBException;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
@@ -70,6 +78,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test object multi delete.
@@ -211,6 +221,81 @@ public class TestObjectMultiDelete {
   }
 
   @Test
+  public void multiDeleteKeepsCompletedResultsWhenLaterBatchFails() throws Exception {
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    when(bucket.deleteKeys(any(), anyBoolean()))
+        .thenReturn(new HashMap<>())
+        .thenThrow(new IOException("Ozone Manager is unavailable"));
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(new DeleteObject("key1"));
+    mdr.getObjects().add(deleteObjectWithSize("key2", "0"));
+    mdr.getObjects().add(new DeleteObject("key3"));
+    mdr.getObjects().add(new DeleteObject("key4"));
+
+    Map<String, String> auditParams = new HashMap<>();
+    BucketEndpoint endpoint = newEndpointFor(bucket, auditParams);
+    long successBefore = endpoint.getMetrics().getDeleteKeySuccess();
+    long failureBefore = endpoint.getMetrics().getDeleteKeyFailure();
+    MultiDeleteResponse response = endpoint.multiDelete("b1", "", mdr);
+
+    assertThat(response.getDeletedObjects()).extracting(DeletedObject::getKey).containsExactly("key1", "key2");
+    assertThat(response.getErrors()).extracting(MultiDeleteResponse.Error::getKey, MultiDeleteResponse.Error::getCode)
+        .containsExactly(tuple("key3", "InternalError"), tuple("key4", "InternalError"));
+    assertEquals("[key3, key4]", auditParams.get("failedDeletes"));
+    assertEquals(successBefore, endpoint.getMetrics().getDeleteKeySuccess());
+    assertEquals(failureBefore + 1, endpoint.getMetrics().getDeleteKeyFailure());
+  }
+
+  public static Stream<Arguments> conditionalDeleteFailureProvider() {
+    return Stream.of(
+        Arguments.arguments(new OMException("Bucket not found", ResultCodes.BUCKET_NOT_FOUND),
+            S3ErrorTable.NO_SUCH_BUCKET.getCode()),
+        Arguments.arguments(new IOException("Ozone Manager is unavailable"), S3ErrorTable.INTERNAL_ERROR.getCode()));
+  }
+
+  @ParameterizedTest
+  @MethodSource("conditionalDeleteFailureProvider")
+  public void multiDeleteReportsFailedConditionalDelete(IOException failure, String expectedCode) throws Exception {
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(new HashMap<>());
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(new DeleteObject("key1"));
+    mdr.getObjects().add(deleteObjectWithSize("key2", "0"));
+    mdr.getObjects().add(new DeleteObject("key3"));
+
+    BucketEndpoint endpoint = newEndpointFor(bucket, new HashMap<>());
+    ClientProtocol clientProtocol = endpoint.getClientProtocol();
+    doThrow(failure).when(clientProtocol).deleteKey(any(), any(), any(), anyBoolean(), any(), any());
+    long successBefore = endpoint.getMetrics().getDeleteKeySuccess();
+    long failureBefore = endpoint.getMetrics().getDeleteKeyFailure();
+    MultiDeleteResponse response = endpoint.multiDelete("b1", "", mdr);
+
+    assertThat(response.getDeletedObjects()).extracting(DeletedObject::getKey).containsExactly("key1", "key3");
+    assertThat(response.getErrors()).extracting(MultiDeleteResponse.Error::getKey, MultiDeleteResponse.Error::getCode)
+        .containsExactly(tuple("key2", expectedCode));
+    assertEquals(successBefore, endpoint.getMetrics().getDeleteKeySuccess());
+    assertEquals(failureBefore + 1, endpoint.getMetrics().getDeleteKeyFailure());
+  }
+
+  @Test
+  public void multiDeleteTranslatesErrorWhenLaterBatchFails() throws Exception {
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    when(bucket.deleteKeys(any(), anyBoolean()))
+        .thenReturn(new HashMap<>())
+        .thenThrow(new OMException("Bucket not found", ResultCodes.BUCKET_NOT_FOUND));
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(new DeleteObject("key1"));
+    mdr.getObjects().add(deleteObjectWithSize("key2", "0"));
+    mdr.getObjects().add(new DeleteObject("key3"));
+
+    MultiDeleteResponse response = newEndpointFor(bucket, new HashMap<>()).multiDelete("b1", "", mdr);
+
+    // the same error as when the first delete request fails
+    assertThat(response.getErrors()).extracting(MultiDeleteResponse.Error::getKey, MultiDeleteResponse.Error::getCode)
+        .containsExactly(tuple("key3", S3ErrorTable.NO_SUCH_BUCKET.getCode()));
+  }
+
+  @Test
   public void multiDeleteWithVersionIdIsNotImplemented() throws Exception {
     final OzoneClient client = new OzoneClientStub();
     final OzoneBucket bucket = initTestData(client);
@@ -323,6 +408,205 @@ public class TestObjectMultiDelete {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(S3Consts.CHECKSUM_HEADER)).thenReturn(contentMD5);
     return EndpointBuilder.newBucketEndpointBuilder().setClient(client).setHeaders(headers).build();
+  }
+
+  @Test
+  public void deleteWithSizeDeletesOnlyMatchingObjects() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initTestData(client);
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(deleteObjectWithSize("key1", "0"));
+    mdr.getObjects().add(deleteObjectWithSize("key2", "1"));
+    mdr.getObjects().add(new DeleteObject("key3"));
+    mdr.getObjects().add(deleteObjectWithSize("key4", "0"));
+
+    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
+
+    assertEquals(singleton("key2"), Sets.newHashSet(bucket.listKeys("")).stream()
+        .map(OzoneKey::getName)
+        .collect(Collectors.toSet()));
+    assertThat(response.getDeletedObjects()).extracting(DeletedObject::getKey)
+        .containsExactlyInAnyOrder("key1", "key3", "key4");
+    assertThat(response.getErrors()).extracting(MultiDeleteResponse.Error::getKey, MultiDeleteResponse.Error::getCode)
+        .containsExactly(tuple("key2", S3ErrorTable.PRECOND_FAILED.getCode()));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"abc", "-1", "", "1.5"})
+  public void deleteWithInvalidSizeDeletesNothing(String size) throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initTestData(client);
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(new DeleteObject("key1"));
+    mdr.getObjects().add(deleteObjectWithSize("key2", size));
+
+    assertErrorResponse(INVALID_ARGUMENT, () -> rest.multiDelete("b1", "", mdr));
+
+    assertEquals(3, Sets.newHashSet(bucket.listKeys("")).size());
+  }
+
+  @Test
+  public void deleteWithETagAndSizeRequiresAllConditions() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initTestData(client);
+    bucket.createKey("tagged", 0, ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+        singletonMap(OzoneConsts.ETAG, "etag1"), new HashMap<>()).close();
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
+
+    MultiDeleteRequest mismatch = new MultiDeleteRequest();
+    DeleteObject wrongETag = deleteObjectWithSize("tagged", "0");
+    wrongETag.setETag("\"etag2\"");
+    mismatch.getObjects().add(wrongETag);
+    MultiDeleteResponse response = rest.multiDelete("b1", "", mismatch);
+
+    assertThat(response.getDeletedObjects()).isEmpty();
+    assertThat(response.getErrors()).extracting(MultiDeleteResponse.Error::getKey, MultiDeleteResponse.Error::getCode)
+        .containsExactly(tuple("tagged", S3ErrorTable.PRECOND_FAILED.getCode()));
+    assertNotNull(bucket.getKey("tagged"));
+
+    MultiDeleteRequest match = new MultiDeleteRequest();
+    DeleteObject rightETag = deleteObjectWithSize("tagged", "0");
+    rightETag.setETag("\"etag1\"");
+    match.getObjects().add(rightETag);
+    response = rest.multiDelete("b1", "", match);
+
+    assertThat(response.getDeletedObjects()).extracting(DeletedObject::getKey).containsExactly("tagged");
+    assertThat(response.getErrors()).isEmpty();
+    assertEquals(3, Sets.newHashSet(bucket.listKeys("")).size());
+  }
+
+  @Test
+  public void deleteWithLastModifiedTimeDeletesNothing() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initTestData(client);
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(new DeleteObject("key1"));
+    DeleteObject withLastModifiedTime = new DeleteObject("key2");
+    withLastModifiedTime.setLastModifiedTime("2026-01-01T00:00:00.000Z");
+    mdr.getObjects().add(withLastModifiedTime);
+
+    assertErrorResponse(NOT_IMPLEMENTED, () -> rest.multiDelete("b1", "", mdr));
+
+    assertEquals(3, Sets.newHashSet(bucket.listKeys("")).size());
+  }
+
+  @ParameterizedTest
+  @NullAndEmptySource
+  public void deleteWithMissingKeyDeletesNothing(String key) throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initTestData(client);
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(new DeleteObject("key1"));
+    mdr.getObjects().add(new DeleteObject(key));
+
+    assertErrorResponse(MALFORMED_XML, () -> rest.multiDelete("b1", "", mdr));
+
+    assertEquals(3, Sets.newHashSet(bucket.listKeys("")).size());
+  }
+
+  @Test
+  public void deleteRepeatedKeyKeepsConditionPerObject() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initTestData(client);
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(deleteObjectWithSize("key1", "1"));
+    mdr.getObjects().add(deleteObjectWithSize("key1", "0"));
+    mdr.getObjects().add(deleteObjectWithSize("key2", "0"));
+    mdr.getObjects().add(deleteObjectWithSize("key2", "1"));
+
+    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
+
+    // key1: the first Object does not match, the second deletes it. key2: the first deletes it, the second finds
+    // no key, which counts as deleted.
+    assertThat(response.getDeletedObjects()).extracting(DeletedObject::getKey).containsExactly("key1", "key2", "key2");
+    assertThat(response.getErrors()).extracting(MultiDeleteResponse.Error::getKey, MultiDeleteResponse.Error::getCode)
+        .containsExactly(tuple("key1", S3ErrorTable.PRECOND_FAILED.getCode()));
+    assertEquals(singleton("key3"), Sets.newHashSet(bucket.listKeys("")).stream()
+        .map(OzoneKey::getName)
+        .collect(Collectors.toSet()));
+  }
+
+  @Test
+  public void deleteWithWildcardETagRequiresKey() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initTestData(client);
+    // OM accepts ETag * only for a key that has an ETag.
+    bucket.createKey("tagged", 0, ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+        singletonMap(OzoneConsts.ETAG, "etag1"), new HashMap<>()).close();
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    DeleteObject existing = new DeleteObject("tagged");
+    existing.setETag("*");
+    mdr.getObjects().add(existing);
+    DeleteObject missing = new DeleteObject("missing");
+    missing.setETag("*");
+    mdr.getObjects().add(missing);
+    mdr.getObjects().add(deleteObjectWithSize("missing", "0"));
+
+    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
+
+    // A size condition alone does not require the key to exist, as for a single DeleteObject.
+    assertThat(response.getDeletedObjects()).extracting(DeletedObject::getKey).containsExactly("tagged", "missing");
+    assertThat(response.getErrors()).extracting(MultiDeleteResponse.Error::getKey, MultiDeleteResponse.Error::getCode)
+        .containsExactly(tuple("missing", S3ErrorTable.PRECOND_FAILED.getCode()));
+    assertEquals(3, Sets.newHashSet(bucket.listKeys("")).size());
+  }
+
+  @Test
+  public void deleteRepeatedKeyFollowsRequestOrder() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initTestData(client);
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(deleteObjectWithSize("key1", "1"));
+    mdr.getObjects().add(new DeleteObject("key1"));
+    mdr.getObjects().add(new DeleteObject("key2"));
+    mdr.getObjects().add(deleteObjectWithSize("key2", "1"));
+
+    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
+
+    // key1: the size condition fails before the unconditional Object deletes it. key2: the unconditional Object
+    // deletes it first, then the size condition finds no key, which counts as deleted.
+    assertThat(response.getDeletedObjects()).extracting(DeletedObject::getKey).containsExactly("key1", "key2", "key2");
+    assertThat(response.getErrors()).extracting(MultiDeleteResponse.Error::getKey, MultiDeleteResponse.Error::getCode)
+        .containsExactly(tuple("key1", S3ErrorTable.PRECOND_FAILED.getCode()));
+    assertEquals(singleton("key3"), Sets.newHashSet(bucket.listKeys("")).stream()
+        .map(OzoneKey::getName)
+        .collect(Collectors.toSet()));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"<Size>-1</Size><Size>0</Size>", "<ETag>\"a\"</ETag><ETag>\"b\"</ETag>",
+      "<LastModifiedTime>a</LastModifiedTime><LastModifiedTime>b</LastModifiedTime>"})
+  public void deleteWithRepeatedConditionDeletesNothing(String conditions) throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initTestData(client);
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
+
+    MultiDeleteRequest mdr = unmarshall(("<Delete><Object><Key>key1</Key></Object><Object><Key>key2</Key>"
+        + conditions + "</Object></Delete>").getBytes(UTF_8));
+
+    assertErrorResponse(MALFORMED_XML, () -> rest.multiDelete("b1", "", mdr));
+
+    assertEquals(3, Sets.newHashSet(bucket.listKeys("")).size());
+  }
+
+  private static DeleteObject deleteObjectWithSize(String key, String size) {
+    DeleteObject deleteObject = new DeleteObject(key);
+    deleteObject.setSize(size);
+    return deleteObject;
   }
 
   private MultiDeleteRequest threeKeyRequest() {
