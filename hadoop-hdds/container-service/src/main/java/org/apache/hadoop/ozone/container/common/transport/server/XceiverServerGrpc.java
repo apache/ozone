@@ -27,10 +27,12 @@ import java.net.BindException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -121,7 +123,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
                   "ChunkReader-%d")
               .build());
     }
-    metrics = new XceiverServerGrpcMetrics(readExecutors, datanodeDetails.getUuidString());
+    metrics = new XceiverServerGrpcMetrics(readExecutors, datanodeDetails.getUuidString(),
+        conf.getInts(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY));
 
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setDaemon(true)
@@ -140,14 +143,14 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
 
     LOG.info("GrpcServer channel type {}", channelType.getSimpleName());
     xceiverService = new GrpcXceiverService(dispatcher, dnConf.getStreamReadFileIdleTimeout(),
-        datanodeDetails.threadNamePrefix());
+        datanodeDetails.threadNamePrefix(), metrics);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .bossEventLoopGroup(eventLoopGroup)
         .workerEventLoopGroup(eventLoopGroup)
         .channelType(channelType)
         .withOption(ChannelOption.SO_BACKLOG, dnConf.getGrpcSoBacklog())
-        .executor(readExecutors)
+        .executor(timedExecutor(readExecutors, metrics))
         // If a client does not send an actual functional business RPC for 15 minutes,
         // the server kicks them off with a GOAWAY frame.
         .maxConnectionIdle(15, TimeUnit.MINUTES)
@@ -183,6 +186,20 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     server = nettyServerBuilder.build();
     storageContainer = dispatcher;
     metrics.register();
+  }
+
+  /**
+   * Wraps the read executor so that each gRPC task records how long it waited before a thread ran it.
+   */
+  @VisibleForTesting
+  static Executor timedExecutor(Executor readExecutor, XceiverServerGrpcMetrics metrics) {
+    return task -> {
+      final long submitNanos = System.nanoTime();
+      readExecutor.execute(() -> {
+        metrics.addReadExecutorQueueTime(System.nanoTime() - submitNanos);
+        task.run();
+      });
+    };
   }
 
   @VisibleForTesting
