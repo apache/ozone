@@ -2083,6 +2083,17 @@
   </property>
 
   <property>
+    <name>ozone.s3g.lifecycle.expiration.header.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      When true, PutObject returns the x-amz-expiration header if the new object matches an enabled
+      Expiration rule of the bucket lifecycle configuration. This adds one lifecycle configuration
+      lookup to OM for every PutObject.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.secret.http.enabled</name>
     <value>false</value>
     <tag>OZONE, S3GATEWAY</tag>

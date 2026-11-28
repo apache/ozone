@@ -36,6 +36,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPIRATION_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_ECDSA_P256_SHA256_PAYLOAD_TRAILER;
@@ -56,6 +57,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
@@ -112,8 +114,12 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -260,6 +266,37 @@ class TestObjectPut {
     assertEquals(2, tags.size());
     assertEquals("value1", tags.get("tag1"));
     assertEquals("value2", tags.get("tag2"));
+  }
+
+  @Test
+  void testPutObjectExpirationHeader() throws Exception {
+    // No lifecycle configuration on the bucket.
+    objectEndpoint.getOzoneConfiguration().setBoolean(
+        S3GatewayConfigKeys.OZONE_S3G_LIFECYCLE_EXPIRATION_HEADER_ENABLED, true);
+    assertNull(putObject(CONTENT).getHeaderString(EXPIRATION_HEADER));
+
+    setExpirationRule("rule1", "key=value/");
+    assertThat(putObject(CONTENT).getHeaderString(EXPIRATION_HEADER))
+        .matches("expiry-date=\"\\w{3}, \\d{2} \\w{3} \\d{4} 00:00:00 GMT\", rule-id=\"rule1\"");
+
+    // Rule prefix does not match the key.
+    assertNull(putObject(BUCKET_NAME, "other/1").getHeaderString(EXPIRATION_HEADER));
+  }
+
+  @Test
+  void testPutObjectExpirationHeaderDisabledByDefault() throws Exception {
+    setExpirationRule("rule1", "");
+    assertNull(putObject(CONTENT).getHeaderString(EXPIRATION_HEADER));
+  }
+
+  private void setExpirationRule(String id, String prefix) throws IOException {
+    bucket.setLifecycleConfiguration(new OmLifecycleConfiguration.Builder()
+        .setVolume(bucket.getVolumeName())
+        .setBucket(BUCKET_NAME)
+        .setBucketLayout(bucket.getBucketLayout())
+        .addRule(new OmLCRule.Builder().setId(id).setPrefix(prefix).setEnabled(true)
+            .addAction(new OmLCExpiration.Builder().setDays(1).build()).build())
+        .build());
   }
 
   static Stream<Arguments> onlyTagKeyCases() {
