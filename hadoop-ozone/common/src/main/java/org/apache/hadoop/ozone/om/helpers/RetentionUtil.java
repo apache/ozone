@@ -82,10 +82,14 @@ public final class RetentionUtil {
       validateRetainUntilDate(retentionDate, currentTime);
     }
     if (eventHold != null) {
-      validateEventHoldRule(eventHold.getDuration());
-      if (eventHold.getEnabled() && retentionDate != 0
-          && retentionDate < calculateRetainUntilDate(eventHold.getDuration(), currentTime)) {
-        throw new IllegalArgumentException("Retention expiration must be at least the event hold duration from now");
+      RetentionDuration duration = eventHold.getDuration();
+      if (eventHold.getEnabled()) {
+        validateEventHoldRule(duration);
+        if (retentionDate != 0 && retentionDate < calculateRetainUntilDate(duration, currentTime)) {
+          throw new IllegalArgumentException("Retention expiration must be at least the event hold duration from now");
+        }
+      } else if (duration != null) {
+        throw new IllegalArgumentException("Disabled event hold must not have a duration");
       }
     }
   }

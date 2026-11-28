@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Test {@link OmKeyInfo#getCodec()} .
@@ -208,20 +208,25 @@ public class TestOmKeyInfoCodec extends Proto2CodecTestBase<OmKeyInfo> {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  public void testCodecsWithKeyWithoutOpenKeyFields(boolean hasDate) throws IOException {
+  @CsvSource({"false, true", "true, true", "true, false"})
+  public void testCodecsWithKeyWithoutOpenKeyFields(boolean hasDate, boolean eventHoldEnabled) throws IOException {
     final Codec<OmKeyInfo> openKeyCodec = OmKeyInfo.getOpenKeyTableCodec();
     final Codec<OmKeyInfo> keyTableCodec = OmKeyInfo.getKeyTableCodec();
 
     RetentionDuration rule = new RetentionDuration(OzoneManagerProtocolProtos.RetentionTimeUnit.YEARS, 1);
     ObjectRetention retention = new ObjectRetention(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE,
-        hasDate ? 1_800_000_000_000L : 0, new EventHold(true, rule));
+        hasDate ? 1_800_000_000_000L : 0, new EventHold(eventHoldEnabled, eventHoldEnabled ? rule : null));
     OmKeyInfo originKey = getKeyInfo(1).toBuilder()
         .setRetention(retention).setLegalHold(true).build();
     assertNull(originKey.getExpectedDataGeneration());
 
     byte[] openKeyData = openKeyCodec.toPersistedFormat(originKey);
     byte[] keyTableData = keyTableCodec.toPersistedFormat(originKey);
+
+    OzoneManagerProtocolProtos.KeyRetention retentionProto = KeyInfo.parseFrom(openKeyData).getRetention();
+    assertTrue(retentionProto.hasEventHold());
+    assertEquals(eventHoldEnabled, retentionProto.getEventHold().getEnabled());
+    assertEquals(eventHoldEnabled, retentionProto.getEventHold().hasDuration());
 
     OmKeyInfo fromOpenKeyCodec = openKeyCodec.fromPersistedFormat(openKeyData);
     OmKeyInfo fromKeyTableCodec = keyTableCodec.fromPersistedFormat(keyTableData);

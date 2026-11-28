@@ -160,8 +160,18 @@ class TestRetentionUtil {
     RetentionUtil.validateObjectRetention(new ObjectRetention(RetentionMode.GOVERNANCE, minimumDate, hold), now);
     assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateObjectRetention(
         new ObjectRetention(RetentionMode.GOVERNANCE, minimumDate - 1, hold), now));
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateObjectRetention(
+        new ObjectRetention(RetentionMode.GOVERNANCE, now + 1, new EventHold(true, null)), now));
+  }
+
+  @Test
+  void validatesDisabledEventHold() {
+    long now = 100;
     RetentionUtil.validateObjectRetention(
-        new ObjectRetention(RetentionMode.GOVERNANCE, now + 1, new EventHold(false, hold.getDuration())), now);
+        new ObjectRetention(RetentionMode.GOVERNANCE, now + 1, new EventHold(false, null)), now);
+    RetentionDuration duration = rule(RetentionTimeUnit.DAYS, 30);
+    assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateObjectRetention(
+        new ObjectRetention(RetentionMode.GOVERNANCE, now + 1, new EventHold(false, duration)), now));
   }
 
   private static RetentionDuration rule(RetentionTimeUnit unit, long duration) {

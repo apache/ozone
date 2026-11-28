@@ -29,7 +29,7 @@ public final class EventHold {
 
   public EventHold(boolean enabled, RetentionDuration duration) {
     this.enabled = enabled;
-    this.duration = Objects.requireNonNull(duration, "event hold duration is null");
+    this.duration = duration;
   }
 
   public boolean getEnabled() {
@@ -42,12 +42,15 @@ public final class EventHold {
 
   public static EventHold fromProto(OzoneManagerProtocolProtos.EventHold proto) {
     Objects.requireNonNull(proto, "event hold is null");
-    return new EventHold(proto.getEnabled(), RetentionDuration.fromProto(proto.getDuration()));
+    return new EventHold(proto.getEnabled(),
+        proto.hasDuration() ? RetentionDuration.fromProto(proto.getDuration()) : null);
   }
 
   public OzoneManagerProtocolProtos.EventHold toProto() {
-    OzoneManagerProtocolProtos.EventHold.Builder builder = OzoneManagerProtocolProtos.EventHold.newBuilder()
-        .setDuration(duration.toProto());
+    OzoneManagerProtocolProtos.EventHold.Builder builder = OzoneManagerProtocolProtos.EventHold.newBuilder();
+    if (duration != null) {
+      builder.setDuration(duration.toProto());
+    }
     if (!enabled) {
       builder.setEnabled(false);
     }
@@ -63,7 +66,7 @@ public final class EventHold {
       return false;
     }
     EventHold that = (EventHold) obj;
-    return enabled == that.enabled && duration.equals(that.duration);
+    return enabled == that.enabled && Objects.equals(duration, that.duration);
   }
 
   @Override

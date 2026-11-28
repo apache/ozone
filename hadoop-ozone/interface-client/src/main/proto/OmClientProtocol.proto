@@ -869,7 +869,7 @@ message KeyRetention {
 
 message EventHold {
     optional bool enabled = 1 [default = true];
-    required RetentionDuration duration = 2;
+    optional RetentionDuration duration = 2;
 }
 
 message RetentionDuration {
