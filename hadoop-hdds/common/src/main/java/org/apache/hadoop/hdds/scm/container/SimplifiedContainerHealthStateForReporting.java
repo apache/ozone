@@ -223,6 +223,16 @@ public enum SimplifiedContainerHealthStateForReporting {
   }
 
   /**
+   * Returns whether this label indicates under-replication, including combined states.
+   */
+  public boolean isUnderReplicated() {
+    return this == UNDER_REPLICATED
+        || this == UNHEALTHY_UNDER_REPLICATED
+        || this == MISSING_UNDER_REPLICATED
+        || this == QUASI_CLOSED_STUCK_UNDER_REPLICATED;
+  }
+
+  /**
    * @return the description, also used as the metric description in ReplicationManager metrics
    */
   public String getDescription() {

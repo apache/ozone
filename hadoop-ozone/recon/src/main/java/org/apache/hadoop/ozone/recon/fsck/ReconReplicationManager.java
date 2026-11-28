@@ -384,10 +384,7 @@ public class ReconReplicationManager extends ReplicationManager {
             handleMissingContainer(containerId, currentTime, recordsToInsert,
                 chunkStats);
           }
-          if (healthState == SimplifiedContainerHealthStateForReporting.UNDER_REPLICATED
-              || healthState == SimplifiedContainerHealthStateForReporting.UNHEALTHY_UNDER_REPLICATED
-              || healthState == SimplifiedContainerHealthStateForReporting.QUASI_CLOSED_STUCK_UNDER_REPLICATED
-              || healthState == SimplifiedContainerHealthStateForReporting.MISSING_UNDER_REPLICATED) {
+          if (healthState != null && healthState.isUnderReplicated()) {
             chunkStats.incrementUnderRepCount();
             handleReplicaStateContainer(containerId, currentTime,
                 UnHealthyContainerStates.UNDER_REPLICATED,
