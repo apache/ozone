@@ -954,15 +954,21 @@ public final class XceiverServerRatis implements XceiverServerSpi {
                                        RaftPeerId raftPeerId1) {
     LOG.info("Leader change notification received for group: {} with new " +
         "leaderId: {}", groupMemberId.getGroupId(), raftPeerId1);
-    // Save the reported leader to be sent with the report to SCM
-    final boolean leaderForGroup = server.getId().equals(raftPeerId1);
+    // A new leader is not ready to serve requests yet, so it is reported as leader only in
+    // handleLeaderReadyNotification. Otherwise SCM may open the pipeline too early.
     activePipelines.compute(groupMemberId.getGroupId(),
-        (key, value) -> value == null ? new ActivePipelineContext(leaderForGroup, false) :
-            new ActivePipelineContext(leaderForGroup, value.isPendingClose()));
-    if (context != null && leaderForGroup) {
-      // Publish new report from leader
-      sendPipelineReport();
-    }
+        (key, value) -> value == null ? new ActivePipelineContext(false, false) :
+            new ActivePipelineContext(false, value.isPendingClose()));
+  }
+
+  void handleLeaderReadyNotification(RaftGroupId groupId) {
+    LOG.info("Leader ready notification received for group: {}", groupId);
+    // Save the reported leader to be sent with the report to SCM
+    activePipelines.compute(groupId,
+        (key, value) -> value == null ? new ActivePipelineContext(true, false) :
+            new ActivePipelineContext(true, value.isPendingClose()));
+    // Publish new report from leader
+    sendPipelineReport();
   }
 
   private void sendPipelineReport() {

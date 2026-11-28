@@ -1417,6 +1417,11 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
+  public void notifyLeaderReady() {
+    ratisServer.handleLeaderReadyNotification(getGroupId());
+  }
+
+  @Override
   public String toStateMachineLogEntryString(StateMachineLogEntryProto proto) {
     return smProtoToString(getGroupId(), containerController, proto);
   }
