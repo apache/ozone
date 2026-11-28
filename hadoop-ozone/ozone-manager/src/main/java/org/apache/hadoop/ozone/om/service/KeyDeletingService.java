@@ -137,6 +137,16 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   KeyPurgeResult processKeyDeletes(Map<String, PurgedKey> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
+    return TracingUtil.executeInternalSpan("KeyDeletingService", () -> {
+      TracingUtil.addAttributesToCurrentSpan("keyCount", keyBlocksList.size());
+      return processKeyDeletesInternal(keyBlocksList, keysToModify, renameEntries, snapTableKey,
+          expectedPreviousSnapshotId);
+    });
+  }
+
+  private Pair<Pair<Integer, Long>, Boolean> processKeyDeletesInternal(Map<String, PurgedKey> keyBlocksList,
+      Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
     long startTime = Time.monotonicNow();
     KeyPurgeResult purgeResult = new KeyPurgeResult(0, 0L, false);
     
@@ -165,10 +175,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       blockDeletionResults = new ArrayList<>();
       LOG.info("Skipping SCM call as all {} keys are empty", keyBlocksList.size());
     } else {
-      blockDeletionResults = TracingUtil.executeInNewSpan(
+      int blockGroupCount = nonEmptyKeyBlocksList.size();
+      blockDeletionResults = TracingUtil.executeInternalSpan(
           "deleteKeyBlocks",
-          () -> scmClient.deleteKeyBlocks(nonEmptyKeyBlocksList.values().stream()
-              .map(PurgedKey::getBlockGroup).collect(Collectors.toList())));
+          () -> {
+            TracingUtil.addAttributesToCurrentSpan("blockGroupCount", blockGroupCount);
+            return scmClient.deleteKeyBlocks(nonEmptyKeyBlocksList.values().stream()
+                .map(PurgedKey::getBlockGroup).collect(Collectors.toList()));
+          });
     }
 
     if (keyBlocksList.size() != nonEmptyKeyBlocksList.size()) {
@@ -452,7 +466,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
-            .setPurgeKeysRequest(requestBuilder.build()).setClientId(getClientId().toString()).build();
+            .setPurgeKeysRequest(requestBuilder.build()).setClientId(getClientId().toString())
+            .setTraceID(TracingUtil.exportCurrentSpan()).build();
 
     try {
       OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
