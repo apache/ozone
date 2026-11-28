@@ -46,6 +46,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -60,6 +61,9 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -70,8 +74,10 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequestWithFSO;
@@ -82,8 +88,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.function.Executable;
 
 /**
  * Test class for quota repair.
@@ -93,6 +101,7 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
 
   /** Seconds; must match {@link Timeout} on this class. */
   private static final int REPAIR_TEST_TIMEOUT_SECONDS = 120;
+  private static final String SNAPSHOT_KEY = "/user/snapKey";
   private static final ReplicationConfig RATIS_ONE = RatisReplicationConfig.getInstance(ONE);
 
   private static Boolean awaitRepair(CompletableFuture<Boolean> repair) throws Exception {
@@ -362,6 +371,146 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     assertEquals(0, repaired.getUsedNamespace());
     assertEquals(keyBytes, repaired.getSnapshotUsedBytes());
     assertEquals(1, repaired.getSnapshotUsedNamespace());
+  }
+
+  @Test
+  public void testQuotaRepairFailsWhenSnapshotPurgedAfterCheckpoint() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
+    SnapshotInfo snapshotInfo = createSnapshotWithDeletedKey();
+    // The deleting service purges the key from the snapshot DB after the repair has taken its checkpoint,
+    // here right before the repair opens the snapshot DB.
+    AtomicBoolean changed = onFirstSnapshotManagerCall(() -> purgeKeyFromSnapshot(snapshotInfo, 3L));
+
+    Boolean repairStatus = awaitRepair(new QuotaRepairTask(ozoneManager).repair());
+    assertThat(changed).isTrue();
+    applyRepairIfSubmitted(request);
+    assertSnapshotUsage(0, 0);
+    assertThat(repairStatus).isFalse();
+    assertThat(request.get()).isNull();
+    assertThat(QuotaRepairTask.getStatus()).contains("changed after the quota repair checkpoint");
+  }
+
+  @Test
+  public void testQuotaRepairSucceedsWhenSnapshotPurgedBeforeCheckpoint() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
+    SnapshotInfo snapshotInfo = createSnapshotWithDeletedKey();
+    purgeKeyFromSnapshot(snapshotInfo, 3L);
+
+    assertThat(awaitRepair(new QuotaRepairTask(ozoneManager).repair())).isTrue();
+    applyRepairIfSubmitted(request);
+    assertThat(request.get()).isNotNull();
+    assertSnapshotUsage(0, 0);
+  }
+
+  @Test
+  public void testQuotaRepairFailsWhenSnapshotLeavesChainAfterCheckpoint() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, SNAPSHOT_KEY);
+    SnapshotInfo snapshotInfo = createSnapshotWithDeletedKey();
+    RepeatedOmKeyInfo pendingKey;
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
+             ozoneManager.getOmSnapshotManager().getSnapshot(snapshotInfo.getSnapshotId())) {
+      pendingKey = snapshot.get().getMetadataManager().getDeletedTable().get(ozoneKey);
+    }
+    long keyBytes = omMetadataManager.getBucketTable().get(omMetadataManager.getBucketKey(volumeName, bucketName))
+        .getSnapshotUsedBytes();
+    // After the checkpoint the snapshot is deleted, its pending key moves back to the active deletedTable and the
+    // snapshot is purged, all before the repair reaches it.
+    AtomicBoolean changed = onFirstSnapshotManagerCall(() -> {
+      omMetadataManager.getDeletedTable().put(ozoneKey, pendingKey);
+      ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager().deleteSnapshot(snapshotInfo);
+      omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
+          CacheValue.get(3L));
+      omMetadataManager.getSnapshotInfoTable().delete(snapshotInfo.getTableKey());
+    });
+
+    Boolean repairStatus = awaitRepair(new QuotaRepairTask(ozoneManager).repair());
+    assertThat(changed).isTrue();
+    applyRepairIfSubmitted(request);
+    assertSnapshotUsage(keyBytes, 1);
+    assertThat(repairStatus).isFalse();
+    assertThat(request.get()).isNull();
+    assertThat(QuotaRepairTask.getStatus()).contains("changed after the quota repair checkpoint");
+  }
+
+  /** Creates snapshot snap1 of a bucket with one deleted key, and sets the bucket usage as after that delete. */
+  private SnapshotInfo createSnapshotWithDeletedKey() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, BucketLayout.OBJECT_STORE);
+    OMRequestTestUtils.addKeyToTableAndCache(volumeName, bucketName,
+        SNAPSHOT_KEY, -1, RatisReplicationConfig.getInstance(THREE), 1L, omMetadataManager);
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, SNAPSHOT_KEY);
+    long keyBytes = omMetadataManager.getKeyTable(BucketLayout.OBJECT_STORE).get(ozoneKey).getReplicatedSize();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    OMRequestTestUtils.deleteKey(ozoneKey, bucketInfo.getObjectID(), omMetadataManager, 2L);
+    OmBucketInfo afterDelete = bucketInfo.toBuilder()
+        .setUsedBytes(0)
+        .setUsedNamespace(0)
+        .setSnapshotUsedBytes(keyBytes)
+        .setSnapshotUsedNamespace(1)
+        .build();
+    omMetadataManager.getBucketTable().put(bucketKey, afterDelete);
+    omMetadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey), CacheValue.get(2L, afterDelete));
+    when(ozoneManager.getDefaultReplicationConfig()).thenReturn(RatisReplicationConfig.getInstance(THREE));
+    return createSnapshot("snap1");
+  }
+
+  /** Applies and flushes a key purge of the deleted key from the snapshot DB, as the deleting service does. */
+  private void purgeKeyFromSnapshot(SnapshotInfo snapshotInfo, long transactionIndex) throws Exception {
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, SNAPSHOT_KEY);
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    OzoneManagerProtocolProtos.OMRequest purgeRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
+        .setClientId(UUID.randomUUID().toString())
+        .setPurgeKeysRequest(OzoneManagerProtocolProtos.PurgeKeysRequest.newBuilder()
+            .addDeletedKeys(OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
+                .setVolumeName(volumeName).setBucketName(bucketName).addKeys(ozoneKey))
+            .setSnapshotTableKey(snapshotInfo.getTableKey())
+            .addBucketPurgeKeysSize(OzoneManagerProtocolProtos.BucketPurgeKeysSize.newBuilder()
+                .setBucketNameInfo(OzoneManagerProtocolProtos.BucketNameInfo.newBuilder()
+                    .setBucketId(bucketInfo.getObjectID()).setVolumeName(volumeName).setBucketName(bucketName))
+                .setPurgedBytes(bucketInfo.getSnapshotUsedBytes()).setPurgedNamespace(1)))
+        .build();
+    OMKeyPurgeRequest purge = new OMKeyPurgeRequest(new OMKeyPurgeRequest(purgeRequest).preExecute(ozoneManager));
+    OMClientResponse purgeResponse = purge.validateAndUpdateCache(ozoneManager, transactionIndex);
+    assertThat(purgeResponse.getOMResponse().getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+    try (BatchOperation batch = omMetadataManager.getStore().initBatchOperation()) {
+      purgeResponse.checkAndUpdateDB(omMetadataManager, batch);
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
+  }
+
+  /** Runs the action once, when the repair first asks for the snapshot manager, which is after its checkpoint. */
+  private AtomicBoolean onFirstSnapshotManagerCall(Executable action) {
+    OmSnapshotManager snapshotManager = ozoneManager.getOmSnapshotManager();
+    AtomicBoolean done = new AtomicBoolean();
+    when(ozoneManager.getOmSnapshotManager()).thenAnswer(invocation -> {
+      if (done.compareAndSet(false, true)) {
+        action.execute();
+      }
+      return snapshotManager;
+    });
+    return done;
+  }
+
+  /** Applies a submitted repair, so that a wrongly submitted one shows up in the bucket usage. */
+  private void applyRepairIfSubmitted(AtomicReference<OzoneManagerProtocolProtos.OMRequest> request)
+      throws Exception {
+    if (request.get() != null) {
+      OMClientResponse response = new OMQuotaRepairRequest(request.get()).validateAndUpdateCache(ozoneManager, 4);
+      try (BatchOperation batch = omMetadataManager.getStore().initBatchOperation()) {
+        ((OMQuotaRepairResponse) response).addToDBBatch(omMetadataManager, batch);
+        omMetadataManager.getStore().commitBatchOperation(batch);
+      }
+    }
+  }
+
+  private void assertSnapshotUsage(long snapshotUsedBytes, long snapshotUsedNamespace) throws IOException {
+    OmBucketInfo bucket = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    assertThat(bucket.getSnapshotUsedBytes()).isEqualTo(snapshotUsedBytes);
+    assertThat(bucket.getSnapshotUsedNamespace()).isEqualTo(snapshotUsedNamespace);
   }
 
   @Test
