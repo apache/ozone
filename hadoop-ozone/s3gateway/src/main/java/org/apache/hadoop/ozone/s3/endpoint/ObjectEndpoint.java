@@ -1297,6 +1297,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       if (StringUtils.isEmpty(metadataCopyDirective) || metadataCopyDirective.equals(CopyDirective.COPY.name())) {
         // The custom metadata will be copied from the source key
         customMetadata = new HashMap<>(sourceKeyDetails.getMetadata());
+        customMetadata.remove(OzoneConsts.COMPLETED_UPLOAD_ID);
+        customMetadata.remove(OzoneConsts.COMPLETED_UPLOAD_PARTS);
       } else if (metadataCopyDirective.equals(CopyDirective.REPLACE.name())) {
         // Replace the metadata with the metadata form the request headers
         customMetadata = getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());

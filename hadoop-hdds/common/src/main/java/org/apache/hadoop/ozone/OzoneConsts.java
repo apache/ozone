@@ -565,6 +565,10 @@ public final class OzoneConsts {
    */
   public static final String ETAG = "ETag";
 
+  public static final String RESERVED_USER_METADATA_KEY_PREFIX = "ozone-s3-internal-";
+  public static final String COMPLETED_UPLOAD_ID = RESERVED_USER_METADATA_KEY_PREFIX + "multipart-upload-id";
+  public static final String COMPLETED_UPLOAD_PARTS = RESERVED_USER_METADATA_KEY_PREFIX + "multipart-parts";
+
   /**
    * A constant string used as a separator in various contexts within
    * the OMDBCheckpoint functions.

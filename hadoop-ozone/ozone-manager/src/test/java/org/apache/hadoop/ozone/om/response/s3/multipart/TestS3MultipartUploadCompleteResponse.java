@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -45,6 +46,15 @@ import org.junit.jupiter.api.Test;
  */
 public class TestS3MultipartUploadCompleteResponse
     extends S3MultipartResponseTests {
+
+  @Test
+  public void testErrorConstructorRejectsSuccess() {
+    OzoneManagerProtocolProtos.OMResponse response = OzoneManagerProtocolProtos.OMResponse.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CompleteMultiPartUpload)
+        .setStatus(OzoneManagerProtocolProtos.Status.OK).build();
+    assertThrows(IllegalArgumentException.class,
+        () -> new S3MultipartUploadCompleteResponse(response, getBucketLayout()));
+  }
 
   @Test
   public void testAddDBToBatch() throws Exception {
