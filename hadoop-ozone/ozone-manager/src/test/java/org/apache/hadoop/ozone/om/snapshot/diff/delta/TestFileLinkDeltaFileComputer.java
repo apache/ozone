@@ -43,7 +43,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -51,6 +50,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
+import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer.DeltaFile;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -359,15 +359,15 @@ public class TestFileLinkDeltaFileComputer {
     when(activeMetadataManager.getTableBucketPrefix("vol1", "bucket1")).thenReturn(tablePrefixInfo);
 
     // Set up the test implementation to return some delta files
-    Map<Path, Pair<Path, SstFileInfo>> deltaMap = new HashMap<>();
+    Map<Path, DeltaFile> deltaMap = new HashMap<>();
     Path sstPath = tempDir.resolve("test.sst");
     Files.createFile(sstPath);
     SstFileInfo sstFileInfo = mock(SstFileInfo.class);
-    deltaMap.put(deltaDirPath.resolve("1.sst"), Pair.of(sstPath, sstFileInfo));
+    deltaMap.put(deltaDirPath.resolve("1.sst"), new DeltaFile(sstPath, sstFileInfo));
 
     deltaFileComputer.setComputeDeltaFilesResult(Optional.of(deltaMap));
 
-    Collection<Pair<Path, SstFileInfo>> result =
+    Collection<DeltaFile> result =
         deltaFileComputer.getDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup);
 
     assertEquals(1, result.size(), "Should have one delta file");
@@ -430,7 +430,7 @@ public class TestFileLinkDeltaFileComputer {
    */
   private static class TestableFileLinkDeltaFileComputer extends FileLinkDeltaFileComputer {
 
-    private Optional<Map<Path, Pair<Path, SstFileInfo>>> computeDeltaFilesResult = Optional.empty();
+    private Optional<Map<Path, DeltaFile>> computeDeltaFilesResult = Optional.empty();
 
     TestableFileLinkDeltaFileComputer(OmSnapshotManager snapshotManager, OMMetadataManager activeMetadataManager,
         Path deltaDirPath, Consumer<SubStatus> activityReporter) throws IOException {
@@ -438,12 +438,12 @@ public class TestFileLinkDeltaFileComputer {
     }
 
     @Override
-    Optional<Map<Path, Pair<Path, SstFileInfo>>> computeDeltaFiles(SnapshotInfo fromSnapshot,
+    Optional<Map<Path, DeltaFile>> computeDeltaFiles(SnapshotInfo fromSnapshot,
         SnapshotInfo toSnapshot, Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) throws IOException {
       return computeDeltaFilesResult;
     }
 
-    void setComputeDeltaFilesResult(Optional<Map<Path, Pair<Path, SstFileInfo>>> result) {
+    void setComputeDeltaFilesResult(Optional<Map<Path, DeltaFile>> result) {
       this.computeDeltaFilesResult = result;
     }
   }

@@ -41,7 +41,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -49,6 +48,7 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
+import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer.DeltaFile;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
@@ -167,9 +167,9 @@ public class TestCompositeDeltaDiffComputer {
     Files.createFile(sstFile2);
     SstFileInfo sstInfo1 = new SstFileInfo("rdb1.sst", "key1", "key2", "keyTable");
     SstFileInfo sstInfo2 = new SstFileInfo("rdb2.sst", "key3", "key4", "keyTable");
-    Map<Path, Pair<Path, SstFileInfo>> rdbDifferResult = new HashMap<>();
-    rdbDifferResult.put(sstFile1, Pair.of(sstFile1, sstInfo1));
-    rdbDifferResult.put(sstFile2, Pair.of(sstFile2, sstInfo2));
+    Map<Path, DeltaFile> rdbDifferResult = new HashMap<>();
+    rdbDifferResult.put(sstFile1, new DeltaFile(sstFile1, sstInfo1));
+    rdbDifferResult.put(sstFile2, new DeltaFile(sstFile2, sstInfo2));
 
     try (MockedConstruction<RDBDifferComputer> rdbDifferMock = mockConstruction(RDBDifferComputer.class,
         (mock, context) -> {
@@ -182,7 +182,7 @@ public class TestCompositeDeltaDiffComputer {
       CompositeDeltaDiffComputer composite = new CompositeDeltaDiffComputer(
           omSnapshotManager, activeMetadataManager, deltaDirPath, activityReporter, false, false);
 
-      Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+      Optional<Map<Path, DeltaFile>> result =
           composite.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
       // Verify RDBDiffer results are returned
@@ -223,8 +223,8 @@ public class TestCompositeDeltaDiffComputer {
     Path sstFile = tempDir.resolve("single.sst");
     Files.createFile(sstFile);
     SstFileInfo sstInfo = new SstFileInfo("single.sst", "key1", "key5", "keyTable");
-    Map<Path, Pair<Path, SstFileInfo>> rdbDifferResult = new HashMap<>();
-    rdbDifferResult.put(sstFile, Pair.of(sstFile, sstInfo));
+    Map<Path, DeltaFile> rdbDifferResult = new HashMap<>();
+    rdbDifferResult.put(sstFile, new DeltaFile(sstFile, sstInfo));
 
     try (MockedConstruction<RDBDifferComputer> rdbDifferMock = mockConstruction(RDBDifferComputer.class,
         (mock, context) -> {
@@ -236,7 +236,7 @@ public class TestCompositeDeltaDiffComputer {
       CompositeDeltaDiffComputer composite = new CompositeDeltaDiffComputer(
           omSnapshotManager, activeMetadataManager, deltaDirPath, activityReporter, false, false);
 
-      Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+      Optional<Map<Path, DeltaFile>> result =
           composite.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
       assertTrue(result.isPresent(), "Result should be present");
@@ -275,10 +275,10 @@ public class TestCompositeDeltaDiffComputer {
     SstFileInfo fileInfo = new SstFileInfo("file1.sst", "file1", "file2", "fileTable");
     SstFileInfo dirInfo = new SstFileInfo("dir1.sst", "dir1", "dir2", "directoryTable");
 
-    Map<Path, Pair<Path, SstFileInfo>> rdbDifferResult = new HashMap<>();
-    rdbDifferResult.put(keyFile, Pair.of(keyFile, keyInfo));
-    rdbDifferResult.put(fileFile, Pair.of(fileFile, fileInfo));
-    rdbDifferResult.put(dirFile, Pair.of(dirFile, dirInfo));
+    Map<Path, DeltaFile> rdbDifferResult = new HashMap<>();
+    rdbDifferResult.put(keyFile, new DeltaFile(keyFile, keyInfo));
+    rdbDifferResult.put(fileFile, new DeltaFile(fileFile, fileInfo));
+    rdbDifferResult.put(dirFile, new DeltaFile(dirFile, dirInfo));
 
     try (MockedConstruction<RDBDifferComputer> rdbDifferMock = mockConstruction(RDBDifferComputer.class,
         (mock, context) -> {
@@ -290,7 +290,7 @@ public class TestCompositeDeltaDiffComputer {
       CompositeDeltaDiffComputer composite = new CompositeDeltaDiffComputer(
           omSnapshotManager, activeMetadataManager, deltaDirPath, activityReporter, false, false);
 
-      Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+      Optional<Map<Path, DeltaFile>> result =
           composite.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
       assertTrue(result.isPresent(), "Result should be present");
@@ -320,7 +320,7 @@ public class TestCompositeDeltaDiffComputer {
     TablePrefixInfo tablePrefixInfo = new TablePrefixInfo(ImmutableMap.of("keyTable", "a"));
 
     // RDBDiffer returns empty map (no differences, but successful computation)
-    Map<Path, Pair<Path, SstFileInfo>> emptyResult = new HashMap<>();
+    Map<Path, DeltaFile> emptyResult = new HashMap<>();
 
     try (MockedConstruction<RDBDifferComputer> rdbDifferMock = mockConstruction(RDBDifferComputer.class,
         (mock, context) -> {
@@ -332,7 +332,7 @@ public class TestCompositeDeltaDiffComputer {
       CompositeDeltaDiffComputer composite = new CompositeDeltaDiffComputer(
           omSnapshotManager, activeMetadataManager, deltaDirPath, activityReporter, false, false);
 
-      Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+      Optional<Map<Path, DeltaFile>> result =
           composite.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
       // Empty result is still a valid success case - no fallback needed
@@ -368,8 +368,8 @@ public class TestCompositeDeltaDiffComputer {
     Path sstFile = tempDir.resolve("test.sst");
     Files.createFile(sstFile);
     SstFileInfo sstInfo = new SstFileInfo("test.sst", "key1", "key2", "keyTable");
-    Map<Path, Pair<Path, SstFileInfo>> fullDiffResult = new HashMap<>();
-    fullDiffResult.put(sstFile, Pair.of(sstFile, sstInfo));
+    Map<Path, DeltaFile> fullDiffResult = new HashMap<>();
+    fullDiffResult.put(sstFile, new DeltaFile(sstFile, sstInfo));
 
     try (MockedConstruction<RDBDifferComputer> rdbDifferMock = mockConstruction(RDBDifferComputer.class,
         (mock, context) -> {
@@ -387,7 +387,7 @@ public class TestCompositeDeltaDiffComputer {
       CompositeDeltaDiffComputer composite = new CompositeDeltaDiffComputer(
           omSnapshotManager, activeMetadataManager, deltaDirPath, activityReporter, false, false);
 
-      Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+      Optional<Map<Path, DeltaFile>> result =
           composite.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
       // Verify fallback occurred
@@ -427,8 +427,8 @@ public class TestCompositeDeltaDiffComputer {
     Path sstFile = tempDir.resolve("test2.sst");
     Files.createFile(sstFile);
     SstFileInfo sstInfo = new SstFileInfo("test2.sst", "key3", "key4", "keyTable");
-    Map<Path, Pair<Path, SstFileInfo>> fullDiffResult = new HashMap<>();
-    fullDiffResult.put(sstFile, Pair.of(sstFile, sstInfo));
+    Map<Path, DeltaFile> fullDiffResult = new HashMap<>();
+    fullDiffResult.put(sstFile, new DeltaFile(sstFile, sstInfo));
 
     try (MockedConstruction<RDBDifferComputer> rdbDifferMock = mockConstruction(RDBDifferComputer.class,
         (mock, context) -> {
@@ -446,7 +446,7 @@ public class TestCompositeDeltaDiffComputer {
       CompositeDeltaDiffComputer composite = new CompositeDeltaDiffComputer(
           omSnapshotManager, activeMetadataManager, deltaDirPath, activityReporter, false, false);
 
-      Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+      Optional<Map<Path, DeltaFile>> result =
           composite.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
       // Verify fallback occurred
@@ -478,8 +478,8 @@ public class TestCompositeDeltaDiffComputer {
     Path sstFile = tempDir.resolve("test3.sst");
     Files.createFile(sstFile);
     SstFileInfo sstInfo = new SstFileInfo("test3.sst", "key5", "key6", "keyTable");
-    Map<Path, Pair<Path, SstFileInfo>> fullDiffResult = new HashMap<>();
-    fullDiffResult.put(sstFile, Pair.of(sstFile, sstInfo));
+    Map<Path, DeltaFile> fullDiffResult = new HashMap<>();
+    fullDiffResult.put(sstFile, new DeltaFile(sstFile, sstInfo));
 
     try (MockedConstruction<RDBDifferComputer> rdbDifferMock = mockConstruction(RDBDifferComputer.class);
          MockedConstruction<FullDiffComputer> fullDiffMock = mockConstruction(FullDiffComputer.class,
@@ -491,7 +491,7 @@ public class TestCompositeDeltaDiffComputer {
       CompositeDeltaDiffComputer composite = new CompositeDeltaDiffComputer(
           omSnapshotManager, activeMetadataManager, deltaDirPath, activityReporter, true, false);
 
-      Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+      Optional<Map<Path, DeltaFile>> result =
           composite.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
       // Verify RDBDifferComputer was never constructed or called
@@ -617,11 +617,11 @@ public class TestCompositeDeltaDiffComputer {
         .thenReturn(fromSnapSupplier);
 
     // Mock RDBDifferComputer to return a result
-    Map<Path, Pair<Path, SstFileInfo>> rdbDifferResult = new HashMap<>();
+    Map<Path, DeltaFile> rdbDifferResult = new HashMap<>();
     Path toSstFile = tempDir.resolve("000003.sst");
     Files.createFile(toSstFile);
     SstFileInfo toSstInfo = new SstFileInfo("000003.sst", "a/key1", "a/key50", "keyTable");
-    rdbDifferResult.put(toSstFile, Pair.of(deltaDirPath.resolve("000003.sst"), toSstInfo));
+    rdbDifferResult.put(toSstFile, new DeltaFile(deltaDirPath.resolve("000003.sst"), toSstInfo));
 
     try (MockedConstruction<RDBDifferComputer> rdbDifferMock = mockConstruction(RDBDifferComputer.class,
         (mock, context) -> {
@@ -640,12 +640,12 @@ public class TestCompositeDeltaDiffComputer {
           omSnapshotManager, activeMetadataManager, deltaDirPath, activityReporter, false, true);
 
       // Then computeDeltaFiles should complete successfully and include fromSnapshot files
-      Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+      Optional<Map<Path, DeltaFile>> result =
           composite.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
       // Result should be present with both RDBDiffer result AND fromSnapshot files
       assertTrue(result.isPresent(), "Result should be present");
-      Map<Path, Pair<Path, SstFileInfo>> deltaFiles = result.get();
+      Map<Path, DeltaFile> deltaFiles = result.get();
       
       // Should have 1 from RDBDiffer + 2 from fromSnapshot = 3 total
       assertEquals(3, deltaFiles.size(),
@@ -653,12 +653,12 @@ public class TestCompositeDeltaDiffComputer {
       assertEquals(ImmutableSet.of(fromSstFile1, fromSstFile2, toSstFile), deltaFiles.keySet());
       Map<Path, SstFileInfo> infoMap = ImmutableMap.of(fromSstFile1, fromSstInfo1, fromSstFile2, fromSstInfo2,
           toSstFile, toSstInfo);
-      for (Map.Entry<Path, Pair<Path, SstFileInfo>> entry : deltaFiles.entrySet()) {
-        assertEquals(infoMap.get(entry.getKey()), entry.getValue().getRight());
-        assertEquals(deltaDirPath.toAbsolutePath(), entry.getValue().getLeft().toAbsolutePath().getParent());
+      for (Map.Entry<Path, DeltaFile> entry : deltaFiles.entrySet()) {
+        assertEquals(infoMap.get(entry.getKey()), entry.getValue().sstFileInfo());
+        assertEquals(deltaDirPath.toAbsolutePath(), entry.getValue().path().toAbsolutePath().getParent());
       }
-      assertEquals(getINode(fromSstFile1), getINode(deltaFiles.get(fromSstFile1).getLeft()));
-      assertEquals(getINode(fromSstFile2), getINode(deltaFiles.get(fromSstFile2).getLeft()));
+      assertEquals(getINode(fromSstFile1), getINode(deltaFiles.get(fromSstFile1).path()));
+      assertEquals(getINode(fromSstFile2), getINode(deltaFiles.get(fromSstFile2).path()));
 
       composite.close();
     }
@@ -679,11 +679,11 @@ public class TestCompositeDeltaDiffComputer {
     TablePrefixInfo tablePrefixInfo = new TablePrefixInfo(ImmutableMap.of("keyTable", "a"));
 
     // Mock RDBDifferComputer to return a result
-    Map<Path, Pair<Path, SstFileInfo>> rdbDifferResult = new HashMap<>();
+    Map<Path, DeltaFile> rdbDifferResult = new HashMap<>();
     Path sstFile = tempDir.resolve("000001.sst");
     Files.createFile(sstFile);
     SstFileInfo sstInfo = new SstFileInfo("000001.sst", "a/key1", "a/key50", "keyTable");
-    rdbDifferResult.put(sstFile, Pair.of(deltaDirPath.resolve("000001.sst"), sstInfo));
+    rdbDifferResult.put(sstFile, new DeltaFile(deltaDirPath.resolve("000001.sst"), sstInfo));
 
     try (MockedConstruction<RDBDifferComputer> rdbDifferMock = mockConstruction(RDBDifferComputer.class,
         (mock, context) -> {
@@ -697,12 +697,12 @@ public class TestCompositeDeltaDiffComputer {
           omSnapshotManager, activeMetadataManager, deltaDirPath, activityReporter, false, false);
 
       // Then computeDeltaFiles should complete successfully with RDBDiffer result
-      Optional<Map<Path, Pair<Path, SstFileInfo>>> result =
+      Optional<Map<Path, DeltaFile>> result =
           composite.computeDeltaFiles(fromSnapshot, toSnapshot, tablesToLookup, tablePrefixInfo);
 
       // Result should contain RDBDiffer result
       assertTrue(result.isPresent(), "Result should be present");
-      Map<Path, Pair<Path, SstFileInfo>> deltaFiles = result.get();
+      Map<Path, DeltaFile> deltaFiles = result.get();
       assertEquals(1, deltaFiles.size(), "Should have RDBDiffer result");
       assertTrue(deltaFiles.containsKey(sstFile), "Should contain the SST file");
 

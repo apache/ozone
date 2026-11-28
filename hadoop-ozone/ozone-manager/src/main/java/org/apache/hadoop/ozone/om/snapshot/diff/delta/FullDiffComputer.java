@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -59,7 +58,7 @@ class FullDiffComputer extends FileLinkDeltaFileComputer {
   }
 
   @Override
-  Optional<Map<Path, Pair<Path, SstFileInfo>>> computeDeltaFiles(SnapshotInfo fromSnapshotInfo,
+  Optional<Map<Path, DeltaFile>> computeDeltaFiles(SnapshotInfo fromSnapshotInfo,
       SnapshotInfo toSnapshotInfo, Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) throws IOException {
     try (UncheckedAutoCloseableSupplier<OmSnapshot> fromSnapHandle = getSnapshot(fromSnapshotInfo);
          UncheckedAutoCloseableSupplier<OmSnapshot> toSnapHandle = getSnapshot(toSnapshotInfo)) {
@@ -67,7 +66,7 @@ class FullDiffComputer extends FileLinkDeltaFileComputer {
       OmSnapshot toSnapshot = toSnapHandle.get();
       Path fromSnapshotPath = fromSnapshot.getMetadataManager().getStore().getDbLocation().getAbsoluteFile().toPath();
       Path toSnapshotPath = toSnapshot.getMetadataManager().getStore().getDbLocation().getAbsoluteFile().toPath();
-      Map<Path, Pair<Path, SstFileInfo>> paths = new HashMap<>();
+      Map<Path, DeltaFile> paths = new HashMap<>();
       try {
         Map<Object, SstFileInfo> fromSnapshotFiles = getSSTFileMapForSnapshot(fromSnapshot, tablesToLookup,
             tablePrefixInfo);
@@ -76,13 +75,13 @@ class FullDiffComputer extends FileLinkDeltaFileComputer {
         for (Map.Entry<Object, SstFileInfo> entry : fromSnapshotFiles.entrySet()) {
           if (!toSnapshotFiles.containsKey(entry.getKey())) {
             Path source = entry.getValue().getFilePath(fromSnapshotPath);
-            paths.put(source, Pair.of(createLink(source), entry.getValue()));
+            paths.put(source, new DeltaFile(createLink(source), entry.getValue()));
           }
         }
         for (Map.Entry<Object, SstFileInfo> entry : toSnapshotFiles.entrySet()) {
           if (!fromSnapshotFiles.containsKey(entry.getKey())) {
             Path source = entry.getValue().getFilePath(toSnapshotPath);
-            paths.put(source, Pair.of(createLink(source), entry.getValue()));
+            paths.put(source, new DeltaFile(createLink(source), entry.getValue()));
           }
         }
       } catch (IOException e) {
@@ -94,11 +93,11 @@ class FullDiffComputer extends FileLinkDeltaFileComputer {
         Set<SstFileInfo> toSnapshotFiles = getSSTFileSetForSnapshot(toSnapshot, tablesToLookup, tablePrefixInfo);
         for (SstFileInfo sstFileInfo : fromSnapshotFiles) {
           Path source = sstFileInfo.getFilePath(fromSnapshotPath);
-          paths.put(source, Pair.of(createLink(source), sstFileInfo));
+          paths.put(source, new DeltaFile(createLink(source), sstFileInfo));
         }
         for (SstFileInfo sstFileInfo : toSnapshotFiles) {
           Path source = sstFileInfo.getFilePath(toSnapshotPath);
-          paths.put(source, Pair.of(createLink(source), sstFileInfo));
+          paths.put(source, new DeltaFile(createLink(source), sstFileInfo));
         }
       }
       return Optional.of(paths);

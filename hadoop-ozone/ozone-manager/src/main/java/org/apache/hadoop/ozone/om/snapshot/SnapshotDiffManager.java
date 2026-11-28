@@ -153,6 +153,7 @@ import org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter;
 import org.apache.hadoop.ozone.om.snapshot.diff.SnapDiffJobStore;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer;
+import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer.DeltaFile;
 import org.apache.hadoop.ozone.om.snapshot.util.TableMergeIterator;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
@@ -164,7 +165,6 @@ import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.hadoop.util.Time;
 import org.apache.logging.log4j.util.Strings;
-import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -1389,7 +1389,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       OMMetadataManager fromMeta, OMMetadataManager toMeta, TablePrefixInfo tablePrefixes, SnapDiffJobStore store)
       throws Exception {
     List<Path> deltaFiles = getDeltaFiles(tableName, deltaDiffComputer, fsInfo, tsInfo, jobId)
-        .stream().map(Pair::getLeft).collect(Collectors.toList());
+        .stream().map(DeltaFile::path).collect(Collectors.toList());
     // The directory stage also builds the path edges of the file entries, so it runs whenever there are any.
     if (deltaFiles.isEmpty() && !(DIRECTORY_TABLE.equals(tableName) && store.hasListEntries())) {
       updateProgress(jobKey, 1.0);
@@ -1475,18 +1475,18 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final Optional<Set<Long>> oldParentIds, final Optional<Set<Long>> newParentIds,
       final DeltaFileComputer deltaFileComputer, final String jobKey,
       final String jobId) throws IOException, RocksDBException {
-    Collection<Pair<Path, SstFileInfo>> deltaFiles = getDeltaFiles(fsTable.getName(), deltaFileComputer,
+    Collection<DeltaFile> deltaFiles = getDeltaFiles(fsTable.getName(), deltaFileComputer,
         fsInfo, tsInfo, jobId);
     recordActivity(jobKey,
         fsTable.getName().equals(FILE_TABLE) ? OBJECT_ID_MAP_GEN_FSO_FILE
             : fsTable.getName().equals(DIRECTORY_TABLE) ? OBJECT_ID_MAP_GEN_FSO_DIR
             : OBJECT_ID_MAP_GEN_OBS);
-    addToObjectIdMap(fsTable, tsTable, deltaFiles.stream().map(Pair::getLeft).collect(Collectors.toList()),
+    addToObjectIdMap(fsTable, tsTable, deltaFiles.stream().map(DeltaFile::path).collect(Collectors.toList()),
         !skipNativeDiff, oldObjIdToKeyMap, newObjIdToKeyMap, objectIdToIsDirMap, oldParentIds,
         newParentIds, tablePrefixes, jobKey, jobId);
   }
 
-  private Collection<Pair<Path, SstFileInfo>> getDeltaFiles(
+  private Collection<DeltaFile> getDeltaFiles(
       final String fsTableName,
       final DeltaFileComputer deltaFileComputer,
       final SnapshotInfo fsInfo, final SnapshotInfo tsInfo,
@@ -1494,7 +1494,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   ) throws IOException {
     long deltaFilesStart = Time.monotonicNow();
     Set<String> tablesToLookUp = Collections.singleton(fsTableName);
-    Collection<Pair<Path, SstFileInfo>> deltaFiles = deltaFileComputer.getDeltaFiles(fsInfo, tsInfo,
+    Collection<DeltaFile> deltaFiles = deltaFileComputer.getDeltaFiles(fsInfo, tsInfo,
         tablesToLookUp);
     LOG.info("Computed Delta SST File Set for table '{}', file count: {}, elapsed: {}ms, jobId: {}",
         fsTableName, deltaFiles.size(), Time.monotonicNow() - deltaFilesStart, jobId);

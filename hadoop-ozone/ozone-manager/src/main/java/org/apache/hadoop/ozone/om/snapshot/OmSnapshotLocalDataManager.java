@@ -58,7 +58,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.Scheduler;
@@ -194,7 +193,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
                    long dbTxnSeqNumber = lfms.stream().mapToLong(LiveFileMetaData::largestSeqno).max().orElse(0L);
                    OmSnapshotLocalData localData = new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
                        lfms, snapshotInfo.getPathPreviousSnapshotId(), null, dbTxnSeqNumber);
-                   return Pair.of(localData, null);
+                   return new LoadedLocalData(localData, null);
                  })) {
       snapshotLocalData.commit();
     }
@@ -321,12 +320,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return true;
     }
     Set<UUID> visitedSnapshotIds = new HashSet<>();
-    Stack<Pair<UUID, SnapshotVersionsMeta>> stack = new Stack<>();
-    stack.push(Pair.of(snapshotId, versionsMeta));
+    Stack<SnapshotIdVersionsMeta> stack = new Stack<>();
+    stack.push(new SnapshotIdVersionsMeta(snapshotId, versionsMeta));
     while (!stack.isEmpty()) {
-      Pair<UUID, SnapshotVersionsMeta> versionNodeToProcess = stack.peek();
-      UUID snapId = versionNodeToProcess.getLeft();
-      SnapshotVersionsMeta snapshotVersionsMeta = versionNodeToProcess.getRight();
+      SnapshotIdVersionsMeta versionNodeToProcess = stack.peek();
+      UUID snapId = versionNodeToProcess.snapshotId();
+      SnapshotVersionsMeta snapshotVersionsMeta = versionNodeToProcess.versionsMeta();
       if (visitedSnapshotIds.contains(snapId)) {
         addSnapshotVersionMeta(snapId, snapshotVersionsMeta);
         stack.pop();
@@ -334,7 +333,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         UUID prevSnapId = snapshotVersionsMeta.getPreviousSnapshotId();
         SnapshotVersionsMeta loadedPrevVersionsMeta = prevSnapId == null ? null : loadedVersions.get(prevSnapId);
         if (loadedPrevVersionsMeta != null && !versionNodeMap.containsKey(prevSnapId)) {
-          stack.push(Pair.of(prevSnapId, loadedPrevVersionsMeta));
+          stack.push(new SnapshotIdVersionsMeta(prevSnapId, loadedPrevVersionsMeta));
         } else if (prevSnapId != null && !versionNodeMap.containsKey(prevSnapId)) {
           File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(prevSnapId));
           OmSnapshotLocalData prevSnapshotLocalData;
@@ -362,7 +361,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             }
             throw new IOException(mismatch);
           }
-          stack.push(Pair.of(prevSnapshotLocalData.getSnapshotId(), new SnapshotVersionsMeta(prevSnapshotLocalData)));
+          stack.push(new SnapshotIdVersionsMeta(prevSnapshotLocalData.getSnapshotId(),
+              new SnapshotVersionsMeta(prevSnapshotLocalData)));
         }
         visitedSnapshotIds.add(snapId);
       }
@@ -431,16 +431,16 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
     Arrays.sort(localDataFiles, Comparator.comparing(File::getName));
     Set<String> failedFilePaths = ConcurrentHashMap.newKeySet();
-    List<Pair<UUID, SnapshotVersionsMeta>> loadedFiles = loadVersionsMeta(localDataFiles, failedFilePaths);
+    List<SnapshotIdVersionsMeta> loadedFiles = loadVersionsMeta(localDataFiles, failedFilePaths);
     Map<UUID, SnapshotVersionsMeta> loadedVersions = new HashMap<>();
-    loadedFiles.forEach(loaded -> loadedVersions.put(loaded.getLeft(), loaded.getRight()));
-    for (Pair<UUID, SnapshotVersionsMeta> loaded : loadedFiles) {
-      if (!addVersionNodeWithDependents(loaded.getLeft(), loaded.getRight(), loadedVersions, failedFilePaths)) {
+    loadedFiles.forEach(loaded -> loadedVersions.put(loaded.snapshotId(), loaded.versionsMeta()));
+    for (SnapshotIdVersionsMeta loaded : loadedFiles) {
+      if (!addVersionNodeWithDependents(loaded.snapshotId(), loaded.versionsMeta(), loadedVersions, failedFilePaths)) {
         // A previous snapshot in the dependency chain could not be loaded, so this snapshot was not added to the
         // version graph. Record its path as failed so later snapshots that depend on it short-circuit in
         // tryLoadSnapshotLocalData instead of reparsing this YAML.
-        loadedVersions.remove(loaded.getLeft());
-        failedFilePaths.add(new File(getSnapshotLocalPropertyYamlPath(loaded.getLeft())).getAbsolutePath());
+        loadedVersions.remove(loaded.snapshotId());
+        failedFilePaths.add(new File(getSnapshotLocalPropertyYamlPath(loaded.snapshotId())).getAbsolutePath());
       }
     }
     for (UUID snapshotId : versionNodeMap.keySet()) {
@@ -470,20 +470,20 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
    *
    * @return snapshot id and version metadata of each loaded file, in the order of localDataFiles
    */
-  private List<Pair<UUID, SnapshotVersionsMeta>> loadVersionsMeta(File[] localDataFiles, Set<String> failedFilePaths)
+  private List<SnapshotIdVersionsMeta> loadVersionsMeta(File[] localDataFiles, Set<String> failedFilePaths)
       throws IOException {
     // The serializer pools GenericObjectPoolConfig.DEFAULT_MAX_TOTAL Yaml instances, so more threads would only wait.
     int threads = Math.min(Runtime.getRuntime().availableProcessors(), GenericObjectPoolConfig.DEFAULT_MAX_TOTAL);
     ExecutorService executor = Executors.newFixedThreadPool(threads,
         new ThreadFactoryBuilder().setNameFormat("SnapshotLocalDataLoader-%d").setDaemon(true).build());
     try {
-      List<Future<Pair<UUID, SnapshotVersionsMeta>>> futures = new ArrayList<>();
+      List<Future<SnapshotIdVersionsMeta>> futures = new ArrayList<>();
       for (File localDataFile : localDataFiles) {
         futures.add(executor.submit(() -> loadVersionsMeta(localDataFile, failedFilePaths)));
       }
-      List<Pair<UUID, SnapshotVersionsMeta>> loadedFiles = new ArrayList<>();
-      for (Future<Pair<UUID, SnapshotVersionsMeta>> future : futures) {
-        Pair<UUID, SnapshotVersionsMeta> loaded = future.get();
+      List<SnapshotIdVersionsMeta> loadedFiles = new ArrayList<>();
+      for (Future<SnapshotIdVersionsMeta> future : futures) {
+        SnapshotIdVersionsMeta loaded = future.get();
         if (loaded != null) {
           loadedFiles.add(loaded);
         }
@@ -499,7 +499,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  private Pair<UUID, SnapshotVersionsMeta> loadVersionsMeta(File localDataFile, Set<String> failedFilePaths) {
+  private SnapshotIdVersionsMeta loadVersionsMeta(File localDataFile, Set<String> failedFilePaths) {
     Optional<OmSnapshotLocalData> loadedLocalData = tryLoadSnapshotLocalData(localDataFile, failedFilePaths);
     if (!loadedLocalData.isPresent()) {
       return null;
@@ -514,7 +514,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           "Expected path: {}.", actualPath, snapshotLocalData.getSnapshotId(), expectedPath);
       return null;
     }
-    return Pair.of(snapshotLocalData.getSnapshotId(), new SnapshotVersionsMeta(snapshotLocalData));
+    return new SnapshotIdVersionsMeta(snapshotLocalData.getSnapshotId(), new SnapshotVersionsMeta(snapshotLocalData));
   }
 
   @VisibleForTesting
@@ -740,7 +740,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
 
     protected ReadableOmSnapshotLocalDataProvider(UUID snapshotId, boolean readLock,
-        CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier,
+        CheckedSupplier<LoadedLocalData, IOException> snapshotLocalDataSupplier,
         UUID snapshotIdToBeResolved, boolean isSnapshotToBeResolvedNullable) throws IOException {
       this.snapshotId = snapshotId;
       LockDataProviderInitResult result = initialize(readLock, snapshotId, snapshotIdToBeResolved,
@@ -775,19 +775,19 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
      */
     private LockDataProviderInitResult initialize(
         boolean readLock, UUID snapId, UUID toResolveSnapshotId, boolean isSnapshotToBeResolvedNullable,
-        CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier) throws IOException {
+        CheckedSupplier<LoadedLocalData, IOException> snapshotLocalDataSupplier) throws IOException {
       HierarchicalResourceLock snapIdLock = null;
       HierarchicalResourceLock previousReadLockAcquired = null;
       try {
         snapIdLock = acquireLock(snapId, readLock);
         snapshotLocalDataSupplier = snapshotLocalDataSupplier == null ? () -> {
           File snapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(snapId));
-          return Pair.of(snapshotLocalDataSerializer.load(snapshotLocalDataFile), snapshotLocalDataFile);
+          return new LoadedLocalData(snapshotLocalDataSerializer.load(snapshotLocalDataFile), snapshotLocalDataFile);
         } : snapshotLocalDataSupplier;
-        Pair<OmSnapshotLocalData, File> pair = snapshotLocalDataSupplier.get();
-        OmSnapshotLocalData ssLocalData = pair.getKey();
+        LoadedLocalData loadedLocalData = snapshotLocalDataSupplier.get();
+        OmSnapshotLocalData ssLocalData = loadedLocalData.localData();
         if (!Objects.equals(ssLocalData.getSnapshotId(), snapId)) {
-          String loadPath = pair.getValue() == null ? null : pair.getValue().getAbsolutePath();
+          String loadPath = loadedLocalData.file() == null ? null : loadedLocalData.file().getAbsolutePath();
           throw new IOException("SnapshotId in path : " + loadPath + " contains snapshotLocalData corresponding " +
               "to snapshotId " + ssLocalData.getSnapshotId() + ". Expected snapshotId " + snapId);
         }
@@ -967,7 +967,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
 
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId,
-        CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier) throws IOException {
+        CheckedSupplier<LoadedLocalData, IOException> snapshotLocalDataSupplier) throws IOException {
       super(snapshotId, false, snapshotLocalDataSupplier, null, false);
     }
 
@@ -1245,5 +1245,19 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     LocalDataVersionNode getVersionNode(int snapshotVersion) {
       return snapshotVersions.get(snapshotVersion);
     }
+  }
+
+  /**
+   * A snapshot id paired with the version metadata loaded from its local data,
+   * used to build the version graph and as the result of loading a local data file.
+   */
+  private record SnapshotIdVersionsMeta(UUID snapshotId, SnapshotVersionsMeta versionsMeta) {
+  }
+
+  /**
+   * A snapshot's local data paired with the file it was loaded from (null if not loaded from a file),
+   * used as the result of the supplier that provides local data to a local data provider.
+   */
+  record LoadedLocalData(OmSnapshotLocalData localData, File file) {
   }
 }

@@ -30,7 +30,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Consumer;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
@@ -68,7 +67,7 @@ class RDBDifferComputer extends FileLinkDeltaFileComputer {
   }
 
   @Override
-  public Optional<Map<Path, Pair<Path, SstFileInfo>>> computeDeltaFiles(SnapshotInfo fromSnapshot,
+  public Optional<Map<Path, DeltaFile>> computeDeltaFiles(SnapshotInfo fromSnapshot,
       SnapshotInfo toSnapshot, Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) throws IOException {
     if (differ != null) {
       try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider snapProvider =
@@ -84,9 +83,9 @@ class RDBDifferComputer extends FileLinkDeltaFileComputer {
           Optional<Map<Path, SstFileInfo>> paths = differ.getSSTDiffListWithFullPath(toDSI, fromDSI, versionMap,
               tablePrefixInfo, tablesToLookup);
           if (paths.isPresent()) {
-            Map<Path, Pair<Path, SstFileInfo>> links = new HashMap<>(paths.get().size());
+            Map<Path, DeltaFile> links = new HashMap<>(paths.get().size());
             for (Map.Entry<Path, SstFileInfo> source : paths.get().entrySet()) {
-              links.put(source.getKey(), Pair.of(createLink(source.getKey()), source.getValue()));
+              links.put(source.getKey(), new DeltaFile(createLink(source.getKey()), source.getValue()));
             }
             return Optional.of(links);
           }
