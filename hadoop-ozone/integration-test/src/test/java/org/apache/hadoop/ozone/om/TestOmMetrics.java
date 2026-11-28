@@ -133,7 +133,8 @@ public class TestOmMetrics {
 
   @AfterAll
   public void shutdown() {
-    IOUtils.closeQuietly(client);
+    // Directory tests share a cached filesystem that must be closed before the cluster checks for leaked metrics.
+    IOUtils.closeQuietly(client, FileSystem::closeAll);
     if (cluster != null) {
       cluster.shutdown();
     }

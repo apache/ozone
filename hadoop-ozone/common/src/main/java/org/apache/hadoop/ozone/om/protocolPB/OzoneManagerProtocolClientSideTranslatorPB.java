@@ -59,6 +59,7 @@ import org.apache.hadoop.ipc_.CallerContext;
 import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OmClientMetrics;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
@@ -275,6 +276,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
@@ -289,6 +291,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   private final String clientID;
   private OmTransport transport;
+  private OmClientMetrics omClientMetrics;
   private ThreadLocal<S3Auth> threadLocalS3Auth
       = new ThreadLocal<>();
   private ThreadLocal<ReadConsistencyHint> threadLocalReadConsistencyHint
@@ -313,6 +316,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     this.s3AuthCheck = false;
     this.blockAllocationRetryCount = retryCount;
     this.blockAllocationRetryWaitTimeMs = retryWaitTimeMs;
+  }
+
+  /** The owning RpcClient supplies the metrics after initialization and releases them on close. */
+  public void setOmClientMetrics(OmClientMetrics metrics) {
+    this.omClientMetrics = metrics;
   }
 
   /**
@@ -393,10 +401,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         CallerContext.setCurrent(callerContext);
       }
     }
-    OMResponse response =
-        transport.submitRequest(
-            builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
-    return response;
+    OMRequest request = builder.setTraceID(TracingUtil.exportCurrentSpan()).build();
+    OmClientMetrics metrics = omClientMetrics;
+    if (metrics == null) {
+      return transport.submitRequest(request);
+    }
+    return MetricUtil.captureLatencyNs(latency -> metrics.addLatency(request.getCmdType(), latency),
+        () -> transport.submitRequest(request));
   }
 
   /**

@@ -805,6 +805,6 @@ public abstract class TestObjectStoreWithFSO implements ClusterForTests.TestCase
 
   @AfterAll
   void cleanup() {
-    IOUtils.closeQuietly(client);
+    IOUtils.closeQuietly(client, fs);
   }
 }

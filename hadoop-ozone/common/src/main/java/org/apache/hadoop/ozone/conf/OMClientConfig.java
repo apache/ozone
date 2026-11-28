@@ -20,17 +20,26 @@ package org.apache.hadoop.ozone.conf;
 import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Config for OM Client.
  */
 @ConfigGroup(prefix = "ozone.om.client")
 public class OMClientConfig {
+  private static final Logger LOG = LoggerFactory.getLogger(OMClientConfig.class);
+  private static final int DEFAULT_METRICS_PERCENTILES_INTERVAL = 60;
 
   @Config(key = "ozone.om.client.rpc.timeout",
       defaultValue = "15m",
@@ -53,6 +62,16 @@ public class OMClientConfig {
       description = "Total number of threads in pool for the Trash Emptier")
   private int trashEmptierPoolSize = 5;
 
+  @Config(key = "ozone.om.client.metrics.percentiles.intervals.seconds",
+      defaultValue = "60",
+      type = ConfigType.STRING,
+      tags = {OM, CLIENT, PERFORMANCE},
+      description = "Comma-separated positive, distinct rollover intervals in seconds for OM client latency " +
+          "percentiles. An empty value disables percentiles. Invalid values use the default interval of 60 seconds. " +
+          "The first active RpcClient in a process supplies the intervals until the last client closes.")
+  private String metricsPercentilesIntervals = "60";
+  private int[] parsedMetricsPercentilesIntervals = {DEFAULT_METRICS_PERCENTILES_INTERVAL};
+
   public int getTrashEmptierPoolSize() {
     return trashEmptierPoolSize;
   }
@@ -72,5 +91,40 @@ public class OMClientConfig {
       this.rpcTimeOut = Integer.MAX_VALUE;
     }
     this.rpcTimeOut = timeOut;
+  }
+
+  public int[] getMetricsPercentilesIntervals() {
+    return parsedMetricsPercentilesIntervals;
+  }
+
+  public void setMetricsPercentilesIntervals(String intervals) {
+    metricsPercentilesIntervals = intervals;
+    validate();
+  }
+
+  @PostConstruct
+  public void validate() {
+    parsedMetricsPercentilesIntervals = parseMetricsPercentilesIntervals();
+  }
+
+  private int[] parseMetricsPercentilesIntervals() {
+    if (StringUtils.isBlank(metricsPercentilesIntervals)) {
+      return new int[0];
+    }
+    int[] intervals;
+    try {
+      intervals = Arrays.stream(ConfigurationSource.getTrimmedStringsFromValue(metricsPercentilesIntervals))
+          .mapToInt(Integer::parseInt)
+          .toArray();
+    } catch (NumberFormatException e) {
+      intervals = new int[0];
+    }
+    if (intervals.length > 0 && Arrays.stream(intervals).allMatch(interval -> interval > 0)
+        && Arrays.stream(intervals).distinct().count() == intervals.length) {
+      return intervals;
+    }
+    LOG.warn("Invalid ozone.om.client.metrics.percentiles.intervals.seconds: {}. The default interval is {} seconds.",
+        metricsPercentilesIntervals, DEFAULT_METRICS_PERCENTILES_INTERVAL);
+    return new int[] {DEFAULT_METRICS_PERCENTILES_INTERVAL};
   }
 }
